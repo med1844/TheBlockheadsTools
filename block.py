@@ -1,5 +1,6 @@
 # encoding: utf-8
 from exportable import Exportable
+from blockType import id_to_block_name
 
 
 class Block(Exportable):
@@ -21,8 +22,9 @@ class Block(Exportable):
 
     # records the position of each attribute
     pos_map = {
-        "first_layer_id": [0, 1],
+        "first_layer_id": [0],
         "third_layer_id": [2],
+        "brightness": [6],
     }
 
     def __init__(self, src_bytes):
@@ -30,26 +32,12 @@ class Block(Exportable):
         self._data = list(src_bytes)
     
     def __repr__(self):
-        return "<Block: %r>" \
-                % {k: self.get_attr(k) for k, v in self.pos_map.items()}
-
-    @classmethod
-    def frombytes(cls, src_bytes):
-        """
-        Create a block object using the input bytes, and return it.
-        根据输入的bytes序列创建并返回一个方块对象。
-
-        ### Arguments
-        - `src_bytes`
-            source byte sequence describing the block.
-            描述该方块的字节序列。
-
-        ### Return
-        a new `Block` object.
-        一个新的`Block`对象。
-        """
-        return cls(src_bytes)
+        return id_to_block_name(self.get_attr("first_layer_id")[0])
     
+    def __str__(self):
+        return "<Block: %r>"\
+               % {attr: self.get_attr(attr) for attr in self.pos_map}
+
     def get_attr(self, attr_name) -> list:
         """
         Return a list of bytes corresponding to the attribute name.
@@ -96,4 +84,4 @@ class Block(Exportable):
         Export bytes representing `self` which would be later saved to files.
         导出用于保存的方块数据。
         """
-        pass
+        return bytes(self._data)
