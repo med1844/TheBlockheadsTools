@@ -8,5 +8,7 @@
   "test_pytest.py::TestChunk::test_read_and_export", 
   "test_pytest.py::TestChunk::test_get_block", 
   "test_pytest.py::TestChunk::test_get_block_assert_fail", 
-  "test_pytest.py::TestChunk::test_set_block_attr"
+  "test_pytest.py::TestChunk::test_set_block_attr", 
+  "test_pytest.py::TestBPList::test_bplist_load_and_export", 
+  "test_pytest.py::TestBPList::test_bplist_get_and_item"
 ]
