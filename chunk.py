@@ -1,3 +1,4 @@
+# encoding: utf-8
 import io
 import gzip
 from exportable import Exportable
@@ -26,7 +27,7 @@ class Chunk(Exportable):
     CHUNK_HEIGHT = 32
     BLOCK_SIZE = 64
 
-    def __init__(self, src_bytes: bytes):
+    def __init__(self, src_bytes):
         self._blocks = [[None] * self.CHUNK_WIDTH
                         for _ in range(self.CHUNK_HEIGHT)]
         with io.BytesIO(src_bytes) as f:
@@ -42,7 +43,7 @@ class Chunk(Exportable):
         ])
     
     @classmethod
-    def from_gzip_file(cls, gzip_file):
+    def from_compressed_file(cls, compressed_file):
         """
         Read chunk data from the input file object and return a new `Chunk` 
         object.
@@ -57,12 +58,12 @@ class Chunk(Exportable):
         A new `Chunk` object
         一个新`Chunk`对象。
         """
-        with gzip.open(gzip_file, "rb") as f:
+        with gzip.GzipFile(fileobj=compressed_file, mode="rb") as f:
             return Chunk(f.read())
 
-    def export(self) -> bytes:
+    def export(self):
         """
-        Export a bytes object. First get all 
+        Export a string object, whose content is the compressed chunk data.
         返回将chunk数据经由gzip压缩后所得的二进制字符串。
         """
         with io.BytesIO() as f:
@@ -70,11 +71,11 @@ class Chunk(Exportable):
                 for row in range(self.CHUNK_HEIGHT):
                     for b in self._blocks[row]:
                         g.write(b.export())
-                g.write(bytes((0,) * 5))
+                g.write(chr(0) * 5)
             result = f.getvalue()
         return result
     
-    def get_block(self, x: int, y: int) -> Block:
+    def get_block(self, x, y):
         """
         Get block at position (x, y).
         获取位于(x, y)的方块。
@@ -97,6 +98,6 @@ class Chunk(Exportable):
 
 
 if __name__ == "__main__":
-    with open("./test_data/blocks/blocks_46_14", "rb") as f:
+    with open("./test_data/blocks/blocks_9_8", "rb") as f:
         chunk = Chunk(f.read())
-    print(chunk.export())
+    print(repr(chunk))

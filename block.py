@@ -28,8 +28,8 @@ class Block(Exportable):
     }
 
     def __init__(self, src_bytes):
-        super().__init__()
-        self._data = list(src_bytes)
+        assert isinstance(src_bytes, str)
+        self._data = [ord(_) for _ in src_bytes]
     
     def __repr__(self):
         return id_to_block_name(self.get_attr("first_layer_id")[0])
@@ -38,7 +38,7 @@ class Block(Exportable):
         return "<Block: %r>"\
                % {attr: self.get_attr(attr) for attr in self.pos_map}
 
-    def get_attr(self, attr_name) -> list:
+    def get_attr(self, attr_name):
         """
         Return a list of bytes corresponding to the attribute name.
         根据输入的属性名，返回对应的bytes列表。
@@ -49,12 +49,13 @@ class Block(Exportable):
             想要读取的属性名
         
         ### Return
-        A list of bytes.
-        一个包含bytes的列表
+        A list of several integers.
+        一个包含几个整数的列表
         """
-        return [self._data[pos] for pos in self.pos_map[attr_name]]
+        res = [self._data[pos] for pos in self.pos_map[attr_name]]
+        return res
     
-    def set_attr(self, attr_name, *values) -> None:
+    def set_attr(self, attr_name, *values):
         """
         Set values according to the attribute name and input values.
         根据输入的属性名和值，设置方块对应属性。
@@ -79,9 +80,9 @@ class Block(Exportable):
         for i, pos in enumerate(positions):
             self._data[pos] = values[i]
 
-    def export(self) -> bytes:
+    def export(self):
         """
         Export bytes representing `self` which would be later saved to files.
         导出用于保存的方块数据。
         """
-        return bytes(self._data)
+        return ''.join(chr(_) for _ in self._data)

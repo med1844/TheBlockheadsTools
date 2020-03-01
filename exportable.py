@@ -6,13 +6,15 @@ a blockhead save file.
 所有需要导出至BH存档的类所需要继承的基类。
 """
 
-from abc import ABC, abstractmethod
+from abc import ABCMeta, abstractmethod
 
 
-class Exportable(ABC):
+class Exportable:
+
+    __metaclass__ = ABCMeta
 
     @abstractmethod
-    def export(self) -> bytes:
+    def export(self):
         """
         Return the binary representation of self, which would be later 
         exported to files by `writeFiles.py`.

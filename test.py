@@ -48,7 +48,8 @@ with env.begin() as txn:
     for k, v in cursor:
         sub_db = env.open_db(k, txn=txn, create=False)
         for k2, v2 in txn.cursor(sub_db):
-            filename = FOLDER + OUT_FOLDER + "%s_%s" % (k.decode(), k2.decode().replace("/", "_"))
+            filename = FOLDER + OUT_FOLDER + "%s_%s" \
+                       % (k.decode(), k2.decode().replace("/", "_"))
             result = process(v2)
             if isinstance(result, bytes):
                 with open(filename, "wb") as f:

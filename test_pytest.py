@@ -31,7 +31,7 @@ class TestChunk:
 
     def test_load_from_gzip_file(self):
         with open("./test_data/blocks/25_19_compressedBlock", "rb") as f:
-            Chunk.from_gzip_file(f)
+            Chunk.from_compressed_file(f)
     
     def test_load_from_raw(self):
         with open("./test_data/blocks/blocks_35_1", "rb") as f:
@@ -41,10 +41,12 @@ class TestChunk:
         with open("./test_data/blocks/blocks_9_8", "rb") as f:
             data = f.read()
         c = Chunk(data)
+        r1 = repr(c)
         exported = c.export()
         f = io.BytesIO(exported)
-        c2 = Chunk.from_gzip_file(f)
-        assert repr(c) == repr(c2)
+        c2 = Chunk.from_compressed_file(f)
+        r2 = repr(c2)
+        assert r1 == r2
     
     def test_get_block(self):
         with open("./test_data/blocks/blocks_9_8", "rb") as f:

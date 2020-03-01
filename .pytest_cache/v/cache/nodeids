@@ -1,0 +1,12 @@
+[
+  "test_pytest.py::TestBlockType::test_block_name_to_id", 
+  "test_pytest.py::TestBlockType::test_block_name_to_id_keyerror", 
+  "test_pytest.py::TestBlockType::test_id_to_block_name", 
+  "test_pytest.py::TestBlockType::test_id_to_block_name_keyerror", 
+  "test_pytest.py::TestChunk::test_load_from_gzip_file", 
+  "test_pytest.py::TestChunk::test_load_from_raw", 
+  "test_pytest.py::TestChunk::test_read_and_export", 
+  "test_pytest.py::TestChunk::test_get_block", 
+  "test_pytest.py::TestChunk::test_get_block_assert_fail", 
+  "test_pytest.py::TestChunk::test_set_block_attr"
+]

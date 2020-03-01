@@ -1,3 +1,4 @@
+# encoding: utf-8
 from enum import Enum
 
 
@@ -76,14 +77,19 @@ class BlockType(Enum):
 
 
 def id_to_block_type(block_id):
+    if not isinstance(block_id, int):
+        block_id = ord(block_id)
     return BlockType._value2member_map_[block_id]
 
 
 def id_to_block_name(block_id):
+    if not isinstance(block_id, int):
+        block_id = ord(block_id)
     return BlockType._value2member_map_[block_id].name
 
 
 def block_name_to_id(block_name):
+    assert isinstance(block_name, str)
     return BlockType._member_map_[block_name].value
 
 
