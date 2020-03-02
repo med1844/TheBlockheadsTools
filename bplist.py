@@ -10,8 +10,9 @@ class BPList(Exportable):
     bplist的支持类。封装只是为了让导出变得更方便。
     """
 
-    def __init__(self, data):
+    def __init__(self, data, src_type):
         self._data = data
+        self.src_type = src_type
 
     def __repr__(self):
         return "<BPList>" + repr(self._data)
@@ -25,42 +26,27 @@ class BPList(Exportable):
     
     def __setitem__(self, key, value):
         self._data[key] = value
-
-    @classmethod
-    def from_bytes(cls, src_bytes):
-        """
-        Create and return a `BPList` object from given bytes.
-        根据给定数据创建并返回一个新`BPList`对象。
-
-        ### Arguments
-        - `src_bytes`
-            A sequence of bytes in binary representation that is a bplist
-            一串bplist二进制形式的字符序列。
-
-        ### Return
-        A new `BPList` object.
-        一个新的`BPList`对象。
-        """
-        result = BPList(biplist.readPlistFromString(src_bytes))
-        for k, v in result._data.items():
-            if isinstance(v, biplist.Data) and v.startswith(b"bplist00"):
-                result._data[k] = BPList.from_bytes(v)
-        return result
+    
+    def items(self):
+        assert isinstance(self._data, dict)
+        return self._data.items()
 
     def export(self):
         """
         Export `self` as a binary bplist.
         将自己导出成二进制的bplist
         """
-        result_dict = dict(self._data)
-        for k, v in result_dict.items():
-            if isinstance(v, BPList):
-                result_dict[k] = biplist.Data(v.export())
-        return biplist.writePlistToString(result_dict)
-
-
-if __name__ == "__main__":
-    from pprint import pprint
-    with open("./test_data/bplists/worldv2", "rb") as f:
-        l = BPList.from_bytes(f.read())
-        pprint(l._data)
+        if isinstance(self._data, dict):
+            result = dict(self._data)
+            for k, v in result.items():
+                if isinstance(v, BPList):
+                    result[k] = biplist.Data(v.export())
+        elif isinstance(self._data, list):
+            result = list(self._data)
+            for i, v in enumerate(result):
+                if isinstance(v, BPList):
+                    result[i] = biplist.Data(v.export())
+        if self.src_type == "bp":
+            return biplist.writePlistToString(result)
+        elif self.src_type == "xml":
+            return biplist.writePlistToString(result, False)

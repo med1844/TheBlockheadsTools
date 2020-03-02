@@ -42,19 +42,20 @@ def process(v):
         return v
 
 
-env = lmdb.open(FOLDER + "world_db", readonly=True, max_dbs=100)
+env = lmdb.open(FOLDER + "world_db", readonly=True, max_dbs=114514)
 with env.begin() as txn:
     cursor = txn.cursor()
     for k, v in cursor:
         sub_db = env.open_db(k, txn=txn, create=False)
         for k2, v2 in txn.cursor(sub_db):
-            filename = FOLDER + OUT_FOLDER + "%s_%s" \
-                       % (k.decode(), k2.decode().replace("/", "_"))
-            result = process(v2)
-            if isinstance(result, bytes):
-                with open(filename, "wb") as f:
-                    f.write(result)
-            else:
-                with open(filename, "w") as f:
-                    f.write(pprint.pformat(result))
+            print(k2, v2)
+            # filename = FOLDER + OUT_FOLDER + "%s_%s" \
+            #            % (k.decode(), k2.decode().replace("/", "_"))
+            # result = process(v2)
+            # if isinstance(result, bytes):
+            #     with open(filename, "wb") as f:
+            #         f.write(result)
+            # else:
+            #     with open(filename, "w") as f:
+            #         f.write(pprint.pformat(result))
 env.close()

@@ -32,7 +32,7 @@ class Block(Exportable):
         self._data = [ord(_) for _ in src_bytes]
     
     def __repr__(self):
-        return id_to_block_name(self.get_attr("first_layer_id")[0])
+        return id_to_block_name(self.get_attr("first_layer_id")[0])[0]
     
     def __str__(self):
         return "<Block: %r>"\

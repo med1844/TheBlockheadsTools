@@ -79,23 +79,3 @@ class TestChunk:
         c = Chunk(data)
         b = c.get_block(5, 7)
         b.set_attr("first_layer_id", 57)
-
-
-class TestBPList:
-
-    def test_bplist_load_and_export(self):
-        from glob import glob
-        for filename in glob("./test_data/bplists/*"):
-            filename = filename.replace("\\", "/")
-            with open(filename, "rb") as f:
-                l = BPList.from_bytes(f.read())
-                l2 = BPList.from_bytes(l.export())
-                assert l == l2
-
-    def test_bplist_get_and_item(self):
-        from glob import glob
-        for filename in glob("./test_data/bplist/*"):
-            filename = filename.replace("\\", "/")
-            with open(filename, "rb") as f:
-                l = BPList.from_bytes(f.read())
-                l["expertMode"] = True
