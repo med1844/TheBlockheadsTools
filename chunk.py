@@ -3,6 +3,7 @@ import io
 import gzip
 from exportable import Exportable
 from block import Block
+import array
 
 
 class Chunk(Exportable):
@@ -28,12 +29,8 @@ class Chunk(Exportable):
     BLOCK_SIZE = 64
 
     def __init__(self, src_bytes):
-        self._blocks = [[None] * self.CHUNK_WIDTH
-                        for _ in range(self.CHUNK_HEIGHT)]
-        with io.BytesIO(src_bytes) as f:
-            for row in range(self.CHUNK_HEIGHT):
-                for col in range(self.CHUNK_WIDTH):
-                    self._blocks[row][col] = Block(f.read(self.BLOCK_SIZE))
+        self._blocks = array.array("b")
+        self._blocks.fromstring(src_bytes)
     
     def __repr__(self):
         return "chunk"
@@ -69,10 +66,7 @@ class Chunk(Exportable):
         """
         with io.BytesIO() as f:
             with gzip.GzipFile(fileobj=f, mode="wb") as g:
-                for row in range(self.CHUNK_HEIGHT):
-                    for b in self._blocks[row]:
-                        g.write(b.export())
-                g.write(chr(0) * 5)
+                g.write(self._blocks.tostring())
             result = f.getvalue()
         return result
     
@@ -94,8 +88,8 @@ class Chunk(Exportable):
         请求的`Block`对象的引用。
         """
         assert 0 <= x < 32 and 0 <= y < 32
-        assert self._blocks[x][y] is not None
-        return self._blocks[x][y]
+        start_addr = (y << 5 | x) << 6
+        return Block(self._blocks, start_addr)
 
 
 if __name__ == "__main__":

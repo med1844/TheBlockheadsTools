@@ -1,9 +1,8 @@
 # encoding: utf-8
-from exportable import Exportable
 from blockType import id_to_block_name
 
 
-class Block(Exportable):
+class Block:
     """
     This is the support class for block objects in the blockheads, offering 
     encapsulated `get` and `set` block attribute methods. Each block takes 
@@ -27,16 +26,24 @@ class Block(Exportable):
         "brightness": [6],
     }
 
-    def __init__(self, src_bytes):
-        assert isinstance(src_bytes, str)
-        self._data = [ord(_) for _ in src_bytes]
+    def __init__(self, src_array, start_pos):
+        self._data = src_array
+        self._st = start_pos
     
     def __repr__(self):
         return id_to_block_name(self.get_attr("first_layer_id")[0])[0]
     
-    def __str__(self):
-        return "<Block: %r>"\
-               % {attr: self.get_attr(attr) for attr in self.pos_map}
+    def __getitem__(self, index):
+        if index < 0:
+            index += 64
+        assert index < 64
+        return self._data[self._st + index]
+    
+    def __setitem__(self, index, value):
+        if index < 0:
+            index += 64
+        assert index < 64
+        self._data[self._st + index] = value
 
     def get_attr(self, attr_name):
         """
@@ -52,7 +59,7 @@ class Block(Exportable):
         A list of several integers.
         一个包含几个整数的列表
         """
-        res = [self._data[pos] for pos in self.pos_map[attr_name]]
+        res = [self[pos] for pos in self.pos_map[attr_name]]
         return res
     
     def set_attr(self, attr_name, *values):
@@ -78,11 +85,4 @@ class Block(Exportable):
                             % (attr_name, len(positions), len(values)))
 
         for i, pos in enumerate(positions):
-            self._data[pos] = values[i]
-
-    def export(self):
-        """
-        Export bytes representing `self` which would be later saved to files.
-        导出用于保存的方块数据。
-        """
-        return ''.join(chr(_) for _ in self._data)
+            self[pos] = values[i]

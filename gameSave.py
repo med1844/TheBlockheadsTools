@@ -182,7 +182,6 @@ if __name__ == "__main__":
     FOLDER = "./test_data/saves/c8185b81198a1890dac4b621677a9229/"
     gs = GameSave(FOLDER)
     for name, chunk in gs.chunks.items():
-        print("Modifying chunk %s" % name)
         for _ in range(128):
             block = chunk.get_block(randint(0, 31), randint(0, 31))
             block.set_attr("first_layer_id", BlockType.TIME_CRYSTAL.value)
