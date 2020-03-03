@@ -31,7 +31,7 @@ class Block:
         self._st = start_pos
     
     def __repr__(self):
-        return id_to_block_name(self.get_attr("first_layer_id")[0])[0]
+        return id_to_block_name(self.get("first_layer_id")[0])[0]
     
     def __getitem__(self, index):
         if index < 0:
@@ -45,7 +45,7 @@ class Block:
         assert index < 64
         self._data[self._st + index] = value
 
-    def get_attr(self, attr_name):
+    def get(self, attr_name):
         """
         Return a list of bytes corresponding to the attribute name.
         根据输入的属性名，返回对应的bytes列表。
@@ -62,7 +62,7 @@ class Block:
         res = [self[pos] for pos in self.pos_map[attr_name]]
         return res
     
-    def set_attr(self, attr_name, *values):
+    def set(self, attr_name, *values):
         """
         Set values according to the attribute name and input values.
         根据输入的属性名和值，设置方块对应属性。
