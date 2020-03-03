@@ -17,6 +17,9 @@ class GzipWrapper(Exportable):
     def export(self):
         with io.BytesIO() as f:
             with gzip.GzipFile(fileobj=f, mode="wb") as g:
-                g.write(self._data[0])
+                if isinstance(self._data[0], (str, bytes)):
+                    g.write(self._data[0])
+                elif isinstance(self._data[0], Exportable):
+                    g.write(self._data[0].export())
             result = f.getvalue()
         return result

@@ -33,12 +33,11 @@ class Chunk(Exportable):
         self._blocks.fromstring(src_bytes)
     
     def __repr__(self):
-        return "chunk"
-        # return '\n'.join([
-        #     ''.join(['%s' % repr(self._blocks[row][col])
-        #              for col in range(self.CHUNK_WIDTH)])
-        #     for row in range(self.CHUNK_HEIGHT - 1, -1, -1)
-        # ])
+        return '\n'.join([
+            ''.join(['%s' % repr(self.get_block(row, col))
+                     for col in range(self.CHUNK_WIDTH)])
+            for row in range(self.CHUNK_HEIGHT - 1, -1, -1)
+        ])
     
     @classmethod
     def from_compressed_file(cls, compressed_file):

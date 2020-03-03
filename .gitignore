@@ -1,3 +1,5 @@
 test_data/
 out
+test
+*_tester.py
 *.pyc

@@ -1,5 +1,5 @@
 # encoding: utf-8
-from blockType import id_to_block_name
+from blockType import BlockType, id_to_block_name
 
 
 class Block:
@@ -85,4 +85,7 @@ class Block:
                             % (attr_name, len(positions), len(values)))
 
         for i, pos in enumerate(positions):
-            self[pos] = values[i]
+            if isinstance(values[i], BlockType):
+                self[pos] = values[i].value
+            else:
+                self[pos] = values[i]

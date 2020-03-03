@@ -16,7 +16,7 @@ class BlockType(Enum):
     DIRT = 6
     SAND = 7
     SAND_ = 8  # guess this is mined sand?
-    STONE_ = 9  # so does above?
+    WOOD = 9
     MINED_STONE = 10
     RED_BRICK = 11
     LIMESTONE = 12
@@ -30,13 +30,13 @@ class BlockType(Enum):
     MINED_RED_MARBLE = 20
     GLASS = 24
     SPAWN_PORTAL_BASE = 25
-    DIRT_ = 26
+    GOLD_BLOCK = 26
     GRASS_DIRT = 27
     SNOW_DIRT = 28
     LAPIS_LAZULI = 29
     MINED_LAPIS_LAZULI = 30
     LAVA = 31
-    SPAWN_PORTAL_BASE_ = 32
+    REINFORCED_PLATFORM = 32
     SPAWN_PORTAL_BASE_AMETHYST = 33
     SPAWN_PORTAL_BASE_SAPPHIRE = 34
     SPAWN_PORTAL_BASE_EMERALD = 35
@@ -46,7 +46,7 @@ class BlockType(Enum):
     SOUTH_POLE = 39
     WEST_POLE = 40
     EAST_POLE = 41
-    PORTAL_BASE_ = 42
+    PORTAL_BASE = 42
     PORTAL_BASE_AMETHYST = 43
     PORTAL_BASE_SAPPHIRE = 44
     PORTAL_BASE_EMERALD = 45
@@ -74,6 +74,13 @@ class BlockType(Enum):
     TITANIUM_BLOCK = 68
     CARBON_FIBER_BLOCK = 69
     GRAVEL = 70
+    AMETHYST_BLOCK = 71
+    SAPPHIRE_BLOCK = 72
+    EMERALD_BLOCK = 73
+    RUBY_BLOCK = 74
+    DIAMOND_BLOCK = 75
+    PLASTER = 76
+    LUMINOUS_PLASTER = 77
 
 
 def id_to_block_type(block_id):

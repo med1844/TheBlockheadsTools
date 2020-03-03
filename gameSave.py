@@ -43,18 +43,19 @@ class GameSave:
             if os.path.isdir(full_path):
                 self._data[sub_dir] = {}
                 self._read_env(full_path, self._data[sub_dir])
-        
-        print("First round read completed.")
-        print("Start parsing blocks...")
 
         self.chunks = self._data["world_db"]["blocks"]
         for name, gw in self.chunks.items():
             self.chunks[name] = Chunk(gw._data[0])
-        
-        print("Loaded.")
     
     def __repr__(self):
         return repr(self._data)
+    
+    def __getitem__(self, key):
+        return self._data[key]
+    
+    def __setitem__(self, key, value):
+        self._data[key] = value
 
     def _read_env(self, path, dict_):
         """
@@ -159,7 +160,7 @@ class GameSave:
             self._export_db(dict_[db], db_data[db])
             for k, v in db_data[db].items():
                 size += len(k) + len(v)
-        env = lmdb.open(path, map_size=size<<2, max_dbs=self.MAX_DBS)
+        env = lmdb.open(path, map_size=size<<3, max_dbs=self.MAX_DBS)
         with env.begin(write=True) as txn:
             for k, v in db_data.items():
                 sub_db = env.open_db(k, txn=txn, create=True)
@@ -169,12 +170,49 @@ class GameSave:
     
     def save(self, path):
         """
+        Save the world to a specific path. Existing files would be overwrite.
+        将世界保存到指定路径。已存在的文件会被覆盖。
+
+        ### Arguments
+        - `path`
+            the path you want to save the world
+            要保存到的路径
+        
+        ### Return
+        Nothing.
+        无。
         """
         if not path.endswith("/"):
             path += "/"
         for env in self._data:
             self._write_env(path + env + "/", self._data[env])
             
+    def get_info(self):
+        """
+        Offers simple info about the world.
+        提供简要的世界基本信息。
+        """
+        info = {}
+        info["world_name"] = self._data["world_db"]["main"]["worldv2"]\
+                                       ["worldName"]
+        info["start_portal_pos"] = (
+            self._data["world_db"]["main"]["worldv2"]["startPortalPos.x"],
+            self._data["world_db"]["main"]["worldv2"]["startPortalPos.y"]
+        )
+        info["seed"] = \
+            self._data["world_db"]["main"]["worldv2"]["randomSeed"]
+        info["width"] = \
+            self._data["world_db"]["main"]["worldv2"]["worldWidthMacro"] << 5
+        info["expertMode"] = \
+            self._data["world_db"]["main"]["worldv2"]["expertMode"]
+        return info
+    
+    def get_chunk(self, x, y):
+        assert 0 <= x < (self._data["world_db"]["main"] \
+            ["worldv2"]["worldWidthMacro"] << 5) and 0 <= y < 32
+        return self.chunks["%d_%d" % (x, y)]
+
+
 if __name__ == "__main__":
     from pprint import pprint
     from random import randint

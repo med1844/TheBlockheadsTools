@@ -2,6 +2,7 @@
 import biplist
 import io
 from exportable import Exportable
+from copy import deepcopy
 
 
 class BPList(Exportable):
@@ -27,25 +28,48 @@ class BPList(Exportable):
     def __setitem__(self, key, value):
         self._data[key] = value
     
+    def __len__(self):
+        return len(self._data)
+    
     def items(self):
         assert isinstance(self._data, dict)
         return self._data.items()
+    
+    @staticmethod
+    def _wrap(exported_data):
+        """
+        Wrap the exported data from Exportable objects to proper types
+        """
+        if isinstance(exported_data, (str, bytes)):
+            return biplist.Data(exported_data)
+        return exported_data
+
+    @classmethod
+    def _update_exportable(cls, container):
+        if not isinstance(container, (dict, list, cls)):
+            return
+        if isinstance(container, cls):
+            cls._update_exportable(container._data)
+        if isinstance(container, dict):
+            for k, v in container.items():
+                if isinstance(v, Exportable):
+                    container[k] = cls._wrap(v.export())
+                else:
+                    cls._update_exportable(v)
+        if isinstance(container, list):
+            for i, v in enumerate(container):
+                if isinstance(v, Exportable):
+                    container[i] = cls._wrap(v.export())
+                else:
+                    cls._update_exportable(v)
 
     def export(self):
         """
         Export `self` as a binary bplist.
         将自己导出成二进制的bplist
         """
-        if isinstance(self._data, dict):
-            result = dict(self._data)
-            for k, v in result.items():
-                if isinstance(v, BPList):
-                    result[k] = biplist.Data(v.export())
-        elif isinstance(self._data, list):
-            result = list(self._data)
-            for i, v in enumerate(result):
-                if isinstance(v, BPList):
-                    result[i] = biplist.Data(v.export())
+        result = deepcopy(self._data)
+        self._update_exportable(result)
         if self.src_type == "bp":
             return biplist.writePlistToString(result)
         elif self.src_type == "xml":
