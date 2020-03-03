@@ -210,13 +210,13 @@ class GameSave:
         return info
     
     def get_chunk(self, x, y):
-        assert 0 <= x < (self._data["world_db"]["main"] \
-            ["worldv2"]["worldWidthMacro"] << 5) and 0 <= y < 32
+        assert 0 <= x < self._data["world_db"]["main"] \
+            ["worldv2"]["worldWidthMacro"] and 0 <= y < 32
         return self.chunks["%d_%d" % (x, y)]
 
     def get_block(self, x, y):
         assert 0 <= x < (self._data["world_db"]["main"] \
-            ["worldv2"]["worldWidthMacro"] << 5) and 0 <= y < 32
+            ["worldv2"]["worldWidthMacro"] << 5) and 0 <= y < 1024
         return self.chunks["%d_%d" % (x, y)].get_block(x & 31, y & 31)
     
     def get_blockheads(self):

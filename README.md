@@ -35,7 +35,7 @@ First, get the chunk you want to change:
 >>> info = gs.get_info()
 >>> start_chunk_pos = [_ >> 5 for _ in info["start_portal_pos"]]
 >>> start_chunk_pos[1] += 1
->>> c = gs.get_chunk(start_chunk_pos)
+>>> c = gs.get_chunk(*start_chunk_pos)
 ```
 
 Then modify blocks in it!
