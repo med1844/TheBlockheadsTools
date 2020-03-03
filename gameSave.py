@@ -8,6 +8,8 @@ import biplist
 from bplist import BPList
 from gzipWrapper import GzipWrapper
 from chunk import Chunk
+from blockhead import Blockhead
+from inventory import Inventory
 
 
 class GameSave:
@@ -216,6 +218,22 @@ class GameSave:
         assert 0 <= x < (self._data["world_db"]["main"] \
             ["worldv2"]["worldWidthMacro"] << 5) and 0 <= y < 32
         return self.chunks["%d_%d" % (x, y)].get_block(x & 31, y & 31)
+    
+    def get_blockheads(self):
+        """
+        Return a list containing reference to dictionaries describing
+        blockheads.
+        返回一个描述blockheads的字典的引用列表。
+        """
+        return [
+            Blockhead(d)
+            for d in self["world_db"]["main"]["blockheads"]["dynamicObjects"]
+        ]
+    
+    def get_inventory(self, blockhead):
+        assert isinstance(blockhead, Blockhead)
+        return Inventory(self["world_db"]["main"]\
+            ["blockhead_%d_inventory" % blockhead.get_uid()])
 
 
 if __name__ == "__main__":

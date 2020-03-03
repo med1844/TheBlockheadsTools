@@ -16,7 +16,7 @@ class BPList(Exportable):
         self.src_type = src_type
 
     def __repr__(self):
-        return "<BPList>" + repr(self._data)
+        return repr(self._data)
     
     def __eq__(self, other):
         if isinstance(other, BPList):

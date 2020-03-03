@@ -57,6 +57,19 @@ class SingleItem(Exportable):
     def set_id(self, new_id):
         new_id = struct.pack("<H", new_id)
         self._data = new_id + self._data[2:]
+    
+    def get_damage(self):
+        return struct.unpack("<H", self._data[2:4])[0]
+
+    def set_damage(self, new_damage):
+        new_damage = struct.pack("<H", new_damage)
+        self._data = self._data[:2] + new_damage + self._data[4:]
+    
+    def __getitem__(self, key):
+        return self._zip._data[0][key]
+    
+    def __setitem__(self, key, value):
+        self._zip._data[0][key] = value
 
     def export(self):
         """
@@ -90,6 +103,25 @@ class Item(Exportable):
             if self.count:
                 return repr(self.items)
             return "empty"
+        
+    def __getitem__(self, index):
+        return self.items[index]
+    
+    def __setitem__(self, index, value):
+        self.items[index] = value
+    
+    def get_id(self):
+        return self.items[0].get_id()
+    
+    def set_id(self, new_id):
+        for item in self.items:
+            item.set_id(new_id)
+    
+    def get_count(self):
+        return self.count
+
+    def set_count(self, new_count):
+        self.count = new_count
     
     def export(self):
         if not self.count:
