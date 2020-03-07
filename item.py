@@ -4,6 +4,7 @@ from gzipWrapper import GzipWrapper
 from bplist import BPList
 import biplist
 import struct
+from itemType import ItemType
 
 
 class SingleItem(Exportable):
@@ -44,6 +45,8 @@ class SingleItem(Exportable):
             return src
         if isinstance(src, list):
             if src and isinstance(src[0], (str, bytes, biplist.Data)):
+                src = Item(src)
+            elif not src:
                 src = Item(src)
             else:
                 for i, v in enumerate(src):
@@ -95,6 +98,9 @@ class Item(Exportable):
                 self.items = [SingleItem(v) for v in src_list]
             else:
                 self.items = [first_item]
+        else:
+            # empty slot
+            self.stack = False
     
     def __repr__(self):
         if self.count and self.stack:
@@ -114,8 +120,17 @@ class Item(Exportable):
         return self.items[0].get_id()
     
     def set_id(self, new_id):
-        for item in self.items:
-            item.set_id(new_id)
+        if isinstance(new_id, ItemType):
+            new_id = new_id.value
+        if self.items:
+            for item in self.items:
+                item.set_id(new_id)
+        else:
+            self.items = \
+                [SingleItem(struct.pack("<H", new_id) + "\x00" * 5 + '\x0c')]
+            self.count = 1
+            self.stack = True
+            # TODO add container support or add container check
     
     def get_count(self):
         return self.count

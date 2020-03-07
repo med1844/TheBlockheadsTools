@@ -95,3 +95,28 @@ It is possible to implement `bh[0].get_inventory()` by passing the reference of 
 ```
 
 Note that it is possible to set the count **over 99**, and the game will not crash.
+
+### Get item from containers
+
+Getting item from containers is hard, since the amount of item in the blockheads is not stored in bytes. Instead, it is stored in a list.
+
+For example, if there are 3 dirts stacked in one slot, that slot would look like this:
+
+```python
+['\x18\x04\x00\x00\x00\x00\x00\x0c', '\x18\x04\x00\x00\x00\x00\x00\x00', 
+'\x18\x04\x00\x00\x00\x00\x00\x00']
+```
+
+When several tools or containers are stacked, where each item's damage or container information is different, this kind of storage is necessary.
+
+But this makes getting items from containers obfuscating. If you want to get the *first* item in a basket, you have to use command like this:
+
+```python
+item = inv[basket_index][0]['s'][-1][0]
+```
+
+Here, the `inv[basket_index][0]` means the first item in `inv[basket_index]`. If there are several baskets stacked in this slot, then you can use `inv[basket_index][i]` to get i-th basket.
+
+The basket is described by a dictionary, where the key `s` in it stores a list of base64-encoded items. The equivalent key in chest is `saveItemSlot`. So we have to use `['s']` to get the storage part in the basket.
+
+Though we are getting the *first* item, however, the storage order is reversed. Therefore, you have to use `[-1]` to get the *first* item list in the basket. Finally, `[0]` returns the first item in that list.
