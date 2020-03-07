@@ -132,6 +132,11 @@ class Item(Exportable):
             self.stack = True
             # TODO add container support or add container check
     
+    def set_damage(self, damage):
+        for item in self.items:
+            item.set_damage(damage)
+
+    
     def get_count(self):
         return self.count
 
