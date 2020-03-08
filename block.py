@@ -23,6 +23,8 @@ class Block:
     pos_map = {
         "first_layer_id": [0],
         "third_layer_id": [2],
+        "sub_type": [3],
+        "damage": [5],
         "brightness": [6],
     }
 
@@ -31,7 +33,7 @@ class Block:
         self._st = start_pos
     
     def __repr__(self):
-        return id_to_block_name(self.get("first_layer_id")[0])[0]
+        return id_to_block_name(self.get("first_layer_id")[0])[:5]
     
     def __getitem__(self, index):
         if index < 0:

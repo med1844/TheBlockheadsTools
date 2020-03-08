@@ -4,7 +4,12 @@ from gzipWrapper import GzipWrapper
 from bplist import BPList
 import biplist
 import struct
-from itemType import ItemType
+from itemType import ItemType, ItemExtra
+
+
+class NotWorkbenchError(Exception):
+    """Raised when trying to set the level of a item that is not a workbench"""
+    pass
 
 
 class SingleItem(Exportable):
@@ -28,7 +33,7 @@ class SingleItem(Exportable):
                     biplist.readPlistFromString(self._zip._data[0]), "bp"
                 )
             self._zip._data[0] = self._parse(self._zip._data[0])
-        self.is_container = self._zip is not None
+        self.has_extra = self._zip is not None
     
     def __repr__(self):
         if self._zip is None:
@@ -68,11 +73,34 @@ class SingleItem(Exportable):
         new_damage = struct.pack("<H", new_damage)
         self._data = self._data[:2] + new_damage + self._data[4:]
     
+    def set_color(self, *colors):
+        assert 1 <= len(colors) <= 4
+        val = 0
+        for i in range(4):
+            val <<= 4
+            if i < len(colors):
+                val |= colors[i]
+        self._data = self._data[:4] + struct.pack("<H", val) + self._data[6:]
+    
     def __getitem__(self, key):
         return self._zip._data[0][key]
     
     def __setitem__(self, key, value):
         self._zip._data[0][key] = value
+    
+    def init_extra(self, dict_):
+        self._zip = GzipWrapper("")
+        self._zip._data[0] = BPList(
+            biplist.readPlistFromString(
+                biplist.writePlistToString(dict_)
+            ), "xml"
+        )
+        self._zip._data[0] = self._parse(self._zip._data[0])
+        self.has_extra = True
+    
+    def remove_extra(self):
+        self._zip = None
+        self.has_extra = False
 
     def export(self):
         """
@@ -92,8 +120,8 @@ class Item(Exportable):
         self.stack = True  # stacked single items
         if self.count:
             first_item = SingleItem(src_list[0])
-            if first_item.is_container:
-                # if the first item is container, then we shall not stack
+            if first_item.has_extra:
+                # if the first item is extra data, then we shall not stack
                 self.stack = False
                 self.items = [SingleItem(v) for v in src_list]
             else:
@@ -116,6 +144,21 @@ class Item(Exportable):
     def __setitem__(self, index, value):
         self.items[index] = value
     
+    def get(self, *indexes):
+        """
+        A shortcut to get item at given position. Note that indexes should be
+        0-indexed.
+        eg:
+        To get the first item in the second row in a chest:
+        >>> item.get(1, 0) 
+        """
+        if len(indexes) == 1:
+            # basket
+            return self[0]['s'][3 - indexes[0]]
+        elif len(indexes) == 2:
+            return self[0]['saveItemSlots'][indexes[0]][3 - indexes[1]]
+        raise TypeError("The count of parameter should not exceed 2.")
+    
     def get_id(self):
         return self.items[0].get_id()
     
@@ -136,6 +179,8 @@ class Item(Exportable):
         for item in self.items:
             item.set_damage(damage)
 
+    def get_damage(self):
+        return self.items[0].get_damage()
     
     def get_count(self):
         return self.count
@@ -143,6 +188,43 @@ class Item(Exportable):
     def set_count(self, new_count):
         self.count = new_count
     
+    def get_level(self, index=0):
+        """
+        Get the workbench level of item at `index`
+        """
+        try:
+            return self.items[index]['d']['level']
+        except KeyError:
+            raise NotWorkbenchError("Current item is not workbench")
+    
+    def set_level(self, value, index=0):
+        assert isinstance(value, int)
+        try:
+            self.items[index]['d']['level'] = value
+        except KeyError:
+            raise NotWorkbenchError("Current item is not workbench")
+    
+    def set_color(self, *colors):
+        self.items[0].set_color(*colors)
+    
+    def init_extra(self, dict_, index=0):
+        if isinstance(dict_, ItemExtra):
+            dict_ = dict_.value
+        if self.stack:
+            if self.items[0].has_extra:
+                return
+            self.stack = False
+            first_data = self.items[0].export()
+            for _ in range(1, self.count):
+                self.items.append(SingleItem(first_data))
+        else:
+            if self.items[index].has_extra:
+                return
+        self.items[index].init_extra(dict_)
+    
+    def remove_extra(self, index=0):
+        self.items[index].remove_extra()
+
     def export(self):
         if not self.count:
             return []

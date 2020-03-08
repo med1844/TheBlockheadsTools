@@ -29,14 +29,14 @@ class Chunk(Exportable):
     BLOCK_SIZE = 64
 
     def __init__(self, src_bytes):
-        self._blocks = array.array("b")
+        self._blocks = array.array("B")
         self._blocks.fromstring(src_bytes)
     
     def __repr__(self):
         return '\n'.join([
-            ''.join(['%s' % repr(self.get_block(row, col))
-                     for col in range(self.CHUNK_WIDTH)])
-            for row in range(self.CHUNK_HEIGHT - 1, -1, -1)
+            ''.join(['%7s' % repr(self.get_block(x, y))
+                     for x in range(self.CHUNK_WIDTH)])
+            for y in range(self.CHUNK_HEIGHT - 1, -1, -1)
         ])
     
     @classmethod

@@ -98,6 +98,18 @@ Note that it is possible to set the count **over 99**, and the game will not cra
 
 ### Get item from containers
 
+If `inv[1]` is a basket, and you want to get the first item:
+
+```python
+>>> item = inv[1].get(0)
+```
+
+If `inv[3]` is a chest, and you want to get the first item in the second row:
+
+```python
+>>> item = inv[3].get(1, 0)
+```
+
 Getting item from containers is hard, since the amount of item in the blockheads is not stored in bytes. Instead, it is stored in a list.
 
 For example, if there are 3 dirts stacked in one slot, that slot would look like this:

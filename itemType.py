@@ -77,7 +77,7 @@ class ItemType(Enum):
     IRON_MACHETE = 67
     IRON_SWORD = 68
     TRAPDOOR = 69
-    IRON_PICKAXE = 70
+    IRON_AXE = 70
     CARROT = 71
     GOLD_INGOT = 72
     GOLD_NUGGET = 73
@@ -434,3 +434,61 @@ class ItemType(Enum):
     PLASTER = 1103
     FEEDER_CHEST = 1104
     LUMINOUS_PLASTER = 1105
+
+
+def id_to_item_type(item_id):
+    if not isinstance(item_id, int):
+        item_id = ord(item_id)
+    return ItemType._value2member_map_[item_id]
+
+
+def id_to_item_name(item_id):
+    if not isinstance(item_id, int):
+        item_id = ord(item_id)
+    return ItemType._value2member_map_[item_id].name
+
+
+def item_name_to_id(item_name):
+    assert isinstance(item_name, str)
+    return ItemType._member_map_[item_name].value
+
+
+class ItemExtra(Enum):
+    """
+    Common extra information that would be used when initializing item's extra.
+
+    在初始化物品extra信息时常用的模板。
+    """
+
+    BASKET = {
+        "s": [[], [], [], []]
+    }
+
+    WORKBENCH = {
+        'd': {
+            'availableElectricity': 0,
+            'craftProgressCount': 0,
+            'fireSpreadTimer': 0.0,
+            'flipped': False,
+            'floatPos': [0, 0],
+            'fuelFraction': 0.0,
+            'hasFuel': False,
+            'hurryCost': 0,
+            'hurrySeconds': 0.0,
+            'hurryTimer': 0.0,
+            'hurrying': False,
+            'interactionObjectType': 1,
+            'isInUse': False,
+            'lastWorldTime': 0,
+            'level': 0,
+            'ownerID': 'server',
+            'paintColor': 0,
+            'pos_x': 0,
+            'pos_y': 0,
+            'saveTime': 0,
+            'selectedIndex': 1,
+            'uniqueID': 0,
+            'workbenchType': 2,
+            'xScroll': -67.03672790527344
+        }
+    }

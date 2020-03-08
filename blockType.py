@@ -83,6 +83,16 @@ class BlockType(Enum):
     LUMINOUS_PLASTER = 77
 
 
+class SubType(Enum):
+    COPPER_ORE = 61
+    TIN_ORE = 62
+    IRON_ORE = 63
+    COAL = 65
+    GOLD_NUGGETS = 77
+    PLATIUM_ORE = 106
+    TITANIUM_ORE = 107
+
+
 def id_to_block_type(block_id):
     if not isinstance(block_id, int):
         block_id = ord(block_id)

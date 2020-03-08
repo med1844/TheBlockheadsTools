@@ -47,8 +47,6 @@ class GameSave:
                 self._read_env(full_path, self._data[sub_dir])
 
         self.chunks = self._data["world_db"]["blocks"]
-        for name, gw in self.chunks.items():
-            self.chunks[name] = Chunk(gw._data[0])
     
     def __repr__(self):
         return repr(self._data)
@@ -212,7 +210,13 @@ class GameSave:
     def get_chunk(self, x, y):
         assert 0 <= x < self._data["world_db"]["main"] \
             ["worldv2"]["worldWidthMacro"] and 0 <= y < 32
-        return self.chunks["%d_%d" % (x, y)]
+        name = "%d_%d" % (x, y)
+        if not isinstance(self.chunks[name], Chunk):
+            self.chunks[name] = Chunk(self.chunks[name]._data[0])
+        return self.chunks[name]
+    
+    def get_chunks(self):
+        return [[int(_) for _ in name.split("_")] for name in self.chunks]
 
     def get_block(self, x, y):
         assert 0 <= x < (self._data["world_db"]["main"] \
