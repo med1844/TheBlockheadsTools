@@ -22,10 +22,13 @@ class Block:
     # records the position of each attribute
     pos_map = {
         "first_layer_id": [0],
-        "third_layer_id": [2],
+        "third_layer_id": [1],
         "sub_type": [3],
+        "height": [4],
         "damage": [5],
-        "brightness": [6],
+        "visibility": [6],  # 6 and 9 are both visibility, yet only the change
+                            # of 6th byte would work
+        "brightness": [7],
     }
 
     def __init__(self, src_array, start_pos):
@@ -91,3 +94,6 @@ class Block:
                 self[pos] = values[i].value
             else:
                 self[pos] = values[i]
+    
+    def to_hex(self):
+        return ' '.join(['%02x' % self[i] for i in range(64)])

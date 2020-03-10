@@ -215,13 +215,20 @@ class GameSave:
             self.chunks[name] = Chunk(self.chunks[name]._data[0])
         return self.chunks[name]
     
+    def set_chunk(self, x, y, c):
+        assert isinstance(c, Chunk)
+        self.chunks["%d_%d" % (x, y)] = c
+    
     def get_chunks(self):
         return [[int(_) for _ in name.split("_")] for name in self.chunks]
 
     def get_block(self, x, y):
         assert 0 <= x < (self._data["world_db"]["main"] \
             ["worldv2"]["worldWidthMacro"] << 5) and 0 <= y < 1024
-        return self.chunks["%d_%d" % (x, y)].get_block(x & 31, y & 31)
+        name = "%d_%d" % (x >> 5, y >> 5)
+        if not isinstance(self.chunks[name], Chunk):
+            self.chunks[name] = Chunk(self.chunks[name]._data[0])
+        return self.chunks[name].get_block(x & 31, y & 31)
     
     def get_blockheads(self):
         """

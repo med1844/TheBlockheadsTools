@@ -57,6 +57,11 @@ class Chunk(Exportable):
         """
         with gzip.GzipFile(fileobj=compressed_file, mode="rb") as f:
             return Chunk(f.read())
+        
+    @classmethod
+    def create(cls):
+        return cls("\0" \
+            * (cls.CHUNK_WIDTH * cls.CHUNK_HEIGHT * cls.BLOCK_SIZE + 5))
 
     def export(self):
         """

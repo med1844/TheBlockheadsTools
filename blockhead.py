@@ -9,3 +9,8 @@ class Blockhead:
     
     def get_uid(self):
         return self._data["uniqueID"]
+    
+    def set_pos(self, x, y):
+        self._data['pos_x'] = x
+        self._data['pos_y'] = y
+        self._data['float_pos'] = [x + .5, y]

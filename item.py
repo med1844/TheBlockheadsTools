@@ -224,6 +224,11 @@ class Item(Exportable):
     
     def remove_extra(self, index=0):
         self.items[index].remove_extra()
+    
+    def clear(self):
+        self.items = None
+        self.count = 0
+        self.stack = False
 
     def export(self):
         if not self.count:

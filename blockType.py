@@ -10,7 +10,7 @@ class BlockType(Enum):
     """
     STONE = 1
     AIR = 2
-    UNKNOWN = 3
+    WATER = 3
     ICE = 4
     SNOW = 5
     DIRT = 6
@@ -84,9 +84,12 @@ class BlockType(Enum):
 
 
 class SubType(Enum):
+    WORKBENCH = 46
+    PORTAL_GATE = 47
     COPPER_ORE = 61
     TIN_ORE = 62
     IRON_ORE = 63
+    OIL = 64
     COAL = 65
     GOLD_NUGGETS = 77
     PLATIUM_ORE = 106
@@ -108,6 +111,12 @@ def id_to_block_name(block_id):
 def block_name_to_id(block_name):
     assert isinstance(block_name, str)
     return BlockType._member_map_[block_name].value
+
+
+def id_to_sub_type_name(sub_type_id):
+    if not isinstance(sub_type_id, int):
+        sub_type_id = ord(sub_type_id)
+    return SubType._value2member_map_[sub_type_id].name
 
 
 if __name__ == "__main__":
