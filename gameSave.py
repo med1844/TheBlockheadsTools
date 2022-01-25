@@ -10,6 +10,7 @@ from gzipWrapper import GzipWrapper
 from chunk import Chunk
 from blockhead import Blockhead
 from inventory import Inventory
+from exportable import Exportable
 
 
 class GameSave:
@@ -146,7 +147,8 @@ class GameSave:
     
     def _export_db(self, dict_, result_dict):
         for k, v in dict_.items():
-            result_dict[k] = v.export()
+            if isinstance(v, Exportable):
+                result_dict[k] = v.export()
 
     def _write_db(self, cursor, dict_):
         for k, v in dict_.items():
@@ -211,6 +213,8 @@ class GameSave:
         assert 0 <= x < self._data["world_db"]["main"] \
             ["worldv2"]["worldWidthMacro"] and 0 <= y < 32
         name = "%d_%d" % (x, y)
+        if name not in self.chunks:
+            self.chunks[name] = Chunk.create()
         if not isinstance(self.chunks[name], Chunk):
             self.chunks[name] = Chunk(self.chunks[name]._data[0])
         return self.chunks[name]
