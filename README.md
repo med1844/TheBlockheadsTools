@@ -3,6 +3,45 @@ Tools for manipulating save files of the mobile game 'the blockheads'
 
 # How to use
 
+## Setting up docker container
+
+LMDB fails if you are trying to use 64-bit python to load a 32-bit save file and vise versa. You will see something like this:
+
+```
+MDB_INVALID: File is not an LMDB file
+```
+
+To avoid this issue, we have provided a `Dockerfile` with i386 python 3.12 in it. You can easily set them up by executing the following commands:
+
+```bash
+$ docker build -t bh_tool_env:0.0.1 .
+$ docker run -v $(pwd)/test_data:/app/test_data -it bh_tool_env:0.0.1
+```
+
+In case you need to debug a script, you can uncomment these lines in the `Dockerfile`:
+
+```docker
+RUN pip install 'git+https://github.com/bretello/pdbpp@master'
+RUN pip install pytest
+CMD ["python3", "-m", "pdb", "your_script.py"]
+```
+
+These would provide you access to CLI debuggers.
+
+### Game file locations
+
+During development I used `test_data` as the folder to store all save files. You may find more save files in `./test_data/saves/`.
+
+If you just want to see what the tool could do, please copy `test_data/out/` into your game folder. (It's not showcase though)
+
+### Change Docker to use 64 bit python
+
+In case your game save is 64 bit lmdb, please modify the first line of `Dockerfile` to this:
+
+```docker
+FROM --platform=linux/amd64 python:alpine3.19
+```
+
 ## Modify blocks and chunks
 
 ### Read a world

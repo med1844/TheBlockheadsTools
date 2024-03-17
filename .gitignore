@@ -1,4 +1,3 @@
-test_data
 out
 test
 *_tester.py
@@ -7,3 +6,4 @@ save_structure*
 .pytest_cache
 .vscode
 .ruff_cache
+*.png

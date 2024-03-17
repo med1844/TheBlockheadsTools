@@ -1,8 +1,8 @@
 # encoding: utf-8
 from exportable import Exportable
 from gzipWrapper import GzipWrapper
+import plistlib
 from bplist import BPList
-import biplist
 import struct
 from itemType import ItemType, ItemExtra
 
@@ -26,13 +26,9 @@ class SingleItem(Exportable):
         if len(src_bytes) > 8:
             self._zip = GzipWrapper(src_bytes[8:])
             if self._zip._data[0].startswith(b"<?xml"):
-                self._zip._data[0] = BPList(
-                    biplist.readPlistFromString(self._zip._data[0]), "xml"
-                )
+                self._zip._data[0] = BPList(plistlib.loads(self._zip._data[0]), "xml")
             elif self._zip._data[0].startswith(b"bplist00"):
-                self._zip._data[0] = BPList(
-                    biplist.readPlistFromString(self._zip._data[0]), "bp"
-                )
+                self._zip._data[0] = BPList(plistlib.loads(self._zip._data[0]), "bp")
             self._zip._data[0] = self._parse(self._zip._data[0])
         self.has_extra = self._zip is not None
 
@@ -50,7 +46,7 @@ class SingleItem(Exportable):
                 src[k] = self._parse(v)
             return src
         if isinstance(src, list):
-            if src and isinstance(src[0], (str, bytes, biplist.Data)):
+            if src and isinstance(src[0], (str, bytes)):
                 src = Item(src)
             elif not src:
                 src = Item(src)
@@ -91,9 +87,7 @@ class SingleItem(Exportable):
 
     def init_extra(self, dict_):
         self._zip = GzipWrapper("")
-        self._zip._data[0] = BPList(
-            biplist.readPlistFromString(biplist.writePlistToString(dict_)), "xml"
-        )
+        self._zip._data[0] = BPList(plistlib.loads(plistlib.dumps(dict_)), "xml")
         self._zip._data[0] = self._parse(self._zip._data[0])
         self.has_extra = True
 
@@ -102,13 +96,9 @@ class SingleItem(Exportable):
         self.has_extra = False
 
     def export(self):
-        """
-        Export the item object to binary string.
-        将item对象导出为二进制数据流。
-        """
         if self._zip is None:
-            return biplist.Data(self._data)
-        return biplist.Data(self._data + self._zip.export())
+            return self._data
+        return self._data + self._zip.export()
 
 
 class Item(Exportable):

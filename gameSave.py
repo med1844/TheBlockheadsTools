@@ -1,10 +1,10 @@
 # encoding: utf-8
 import os
-import os.path
+import pathlib
 import shutil
 import lmdb
 import plistlib
-import biplist
+from typing import Dict, Any
 from bplist import BPList
 from gzipWrapper import GzipWrapper
 from bh_chunk import Chunk
@@ -47,7 +47,7 @@ class GameSave:
                 self._data[sub_dir] = {}
                 self._read_env(full_path, self._data[sub_dir])
 
-        self.chunks = self._data["world_db"]["blocks"]
+        self.chunks: Dict[str, GzipWrapper | Chunk] = self._data["world_db"][b"blocks"]
 
     def __repr__(self):
         return repr(self._data)
@@ -95,19 +95,19 @@ class GameSave:
         - normal string
         - xml plist files
         """
-        if isinstance(src, (str, bytes, biplist.Data)):
+        if isinstance(src, bytes):
             if src.startswith(b"bplist00"):  # bplist
-                result = BPList(biplist.readPlistFromString(src), src_type="bp")
+                result = BPList(plistlib.loads(src), src_type="bp")
                 return self._parse(result)
             if src.startswith(b"\x1f\x8b"):  # gzip
                 result = GzipWrapper(src)
                 result._data[0] = self._parse(result._data[0])
                 return result
             if src.startswith(b"<?xml"):  # xml plist
-                result = BPList(biplist.readPlistFromString(src), src_type="xml")
+                result = BPList(plistlib.loads(src), src_type="xml")
                 return self._parse(result)
             return src
-        elif isinstance(src, (list, tuple)):
+        elif isinstance(src, list):
             for i, v in enumerate(src):
                 src[i] = self._parse(v)
             return src
@@ -152,7 +152,9 @@ class GameSave:
         for k, v in dict_.items():
             cursor.put(k, v)
 
-    def _write_env(self, path, dict_):
+    def _write_env(self, path: str, dict_):
+        if not os.path.exists(path):
+            pathlib.Path(path).mkdir(parents=True, exist_ok=True)
         db_data = {}
         size = 0
         for db in dict_:
@@ -168,26 +170,21 @@ class GameSave:
                 self._write_db(cursor, db_data[k])
         env.close()
 
-    def save(self, path):
+    def save(self, path: str) -> None:
         """
         Save the world to a specific path. Existing files would be overwrite.
-        将世界保存到指定路径。已存在的文件会被覆盖。
 
         ### Arguments
         - `path`
             the path you want to save the world
-            要保存到的路径
 
         ### Return
         Nothing.
-        无。
         """
-        if not path.endswith("/"):
-            path += "/"
         for env in self._data:
-            self._write_env(path + env + "/", self._data[env])
+            self._write_env(os.path.join(path, env), self._data[env])
 
-    def get_info(self):
+    def get_info(self) -> Dict[str, Any]:
         """
         Offers simple info about the world.
         提供简要的世界基本信息。
@@ -205,7 +202,7 @@ class GameSave:
         info["expertMode"] = self._data["world_db"]["main"]["worldv2"]["expertMode"]
         return info
 
-    def get_chunk(self, x, y):
+    def get_chunk(self, x, y) -> Chunk:
         assert (
             0 <= x < self._data["world_db"]["main"]["worldv2"]["worldWidthMacro"]
             and 0 <= y < 32
@@ -238,7 +235,6 @@ class GameSave:
         """
         Return a list containing reference to dictionaries describing
         blockheads.
-        返回一个描述blockheads的字典的引用列表。
         """
         return [
             Blockhead(d)
@@ -257,11 +253,13 @@ if __name__ == "__main__":
     from random import randint
     from blockType import BlockType
 
-    FOLDER = "./test_data/saves/c8185b81198a1890dac4b621677a9229/"
-    gs = GameSave(FOLDER)
-    for name, chunk in gs.chunks.items():
-        for _ in range(128):
-            block = chunk.get_block(randint(0, 31), randint(0, 31))
-            block.set_attr("first_layer_id", BlockType.TIME_CRYSTAL.value)
+    gs = GameSave("./test_data/saves/c8185b81198a1890dac4b621677a9229/")
+    info = gs.get_info()
+    start_chunk_pos = [_ >> 5 for _ in info["start_portal_pos"]]
+    start_chunk_pos[1] += 1
+    c = gs.get_chunk(*start_chunk_pos)
+    for _ in range(128):
+        block = c.get_block(randint(0, 31), randint(0, 31))
+        block.set_attr("first_layer_id", BlockType.TIME_CRYSTAL.value)
     print("saving...")
     gs.save("./test_data/saves/out/")

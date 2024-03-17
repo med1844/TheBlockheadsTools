@@ -5,11 +5,7 @@ import gzip
 
 
 class GzipWrapper(Exportable):
-    """
-    简单包装一下Gzip文件，方便导出
-    """
-
-    def __init__(self, src_bytes):
+    def __init__(self, src_bytes: bytes):
         with io.BytesIO(src_bytes) as src:
             with gzip.GzipFile(fileobj=src, mode="rb") as f:
                 self._data = [f.read()]

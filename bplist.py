@@ -1,6 +1,7 @@
 # encoding: utf-8
-import biplist
 import io
+import plistlib
+from typing import Literal
 from exportable import Exportable
 from copy import deepcopy
 
@@ -11,7 +12,7 @@ class BPList(Exportable):
     bplist的支持类。封装只是为了让导出变得更方便。
     """
 
-    def __init__(self, data, src_type):
+    def __init__(self, data, src_type: Literal["bp", "xml"]):
         self._data = data
         self.src_type = src_type
 
@@ -35,15 +36,6 @@ class BPList(Exportable):
         assert isinstance(self._data, dict)
         return self._data.items()
 
-    @staticmethod
-    def _wrap(exported_data):
-        """
-        Wrap the exported data from Exportable objects to proper types
-        """
-        if isinstance(exported_data, (str, bytes)):
-            return biplist.Data(exported_data)
-        return exported_data
-
     @classmethod
     def _update_exportable(cls, container):
         if not isinstance(container, (dict, list, cls)):
@@ -53,24 +45,22 @@ class BPList(Exportable):
         if isinstance(container, dict):
             for k, v in container.items():
                 if isinstance(v, Exportable):
-                    container[k] = cls._wrap(v.export())
+                    container[k] = v.export()
                 else:
                     cls._update_exportable(v)
         if isinstance(container, list):
             for i, v in enumerate(container):
                 if isinstance(v, Exportable):
-                    container[i] = cls._wrap(v.export())
+                    container[i] = v.export()
                 else:
                     cls._update_exportable(v)
 
-    def export(self):
-        """
-        Export `self` as a binary bplist.
-        将自己导出成二进制的bplist
-        """
+    def export(self) -> bytes:
         result = deepcopy(self._data)
         self._update_exportable(result)
-        if self.src_type == "bp":
-            return biplist.writePlistToString(result)
-        elif self.src_type == "xml":
-            return biplist.writePlistToString(result, False)
+        match self.src_type:
+            case "bp":
+                return plistlib.dumps(result, fmt=plistlib.FMT_BINARY)
+            case "xml":
+                return plistlib.dumps(result, fmt=plistlib.FMT_XML)
+        assert False
