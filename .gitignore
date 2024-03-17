@@ -1,7 +1,9 @@
-test_data/
+test_data
 out
 test
 *_tester.py
 *.pyc
 save_structure*
-
+.pytest_cache
+.vscode
+.ruff_cache

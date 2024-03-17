@@ -17,24 +17,24 @@ class BPList(Exportable):
 
     def __repr__(self):
         return repr(self._data)
-    
+
     def __eq__(self, other):
         if isinstance(other, BPList):
             return self._data == other._data
-    
+
     def __getitem__(self, key):
         return self._data[key]
-    
+
     def __setitem__(self, key, value):
         self._data[key] = value
-    
+
     def __len__(self):
         return len(self._data)
-    
+
     def items(self):
         assert isinstance(self._data, dict)
         return self._data.items()
-    
+
     @staticmethod
     def _wrap(exported_data):
         """

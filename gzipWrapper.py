@@ -13,7 +13,7 @@ class GzipWrapper(Exportable):
         with io.BytesIO(src_bytes) as src:
             with gzip.GzipFile(fileobj=src, mode="rb") as f:
                 self._data = [f.read()]
-    
+
     def export(self):
         with io.BytesIO() as f:
             with gzip.GzipFile(fileobj=f, mode="wb") as g:

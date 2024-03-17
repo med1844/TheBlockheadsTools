@@ -7,6 +7,7 @@ class ItemType(Enum):
     The enumeration of item types.
     物品枚举类。
     """
+
     UNKNOWN = 0
     CLOTHING = 1
     DEPRECATED_DIRT_BLOCK = 2
@@ -460,35 +461,33 @@ class ItemExtra(Enum):
     在初始化物品extra信息时常用的模板。
     """
 
-    BASKET = {
-        "s": [[], [], [], []]
-    }
+    BASKET = {"s": [[], [], [], []]}
 
     WORKBENCH = {
-        'd': {
-            'availableElectricity': 0,
-            'craftProgressCount': 0,
-            'fireSpreadTimer': 0.0,
-            'flipped': False,
-            'floatPos': [0, 0],
-            'fuelFraction': 0.0,
-            'hasFuel': False,
-            'hurryCost': 0,
-            'hurrySeconds': 0.0,
-            'hurryTimer': 0.0,
-            'hurrying': False,
-            'interactionObjectType': 1,
-            'isInUse': False,
-            'lastWorldTime': 0,
-            'level': 0,
-            'ownerID': 'server',
-            'paintColor': 0,
-            'pos_x': 0,
-            'pos_y': 0,
-            'saveTime': 0,
-            'selectedIndex': 1,
-            'uniqueID': 0,
-            'workbenchType': 2,
-            'xScroll': -67.03672790527344
+        "d": {
+            "availableElectricity": 0,
+            "craftProgressCount": 0,
+            "fireSpreadTimer": 0.0,
+            "flipped": False,
+            "floatPos": [0, 0],
+            "fuelFraction": 0.0,
+            "hasFuel": False,
+            "hurryCost": 0,
+            "hurrySeconds": 0.0,
+            "hurryTimer": 0.0,
+            "hurrying": False,
+            "interactionObjectType": 1,
+            "isInUse": False,
+            "lastWorldTime": 0,
+            "level": 0,
+            "ownerID": "server",
+            "paintColor": 0,
+            "pos_x": 0,
+            "pos_y": 0,
+            "saveTime": 0,
+            "selectedIndex": 1,
+            "uniqueID": 0,
+            "workbenchType": 2,
+            "xScroll": -67.03672790527344,
         }
     }

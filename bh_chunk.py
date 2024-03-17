@@ -8,7 +8,7 @@ import array
 
 class Chunk(Exportable):
     """
-    This is the support class for chunks in the blockheads, offering load, 
+    This is the support class for chunks in the blockheads, offering load,
     modify, and exporting methods.
 
     这是对the blockheads中的区块的支持类，用于封装读取，修改，导出等方法。
@@ -30,19 +30,25 @@ class Chunk(Exportable):
 
     def __init__(self, src_bytes):
         self._blocks = array.array("B")
-        self._blocks.fromstring(src_bytes)
-    
+        self._blocks.frombytes(src_bytes)
+
     def __repr__(self):
-        return '\n'.join([
-            ''.join(['%7s' % repr(self.get_block(x, y))
-                     for x in range(self.CHUNK_WIDTH)])
-            for y in range(self.CHUNK_HEIGHT - 1, -1, -1)
-        ])
-    
+        return "\n".join(
+            [
+                "".join(
+                    [
+                        "%7s" % repr(self.get_block(x, y))
+                        for x in range(self.CHUNK_WIDTH)
+                    ]
+                )
+                for y in range(self.CHUNK_HEIGHT - 1, -1, -1)
+            ]
+        )
+
     @classmethod
     def from_compressed_file(cls, compressed_file):
         """
-        Read chunk data from the input file object and return a new `Chunk` 
+        Read chunk data from the input file object and return a new `Chunk`
         object.
         从输入的文件中读取并返回一个`Chunk`对象。
 
@@ -50,18 +56,17 @@ class Chunk(Exportable):
         - `gzip_file`
             A `file` object, whose content makes up a gzip file.
             一个内容是gzip压缩包数据的`file`对象。
-        
+
         ### Return
         A new `Chunk` object
         一个新`Chunk`对象。
         """
         with gzip.GzipFile(fileobj=compressed_file, mode="rb") as f:
             return Chunk(f.read())
-        
+
     @classmethod
     def create(cls):
-        return cls("\0" \
-            * (cls.CHUNK_WIDTH * cls.CHUNK_HEIGHT * cls.BLOCK_SIZE + 5))
+        return cls("\0" * (cls.CHUNK_WIDTH * cls.CHUNK_HEIGHT * cls.BLOCK_SIZE + 5))
 
     def export(self):
         """
@@ -70,10 +75,10 @@ class Chunk(Exportable):
         """
         with io.BytesIO() as f:
             with gzip.GzipFile(fileobj=f, mode="wb") as g:
-                g.write(self._blocks.tostring())
+                g.write(self._blocks.tobytes())
             result = f.getvalue()
         return result
-    
+
     def get_block(self, x, y):
         """
         Get block at position (x, y).
