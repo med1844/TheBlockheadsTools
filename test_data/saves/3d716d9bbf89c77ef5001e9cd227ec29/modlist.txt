@@ -1,0 +1,1 @@
+Usernames in this file will be able to issue most server commands via chat. One username per line, non case sensitive. This first line is ignored.

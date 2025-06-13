@@ -79,23 +79,7 @@ class Chunk(Exportable):
             result = f.getvalue()
         return result
 
-    def get_block(self, x, y):
-        """
-        Get block at position (x, y).
-        获取位于(x, y)的方块。
-
-        ### Arguments
-        - `x`
-            An integer in [0, 31]
-            一个区间在[0, 31]的整数。
-        - `y`
-            An integer in [0, 31]
-            一个区间在[0, 31]的整数。
-
-        ### Return
-        Reference of the `Block` object required.
-        请求的`Block`对象的引用。
-        """
+    def get_block(self, x: int, y: int) -> Block:
         assert 0 <= x < 32 and 0 <= y < 32
         start_addr = (y << 5 | x) << 6
         return Block(self._blocks, start_addr)

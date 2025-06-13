@@ -1,0 +1,1 @@
+Usernames in this file will be able to issue all server commands via chat, and pick up and remove all objects. One username per line, non case sensitive. This first line is ignored.

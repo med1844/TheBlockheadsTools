@@ -1,0 +1,1 @@
+Usernames or IP addresses in this file will not be able to connect. One username or IP address per line, non case sensitive. This first line is ignored.

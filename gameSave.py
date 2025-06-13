@@ -1,16 +1,26 @@
 # encoding: utf-8
 import os
 import pathlib
-import shutil
 import lmdb
 import plistlib
 from typing import Dict, Any
 from bplist import BPList
 from gzipWrapper import GzipWrapper
 from bh_chunk import Chunk
+from block import Block
 from blockhead import Blockhead
 from inventory import Inventory
 from exportable import Exportable
+from dataclasses import dataclass
+
+
+@dataclass
+class SaveSummary:
+    world_name: str
+    start_portal_pos: tuple[int, int]
+    seed: int
+    world_width_in_chunks: int
+    expert_mode: bool
 
 
 class GameSave:
@@ -21,18 +31,6 @@ class GameSave:
     provides methods to load and save GameSave within one method call. On top
     of these, methods for manipulating chunks, blocks and dynamic objects
     will be offered.
-
-    As a homage to my past scripts, there would be bonus methods like:
-    - exporting the whole world's map
-    - loading design and color mapping, and converts the design into
-        `GameSave` object.
-
-    存档类。用来描述一个世界的存档。将存档抽象成了一个类，封装了为了读写数据而必须的lmdb
-    操作，以及解析BPList等工作，并且还提供读取与保存方法。此外，会为修改区块等操作提供方便的
-    接口。
-    作为对以前自己写的脚本的致敬，提供额外的:
-    - 导出整个世界地图的功能
-    - 根据设计图和颜色映射表，将设计图转换成存档的功能。
     """
 
     MAX_DBS = 100
@@ -40,14 +38,16 @@ class GameSave:
     def __init__(self, folder_path):
         if not folder_path.endswith("/"):
             folder_path += "/"
-        self._data = {}
+        self._data: dict[str, Any] = {}
         for sub_dir in ["world_db", "server_db", "lightBlocks"]:
             full_path = folder_path + sub_dir
             if os.path.isdir(full_path):
                 self._data[sub_dir] = {}
                 self._read_env(full_path, self._data[sub_dir])
 
-        self.chunks: Dict[str, GzipWrapper | Chunk] = self._data["world_db"][b"blocks"]
+        self.chunks: Dict[bytes, GzipWrapper | Chunk] = self._data["world_db"][
+            b"blocks"
+        ]
 
     def __repr__(self):
         return repr(self._data)
@@ -58,12 +58,9 @@ class GameSave:
     def __setitem__(self, key, value):
         self._data[key] = value
 
-    def _read_env(self, path, dict_):
-        """
-        Read all databases in LMDB Environment from given path, and write
-        key-value pairs into `dict_`.
-        从指定路径读取LMDB环境中的所有数据库，并将键值对写入dict_中。
-        """
+    def _read_env(self, path: str, dict_: dict[str, Any]):
+        """Read all databases in LMDB Environment from given path, and write
+        key-value pairs into `dict_`."""
         env = lmdb.open(path, readonly=True, max_dbs=self.MAX_DBS)
         with env.begin() as txn:
             for k, _ in txn.cursor():
@@ -85,10 +82,8 @@ class GameSave:
         """
         Read the input bytes and determine which type of data to convert, and
         return the recursively parsed result.
-        根据输入字节判断应该解析成哪种数据，并递归地解析后返回结果。
 
         Types that would be parsed includes:
-        会被解析的数据包括:
         - gzip files
         - base64 encoded data
         - bplist
@@ -111,7 +106,7 @@ class GameSave:
             for i, v in enumerate(src):
                 src[i] = self._parse(v)
             return src
-        elif isinstance(src, (dict)):
+        elif isinstance(src, dict):
             for k, v in src.items():
                 src[k] = self._parse(v)
             return src
@@ -171,80 +166,78 @@ class GameSave:
         env.close()
 
     def save(self, path: str) -> None:
-        """
-        Save the world to a specific path. Existing files would be overwrite.
-
-        ### Arguments
-        - `path`
-            the path you want to save the world
-
-        ### Return
-        Nothing.
-        """
+        """Save the world to the given path. Existing files would be overwrite."""
         for env in self._data:
             self._write_env(os.path.join(path, env), self._data[env])
 
-    def get_info(self) -> Dict[str, Any]:
-        """
-        Offers simple info about the world.
-        提供简要的世界基本信息。
-        """
-        info = {}
-        info["world_name"] = self._data["world_db"]["main"]["worldv2"]["worldName"]
-        info["start_portal_pos"] = (
-            self._data["world_db"]["main"]["worldv2"]["startPortalPos.x"],
-            self._data["world_db"]["main"]["worldv2"]["startPortalPos.y"],
-        )
-        info["seed"] = self._data["world_db"]["main"]["worldv2"]["randomSeed"]
-        info["width"] = (
-            self._data["world_db"]["main"]["worldv2"]["worldWidthMacro"] << 5
-        )
-        info["expertMode"] = self._data["world_db"]["main"]["worldv2"]["expertMode"]
-        return info
+    def world_v2(self) -> Dict[str, Any]:
+        return self._data["world_db"][b"main"][b"worldv2"]
 
-    def get_chunk(self, x, y) -> Chunk:
+    def get_summary(self) -> SaveSummary:
+        world_v2 = self.world_v2()
+        return SaveSummary(
+            world_name=world_v2["worldName"],
+            start_portal_pos=(
+                world_v2["startPortalPos.x"],
+                world_v2["startPortalPos.y"],
+            ),
+            seed=world_v2["randomSeed"],
+            world_width_in_chunks=world_v2["worldWidthMacro"],
+            expert_mode=world_v2["expertMode"],
+        )
+
+    def world_width(self) -> int:
+        return self.world_v2()["worldWidthMacro"]
+
+    def get_chunk(self, x: int, y: int) -> Chunk:
         assert (
-            0 <= x < self._data["world_db"]["main"]["worldv2"]["worldWidthMacro"]
+            0 <= x < self._data["world_db"][b"main"][b"worldv2"]["worldWidthMacro"]
             and 0 <= y < 32
         )
-        name = "%d_%d" % (x, y)
+        name = b"%d_%d" % (x, y)
         if name not in self.chunks:
             self.chunks[name] = Chunk.create()
         if not isinstance(self.chunks[name], Chunk):
             self.chunks[name] = Chunk(self.chunks[name]._data[0])
         return self.chunks[name]
 
-    def set_chunk(self, x, y, c):
-        assert isinstance(c, Chunk)
-        self.chunks["%d_%d" % (x, y)] = c
+    def set_chunk(self, x: int, y: int, c: Chunk):
+        assert (
+            0 <= x < self._data["world_db"][b"main"][b"worldv2"]["worldWidthMacro"]
+            and 0 <= y < 32
+        )
+        self.chunks[b"%d_%d" % (x, y)] = c
 
     def get_chunks(self):
-        return [[int(_) for _ in name.split("_")] for name in self.chunks]
+        return [[int(_) for _ in name.split(b"_")] for name in self.chunks]
 
-    def get_block(self, x, y):
+    def get_block(self, x: int, y: int) -> Block:
         assert (
-            0 <= x < (self._data["world_db"]["main"]["worldv2"]["worldWidthMacro"] << 5)
+            0
+            <= x
+            < (self._data["world_db"][b"main"][b"worldv2"]["worldWidthMacro"] << 5)
             and 0 <= y < 1024
         )
-        name = "%d_%d" % (x >> 5, y >> 5)
+        name = bytes("%d_%d" % (x >> 5, y >> 5), "ascii")
+        if name not in self.chunks:
+            self.chunks[name] = Chunk.create()
         if not isinstance(self.chunks[name], Chunk):
             self.chunks[name] = Chunk(self.chunks[name]._data[0])
         return self.chunks[name].get_block(x & 31, y & 31)
 
-    def get_blockheads(self):
+    def get_blockheads(self) -> list[Blockhead]:
         """
         Return a list containing reference to dictionaries describing
         blockheads.
         """
         return [
             Blockhead(d)
-            for d in self["world_db"]["main"]["blockheads"]["dynamicObjects"]
+            for d in self["world_db"][b"main"][b"blockheads"]["dynamicObjects"]
         ]
 
-    def get_inventory(self, blockhead):
-        assert isinstance(blockhead, Blockhead)
+    def get_inventory(self, blockhead: Blockhead):
         return Inventory(
-            self["world_db"]["main"]["blockhead_%d_inventory" % blockhead.get_uid()]
+            self["world_db"][b"main"][b"blockhead_%d_inventory" % blockhead.get_uid()]
         )
 
 
@@ -254,8 +247,8 @@ if __name__ == "__main__":
     from blockType import BlockType
 
     gs = GameSave("./test_data/saves/c8185b81198a1890dac4b621677a9229/")
-    info = gs.get_info()
-    start_chunk_pos = [_ >> 5 for _ in info["start_portal_pos"]]
+    info = gs.get_summary()
+    start_chunk_pos = [_ >> 5 for _ in info.start_portal_pos]
     start_chunk_pos[1] += 1
     c = gs.get_chunk(*start_chunk_pos)
     for _ in range(128):

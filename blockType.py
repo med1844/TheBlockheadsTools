@@ -5,8 +5,6 @@ from enum import Enum
 class BlockType(Enum):
     """
     The enumeration of block types. Records the ID of each type of block.
-
-    方块类型枚举类。保存了每种方块的ID。
     """
 
     STONE = 1

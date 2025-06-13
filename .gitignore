@@ -7,3 +7,5 @@ save_structure*
 .vscode
 .ruff_cache
 *.png
+server
+test.py
