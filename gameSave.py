@@ -44,11 +44,14 @@ class GameSave:
             if os.path.isdir(full_path):
                 self._data[sub_dir] = {}
                 self._read_env(full_path, self._data[sub_dir])
-
-        self.chunks: Dict[bytes, GzipWrapper | Chunk] = self._data["world_db"][
-            b"blocks"
-        ]
         self.is_server_save = is_server_save
+
+    def chunks(self):
+        return (
+            self._data["world_db"][b"blocks"]
+            if self.is_server_save
+            else self._data["world_db"]["blocks"]
+        )
 
     def __repr__(self):
         return repr(self._data)
@@ -194,27 +197,33 @@ class GameSave:
     def get_chunk(self, x: int, y: int) -> Chunk:
         assert 0 <= x < self.world_width() and 0 <= y < 32
         name = self._get_chunk_name(x, y)
-        if name not in self.chunks:
-            self.chunks[name] = Chunk.create()
-        if not isinstance(self.chunks[name], Chunk):
-            self.chunks[name] = Chunk(self.chunks[name]._data[0])
-        return self.chunks[name]
+        chunks = self.chunks()
+        if name not in chunks:
+            chunks[name] = Chunk.create()
+        if not isinstance(chunks[name], Chunk):
+            chunks[name] = Chunk(chunks[name]._data[0])
+        return chunks[name]
 
     def set_chunk(self, x: int, y: int, c: Chunk):
         assert 0 <= x < self.world_width() and 0 <= y < 32
-        self.chunks[b"%d_%d" % (x, y)] = c
+        chunks = self.chunks()
+        chunks[self._get_chunk_name(x, y)] = c
 
-    def get_chunks(self):
-        return [[int(_) for _ in name.split(b"_")] for name in self.chunks]
+    def get_chunks(self) -> list[tuple[int, ...]]:
+        return [
+            tuple(map(int, name.split(b"_" if self.is_server_save else "_")))
+            for name in self.chunks()
+        ]
 
     def get_block(self, x: int, y: int) -> Block:
         assert 0 <= x < (self.world_width() << 5) and 0 <= y < 1024
         name = self._get_chunk_name(x >> 5, y >> 5)
-        if name not in self.chunks:
-            self.chunks[name] = Chunk.create()
-        if not isinstance(self.chunks[name], Chunk):
-            self.chunks[name] = Chunk(self.chunks[name]._data[0])
-        return self.chunks[name].get_block(x & 31, y & 31)
+        chunks = self.chunks()
+        if name not in chunks:
+            chunks[name] = Chunk.create()
+        if not isinstance(chunks[name], Chunk):
+            chunks[name] = Chunk(chunks[name]._data[0])
+        return chunks[name].get_block(x & 31, y & 31)
 
     def get_blockheads(self) -> list[Blockhead]:
         """
