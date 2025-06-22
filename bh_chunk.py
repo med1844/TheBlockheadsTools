@@ -1,6 +1,8 @@
 # encoding: utf-8
+from dataclasses import dataclass
 import io
 import gzip
+from typing import Iterable
 from exportable import Exportable
 from block import Block
 import array
@@ -8,11 +10,6 @@ import array
 
 class Chunk(Exportable):
     """
-    This is the support class for chunks in the blockheads, offering load,
-    modify, and exporting methods.
-
-    这是对the blockheads中的区块的支持类，用于封装读取，修改，导出等方法。
-
     Chunk format:
      Y
     31| 992| 993| 994|     1023|
@@ -28,7 +25,7 @@ class Chunk(Exportable):
     CHUNK_HEIGHT = 32
     BLOCK_SIZE = 64
 
-    def __init__(self, src_bytes):
+    def __init__(self, src_bytes: bytes):
         self._blocks = array.array("B")
         self._blocks.frombytes(src_bytes)
 
@@ -66,12 +63,11 @@ class Chunk(Exportable):
 
     @classmethod
     def create(cls):
-        return cls("\0" * (cls.CHUNK_WIDTH * cls.CHUNK_HEIGHT * cls.BLOCK_SIZE + 5))
+        return cls(b"\0" * (cls.CHUNK_WIDTH * cls.CHUNK_HEIGHT * cls.BLOCK_SIZE + 5))
 
     def export(self):
         """
         Export a string object, whose content is the compressed chunk data.
-        返回将chunk数据经由gzip压缩后所得的二进制字符串。
         """
         with io.BytesIO() as f:
             with gzip.GzipFile(fileobj=f, mode="wb") as g:

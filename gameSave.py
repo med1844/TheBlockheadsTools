@@ -3,7 +3,7 @@ import os
 import pathlib
 import lmdb
 import plistlib
-from typing import Dict, Any
+from typing import Dict, Any, Self
 from bplist import BPList
 from gzipWrapper import GzipWrapper
 from bh_chunk import Chunk
@@ -35,7 +35,7 @@ class GameSave:
 
     MAX_DBS = 100
 
-    def __init__(self, folder_path):
+    def __init__(self, folder_path: str, is_server_save=True):
         if not folder_path.endswith("/"):
             folder_path += "/"
         self._data: dict[str, Any] = {}
@@ -48,6 +48,7 @@ class GameSave:
         self.chunks: Dict[bytes, GzipWrapper | Chunk] = self._data["world_db"][
             b"blocks"
         ]
+        self.is_server_save = is_server_save
 
     def __repr__(self):
         return repr(self._data)
@@ -73,7 +74,6 @@ class GameSave:
         """
         Write all key-value pairs in db into dict_, given transaction, db and
         dict_.
-        输入Transaction, db和要写入的字典，读取db中所有键值对并写入dict_中。
         """
         for k, v in txn.cursor(db):
             dict_[k] = self._parse(v)
@@ -116,27 +116,10 @@ class GameSave:
         return src
 
     @classmethod
-    def load(cls, path):
-        """
-        Read save files according to the input path, and return a new
-        `GameSave` object for furthur operations.
-        根据输入的文件夹的路径，读取该存档，并返回一个`GameSave`对象，用于后续操作。
-
-        ### Example
-        ```python
-        >>> world = GameSave.load("saves/70b...d36")
-        ```
-
-        ### Arguments
-        - `path`
-            The path of the save that you want to load.
-            你想读取的存档的路径。
-
-        ### Return
-        A new `GameSave` object.
-        一个新`GameSave`对象。
-        """
-        return GameSave(path)
+    def load(cls, path: str) -> Self:
+        """Read save files according to the input path, and return a new
+        `GameSave` object for furthur operations."""
+        return cls(path)
 
     def _export_db(self, dict_, result_dict):
         for k, v in dict_.items():
@@ -147,7 +130,7 @@ class GameSave:
         for k, v in dict_.items():
             cursor.put(k, v)
 
-    def _write_env(self, path: str, dict_):
+    def _write_env(self, path: str, dict_: Dict[str, Any]):
         if not os.path.exists(path):
             pathlib.Path(path).mkdir(parents=True, exist_ok=True)
         db_data = {}
@@ -157,7 +140,7 @@ class GameSave:
             self._export_db(dict_[db], db_data[db])
             for k, v in db_data[db].items():
                 size += len(k) + len(v)
-        env = lmdb.open(path, map_size=size << 3, max_dbs=self.MAX_DBS)
+        env = lmdb.open(path, map_size=size << 8, max_dbs=self.MAX_DBS)
         with env.begin(write=True) as txn:
             for k, v in db_data.items():
                 sub_db = env.open_db(k, txn=txn, create=True)
@@ -171,7 +154,23 @@ class GameSave:
             self._write_env(os.path.join(path, env), self._data[env])
 
     def world_v2(self) -> Dict[str, Any]:
-        return self._data["world_db"][b"main"][b"worldv2"]
+        return (
+            self._data["world_db"][b"main"][b"worldv2"]
+            if self.is_server_save
+            else self._data["world_db"]["main"]["worldv2"]
+        )
+
+    def world_name(self) -> str:
+        return self.world_v2()["worldName"]
+
+    def set_world_name(self, name: str):
+        self.world_v2()["worldName"] = name
+
+    def save_id(self) -> str:
+        return self.world_v2()["saveID"]
+
+    def set_save_id(self, id: str):
+        self.world_v2()["saveID"] = id
 
     def get_summary(self) -> SaveSummary:
         world_v2 = self.world_v2()
@@ -189,12 +188,12 @@ class GameSave:
     def world_width(self) -> int:
         return self.world_v2()["worldWidthMacro"]
 
+    def _get_chunk_name(self, x: int, y: int) -> bytes | str:
+        return (b"%d_%d" if self.is_server_save else "%d_%d") % (x, y)
+
     def get_chunk(self, x: int, y: int) -> Chunk:
-        assert (
-            0 <= x < self._data["world_db"][b"main"][b"worldv2"]["worldWidthMacro"]
-            and 0 <= y < 32
-        )
-        name = b"%d_%d" % (x, y)
+        assert 0 <= x < self.world_width() and 0 <= y < 32
+        name = self._get_chunk_name(x, y)
         if name not in self.chunks:
             self.chunks[name] = Chunk.create()
         if not isinstance(self.chunks[name], Chunk):
@@ -202,23 +201,15 @@ class GameSave:
         return self.chunks[name]
 
     def set_chunk(self, x: int, y: int, c: Chunk):
-        assert (
-            0 <= x < self._data["world_db"][b"main"][b"worldv2"]["worldWidthMacro"]
-            and 0 <= y < 32
-        )
+        assert 0 <= x < self.world_width() and 0 <= y < 32
         self.chunks[b"%d_%d" % (x, y)] = c
 
     def get_chunks(self):
         return [[int(_) for _ in name.split(b"_")] for name in self.chunks]
 
     def get_block(self, x: int, y: int) -> Block:
-        assert (
-            0
-            <= x
-            < (self._data["world_db"][b"main"][b"worldv2"]["worldWidthMacro"] << 5)
-            and 0 <= y < 1024
-        )
-        name = bytes("%d_%d" % (x >> 5, y >> 5), "ascii")
+        assert 0 <= x < (self.world_width() << 5) and 0 <= y < 1024
+        name = self._get_chunk_name(x >> 5, y >> 5)
         if name not in self.chunks:
             self.chunks[name] = Chunk.create()
         if not isinstance(self.chunks[name], Chunk):
@@ -232,12 +223,20 @@ class GameSave:
         """
         return [
             Blockhead(d)
-            for d in self["world_db"][b"main"][b"blockheads"]["dynamicObjects"]
+            for d in (
+                self["world_db"][b"main"][b"blockheads"]["dynamicObjects"]
+                if self.is_server_save
+                else self["world_db"]["main"]["blockheads"]["dynamicObjects"]
+            )
         ]
 
     def get_inventory(self, blockhead: Blockhead):
         return Inventory(
             self["world_db"][b"main"][b"blockhead_%d_inventory" % blockhead.get_uid()]
+            if self.is_server_save
+            else self["world_db"]["main"][
+                "blockhead_%d_inventory" % blockhead.get_uid()
+            ]
         )
 
 
@@ -248,11 +247,11 @@ if __name__ == "__main__":
 
     gs = GameSave("./test_data/saves/c8185b81198a1890dac4b621677a9229/")
     info = gs.get_summary()
-    start_chunk_pos = [_ >> 5 for _ in info.start_portal_pos]
-    start_chunk_pos[1] += 1
-    c = gs.get_chunk(*start_chunk_pos)
+    start_pos_x, start_pos_y = info.start_portal_pos
+    start_chunk_x, start_chunk_y = start_pos_x >> 5, (start_pos_y >> 5) + 1
+    c = gs.get_chunk(start_chunk_x, start_chunk_y)
     for _ in range(128):
         block = c.get_block(randint(0, 31), randint(0, 31))
-        block.set_attr("first_layer_id", BlockType.TIME_CRYSTAL.value)
+        block.set_fg_type(BlockType.TIME_CRYSTAL)
     print("saving...")
     gs.save("./test_data/saves/out/")

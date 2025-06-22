@@ -76,4 +76,4 @@ class TestChunk:
             data = f.read()
         c = Chunk(data)
         b = c.get_block(5, 7)
-        b.set("first_layer_id", 57)
+        b.set_fg_type_raw(57)

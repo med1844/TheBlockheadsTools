@@ -63,7 +63,7 @@ And you would like to change it to time crystal:
 
 ```python
 >>> from blockType import BlockType
->>> b.set("first_layer_id", BlockType.TIME_CRYSTAL)
+>>> b.set_fg_type(BlockType.TIME_CRYSTAL)
 ```
 
 ### Modify a chunk
@@ -83,7 +83,7 @@ Then modify blocks in it!
 >>> for x in range(32):
 ...     for y in range(32):
 ...         b = c.get_block(x, y)
-...         b.set("first_layer_id", BlockType.LUMINOUS_PLASTER)
+...         b.set_fg_type(BlockType.LUMINOUS_PLASTER)
 ```
 
 The code above would set every block in that chunk to luminous plaster.

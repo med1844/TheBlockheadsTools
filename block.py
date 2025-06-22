@@ -27,7 +27,10 @@ class Block:
         self._st = start_pos
 
     def __repr__(self):
-        return self.fg_type().name[:5]
+        try:
+            return self.fg_type().name[:5]
+        except ValueError:
+            return "%5d" % self.fg_type_raw()
 
     def __getitem__(self, index):
         if index < 0:
@@ -44,8 +47,14 @@ class Block:
     def fg_type(self) -> BlockType:
         return BlockType(self[0])
 
+    def fg_type_raw(self) -> int:
+        return self[0]
+
     def set_fg_type(self, t: BlockType):
         self[0] = t.value
+
+    def set_fg_type_raw(self, t: int):
+        self[0] = t
 
     def bg_type(self) -> BlockType:
         return BlockType(self[1])
@@ -73,6 +82,15 @@ class Block:
 
     def visibility(self) -> int:
         return self[6]
+
+    def set_visibility(self, b: int):
+        self[6] = b
+
+    def brightness(self) -> int:
+        return self[7]
+
+    def set_brightness(self, b: int):
+        self[7] = b
 
     def to_hex(self) -> str:
         return " ".join(["%02x" % self[i] for i in range(64)])

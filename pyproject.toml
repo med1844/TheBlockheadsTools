@@ -8,3 +8,8 @@ dependencies = [
     "lmdb>=1.6.2",
     "option>=2.1.0",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.1",
+]
