@@ -1,13 +1,14 @@
-[package]
-name = "the-blockheads-tools"
-version = "0.1.0"
-edition = "2024"
+[workspace]
+members = ["crates/*"]
+resolver = "2"
 
-[dependencies]
-byteorder = "1.5.0"
-flate2 = "1.1.2"
-heed = "0.22.0"
-plist = "1.7.2"
-serde = "1.0.219"
-serde_derive = "1.0.219"
-thiserror = "2.0.12"
+[workspace.package]
+edition = "2024"
+rust-version = "1.85"
+authors = ["med1844"]
+license = "MIT"
+
+[workspace.dependencies]
+the-blockheads-tools-lib = { path = "crates/lib" }
+the-blockheads-tools-gui = { path = "crates/gui" }
+

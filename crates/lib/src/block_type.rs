@@ -3,7 +3,7 @@ use crate::error::BhError;
 /// An enumeration of block types.
 ///
 /// Records the ID of each type of block.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 #[repr(u64)]
 pub enum BlockType {
     Stone = 1,
