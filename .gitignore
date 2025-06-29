@@ -9,3 +9,8 @@ save_structure*
 *.png
 server
 test.py
+
+
+# Added by cargo
+
+/target
