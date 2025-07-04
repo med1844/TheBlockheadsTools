@@ -4,7 +4,7 @@ use crate::error::BhError;
 ///
 /// Records the ID of each type of block.
 #[derive(Debug, PartialEq, Eq, Hash)]
-#[repr(u64)]
+#[repr(u8)]
 pub enum BlockType {
     Stone = 1,
     Air = 2,

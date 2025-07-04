@@ -5,8 +5,16 @@ edition = "2024"
 
 [dependencies]
 egui = "0.31.1"
-egui-macroquad = "0.17.3"
-glam = "0.27"
-macroquad = "0.4.14"
+egui-wgpu = { version = "0.31.1",features = ["winit"] }
+egui-winit = "0.31.1"
+winit = "0.30.9"
+pollster = "0.4.0"
+bytemuck = { version = "1.12", features = ["derive"] }
+glam = { version = "0.30.4", features = ["bytemuck"] }
 the-blockheads-tools-lib = { workspace = true }
+eframe = { version = "0.31.1", features = ["wgpu"] }
+mimalloc = "0.1.47"
+env_logger = "0.11.8"
+log = "0.4.27"
+zune-png = "0.4.10"
 

@@ -1,4 +1,3 @@
-use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::io::Read;
 use std::ops::Deref;
@@ -20,7 +19,7 @@ mod error;
 pub use block::{Block, BlockMut, BlockView, BlockViewMut};
 pub use block_type::BlockType;
 pub use coords::{BlockCoord, ChunkBlockCoord, ChunkCoord};
-pub use error::BhResult;
+pub use error::{BhError, BhResult};
 
 #[derive(Debug)]
 pub struct Map(HashMap<String, Vec<u8>>);
