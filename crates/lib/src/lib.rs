@@ -17,7 +17,7 @@ mod coords;
 mod error;
 
 pub use block::{Block, BlockMut, BlockView, BlockViewMut};
-pub use block_type::BlockType;
+pub use block_type::{BlockContent, BlockType};
 pub use coords::{BlockCoord, ChunkBlockCoord, ChunkCoord};
 pub use error::{BhError, BhResult};
 

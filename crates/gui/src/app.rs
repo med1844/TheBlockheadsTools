@@ -4,7 +4,9 @@ use egui_wgpu::wgpu::{SurfaceError, util::DeviceExt};
 use egui_wgpu::{ScreenDescriptor, wgpu};
 use glam::{Mat4, Vec3};
 use std::sync::Arc;
-use the_blockheads_tools_lib::{BhResult, BlockCoord, BlockView, ChunkBlockCoord, WorldDb};
+use the_blockheads_tools_lib::{
+    BhResult, BlockContent, BlockCoord, BlockView, ChunkBlockCoord, WorldDb,
+};
 use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
 use winit::event::WindowEvent;
@@ -21,16 +23,20 @@ fn load_chunk() -> BhResult<AllChunk> {
         let x = world_db.main.world_v2.start_portal_pos_x;
         let y = world_db.main.world_v2.start_portal_pos_y;
         let start_portal_pos = BlockCoord::new(x, (y - 1) as u16)?;
-        // let block = world_db.blocks.block_at(start_portal_pos).unwrap()?;
-        // let block_type = block.fg()?;
         let mut blocks = Vec::with_capacity(32 * 32 * 3);
         let chunk = world_db.blocks.chunk_at(start_portal_pos).unwrap()?;
         for y in 0..32 {
             for x in 0..32 {
                 let block = chunk.block_at(&ChunkBlockCoord::new(x, y)?);
-                blocks.push(block.fg()?.try_into()?);
-                blocks.push(block.fg()?.try_into()?);
-                blocks.push(block.bg()?.try_into()?);
+                let fg_type: UVMappedBlockType = (
+                    block.fg()?,
+                    block.fg_content().unwrap_or(BlockContent::None),
+                )
+                    .try_into()?;
+                let bg_type: UVMappedBlockType = (block.bg()?, BlockContent::None).try_into()?;
+                blocks.push(bg_type);
+                blocks.push(fg_type);
+                blocks.push(fg_type);
             }
         }
         Ok(AllChunk {
@@ -41,52 +47,75 @@ fn load_chunk() -> BhResult<AllChunk> {
     }
 }
 
-// Define the 8 vertices of a cube.
-const VERTICES: &[Vertex] = &[
-    Vertex {
-        pos: [-0.5, -0.5, 0.5],
-        color: [1.0, 0.0, 0.0],
-    },
-    Vertex {
-        pos: [0.5, -0.5, 0.5],
-        color: [0.0, 1.0, 0.0],
-    },
-    Vertex {
-        pos: [0.5, 0.5, 0.5],
-        color: [0.0, 0.0, 1.0],
-    },
-    Vertex {
-        pos: [-0.5, 0.5, 0.5],
-        color: [1.0, 1.0, 0.0],
-    },
-    Vertex {
-        pos: [-0.5, -0.5, -0.5],
-        color: [1.0, 0.0, 1.0],
-    },
-    Vertex {
-        pos: [0.5, -0.5, -0.5],
-        color: [0.0, 1.0, 1.0],
-    },
-    Vertex {
-        pos: [0.5, 0.5, -0.5],
-        color: [1.0, 1.0, 1.0],
-    },
-    Vertex {
-        pos: [-0.5, 0.5, -0.5],
-        color: [0.0, 0.0, 0.0],
-    },
-];
+struct ChunkMesh {
+    vertices: [Vertex; 8],
+}
+
+impl ChunkMesh {
+    const INDICES: &[u16] = &[
+        0, 1, 2, 2, 3, 0, // front
+        1, 5, 6, 6, 2, 1, // right
+        5, 4, 7, 7, 6, 5, // back
+        4, 0, 3, 3, 7, 4, // left
+        3, 2, 6, 6, 7, 3, // top
+        4, 5, 1, 1, 0, 4, // bottom
+    ];
+
+    fn new(offset: Vec3) -> Self {
+        let [min_x, min_y, min_z] = offset.to_array();
+        let max_x = min_x + 32.;
+        let max_y = min_y + 32.;
+        let max_z = min_z + 3.;
+        Self {
+            vertices: [
+                // Front face
+                Vertex {
+                    pos: [min_x, min_y, max_z],
+                },
+                Vertex {
+                    pos: [max_x, min_y, max_z],
+                },
+                Vertex {
+                    pos: [max_x, max_y, max_z],
+                },
+                Vertex {
+                    pos: [min_x, max_y, max_z],
+                },
+                // Back face
+                Vertex {
+                    pos: [min_x, min_y, min_z],
+                },
+                Vertex {
+                    pos: [max_x, min_y, min_z],
+                },
+                Vertex {
+                    pos: [max_x, max_y, min_z],
+                },
+                Vertex {
+                    pos: [min_x, max_y, min_z],
+                },
+            ],
+        }
+    }
+
+    fn to_vertex_index_buffer(&self, device: &wgpu::Device) -> (wgpu::Buffer, wgpu::Buffer, u32) {
+        let vertex_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Vertex Buffer"),
+            contents: bytemuck::cast_slice(&self.vertices),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+
+        let index_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Index Buffer"),
+            contents: bytemuck::cast_slice(Self::INDICES),
+            usage: wgpu::BufferUsages::INDEX,
+        });
+
+        (vertex_buf, index_buf, Self::INDICES.len() as u32)
+    }
+}
 
 // Define how to connect the vertices to form triangles.
-const INDICES: &[u16] = &[
-    0, 1, 2, 2, 3, 0, // front
-    1, 5, 6, 6, 2, 1, // right
-    5, 4, 7, 7, 6, 5, // back
-    4, 0, 3, 3, 7, 4, // left
-    3, 2, 6, 6, 7, 3, // top
-    4, 5, 1, 1, 0, 4, // bottom
-];
-
 pub struct Camera {
     pub center: glam::Vec2,
     pub distance: f32,
@@ -100,7 +129,7 @@ impl Default for Camera {
     fn default() -> Self {
         Self {
             center: glam::Vec2::new(0.0, 0.0),
-            distance: -5.0,
+            distance: 5.0,
             up: Vec3::Y,
             fovy: 45.0_f32.to_radians(),
             z_near: 0.01,
@@ -127,11 +156,11 @@ impl Camera {
         self.center.extend(0.0)
     }
 
-    pub fn to_uniform(&self, window_size: (f32, f32)) -> CameraUniform {
+    fn to_uniform(&self, window_size: (f32, f32)) -> CameraUniform {
         let (width, height) = window_size;
         let aspect = width / height;
-        let view = Mat4::look_at_lh(self.eye(), self.target(), self.up);
-        let proj = Mat4::perspective_lh(self.fovy, aspect, self.z_near, self.z_far);
+        let view = Mat4::look_at_rh(self.eye(), self.target(), self.up);
+        let proj = Mat4::perspective_rh(self.fovy, aspect, self.z_near, self.z_far);
         let pv = proj * view;
         CameraUniform {
             view_proj: pv.to_cols_array_2d(),
@@ -148,7 +177,7 @@ struct Scene {
     voxel_buf: wgpu::Buffer,
     num_indices: u32,
     pipeline: wgpu::RenderPipeline,
-    uniform_buf: wgpu::Buffer,
+    camera_buf: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
     camera: Camera,
 }
@@ -159,17 +188,8 @@ impl Scene {
         queue: &wgpu::Queue,
         config: &wgpu::SurfaceConfiguration,
     ) -> Self {
-        let vertex_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Vertex Buffer"),
-            contents: bytemuck::cast_slice(VERTICES),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
-
-        let index_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Index Buffer"),
-            contents: bytemuck::cast_slice(INDICES),
-            usage: wgpu::BufferUsages::INDEX,
-        });
+        let chunk = ChunkMesh::new(Vec3::ZERO);
+        let (vertex_buf, index_buf, num_indices) = chunk.to_vertex_index_buffer(device);
 
         let all_chunks = load_chunk().unwrap();
         let voxel_buf = all_chunks.create_buffer_init(device);
@@ -190,7 +210,6 @@ impl Scene {
 
         let tile_map_img_bytes = include_bytes!("../resources/TileMap.png");
         let mut decoder = PngDecoder::new(tile_map_img_bytes);
-        // let (tile_map_img_w, tile_map_img_h) = decoder.get_dimensions().unwrap();
         let (tile_map_img_w, tile_map_img_h) = (512, 512);
         let tile_map_img = decoder.decode().unwrap().u8().unwrap();
 
@@ -253,7 +272,7 @@ impl Scene {
             entries: &[
                 wgpu::BindGroupLayoutEntry {
                     binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform,
                         has_dynamic_offset: false,
@@ -343,12 +362,8 @@ impl Scene {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: Some("vs_main"),
-                // buffers: &[wgpu::VertexBufferLayout {
-                //     array_stride: std::mem::size_of::<Vertex>() as wgpu::BufferAddress,
-                //     step_mode: wgpu::VertexStepMode::Vertex,
-                //     attributes: &wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3],
-                // }],
-                buffers: &[],
+                buffers: &[Vertex::buffer_layout()],
+                // buffers: &[],
                 compilation_options: Default::default(),
             },
             fragment: Some(wgpu::FragmentState {
@@ -366,14 +381,14 @@ impl Scene {
                 cull_mode: Some(wgpu::Face::Back), // Prevent rendering the inside of the cube
                 ..Default::default()
             },
-            // depth_stencil: Some(wgpu::DepthStencilState {
-            //     format: DEPTH_FORMAT,
-            //     depth_write_enabled: true,
-            //     depth_compare: wgpu::CompareFunction::Less,
-            //     stencil: wgpu::StencilState::default(),
-            //     bias: wgpu::DepthBiasState::default(),
-            // }),
-            depth_stencil: None,
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: DEPTH_FORMAT,
+                depth_write_enabled: true,
+                depth_compare: wgpu::CompareFunction::Less,
+                stencil: wgpu::StencilState::default(),
+                bias: wgpu::DepthBiasState::default(),
+            }),
+            // depth_stencil: None,
             multisample: wgpu::MultisampleState::default(),
             multiview: None,
             cache: None,
@@ -383,9 +398,9 @@ impl Scene {
             vertex_buf,
             index_buf,
             voxel_buf,
-            num_indices: INDICES.len() as u32,
+            num_indices,
             pipeline,
-            uniform_buf: camera_buf,
+            camera_buf,
             bind_group,
             camera: Camera::default(),
         }
@@ -394,7 +409,7 @@ impl Scene {
     fn update_uniforms(&self, queue: &wgpu::Queue, width: u32, height: u32) {
         let camera = self.camera.to_uniform((width as f32, height as f32));
 
-        queue.write_buffer(&self.uniform_buf, 0, bytemuck::cast_slice(&[camera]));
+        queue.write_buffer(&self.camera_buf, 0, bytemuck::cast_slice(&[camera]));
     }
 }
 
@@ -613,25 +628,25 @@ impl App {
                         store: wgpu::StoreOp::Store,
                     },
                 })],
-                // depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                //     view: &state.depth_view,
-                //     depth_ops: Some(wgpu::Operations {
-                //         load: wgpu::LoadOp::Clear(1.0),
-                //         store: wgpu::StoreOp::Store,
-                //     }),
-                //     stencil_ops: None,
-                // }),
-                depth_stencil_attachment: None,
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: &state.depth_view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(1.0),
+                        store: wgpu::StoreOp::Store,
+                    }),
+                    stencil_ops: None,
+                }),
+                // depth_stencil_attachment: None,
                 timestamp_writes: None,
                 occlusion_query_set: None,
             });
 
             rpass.set_pipeline(&state.scene.pipeline);
             rpass.set_bind_group(0, &state.scene.bind_group, &[]);
-            // rpass.set_vertex_buffer(0, state.scene.vertex_buf.slice(..));
-            // rpass.set_index_buffer(state.scene.index_buf.slice(..), wgpu::IndexFormat::Uint16);
-            // rpass.draw_indexed(0..state.scene.num_indices, 0, 0..1);
-            rpass.draw(0..3, 0..1);
+            rpass.set_vertex_buffer(0, state.scene.vertex_buf.slice(..));
+            rpass.set_index_buffer(state.scene.index_buf.slice(..), wgpu::IndexFormat::Uint16);
+            rpass.draw_indexed(0..state.scene.num_indices, 0, 0..1);
+            // rpass.draw(0..3, 0..1);
         }
 
         // egui Pass

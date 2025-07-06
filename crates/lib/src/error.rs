@@ -14,6 +14,8 @@ pub enum BhError {
     ParseError(String), // New error variant for parsing issues
     #[error("Invalid block ID: {0}")]
     InvalidBlockIdError(u8),
+    #[error("Invalid block content ID: {0}")]
+    InvalidBlockContentIdError(u8),
 }
 
 pub type BhResult<T> = Result<T, BhError>;

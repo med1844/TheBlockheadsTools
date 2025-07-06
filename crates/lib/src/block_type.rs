@@ -270,3 +270,38 @@ impl Into<u8> for BlockType {
         self as u8
     }
 }
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+#[repr(u8)]
+pub enum BlockContent {
+    None = 0,
+    Workbench = 46,
+    PortalGate = 47,
+    CopperOre = 61,
+    TinOre = 62,
+    IronOre = 63,
+    Oil = 64,
+    Coal = 65,
+    GoldNuggets = 66,
+    PlatinumOre = 67,
+    TitaniumOre = 68,
+}
+
+impl BlockContent {
+    pub fn try_from_u8(value: u8) -> Result<Self, BhError> {
+        match value {
+            0 => Ok(BlockContent::None),
+            46 => Ok(BlockContent::Workbench),
+            47 => Ok(BlockContent::PortalGate),
+            61 => Ok(BlockContent::CopperOre),
+            62 => Ok(BlockContent::TinOre),
+            63 => Ok(BlockContent::IronOre),
+            64 => Ok(BlockContent::Oil),
+            65 => Ok(BlockContent::Coal),
+            66 => Ok(BlockContent::GoldNuggets),
+            67 => Ok(BlockContent::PlatinumOre),
+            68 => Ok(BlockContent::TitaniumOre),
+            _ => Err(BhError::InvalidBlockContentIdError(value)),
+        }
+    }
+}

@@ -85,24 +85,45 @@ fn sample_texture(voxel_type: u32, hit_face_id: u32, uv_on_face: vec2<f32>) -> v
     return textureSample(texture_atlas, texture_sampler, final_atlas_uv);
 }
 
+// @vertex
+// fn vs_main(@builtin(vertex_index) vertex_index : u32) -> @builtin(position) vec4<f32> {
+//     var positions = array<vec2<f32>, 3>(
+//         vec2<f32>(-1.0, -1.0),
+//         vec2<f32>( 3.0, -1.0),
+//         vec2<f32>(-1.0,  3.0)
+//     );
+//     return vec4<f32>(positions[vertex_index], 0.0, 1.0);
+// }
+
+// Vertex shader input
+struct VertexInput {
+    @location(0) position: vec3<f32>,
+};
+
+// Vertex shader output (and fragment shader input)
+struct VertexOutput {
+    @builtin(position) clip_position: vec4<f32>,
+};
+
 @vertex
-fn vs_main(@builtin(vertex_index) vertex_index : u32) -> @builtin(position) vec4<f32> {
-    var positions = array<vec2<f32>, 3>(
-        vec2<f32>(-1.0, -1.0),
-        vec2<f32>( 3.0, -1.0),
-        vec2<f32>(-1.0,  3.0)
-    );
-    return vec4<f32>(positions[vertex_index], 0.0, 1.0);
+fn vs_main(
+    model: VertexInput,
+) -> VertexOutput {
+    var out: VertexOutput;
+    out.clip_position = camera.view_proj * vec4<f32>(model.position, 1.0);
+    return out;
 }
 
 @fragment
-fn fs_main(@builtin(position) frag_coord: vec4<f32>) -> @location(0) vec4<f32> {
+fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+    let frag_coord = in.clip_position;
     let screen_width = camera.screen_size.x;
     let screen_height = camera.screen_size.y;
 
     let ndc_coords = vec2<f32>(
         (frag_coord.x / screen_width) * 2.0 - 1.0,
-        (frag_coord.y / screen_height) * 2.0 - 1.0
+        // (frag_coord.y / screen_height) * 2.0 - 1.0
+        1.0 - (frag_coord.y / screen_height) * 2.0
     );
 
     let inv_view_proj = camera.inv_view_proj;
@@ -213,11 +234,11 @@ fn fs_main(@builtin(position) frag_coord: vec4<f32>) -> @location(0) vec4<f32> {
             let fractional_pos = hit_point / VOXEL_SIZE;
 
             if (normal_of_entry_face.x != 0) { // Hit an X face
-                uv = vec2<f32>(fract(fractional_pos.z), fract(fractional_pos.y));
+                uv = vec2<f32>(fract(fractional_pos.z), 1.0 - fract(fractional_pos.y));
             } else if (normal_of_entry_face.y != 0) { // Hit a Y face
                 uv = vec2<f32>(fract(fractional_pos.x), fract(fractional_pos.z));
             } else { // Hit a Z face
-                uv = vec2<f32>(fract(fractional_pos.x), fract(fractional_pos.y));
+                uv = vec2<f32>(fract(fractional_pos.x), 1.0 - fract(fractional_pos.y));
             }
 
             hit_color = sample_texture(voxel_type, hit_face_id, uv);
