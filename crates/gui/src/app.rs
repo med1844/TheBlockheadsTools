@@ -1,6 +1,7 @@
-use crate::{
+use super::{
     egui_tools::EguiRenderer,
     gpu::{Camera, CameraBuf, ChunkBuffers, RgbaTexture, VoxelBuf},
+    input::Input,
     renderer::{DEPTH_FORMAT, VoxelRenderer},
 };
 use egui_wgpu::wgpu::SurfaceError;
@@ -20,6 +21,9 @@ pub struct AppState {
     pub surface: wgpu::Surface<'static>,
     pub scale_factor: f32,
     pub egui_renderer: EguiRenderer,
+
+    // input
+    pub input: Input,
 
     // 3d rendering related
     pub camera_buf: CameraBuf,
@@ -121,6 +125,8 @@ impl AppState {
             scale_factor,
             egui_renderer,
 
+            input: Input::new(),
+
             camera_buf,
             voxel_renderer,
             depth_view,
@@ -154,9 +160,8 @@ impl AppState {
     }
 
     fn handle_input(&mut self, window: &Window, event: &WindowEvent) {
-        if matches!(event, WindowEvent::MouseInput { .. }) {
-            dbg!(event);
-        }
+        self.input.handle_input(window, event);
+        self.camera_buf.handle_input(&self.input);
     }
 }
 

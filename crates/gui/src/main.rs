@@ -2,6 +2,7 @@ mod app;
 mod chunk_manager;
 mod egui_tools;
 mod gpu;
+mod input;
 mod renderer;
 
 use winit::event_loop::{ControlFlow, EventLoop};

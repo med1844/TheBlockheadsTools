@@ -1,5 +1,6 @@
+use crate::input::Input;
 use egui_wgpu::wgpu::{self, util::DeviceExt};
-use glam::{Mat4, Vec3};
+use glam::{Mat4, Vec3, Vec3Swizzles, Vec4Swizzles};
 
 // Define how to connect the vertices to form triangles.
 pub struct Camera {
@@ -60,6 +61,7 @@ impl Camera {
         let uniform = self.uniform((1280.0, 720.0)); // placeholder value
         CameraBuf {
             camera: self,
+            uniform,
             buf: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some("Camera Uniform Buffer"),
                 contents: bytemuck::cast_slice(&[uniform]),
@@ -69,14 +71,74 @@ impl Camera {
     }
 }
 
+impl CameraUniform {
+    fn window_size(&self) -> (f32, f32) {
+        (self.screen_size[0], self.screen_size[1])
+    }
+}
+
 pub struct CameraBuf {
     pub camera: Camera,
+    pub uniform: CameraUniform,
     pub buf: wgpu::Buffer,
 }
 
 impl CameraBuf {
-    pub fn update_uniforms(&self, queue: &wgpu::Queue, width: u32, height: u32) {
-        let camera = self.camera.uniform((width as f32, height as f32));
-        queue.write_buffer(&self.buf, 0, bytemuck::cast_slice(&[camera]));
+    pub fn update_uniforms(&mut self, queue: &wgpu::Queue, width: u32, height: u32) {
+        self.uniform = self.camera.uniform((width as f32, height as f32));
+        queue.write_buffer(&self.buf, 0, bytemuck::cast_slice(&[self.uniform]));
+    }
+
+    fn screen_to_world_ray(&self, screen_pos: (f32, f32), window_size: (f32, f32)) -> (Vec3, Vec3) {
+        let (screen_x, screen_y) = screen_pos;
+        let (window_width, window_height) = window_size;
+
+        // Convert screen coordinates to normalized device coordinates (NDC)
+        // NDC range from -1 to 1
+        let ndc_x = (screen_x / window_width) * 2.0 - 1.0;
+        let ndc_y = (1.0 - (screen_y / window_height)) * 2.0 - 1.0; // Y is inverted in screen space
+
+        let inv_view_proj = Mat4::from_cols_array_2d(&self.uniform.inv_view_proj);
+
+        // Create a ray in clip space (start at z=-1 for near plane, end at z=1 for far plane)
+        let ray_clip_start = Vec3::new(ndc_x, ndc_y, -1.0).extend(1.0);
+        let ray_clip_end = Vec3::new(ndc_x, ndc_y, 1.0).extend(1.0);
+
+        // Transform ray to world space
+        let ray_world_start = inv_view_proj * ray_clip_start;
+        let ray_world_end = inv_view_proj * ray_clip_end;
+
+        let ray_world_start = ray_world_start.xyz() / ray_world_start.w;
+        let ray_world_end = ray_world_end.xyz() / ray_world_end.w;
+
+        let ray_origin = ray_world_start;
+        let ray_direction = (ray_world_end - ray_world_start).normalize();
+
+        (ray_origin, ray_direction)
+    }
+
+    fn screen_to_xy_at_z(
+        &self,
+        screen_pos: (f32, f32),
+        window_size: (f32, f32),
+        z_plane: f32,
+    ) -> Vec3 {
+        let (ray_origin, ray_direction) = self.screen_to_world_ray(screen_pos, window_size);
+        let t = (z_plane - ray_origin.z) / ray_direction.z;
+        ray_origin + t * ray_direction
+    }
+
+    pub fn handle_input(&mut self, input: &Input) {
+        if input.is_mouse_left_down {
+            let window_size = self.uniform.window_size();
+            let prev_world_pos_at_z3 =
+                self.screen_to_xy_at_z(input.prev_mouse_pos, window_size, 3.0);
+            let curr_world_pos_at_z3 =
+                self.screen_to_xy_at_z(input.current_mouse_pos, window_size, 3.0);
+            self.camera.center -= (curr_world_pos_at_z3 - prev_world_pos_at_z3).xy();
+        }
+        if input.mouse_wheel_delta != 0.0 {
+            self.camera.distance *= 1.0 - input.mouse_wheel_delta * 1e-1;
+        }
     }
 }

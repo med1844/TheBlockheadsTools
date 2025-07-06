@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use egui_wgpu::wgpu::{self, util::DeviceExt};
 use the_blockheads_tools_lib::{
     BhError, BhResult, BlockContent, BlockCoord, BlockType, BlockView, Chunk, ChunkBlockCoord,

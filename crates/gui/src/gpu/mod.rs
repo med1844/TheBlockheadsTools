@@ -6,7 +6,7 @@ mod vertex;
 mod voxel;
 
 pub use camera::{Camera, CameraBuf};
-pub use chunk::{ChunkBuffers, ChunkMesh};
+pub use chunk::ChunkBuffers;
 pub use texture::RgbaTexture;
 pub use vertex::Vertex;
 pub use voxel::{VoxelBuf, VoxelType};

@@ -1,7 +1,7 @@
 use egui_wgpu::wgpu;
 
 pub struct RgbaTexture {
-    pub texture: wgpu::Texture,
+    // pub texture: wgpu::Texture,
     pub view: wgpu::TextureView,
     pub sampler: wgpu::Sampler,
 }
@@ -57,7 +57,7 @@ impl RgbaTexture {
         });
 
         Self {
-            texture,
+            // texture,
             view,
             sampler,
         }
