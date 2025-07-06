@@ -1,8 +1,4 @@
-use crate::{
-    BlockContent,
-    block_type::BlockType,
-    error::{BhError, BhResult},
-};
+use crate::{BlockContent, block_type::BlockType, error::BhResult};
 use std::ops::{Deref, DerefMut};
 
 pub struct Block<'chunk>(&'chunk [u8; 64]);

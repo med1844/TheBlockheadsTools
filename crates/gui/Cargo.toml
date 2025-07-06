@@ -12,7 +12,6 @@ pollster = "0.4.0"
 bytemuck = { version = "1.12", features = ["derive"] }
 glam = { version = "0.30.4", features = ["bytemuck"] }
 the-blockheads-tools-lib = { workspace = true }
-eframe = { version = "0.31.1", features = ["wgpu"] }
 mimalloc = "0.1.47"
 env_logger = "0.11.8"
 log = "0.4.27"

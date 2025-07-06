@@ -116,14 +116,16 @@ impl WorldDbMain {
     }
 }
 
-const NUM_BLOCK_PER_ROW: usize = 32;
-const NUM_BLOCK_PER_COL: usize = 32;
-const NUM_BYTES_PER_BLOCK: usize = 64;
-
 #[derive(Debug)]
-pub struct Chunk([u8; NUM_BLOCK_PER_ROW * NUM_BLOCK_PER_COL * NUM_BYTES_PER_BLOCK + 5]); // 5 unknown bytes
+pub struct Chunk(
+    [u8; Self::NUM_BLOCK_PER_ROW * Self::NUM_BLOCK_PER_COL * Self::NUM_BYTES_PER_BLOCK + 5],
+); // 5 unknown bytes
 
 impl Chunk {
+    pub const NUM_BLOCK_PER_ROW: usize = 32;
+    pub const NUM_BLOCK_PER_COL: usize = 32;
+    pub const NUM_BYTES_PER_BLOCK: usize = 64;
+
     fn new_empty() -> Self {
         Self([0; 32 * 32 * 64 + 5])
     }
@@ -138,31 +140,33 @@ impl Chunk {
 
     pub fn block_at<O: ChunkOffset>(&self, coord: O) -> Block {
         let offset = coord.to_offset();
-        let slice = <&[u8; 64]>::try_from(&self.inner()[offset..offset + NUM_BYTES_PER_BLOCK])
-            .expect(
-                "Return value of `ChunkBlockCoord.to_offset()` is guaranteed \
+        let slice =
+            <&[u8; 64]>::try_from(&self.inner()[offset..offset + Self::NUM_BYTES_PER_BLOCK])
+                .expect(
+                    "Return value of `ChunkBlockCoord.to_offset()` is guaranteed \
                 to be smaller than chunk bytes len - 32",
-            );
+                );
         Block::new(slice)
     }
 
     pub fn block_at_mut<O: ChunkOffset>(&mut self, coord: O) -> BlockMut {
         let offset = coord.to_offset();
-        let slice =
-            <&mut [u8; 64]>::try_from(&mut self.inner_mut()[offset..offset + NUM_BYTES_PER_BLOCK])
-                .expect(
-                    "Return value of `ChunkBlockCoord.to_offset()` is guaranteed \
+        let slice = <&mut [u8; 64]>::try_from(
+            &mut self.inner_mut()[offset..offset + Self::NUM_BYTES_PER_BLOCK],
+        )
+        .expect(
+            "Return value of `ChunkBlockCoord.to_offset()` is guaranteed \
                 to be smaller than chunk bytes len - 32",
-                );
+        );
         BlockMut::new(slice)
     }
 
     pub fn display_chunk_by_fg(&self) -> String {
         let mut result = String::new();
 
-        for y in (0..NUM_BLOCK_PER_COL).rev() {
+        for y in (0..Self::NUM_BLOCK_PER_COL).rev() {
             let mut row_strings = Vec::new();
-            for x in 0..NUM_BLOCK_PER_ROW {
+            for x in 0..Self::NUM_BLOCK_PER_ROW {
                 let coord = ChunkBlockCoord::new(x as u8, y as u8).expect("Must be valid coord");
                 let block = self.block_at(coord);
 

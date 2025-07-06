@@ -56,8 +56,8 @@ impl ChunkOffset for &ChunkBlockCoord {
 /// Chunk coordinates in world. 0 <= x < world_v2.world_width_macro, 0 <= y < 32
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub struct ChunkCoord {
-    x: u64,
-    y: u8,
+    pub x: u64,
+    pub y: u8,
 }
 
 impl ChunkCoord {
