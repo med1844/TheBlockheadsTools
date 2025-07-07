@@ -1,4 +1,4 @@
-use crate::input::Input;
+use crate::input::{AnyUpdate, Input};
 use egui_wgpu::wgpu::{self, util::DeviceExt};
 use glam::{Mat4, Vec3, Vec3Swizzles, Vec4Swizzles};
 
@@ -22,6 +22,12 @@ impl Default for Camera {
             z_near: 0.01,
             z_far: 10000.0,
         }
+    }
+}
+
+impl Camera {
+    pub fn with_center(self, center: glam::Vec2) -> Self {
+        Self { center, ..self }
     }
 }
 
@@ -84,6 +90,8 @@ pub struct CameraBuf {
 }
 
 impl CameraBuf {
+    const MAX_Z: f32 = 3.0;
+
     pub fn update_uniforms(&mut self, queue: &wgpu::Queue, width: u32, height: u32) {
         self.uniform = self.camera.uniform((width as f32, height as f32));
         queue.write_buffer(&self.buf, 0, bytemuck::cast_slice(&[self.uniform]));
@@ -122,23 +130,31 @@ impl CameraBuf {
         screen_pos: (f32, f32),
         window_size: (f32, f32),
         z_plane: f32,
-    ) -> Vec3 {
+    ) -> glam::Vec2 {
         let (ray_origin, ray_direction) = self.screen_to_world_ray(screen_pos, window_size);
         let t = (z_plane - ray_origin.z) / ray_direction.z;
-        ray_origin + t * ray_direction
+        (ray_origin + t * ray_direction).xy()
     }
 
-    pub fn handle_input(&mut self, input: &Input) {
+    pub fn handle_input(&mut self, input: &Input) -> AnyUpdate {
+        let mut any_update = false;
         if input.is_mouse_left_down {
             let window_size = self.uniform.window_size();
             let prev_world_pos_at_z3 =
-                self.screen_to_xy_at_z(input.prev_mouse_pos, window_size, 3.0);
+                self.screen_to_xy_at_z(input.prev_mouse_pos, window_size, Self::MAX_Z);
             let curr_world_pos_at_z3 =
-                self.screen_to_xy_at_z(input.current_mouse_pos, window_size, 3.0);
-            self.camera.center -= (curr_world_pos_at_z3 - prev_world_pos_at_z3).xy();
+                self.screen_to_xy_at_z(input.current_mouse_pos, window_size, Self::MAX_Z);
+            let diff = curr_world_pos_at_z3 - prev_world_pos_at_z3;
+            self.camera.center -= diff;
+            any_update |= diff != glam::Vec2::ZERO;
+            if diff != glam::Vec2::ZERO {
+                dbg!(diff);
+            }
         }
         if input.mouse_wheel_delta != 0.0 {
             self.camera.distance *= 1.0 - input.mouse_wheel_delta * 1e-1;
+            any_update = true;
         }
+        any_update.into()
     }
 }

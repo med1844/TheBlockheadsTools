@@ -1,6 +1,7 @@
 use crate::{BlockContent, block_type::BlockType, error::BhResult};
 use std::ops::{Deref, DerefMut};
 
+#[derive(Debug, Clone, Copy)]
 pub struct Block<'chunk>(&'chunk [u8; 64]);
 
 impl<'chunk> Block<'chunk> {

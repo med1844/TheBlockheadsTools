@@ -1,7 +1,9 @@
+use std::collections::HashSet;
+
 use egui_wgpu::wgpu::{self, util::DeviceExt};
 use the_blockheads_tools_lib::{
-    BhError, BhResult, BlockContent, BlockCoord, BlockType, BlockView, Chunk, ChunkBlockCoord,
-    ChunkCoord, WorldDb,
+    BhError, BhResult, Block, BlockContent, BlockCoord, BlockType, BlockView, Chunk,
+    ChunkBlockCoord, ChunkCoord, WorldDb,
 };
 
 type BlockIdType = u16;
@@ -101,39 +103,66 @@ impl VoxelType {
     ];
 }
 
-impl TryFrom<(BlockType, BlockContent)> for VoxelType {
-    type Error = BhError;
-    fn try_from(value: (BlockType, BlockContent)) -> Result<Self, Self::Error> {
-        Ok(Self(match value {
+impl From<(BlockType, BlockContent)> for VoxelType {
+    fn from(value: (BlockType, BlockContent)) -> Self {
+        Self(match value {
             (BlockType::Air, _) => 0,
             (block_type, BlockContent::None) => block_type as u16,
             _ => 0,
-        }))
+        })
+    }
+}
+
+impl VoxelType {
+    fn fg_from_block_inner<'b>(block: Block<'b>) -> BhResult<Self> {
+        Ok((
+            block.fg()?,
+            block.fg_content().unwrap_or(BlockContent::None),
+        )
+            .into())
+    }
+
+    pub fn fg_from_block<'b>(block: Block<'b>) -> Self {
+        Self::fg_from_block_inner(block).unwrap_or(Self(0))
+    }
+
+    fn bg_from_block_inner<'b>(block: Block<'b>) -> BhResult<Self> {
+        Ok((block.bg()?, BlockContent::None).into())
+    }
+
+    pub fn bg_from_block<'b>(block: Block<'b>) -> Self {
+        Self::bg_from_block_inner(block).unwrap_or(Self(0))
     }
 }
 
 pub struct VoxelBuf {
-    // Contains flattened block type, (32 * 32 * 3) * 512 * 32 blocks
+    // Contains flattened block type, 512 * 32 * (32 * 32 * 3) blocks
     pub buf: wgpu::Buffer,
-    chunk_width: usize,
+    chunk_keys: HashSet<ChunkCoord>,
 }
 
 impl VoxelBuf {
     const NUM_BLOCK_PER_CHUNK: usize = Chunk::NUM_BLOCK_PER_ROW * Chunk::NUM_BLOCK_PER_COL * 3;
 
     // Costly function - only call this once or VRAM nuked
-    pub fn new(device: &wgpu::Device, chunk_width: usize) -> Self {
+    pub fn new(device: &wgpu::Device, world_width_macro: usize) -> Self {
         Self {
             buf: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some("Global Voxel Data Buffer"),
                 contents: bytemuck::cast_slice(&vec![
                     VoxelType(0);
-                    Self::NUM_BLOCK_PER_CHUNK * 32 * chunk_width
+                    Self::NUM_BLOCK_PER_CHUNK
+                        * 32
+                        * world_width_macro
                 ]),
                 usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             }),
-            chunk_width,
+            chunk_keys: HashSet::new(),
         }
+    }
+
+    pub fn has_chunk<I: Into<ChunkCoord>>(&self, key: I) -> bool {
+        self.chunk_keys.contains(&key.into())
     }
 
     pub fn set_chunk<I: Into<ChunkCoord>>(
@@ -146,12 +175,8 @@ impl VoxelBuf {
         for y in 0..Chunk::NUM_BLOCK_PER_COL {
             for x in 0..Chunk::NUM_BLOCK_PER_ROW {
                 let block = chunk.block_at(&ChunkBlockCoord::new(x as u8, y as u8)?);
-                let fg_type: VoxelType = (
-                    block.fg()?,
-                    block.fg_content().unwrap_or(BlockContent::None),
-                )
-                    .try_into()?;
-                let bg_type: VoxelType = (block.bg()?, BlockContent::None).try_into()?;
+                let fg_type = VoxelType::fg_from_block(block);
+                let bg_type = VoxelType::bg_from_block(block);
                 let index = (y * Chunk::NUM_BLOCK_PER_ROW + x) * 3;
                 blocks[index + 0] = bg_type;
                 blocks[index + 1] = fg_type;
@@ -160,11 +185,14 @@ impl VoxelBuf {
         }
 
         let chunk_coord: ChunkCoord = coord.into();
-        let offset = (chunk_coord.x + chunk_coord.y as u64 * self.chunk_width as u64)
-            * Self::NUM_BLOCK_PER_CHUNK as u64;
+        let offset = (chunk_coord.x * 32 + chunk_coord.y as u64) * Self::NUM_BLOCK_PER_CHUNK as u64;
 
-        queue.write_buffer(&self.buf, offset, bytemuck::cast_slice(&blocks));
-
+        queue.write_buffer(
+            &self.buf,
+            offset * size_of::<u16>() as u64,
+            bytemuck::cast_slice(&blocks),
+        );
+        self.chunk_keys.insert(chunk_coord);
         Ok(())
     }
 

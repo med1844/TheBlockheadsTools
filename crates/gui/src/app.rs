@@ -1,12 +1,15 @@
+use crate::input::AnyUpdate;
+
 use super::{
     egui_tools::EguiRenderer,
-    gpu::{Camera, CameraBuf, ChunkBuffers, RgbaTexture, VoxelBuf},
+    gpu::{Camera, CameraBuf, RgbaTexture, VoxelBuf},
     input::Input,
     renderer::{DEPTH_FORMAT, VoxelRenderer},
 };
 use egui_wgpu::wgpu::SurfaceError;
 use egui_wgpu::{ScreenDescriptor, wgpu};
 use std::sync::Arc;
+use the_blockheads_tools_lib::{ChunkCoord, WorldDb};
 use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
 use winit::event::WindowEvent;
@@ -28,8 +31,11 @@ pub struct AppState {
     // 3d rendering related
     pub camera_buf: CameraBuf,
     pub voxel_renderer: VoxelRenderer,
+    pub voxel_buf: VoxelBuf,
     pub depth_view: wgpu::TextureView,
-    pub chunk_manager: ChunkBuffers,
+
+    // game save
+    world_db: Option<WorldDb>,
 }
 
 impl AppState {
@@ -40,6 +46,11 @@ impl AppState {
         width: u32,
         height: u32,
     ) -> Self {
+        // should be moved to egui
+        let mut world_db =
+            WorldDb::from_path("../../test_data/saves/3d716d9bbf89c77ef5001e9cd227ec29/world_db")
+                .unwrap();
+
         let power_pref = wgpu::PowerPreference::default();
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
@@ -87,8 +98,20 @@ impl AppState {
 
         let depth_view = Self::create_depth_view(&device, width, height);
 
-        let voxel_buf = VoxelBuf::load_test_chunk(&device, &queue).unwrap();
-        let chunk_manager = ChunkBuffers::new(&device, voxel_buf);
+        // When we load other worlds, rebuild voxel buf. By default we go 512.
+        let mut voxel_buf = VoxelBuf::new(&device, 512);
+        if let Some(world_db) = world_db.as_mut() {
+            for chunk_y in 0..32 {
+                for chunk_x in 0..world_db.main.world_v2.world_width_macro {
+                    let chunk_coord = ChunkCoord::new(chunk_x, chunk_y).unwrap();
+                    if !voxel_buf.has_chunk(chunk_coord) {
+                        if let Some(Ok(chunk)) = world_db.blocks.chunk_at(chunk_coord) {
+                            let _ = voxel_buf.set_chunk(&queue, chunk_coord, chunk);
+                        }
+                    }
+                }
+            }
+        }
 
         let egui_renderer = EguiRenderer::new(
             &device,
@@ -100,7 +123,10 @@ impl AppState {
 
         let scale_factor = 1.0;
 
-        let camera = Camera::default();
+        let x = world_db.as_ref().unwrap().main.world_v2.start_portal_pos_x;
+        let y = world_db.as_ref().unwrap().main.world_v2.start_portal_pos_y;
+
+        let camera = Camera::default().with_center(glam::Vec2::new(x as f32, y as f32));
         let camera_buf = camera.into_buffered(&device);
 
         let tile_map_texture = {
@@ -113,7 +139,7 @@ impl AppState {
             &device,
             &surface_config,
             &camera_buf.buf,
-            &chunk_manager.voxel_buf.buf,
+            &voxel_buf.buf,
             &tile_map_texture,
         );
 
@@ -129,8 +155,10 @@ impl AppState {
 
             camera_buf,
             voxel_renderer,
+            voxel_buf,
             depth_view,
-            chunk_manager,
+
+            world_db,
         }
     }
 
@@ -159,9 +187,9 @@ impl AppState {
         self.depth_view = Self::create_depth_view(&self.device, width, height);
     }
 
-    fn handle_input(&mut self, window: &Window, event: &WindowEvent) {
+    fn handle_input(&mut self, window: &Window, event: &WindowEvent) -> AnyUpdate {
         self.input.handle_input(window, event);
-        self.camera_buf.handle_input(&self.input);
+        self.camera_buf.handle_input(&self.input)
     }
 }
 
@@ -278,12 +306,7 @@ impl App {
 
             rpass.set_pipeline(&state.voxel_renderer.pipeline);
             rpass.set_bind_group(0, &state.voxel_renderer.bind_group, &[]);
-            rpass.set_vertex_buffer(0, state.chunk_manager.vertex_buf.slice(..));
-            rpass.set_index_buffer(
-                state.chunk_manager.index_buf.slice(..),
-                wgpu::IndexFormat::Uint16,
-            );
-            rpass.draw_indexed(0..state.chunk_manager.num_indices, 0, 0..1);
+            rpass.draw(0..3, 0..1);
         }
 
         // egui Pass
@@ -384,8 +407,15 @@ impl ApplicationHandler for App {
             .egui_renderer
             .handle_input(window, &event);
 
-        if !response.consumed {
-            self.state.as_mut().unwrap().handle_input(window, &event);
+        let mut any_update = !response.consumed;
+        if any_update {
+            let any_update_in_wgpu: bool = self
+                .state
+                .as_mut()
+                .unwrap()
+                .handle_input(window, &event)
+                .into();
+            any_update |= any_update_in_wgpu;
         }
 
         match event {
@@ -394,7 +424,9 @@ impl ApplicationHandler for App {
                 event_loop.exit();
             }
             WindowEvent::RedrawRequested => {
-                self.handle_redraw();
+                if any_update {
+                    self.handle_redraw();
+                }
             }
             WindowEvent::Resized(new_size) => {
                 self.handle_resized(new_size.width, new_size.height);

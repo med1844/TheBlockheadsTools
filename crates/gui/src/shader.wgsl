@@ -5,7 +5,17 @@ const CHUNK_DIM_Z: u32 = 3u;
 const CHUNK_VOXEL_COUNT: u32 = CHUNK_DIM_X * CHUNK_DIM_Y * CHUNK_DIM_Z;
 const VOXEL_SIZE: f32 = 1.0;
 
-const MAX_VOXEL_TRAVERSAL_STEPS: u32 = 100u;
+// World dimensions in chunks
+const WORLD_CHUNKS_X: u32 = 512u;
+const WORLD_CHUNKS_Y: u32 = 32u;
+
+// The total number of voxels along each axis of the world
+const WORLD_DIM_X: u32 = CHUNK_DIM_X * WORLD_CHUNKS_X;
+const WORLD_DIM_Y: u32 = CHUNK_DIM_Y * WORLD_CHUNKS_Y;
+const WORLD_DIM_Z: u32 = CHUNK_DIM_Z; // World is flat, only one chunk deep in Z
+
+// Iterate finite amount of steps or GPU on fire
+const MAX_VOXEL_TRAVERSAL_STEPS: u32 = 10u;
 
 // Face IDs are not used for coloring anymore but are good for reference
 const FACE_PX: u32 = 0u;
@@ -43,26 +53,64 @@ var texture_sampler: sampler;
 @group(0) @binding(4)
 var<storage, read> texture_uv_atlas_indices: array<u32>; // UV atlas storing single u16 tile indices
 
-fn get_voxel_type(local_voxel_coords: vec3<i32>) -> u32 {
-    if local_voxel_coords.x < 0 || local_voxel_coords.x >= i32(CHUNK_DIM_X) ||
-       local_voxel_coords.y < 0 || local_voxel_coords.y >= i32(CHUNK_DIM_Y) ||
-       local_voxel_coords.z < 0 || local_voxel_coords.z >= i32(CHUNK_DIM_Z) {
-        return 0u;
+// fn get_voxel_type(voxel_coords: vec3<i32>) -> u32 {
+//     if voxel_coords.x < 0 || voxel_coords.x >= i32(WORLD_DIM_X) ||
+//        voxel_coords.y < 0 || voxel_coords.y >= i32(WORLD_DIM_Y) ||
+//        voxel_coords.z < 0 || voxel_coords.z >= i32(WORLD_DIM_Z) {
+//         return 0u;
+//     }
+
+//     let index = u32(voxel_coords.z) +
+//                 u32(voxel_coords.y) * WORLD_DIM_Z +
+//                 u32(voxel_coords.x) * WORLD_DIM_Z * WORLD_DIM_Y;
+
+//     let data = voxel_data[index >> 1];
+//     if ((index & 1) != 0) {
+//         return data >> 16;
+//     } else {
+//         return data & 65535;
+//     }
+// }
+
+fn get_voxel_type(global_voxel_coords: vec3<i32>) -> u32 {
+    // 1. Check if the global coordinate is within the world boundaries.
+    if global_voxel_coords.x < 0 || global_voxel_coords.x >= i32(WORLD_DIM_X) ||
+       global_voxel_coords.y < 0 || global_voxel_coords.y >= i32(WORLD_DIM_Y) ||
+       global_voxel_coords.z < 0 || global_voxel_coords.z >= i32(WORLD_DIM_Z) {
+        return 0u; // Return air if outside the world.
     }
 
-    let index = u32(local_voxel_coords.z) +
-                u32(local_voxel_coords.x) * CHUNK_DIM_Z +
-                u32(local_voxel_coords.y) * CHUNK_DIM_Z * CHUNK_DIM_X;
+    // 2. Determine the chunk coordinates from the global voxel coordinates.
+    let chunk_coord_x = u32(global_voxel_coords.x) / CHUNK_DIM_X;
+    let chunk_coord_y = u32(global_voxel_coords.y) / CHUNK_DIM_Y;
 
-    let data = voxel_data[index >> 1];
-    if ((index & 1) != 0) {
-        return data >> 16;
+    // 3. Determine the local voxel coordinates within the identified chunk.
+    let local_voxel_coord_x = u32(global_voxel_coords.x) % CHUNK_DIM_X;
+    let local_voxel_coord_y = u32(global_voxel_coords.y) % CHUNK_DIM_Y;
+    let local_voxel_coord_z = u32(global_voxel_coords.z);
+
+    // 4. Calculate the base index for the start of the chunk's data.
+    // This layout matches your Rust code's offset calculation.
+    let chunk_offset = (chunk_coord_x * WORLD_CHUNKS_Y + chunk_coord_y) * CHUNK_VOXEL_COUNT;
+
+    // 5. Calculate the index of the voxel within the chunk's local data.
+    let local_voxel_index = local_voxel_coord_z +
+                            local_voxel_coord_x * CHUNK_DIM_Z +
+                            local_voxel_coord_y * CHUNK_DIM_Z * CHUNK_DIM_X;
+
+    // 6. Combine offsets to get the final index for the u16 array.
+    let final_index = chunk_offset + local_voxel_index;
+
+    // 7. Access the packed u16 data from the u32 array.
+    let data = voxel_data[final_index >> 1]; // Each u32 holds two u16 values.
+    if ((final_index & 1) != 0) {
+        return data >> 16; // Odd index, get the high 16 bits.
     } else {
-        return data & 65535;
+        return data & 0xFFFFu; // Even index, get the low 16 bits.
     }
 }
 
-// --- NEW: Function to sample the texture atlas ---
+// --- Function to sample the texture atlas ---
 // This function takes the block type, hit face, and local UV coordinates
 // to return the final sampled color from the texture atlas.
 fn sample_texture(voxel_type: u32, hit_face_id: u32, uv_on_face: vec2<f32>) -> vec4<f32> {
@@ -85,28 +133,20 @@ fn sample_texture(voxel_type: u32, hit_face_id: u32, uv_on_face: vec2<f32>) -> v
     return textureSample(texture_atlas, texture_sampler, final_atlas_uv);
 }
 
-// Vertex shader input
-struct VertexInput {
-    @location(0) position: vec3<f32>,
-};
-
-// Vertex shader output (and fragment shader input)
-struct VertexOutput {
-    @builtin(position) clip_position: vec4<f32>,
-};
-
 @vertex
-fn vs_main(
-    model: VertexInput,
-) -> VertexOutput {
-    var out: VertexOutput;
-    out.clip_position = camera.view_proj * vec4<f32>(model.position, 1.0);
-    return out;
+fn vs_main(@builtin(vertex_index) vertex_index: u32) -> @builtin(position) vec4<f32> {
+    // Define three vertices that form a triangle covering the screen in NDC space (-1 to 1).
+    var positions = array<vec2<f32>, 3>(
+        vec2<f32>(-1.0, -1.0), // Bottom-left
+        vec2<f32>( 3.0, -1.0), // Extends far right
+        vec2<f32>(-1.0,  3.0)  // Extends far up
+    );
+    return vec4<f32>(positions[vertex_index], 0.0, 1.0);
 }
 
 @fragment
-fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    let frag_coord = in.clip_position;
+fn fs_main(@builtin(position) clip_position: vec4<f32>) -> @location(0) vec4<f32> {
+    let frag_coord = clip_position;
     let screen_width = camera.screen_size.x;
     let screen_height = camera.screen_size.y;
 
@@ -131,17 +171,17 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
     var hit_color = vec4<f32>(0.0, 0.0, 0.0, 1.0); // Default background color is black
 
-    let chunk_min_bound = vec3<f32>(0.0, 0.0, 0.0);
-    let chunk_max_bound = vec3<f32>(
-        f32(CHUNK_DIM_X) * VOXEL_SIZE,
-        f32(CHUNK_DIM_Y) * VOXEL_SIZE,
-        f32(CHUNK_DIM_Z) * VOXEL_SIZE
+    let world_min_bound = vec3<f32>(0.0, 0.0, 0.0);
+    let world_max_bound = vec3<f32>(
+        f32(WORLD_DIM_X) * VOXEL_SIZE,
+        f32(WORLD_DIM_Y) * VOXEL_SIZE,
+        f32(WORLD_DIM_Z) * VOXEL_SIZE
     );
 
     // AABB Intersection that finds the entry normal
     let inv_dir = 1.0 / ray_dir_world;
-    let t_bottom = (chunk_min_bound - ray_origin_world) * inv_dir;
-    let t_top = (chunk_max_bound - ray_origin_world) * inv_dir;
+    let t_bottom = (world_min_bound - ray_origin_world) * inv_dir;
+    let t_top = (world_max_bound - ray_origin_world) * inv_dir;
 
     let t_min_v = min(t_bottom, t_top);
     let t_max_v = max(t_bottom, t_top);
