@@ -3,11 +3,27 @@ use winit::{
     window::Window,
 };
 
+#[derive(Debug)]
+pub struct EventResponse {
+    pub repaint: bool,
+    pub click: bool, // an click release event, no drag when pressed
+}
+
+impl Default for EventResponse {
+    fn default() -> Self {
+        Self {
+            repaint: false,
+            click: false,
+        }
+    }
+}
+
 pub struct Input {
     pub is_mouse_left_down: bool,
     pub prev_mouse_pos: (f32, f32),
     pub current_mouse_pos: (f32, f32),
     pub mouse_wheel_delta: f32,
+    pub moved_during_press: bool, // if not drag and drop, we select block
 }
 
 impl Input {
@@ -17,14 +33,18 @@ impl Input {
             prev_mouse_pos: (0.0, 0.0),
             current_mouse_pos: (0.0, 0.0),
             mouse_wheel_delta: 0.0,
+            moved_during_press: false,
         }
     }
 
-    pub fn handle_input(&mut self, _window: &Window, event: &WindowEvent) {
+    pub fn handle_input(&mut self, _window: &Window, event: &WindowEvent) -> EventResponse {
         match event {
             WindowEvent::CursorMoved { position, .. } => {
                 self.prev_mouse_pos = self.current_mouse_pos;
                 self.current_mouse_pos = (position.x as f32, position.y as f32);
+                if self.is_mouse_left_down {
+                    self.moved_during_press = true;
+                }
             }
             WindowEvent::MouseWheel { delta, .. } => {
                 self.mouse_wheel_delta = match delta {
@@ -40,15 +60,21 @@ impl Input {
                 ..
             } => {
                 self.is_mouse_left_down = matches!(state, ElementState::Pressed);
+                if !self.is_mouse_left_down {
+                    if !self.moved_during_press {
+                        return EventResponse {
+                            click: true,
+                            ..Default::default()
+                        };
+                    }
+                    self.moved_during_press = false;
+                }
             }
             _ => {
                 self.prev_mouse_pos = self.current_mouse_pos;
                 self.mouse_wheel_delta = 0.0;
             }
-        }
+        };
+        EventResponse::default()
     }
-}
-
-pub struct EventResponse {
-    pub repaint: bool,
 }

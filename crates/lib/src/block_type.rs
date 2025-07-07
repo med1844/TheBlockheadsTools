@@ -275,6 +275,7 @@ impl Into<u8> for BlockType {
 #[repr(u8)]
 pub enum BlockContent {
     None = 0,
+    Clay = 2,
     Workbench = 46,
     PortalGate = 47,
     CopperOre = 61,
@@ -291,6 +292,7 @@ impl BlockContent {
     pub fn try_from_u8(value: u8) -> Result<Self, BhError> {
         match value {
             0 => Ok(BlockContent::None),
+            2 => Ok(BlockContent::Clay),
             46 => Ok(BlockContent::Workbench),
             47 => Ok(BlockContent::PortalGate),
             61 => Ok(BlockContent::CopperOre),

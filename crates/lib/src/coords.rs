@@ -101,7 +101,7 @@ impl ChunkCoord {
 }
 
 /// Block coordinates in world. 0 <= x < world_v2.world_width_macro * 32, 0 <= y < 1024
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BlockCoord {
     x: u64,
     y: u16,
@@ -113,6 +113,14 @@ impl BlockCoord {
     pub fn new(x: u64, y: u16) -> BhResult<Self> {
         check_coord_limit(y as u64, 1024)?;
         Ok(Self { x, y: y as u16 })
+    }
+
+    pub fn x(&self) -> u64 {
+        self.x
+    }
+
+    pub fn y(&self) -> u16 {
+        self.y
     }
 }
 

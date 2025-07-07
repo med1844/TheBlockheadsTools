@@ -9,7 +9,7 @@ use super::{
 use egui_wgpu::wgpu::SurfaceError;
 use egui_wgpu::{ScreenDescriptor, wgpu};
 use std::sync::Arc;
-use the_blockheads_tools_lib::{ChunkCoord, WorldDb};
+use the_blockheads_tools_lib::{BlockCoord, ChunkCoord, WorldDb};
 use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
 use winit::event::WindowEvent;
@@ -36,6 +36,9 @@ pub struct AppState {
 
     // game save
     world_db: Option<WorldDb>,
+
+    // inspections
+    selected_block: Option<BlockCoord>,
 }
 
 impl AppState {
@@ -159,6 +162,8 @@ impl AppState {
             depth_view,
 
             world_db,
+
+            selected_block: None,
         }
     }
 
@@ -188,8 +193,30 @@ impl AppState {
     }
 
     fn handle_input(&mut self, window: &Window, event: &WindowEvent) -> EventResponse {
-        self.input.handle_input(window, event);
+        let response = self.input.handle_input(window, event);
+        if response.click {
+            let [x, y] = self.camera_buf.mouse_at(&self.input).floor().to_array();
+            let new_coord = BlockCoord::new(x as u64, y as u16).ok();
+            if self.selected_block == new_coord {
+                self.selected_block = None;
+            } else {
+                self.selected_block = new_coord;
+            }
+        }
         self.camera_buf.handle_input(&self.input)
+    }
+
+    fn selected_block_info(&mut self) -> Option<(BlockCoord, String)> {
+        let world_db = self.world_db.as_mut()?;
+        let selected_block_coord = self.selected_block.as_ref()?;
+        let block = world_db
+            .blocks
+            .block_at(selected_block_coord.clone())?
+            .ok()?;
+        Some((
+            selected_block_coord.clone(),
+            block.to_hex_string_single_allocation(),
+        ))
     }
 }
 
@@ -319,27 +346,21 @@ impl App {
         {
             state.egui_renderer.begin_frame(window);
 
+            let selected_block_info = state.selected_block_info();
+
             egui::Window::new("winit + egui + wgpu says hello!")
                 .resizable(true)
                 .vscroll(true)
                 .show(state.egui_renderer.context(), |ui| {
-                    ui.label("Label!");
-                    if ui.button("Button!").clicked() {
-                        println!("boom!")
-                    }
-                    ui.separator();
-                    ui.horizontal(|ui| {
+                    if let Some((coord, bytes)) = selected_block_info {
                         ui.label(format!(
-                            "Pixels per point: {}",
-                            state.egui_renderer.context().pixels_per_point()
+                            "Selected block: x = {}, y = {}",
+                            coord.x(),
+                            coord.y()
                         ));
-                        if ui.button("-").clicked() {
-                            state.scale_factor = (state.scale_factor - 0.1).max(0.3);
-                        }
-                        if ui.button("+").clicked() {
-                            state.scale_factor = (state.scale_factor + 0.1).min(3.0);
-                        }
-                    });
+                        ui.code(bytes);
+                        ui.separator();
+                    }
 
                     ui.add(
                         egui::DragValue::new(&mut state.camera_buf.camera.world_offset.x)

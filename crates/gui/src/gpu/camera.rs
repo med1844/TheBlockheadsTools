@@ -142,6 +142,12 @@ impl CameraBuf {
         (ray_origin + t * ray_direction).xy()
     }
 
+    pub fn mouse_at(&self, input: &Input) -> glam::Vec2 {
+        let window_size = self.uniform.window_size();
+        self.screen_to_xy_at_z(input.current_mouse_pos, window_size, Self::MAX_Z)
+            + self.camera.world_offset
+    }
+
     pub fn handle_input(&mut self, input: &Input) -> EventResponse {
         let mut any_update = false;
         if input.is_mouse_left_down {
@@ -160,6 +166,7 @@ impl CameraBuf {
         }
         EventResponse {
             repaint: any_update,
+            ..Default::default()
         }
     }
 }
