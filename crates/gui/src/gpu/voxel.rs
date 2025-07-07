@@ -20,33 +20,33 @@ impl From<BlockIdType> for VoxelType {
 
 impl VoxelType {
     // [PX, NX, PY, NY, PZ, NZ]
-    pub(crate) const UV_AT_FACE: [[u32; 6]; 78] = [
-        [0; 6],                        // NONE,
-        [32; 6],                       // STONE,
-        [0; 6],                        // AIR
-        [14; 6],                       // WATER
-        [110; 6],                      // ICE
-        [129; 6],                      // SNOW
-        [64; 6],                       // DIRT
-        [65; 6],                       // SAND
-        [65; 6],                       // SAND_ (assuming same as SAND)
-        [196; 6],                      // WOOD
-        [33; 6],                       // MINED_STONE (from 0x21)
-        [34; 6],                       // RED_BRICK (from 0x22)
-        [66; 6],                       // LIMESTONE (from 0x42, default)
-        [35; 6],                       // MINED_LIMESTONE (from 0x23)
-        [67; 6],                       // MARBLE (from 0x43)
-        [76; 6],                       // MINED_MARBLE (from 0x4c)
-        [77; 6],                       // TIME_CRYSTAL (from 0x4d)
-        [79; 6],                       // SAND_STONE (from 0x4f)
-        [80; 6],                       // MINED_SAND_STONE (from 0x50)
-        [81; 6],                       // RED_MARBLE (from 0x51)
-        [82; 6],                       // MINED_RED_MARBLE (from 0x52)
-        [0; 6],                        // Missing ID 21
-        [0; 6],                        // Missing ID 22
-        [0; 6],                        // Missing ID 23
-        [108; 6],                      // GLASS (from 0x6c)
-        [132; 6],                      // SPAWN_PORTAL_BASE (from 0x55)
+    pub(crate) const UV_AT_FACE: &[[u32; 6]] = &[
+        [0; 6],                                // NONE,
+        [32; 6],                               // STONE,
+        [0; 6],                                // AIR
+        [14; 6],                               // WATER
+        [110; 6],                              // ICE
+        [129; 6],                              // SNOW
+        [64; 6],                               // DIRT
+        [65; 6],                               // SAND
+        [65; 6],                               // SAND_ (assuming same as SAND)
+        [196; 6],                              // WOOD
+        [33; 6],                               // MINED_STONE (from 0x21)
+        [34; 6],                               // RED_BRICK (from 0x22)
+        [66; 6],                               // LIMESTONE (from 0x42, default)
+        [35; 6],                               // MINED_LIMESTONE (from 0x23)
+        [67; 6],                               // MARBLE (from 0x43)
+        [76; 6],                               // MINED_MARBLE (from 0x4c)
+        [77; 6],                               // TIME_CRYSTAL (from 0x4d)
+        [79; 6],                               // SAND_STONE (from 0x4f)
+        [80; 6],                               // MINED_SAND_STONE (from 0x50)
+        [81; 6],                               // RED_MARBLE (from 0x51)
+        [82; 6],                               // MINED_RED_MARBLE (from 0x52)
+        [0; 6],                                // Missing ID 21
+        [0; 6],                                // Missing ID 22
+        [0; 6],                                // Missing ID 23
+        [108; 6],                              // GLASS (from 0x6c)
+        [132; 6],                              // SPAWN_PORTAL_BASE (from 0x55)
         [288; 6], // GOLD_BLOCK (from 0x120, default. Note that this block has sub-types for gold and silver, but the prompt only asks for the base UV, which is the default in the code)
         [160, 160, 161, 64, 160, 160], // GRASS_DIRT (from 0xa0, default)
         [162, 162, 163, 64, 162, 162], // SNOW_DIRT (from 0xa2, default)
@@ -99,6 +99,10 @@ impl VoxelType {
         [175; 6], // DIAMOND_BLOCK (from 0xaf)
         [0; 6],   // PLASTER (Missing in code)
         [0; 6],   // LUMINOUS_PLASTER (Missing in code)
+        [0x122; 6], // DIRT + CLAY
+        [0x120; 6], // DIRT + FLINT
+        [0x123, 0x123, 161, 64, 0x123, 0x123], // GRASS DIRT + CLAY
+        [0x121, 0x121, 161, 64, 0x121, 0x121], // GRASS DIRT + FLINT
     ];
 }
 
@@ -107,6 +111,10 @@ impl From<(BlockType, BlockContent)> for VoxelType {
         Self(match value {
             (BlockType::Air, _) => 0,
             (block_type, BlockContent::None) => block_type as u16,
+            (BlockType::Dirt, BlockContent::Clay) => 78,
+            (BlockType::Dirt, BlockContent::Flint) => 79,
+            (BlockType::GrassDirt, BlockContent::Clay) => 80,
+            (BlockType::GrassDirt, BlockContent::Flint) => 81,
             _ => 0,
         })
     }

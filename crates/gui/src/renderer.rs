@@ -24,7 +24,7 @@ impl VoxelRenderer {
 
         let uv_at_face_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Texture UV Atlas Buffer"),
-            contents: bytemuck::cast_slice(&VoxelType::UV_AT_FACE),
+            contents: bytemuck::cast_slice(VoxelType::UV_AT_FACE),
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
         });
 
