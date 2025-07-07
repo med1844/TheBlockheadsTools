@@ -284,9 +284,9 @@ pub enum BlockContent {
     IronOre = 63,
     Oil = 64,
     Coal = 65,
-    GoldNuggets = 66,
-    PlatinumOre = 67,
-    TitaniumOre = 68,
+    GoldNuggets = 77,
+    PlatinumOre = 106,
+    TitaniumOre = 107,
 }
 
 impl BlockContent {

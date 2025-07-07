@@ -275,7 +275,6 @@ impl App {
         }
 
         let state = self.state.as_mut().unwrap();
-
         state.camera_buf.update_uniforms(
             &state.queue,
             state.surface_config.width,
@@ -428,10 +427,8 @@ impl ApplicationHandler for App {
             .egui_renderer
             .handle_input(window, &event);
 
-        let mut any_update = !response.consumed;
-        if any_update {
-            let wgpu_response = self.state.as_mut().unwrap().handle_input(window, &event);
-            any_update |= wgpu_response.repaint;
+        if !response.consumed {
+            let _ = self.state.as_mut().unwrap().handle_input(window, &event);
         }
 
         match event {
@@ -440,9 +437,7 @@ impl ApplicationHandler for App {
                 event_loop.exit();
             }
             WindowEvent::RedrawRequested => {
-                if any_update {
-                    self.handle_redraw();
-                }
+                self.handle_redraw();
             }
             WindowEvent::Resized(new_size) => {
                 self.handle_resized(new_size.width, new_size.height);

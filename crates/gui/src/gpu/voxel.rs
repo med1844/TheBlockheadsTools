@@ -29,80 +29,90 @@ impl VoxelType {
         [129; 6],                              // SNOW
         [64; 6],                               // DIRT
         [65; 6],                               // SAND
-        [65; 6],                               // SAND_ (assuming same as SAND)
+        [65; 6],                               // SAND_
         [196; 6],                              // WOOD
-        [33; 6],                               // MINED_STONE (from 0x21)
-        [34; 6],                               // RED_BRICK (from 0x22)
-        [66; 6],                               // LIMESTONE (from 0x42, default)
-        [35; 6],                               // MINED_LIMESTONE (from 0x23)
-        [67; 6],                               // MARBLE (from 0x43)
-        [76; 6],                               // MINED_MARBLE (from 0x4c)
-        [77; 6],                               // TIME_CRYSTAL (from 0x4d)
-        [79; 6],                               // SAND_STONE (from 0x4f)
-        [80; 6],                               // MINED_SAND_STONE (from 0x50)
-        [81; 6],                               // RED_MARBLE (from 0x51)
-        [82; 6],                               // MINED_RED_MARBLE (from 0x52)
+        [33; 6],                               // MINED_STONE
+        [34; 6],                               // RED_BRICK
+        [66; 6],                               // LIMESTONE
+        [35; 6],                               // MINED_LIMESTONE
+        [67; 6],                               // MARBLE
+        [76; 6],                               // MINED_MARBLE
+        [77; 6],                               // TIME_CRYSTAL
+        [79; 6],                               // SAND_STONE
+        [80; 6],                               // MINED_SAND_STONE
+        [81; 6],                               // RED_MARBLE
+        [82; 6],                               // MINED_RED_MARBLE
         [0; 6],                                // Missing ID 21
         [0; 6],                                // Missing ID 22
         [0; 6],                                // Missing ID 23
-        [108; 6],                              // GLASS (from 0x6c)
-        [132; 6],                              // SPAWN_PORTAL_BASE (from 0x55)
-        [288; 6], // GOLD_BLOCK (from 0x120, default. Note that this block has sub-types for gold and silver, but the prompt only asks for the base UV, which is the default in the code)
-        [160, 160, 161, 64, 160, 160], // GRASS_DIRT (from 0xa0, default)
-        [162, 162, 163, 64, 162, 162], // SNOW_DIRT (from 0xa2, default)
-        [86; 6],  // LAPIS_LAZULI (from 0x56)
-        [87; 6],  // MINED_LAPIS_LAZULI (from 0x57)
-        [46; 6],  // LAVA (dynamic, using formula)
-        [164; 6], // REINFORCED_PLATFORM (from 0xa4)
-        [165; 6], // SPAWN_PORTAL_BASE_AMETHYST (from 0xa5)
-        [166; 6], // SPAWN_PORTAL_BASE_SAPPHIRE (from 0xa6)
-        [167; 6], // SPAWN_PORTAL_BASE_EMERALD (from 0xa7)
-        [168; 6], // SPAWN_PORTAL_BASE_RUBY (from 0xa8)
-        [169; 6], // SPAWN_PORTAL_BASE_DIAMOND (from 0xa9)
-        [89; 6],  // NORTH_POLE (from 0x59)
-        [112; 6], // SOUTH_POLE (from 0x70)
-        [113; 6], // WEST_POLE (from 0x71)
-        [114; 6], // EAST_POLE (from 0x72)
-        [672; 6], // PORTAL_BASE (dynamic, using formula)
-        [190; 6], // PORTAL_BASE_AMETHYST (from 0xbe)
-        [188; 6], // PORTAL_BASE_SAPPHIRE (from 0xbc)
-        [478; 6], // PORTAL_BASE_EMERALD (from 0x1de)
-        [700; 6], // PORTAL_BASE_RUBY (from 0x2ba)
-        [699; 6], // PORTAL_BASE_DIAMOND (from 0x2b9)
-        [741; 6], // COMPOST (from 0x2e5)
-        [746; 6], // GRASS_COMPOST (from 0x2ea)
-        [0; 6],   // SNOW_COMPOST (Missing in code)
-        [97; 6],  // BASALT (from 0x61)
-        [294; 6], // MINED_BASALT (from 0x126 from 0x31)
-        [130; 6], // COPPER_BLOCK (from 0x82)
-        [0; 6],   // TIN_BLOCK (Missing in code)
-        [0; 6],   // BRONZE_BLOCK (Missing in code)
-        [0; 6],   // IRON_BLOCK (Missing in code)
-        [0; 6],   // STEEL_BLOCK (Missing in code)
-        [0; 6],   // BLACK_SAND (Missing in code)
-        [0; 6],   // BLACK_GLASS (Missing in code)
-        [170; 6], // TRADE_PORTAL_BASE (from 0xaa)
-        [171; 6], // TRADE_PORTAL_BASE_AMETHYST (from 0xab)
-        [172; 6], // TRADE_PORTAL_BASE_SAPPHIRE (from 0xac)
-        [173; 6], // TRADE_PORTAL_BASE_EMERALD (from 0xad)
-        [174; 6], // TRADE_PORTAL_BASE_RUBY (from 0xae)
-        [175; 6], // TRADE_PORTAL_BASE_DIAMOND (from 0xaf)
-        [0; 6],   // Missing ID 66
-        [117; 6], // PLATINUM_BLOCK (from 0x75)
-        [0; 6],   // TITANIUM_BLOCK (Missing in code)
-        [0; 6],   // CARBON_FIBER_BLOCK (Missing in code)
-        [170; 6], // GRAVEL (from 0xaa - duplicates TRADE_PORTAL_BASE, which is probably a copy-paste error in the original code, but following the provided logic)
-        [171; 6], // AMETHYST_BLOCK (from 0xab)
-        [172; 6], // SAPPHIRE_BLOCK (from 0xac)
-        [173; 6], // EMERALD_BLOCK (from 0xad)
-        [174; 6], // RUBY_BLOCK (from 0xae)
-        [175; 6], // DIAMOND_BLOCK (from 0xaf)
-        [0; 6],   // PLASTER (Missing in code)
-        [0; 6],   // LUMINOUS_PLASTER (Missing in code)
-        [0x122; 6], // DIRT + CLAY
-        [0x120; 6], // DIRT + FLINT
+        [108; 6],                              // GLASS
+        [132; 6],                              // SPAWN_PORTAL_BASE
+        [288; 6],                              // GOLD_BLOCK
+        [160, 160, 161, 64, 160, 160],         // GRASS_DIRT
+        [162, 162, 163, 64, 162, 162],         // SNOW_DIRT
+        [86; 6],                               // LAPIS_LAZULI
+        [87; 6],                               // MINED_LAPIS_LAZULI
+        [46; 6],                               // LAVA
+        [164; 6],                              // REINFORCED_PLATFORM
+        [165; 6],                              // SPAWN_PORTAL_BASE_AMETHYST
+        [166; 6],                              // SPAWN_PORTAL_BASE_SAPPHIRE
+        [167; 6],                              // SPAWN_PORTAL_BASE_EMERALD
+        [168; 6],                              // SPAWN_PORTAL_BASE_RUBY
+        [169; 6],                              // SPAWN_PORTAL_BASE_DIAMOND
+        [89; 6],                               // NORTH_POLE
+        [112; 6],                              // SOUTH_POLE
+        [113; 6],                              // WEST_POLE
+        [114; 6],                              // EAST_POLE
+        [672; 6],                              // PORTAL_BASE
+        [190; 6],                              // PORTAL_BASE_AMETHYST
+        [188; 6],                              // PORTAL_BASE_SAPPHIRE
+        [478; 6],                              // PORTAL_BASE_EMERALD
+        [700; 6],                              // PORTAL_BASE_RUBY
+        [699; 6],                              // PORTAL_BASE_DIAMOND
+        [741; 6],                              // COMPOST
+        [746; 6],                              // GRASS_COMPOST
+        [0; 6],                                // SNOW_COMPOST
+        [97; 6],                               // BASALT
+        [294; 6],                              // MINED_BASALT
+        [130; 6],                              // COPPER_BLOCK
+        [0; 6],                                // TIN_BLOCK
+        [0; 6],                                // BRONZE_BLOCK
+        [0; 6],                                // IRON_BLOCK
+        [0; 6],                                // STEEL_BLOCK
+        [89; 6],                               // BLACK_SAND
+        [0; 6],                                // BLACK_GLASS
+        [170; 6],                              // TRADE_PORTAL_BASE
+        [171; 6],                              // TRADE_PORTAL_BASE_AMETHYST
+        [172; 6],                              // TRADE_PORTAL_BASE_SAPPHIRE
+        [173; 6],                              // TRADE_PORTAL_BASE_EMERALD
+        [174; 6],                              // TRADE_PORTAL_BASE_RUBY
+        [175; 6],                              // TRADE_PORTAL_BASE_DIAMOND
+        [0; 6],                                // Missing ID 66
+        [117; 6],                              // PLATINUM_BLOCK
+        [0; 6],                                // TITANIUM_BLOCK
+        [0; 6],                                // CARBON_FIBER_BLOCK
+        [170; 6],                              // GRAVEL
+        [171; 6],                              // AMETHYST_BLOCK
+        [172; 6],                              // SAPPHIRE_BLOCK
+        [173; 6],                              // EMERALD_BLOCK
+        [174; 6],                              // RUBY_BLOCK
+        [175; 6],                              // DIAMOND_BLOCK
+        [0; 6],                                // PLASTER
+        [0; 6],                                // LUMINOUS_PLASTER
+        [0x122; 6],                            // DIRT + CLAY
+        [0x120; 6],                            // DIRT + FLINT
         [0x123, 0x123, 161, 64, 0x123, 0x123], // GRASS DIRT + CLAY
         [0x121, 0x121, 161, 64, 0x121, 0x121], // GRASS DIRT + FLINT
+        [0x125, 0x125, 161, 64, 0x125, 0x125], // SNOW DIRT + CLAY
+        [0x124, 0x124, 161, 64, 0x124, 0x124], // SNOW DIRT + FLINT
+        [1; 6],                                // STONE + COPPER ORE
+        [3; 6],                                // STONE + TIN ORE
+        [2; 6],                                // STONE + IRON ORE
+        [83; 6],                               // STONE + COAL
+        [84; 6],                               // STONE + GOLD NUGGETS
+        [157; 6],                              // STONE + PLATINUM ORE
+        [219; 6],                              // STONE + TITANIUM ORE
+        [78; 6],                               // LIMESTONE + OIL
     ];
 }
 
@@ -115,6 +125,16 @@ impl From<(BlockType, BlockContent)> for VoxelType {
             (BlockType::Dirt, BlockContent::Flint) => 79,
             (BlockType::GrassDirt, BlockContent::Clay) => 80,
             (BlockType::GrassDirt, BlockContent::Flint) => 81,
+            (BlockType::SnowDirt, BlockContent::Clay) => 82,
+            (BlockType::SnowDirt, BlockContent::Flint) => 83,
+            (BlockType::Stone, BlockContent::CopperOre) => 84,
+            (BlockType::Stone, BlockContent::TinOre) => 85,
+            (BlockType::Stone, BlockContent::IronOre) => 86,
+            (BlockType::Stone, BlockContent::Coal) => 87,
+            (BlockType::Stone, BlockContent::GoldNuggets) => 88,
+            (BlockType::Stone, BlockContent::PlatinumOre) => 89,
+            (BlockType::Stone, BlockContent::TitaniumOre) => 90,
+            (BlockType::Limestone, BlockContent::Oil) => 91,
             _ => 0,
         })
     }
