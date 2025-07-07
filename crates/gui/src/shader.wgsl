@@ -182,7 +182,7 @@ fn fs_main(@builtin(position) clip_position: vec4<f32>) -> @location(0) vec4<f32
 
     // --- DDA Initialization ---
     // The DDA starting voxel is found by pushing the ray slightly past the chunk boundary.
-    var current_ray_pos = ray_origin_world + ray_dir_world * (t_min_intersect + 0.0001);
+    var current_ray_pos = ray_origin_world + ray_dir_world * t_min_intersect;
     var current_voxel_coords = vec3<i32>(floor(current_ray_pos / VOXEL_SIZE));
     
     var step_dir = sign(ray_dir_world);
@@ -248,8 +248,18 @@ fn fs_main(@builtin(position) clip_position: vec4<f32>) -> @location(0) vec4<f32
             } else { // Hit a Z face
                 uv = vec2<f32>(fract(fractional_pos.x), 1.0 - fract(fractional_pos.y));
             }
+            uv = clamp(uv, vec2<f32>(0.0), vec2<f32>(1.0 - 1e-6));
 
             hit_color = sample_texture(voxel_type, hit_face_id, uv);
+
+            let face_normal_f32 = vec3<f32>(normal_of_entry_face);
+            let light_direction = normalize(vec3<f32>(0.5, 1.0, 0.5)); // Example light direction
+            let ambient_light = 0.5; // Base ambient light
+            let diffuse_factor = max(dot(face_normal_f32, light_direction), 0.0);
+            let final_light_factor = ambient_light + (1.0 - ambient_light) * diffuse_factor;
+
+            hit_color *= final_light_factor;
+            hit_color.w = 1.0;
 
             break; // Exit loop, we found our color.
         }
