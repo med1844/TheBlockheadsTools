@@ -36,6 +36,7 @@ struct CameraUniform {
     inv_view_proj: mat4x4<f32>,
     camera_pos: vec4<f32>, // xyz
     screen_size: vec4<f32>, // x=width, y=height
+    world_offset: vec4<f32>,
 };
 
 @group(0) @binding(0)
@@ -53,60 +54,33 @@ var texture_sampler: sampler;
 @group(0) @binding(4)
 var<storage, read> texture_uv_atlas_indices: array<u32>; // UV atlas storing single u16 tile indices
 
-// fn get_voxel_type(voxel_coords: vec3<i32>) -> u32 {
-//     if voxel_coords.x < 0 || voxel_coords.x >= i32(WORLD_DIM_X) ||
-//        voxel_coords.y < 0 || voxel_coords.y >= i32(WORLD_DIM_Y) ||
-//        voxel_coords.z < 0 || voxel_coords.z >= i32(WORLD_DIM_Z) {
-//         return 0u;
-//     }
-
-//     let index = u32(voxel_coords.z) +
-//                 u32(voxel_coords.y) * WORLD_DIM_Z +
-//                 u32(voxel_coords.x) * WORLD_DIM_Z * WORLD_DIM_Y;
-
-//     let data = voxel_data[index >> 1];
-//     if ((index & 1) != 0) {
-//         return data >> 16;
-//     } else {
-//         return data & 65535;
-//     }
-// }
-
 fn get_voxel_type(global_voxel_coords: vec3<i32>) -> u32 {
-    // 1. Check if the global coordinate is within the world boundaries.
     if global_voxel_coords.x < 0 || global_voxel_coords.x >= i32(WORLD_DIM_X) ||
        global_voxel_coords.y < 0 || global_voxel_coords.y >= i32(WORLD_DIM_Y) ||
        global_voxel_coords.z < 0 || global_voxel_coords.z >= i32(WORLD_DIM_Z) {
-        return 0u; // Return air if outside the world.
+        return 0u;
     }
 
-    // 2. Determine the chunk coordinates from the global voxel coordinates.
     let chunk_coord_x = u32(global_voxel_coords.x) / CHUNK_DIM_X;
     let chunk_coord_y = u32(global_voxel_coords.y) / CHUNK_DIM_Y;
 
-    // 3. Determine the local voxel coordinates within the identified chunk.
     let local_voxel_coord_x = u32(global_voxel_coords.x) % CHUNK_DIM_X;
     let local_voxel_coord_y = u32(global_voxel_coords.y) % CHUNK_DIM_Y;
     let local_voxel_coord_z = u32(global_voxel_coords.z);
 
-    // 4. Calculate the base index for the start of the chunk's data.
-    // This layout matches your Rust code's offset calculation.
     let chunk_offset = (chunk_coord_x * WORLD_CHUNKS_Y + chunk_coord_y) * CHUNK_VOXEL_COUNT;
 
-    // 5. Calculate the index of the voxel within the chunk's local data.
     let local_voxel_index = local_voxel_coord_z +
                             local_voxel_coord_x * CHUNK_DIM_Z +
                             local_voxel_coord_y * CHUNK_DIM_Z * CHUNK_DIM_X;
 
-    // 6. Combine offsets to get the final index for the u16 array.
     let final_index = chunk_offset + local_voxel_index;
 
-    // 7. Access the packed u16 data from the u32 array.
-    let data = voxel_data[final_index >> 1]; // Each u32 holds two u16 values.
+    let data = voxel_data[final_index >> 1];
     if ((final_index & 1) != 0) {
-        return data >> 16; // Odd index, get the high 16 bits.
+        return data >> 16;
     } else {
-        return data & 0xFFFFu; // Even index, get the low 16 bits.
+        return data & 0xFFFFu;
     }
 }
 
@@ -163,11 +137,15 @@ fn fs_main(@builtin(position) clip_position: vec4<f32>) -> @location(0) vec4<f32
     let world_pos_near = inv_view_proj * clip_pos_near;
     let world_pos_far = inv_view_proj * clip_pos_far;
 
-    let ray_start_world = world_pos_near.xyz / world_pos_near.w;
-    let ray_end_world = world_pos_far.xyz / world_pos_far.w;
+    // The ray origin is the camera's position in its own local space.
+    let ray_origin_local = camera.camera_pos.xyz;
+    
+    // The direction is from the local origin towards the unprojected far point.
+    let ray_dir_local = normalize((world_pos_far.xyz / world_pos_far.w) - ray_origin_local);
 
-    let ray_origin_world = camera.camera_pos.xyz;
-    let ray_dir_world = normalize(ray_end_world - ray_start_world);
+    // Now, translate the local-space ray into world-space for traversal.
+    let ray_origin_world = ray_origin_local + vec3<f32>(camera.world_offset.xy, 0.0);
+    let ray_dir_world = ray_dir_local; // Direction is unaffected by translation.
 
     var hit_color = vec4<f32>(0.0, 0.0, 0.0, 1.0); // Default background color is black
 

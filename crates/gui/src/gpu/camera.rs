@@ -1,21 +1,22 @@
-use crate::input::{AnyUpdate, Input};
+use crate::input::{EventResponse, Input};
 use egui_wgpu::wgpu::{self, util::DeviceExt};
 use glam::{Mat4, Vec3, Vec3Swizzles, Vec4Swizzles};
 
 // Define how to connect the vertices to form triangles.
 pub struct Camera {
-    pub center: glam::Vec2,
+    // we always look at (0, 0)
     pub distance: f32,
     pub up: Vec3,
     pub fovy: f32,   // Field of view in radians
     pub z_near: f32, // Near clipping plane
     pub z_far: f32,  // Far clipping plane
+    pub world_offset: glam::Vec2,
 }
 
 impl Default for Camera {
     fn default() -> Self {
         Self {
-            center: glam::Vec2::new(0.0, 0.0),
+            world_offset: glam::Vec2::new(0.0, 0.0),
             distance: 5.0,
             up: Vec3::Y,
             fovy: 45.0_f32.to_radians(),
@@ -27,7 +28,10 @@ impl Default for Camera {
 
 impl Camera {
     pub fn with_center(self, center: glam::Vec2) -> Self {
-        Self { center, ..self }
+        Self {
+            world_offset: center,
+            ..self
+        }
     }
 }
 
@@ -38,15 +42,16 @@ pub struct CameraUniform {
     inv_view_proj: [[f32; 4]; 4], // Combined view and projection matrix
     camera_pos: [f32; 4],         // Camera's world position (vec3 + padding)
     screen_size: [f32; 4],        // Screen width and height (vec2 + padding)
+    world_offset: [f32; 4],       // World offset
 }
 
 impl Camera {
     fn eye(&self) -> Vec3 {
-        self.center.extend(self.distance)
+        Vec3::new(0.0, 0.0, self.distance)
     }
 
     fn target(&self) -> Vec3 {
-        self.center.extend(0.0)
+        Vec3::ZERO
     }
 
     pub fn uniform(&self, window_size: (f32, f32)) -> CameraUniform {
@@ -60,6 +65,7 @@ impl Camera {
             inv_view_proj: pv.inverse().to_cols_array_2d(),
             camera_pos: self.eye().extend(1.0).into(),
             screen_size: [width, height, 0.0, 0.0],
+            world_offset: [self.world_offset.x, self.world_offset.y, 0.0, 0.0],
         }
     }
 
@@ -136,7 +142,7 @@ impl CameraBuf {
         (ray_origin + t * ray_direction).xy()
     }
 
-    pub fn handle_input(&mut self, input: &Input) -> AnyUpdate {
+    pub fn handle_input(&mut self, input: &Input) -> EventResponse {
         let mut any_update = false;
         if input.is_mouse_left_down {
             let window_size = self.uniform.window_size();
@@ -145,16 +151,15 @@ impl CameraBuf {
             let curr_world_pos_at_z3 =
                 self.screen_to_xy_at_z(input.current_mouse_pos, window_size, Self::MAX_Z);
             let diff = curr_world_pos_at_z3 - prev_world_pos_at_z3;
-            self.camera.center -= diff;
+            self.camera.world_offset -= diff;
             any_update |= diff != glam::Vec2::ZERO;
-            if diff != glam::Vec2::ZERO {
-                dbg!(diff);
-            }
         }
         if input.mouse_wheel_delta != 0.0 {
             self.camera.distance *= 1.0 - input.mouse_wheel_delta * 1e-1;
             any_update = true;
         }
-        any_update.into()
+        EventResponse {
+            repaint: any_update,
+        }
     }
 }

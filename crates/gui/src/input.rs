@@ -49,25 +49,6 @@ impl Input {
     }
 }
 
-pub enum AnyUpdate {
-    No,
-    Yes,
-}
-
-impl From<bool> for AnyUpdate {
-    fn from(value: bool) -> Self {
-        match value {
-            true => AnyUpdate::Yes,
-            false => AnyUpdate::No,
-        }
-    }
-}
-
-impl From<AnyUpdate> for bool {
-    fn from(value: AnyUpdate) -> Self {
-        match value {
-            AnyUpdate::No => false,
-            AnyUpdate::Yes => true,
-        }
-    }
+pub struct EventResponse {
+    pub repaint: bool,
 }

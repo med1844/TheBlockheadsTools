@@ -2,8 +2,8 @@ use std::collections::HashSet;
 
 use egui_wgpu::wgpu::{self, util::DeviceExt};
 use the_blockheads_tools_lib::{
-    BhError, BhResult, Block, BlockContent, BlockCoord, BlockType, BlockView, Chunk,
-    ChunkBlockCoord, ChunkCoord, WorldDb,
+    BhResult, Block, BlockContent, BlockCoord, BlockType, BlockView, Chunk, ChunkBlockCoord,
+    ChunkCoord, WorldDb,
 };
 
 type BlockIdType = u16;
@@ -194,22 +194,5 @@ impl VoxelBuf {
         );
         self.chunk_keys.insert(chunk_coord);
         Ok(())
-    }
-
-    pub(crate) fn load_test_chunk(device: &wgpu::Device, queue: &wgpu::Queue) -> BhResult<Self> {
-        let world_db =
-            WorldDb::from_path("../../test_data/saves/3d716d9bbf89c77ef5001e9cd227ec29/world_db")?;
-        if let Some(mut world_db) = world_db {
-            let x = world_db.main.world_v2.start_portal_pos_x;
-            let y = world_db.main.world_v2.start_portal_pos_y;
-            let start_portal_pos = BlockCoord::new(x, (y - 1) as u16)?;
-            let chunk = world_db.blocks.chunk_at(start_portal_pos).unwrap()?;
-
-            let mut vox_buf = Self::new(device, world_db.main.world_v2.world_width_macro as usize);
-            let _ = vox_buf.set_chunk(queue, ChunkCoord::new(0, 0)?, chunk);
-            Ok(vox_buf)
-        } else {
-            Err(the_blockheads_tools_lib::BhError::InvalidBlockIdError(0))
-        }
     }
 }

@@ -1,4 +1,4 @@
-use crate::input::AnyUpdate;
+use crate::input::EventResponse;
 
 use super::{
     egui_tools::EguiRenderer,
@@ -121,7 +121,7 @@ impl AppState {
             window,
         );
 
-        let scale_factor = 1.0;
+        let scale_factor = 1.5;
 
         let x = world_db.as_ref().unwrap().main.world_v2.start_portal_pos_x;
         let y = world_db.as_ref().unwrap().main.world_v2.start_portal_pos_y;
@@ -187,7 +187,7 @@ impl AppState {
         self.depth_view = Self::create_depth_view(&self.device, width, height);
     }
 
-    fn handle_input(&mut self, window: &Window, event: &WindowEvent) -> AnyUpdate {
+    fn handle_input(&mut self, window: &Window, event: &WindowEvent) -> EventResponse {
         self.input.handle_input(window, event);
         self.camera_buf.handle_input(&self.input)
     }
@@ -342,12 +342,12 @@ impl App {
                     });
 
                     ui.add(
-                        egui::DragValue::new(&mut state.camera_buf.camera.center.x)
+                        egui::DragValue::new(&mut state.camera_buf.camera.world_offset.x)
                             .speed(0.1)
                             .prefix("Viewport Center X: "),
                     );
                     ui.add(
-                        egui::DragValue::new(&mut state.camera_buf.camera.center.y)
+                        egui::DragValue::new(&mut state.camera_buf.camera.world_offset.y)
                             .speed(0.1)
                             .prefix("Viewport Center Y: "),
                     );
@@ -409,13 +409,8 @@ impl ApplicationHandler for App {
 
         let mut any_update = !response.consumed;
         if any_update {
-            let any_update_in_wgpu: bool = self
-                .state
-                .as_mut()
-                .unwrap()
-                .handle_input(window, &event)
-                .into();
-            any_update |= any_update_in_wgpu;
+            let wgpu_response = self.state.as_mut().unwrap().handle_input(window, &event);
+            any_update |= wgpu_response.repaint;
         }
 
         match event {
