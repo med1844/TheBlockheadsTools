@@ -16,6 +16,8 @@ pub enum BhError {
     InvalidBlockIdError(u8),
     #[error("Invalid block content ID: {0}")]
     InvalidBlockContentIdError(u8),
+    #[error("Missing key: {0}")]
+    MissingKey(&'static str),
 }
 
 pub type BhResult<T> = Result<T, BhError>;

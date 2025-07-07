@@ -1,15 +1,13 @@
-use crate::input::EventResponse;
-
 use super::{
     egui_tools::EguiRenderer,
     gpu::{Camera, CameraBuf, RgbaTexture, VoxelBuf},
-    input::Input,
+    input::{EventResponse, Input},
     renderer::{DEPTH_FORMAT, VoxelRenderer},
 };
 use egui_wgpu::wgpu::SurfaceError;
 use egui_wgpu::{ScreenDescriptor, wgpu};
-use std::sync::Arc;
-use the_blockheads_tools_lib::{BlockCoord, ChunkCoord, WorldDb};
+use std::{path::Path, sync::Arc};
+use the_blockheads_tools_lib::{BhResult, BlockCoord, ChunkCoord, WorldDb};
 use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
 use winit::event::WindowEvent;
@@ -49,11 +47,6 @@ impl AppState {
         width: u32,
         height: u32,
     ) -> Self {
-        // should be moved to egui
-        let mut world_db =
-            WorldDb::from_path("../../test_data/saves/3d716d9bbf89c77ef5001e9cd227ec29/world_db")
-                .unwrap();
-
         let power_pref = wgpu::PowerPreference::default();
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
@@ -102,19 +95,7 @@ impl AppState {
         let depth_view = Self::create_depth_view(&device, width, height);
 
         // When we load other worlds, rebuild voxel buf. By default we go 512.
-        let mut voxel_buf = VoxelBuf::new(&device, 512);
-        if let Some(world_db) = world_db.as_mut() {
-            for chunk_y in 0..32 {
-                for chunk_x in 0..world_db.main.world_v2.world_width_macro {
-                    let chunk_coord = ChunkCoord::new(chunk_x, chunk_y).unwrap();
-                    if !voxel_buf.has_chunk(chunk_coord) {
-                        if let Some(Ok(chunk)) = world_db.blocks.chunk_at(chunk_coord) {
-                            let _ = voxel_buf.set_chunk(&queue, chunk_coord, chunk);
-                        }
-                    }
-                }
-            }
-        }
+        let voxel_buf = VoxelBuf::new(&device, 512);
 
         let egui_renderer = EguiRenderer::new(
             &device,
@@ -126,10 +107,7 @@ impl AppState {
 
         let scale_factor = 1.5;
 
-        let x = world_db.as_ref().unwrap().main.world_v2.start_portal_pos_x;
-        let y = world_db.as_ref().unwrap().main.world_v2.start_portal_pos_y;
-
-        let camera = Camera::default().with_center(glam::Vec2::new(x as f32, y as f32));
+        let camera = Camera::default().with_center(glam::Vec2::ZERO);
         let camera_buf = camera.into_buffered(&device);
 
         let tile_map_texture = {
@@ -161,10 +139,44 @@ impl AppState {
             voxel_buf,
             depth_view,
 
-            world_db,
+            world_db: None,
 
             selected_block: None,
         }
+    }
+
+    fn open_world_db<P: AsRef<Path>>(&mut self, path: P) -> BhResult<()> {
+        let mut world_db = WorldDb::from_path(path)?;
+        let x = world_db.main.world_v2.start_portal_pos_x;
+        let y = world_db.main.world_v2.start_portal_pos_y - 1;
+
+        // By default we look at start portal
+        self.camera_buf.camera.world_offset = glam::Vec2::new(x as f32, y as f32);
+
+        let new_world_width_macro = world_db.main.world_v2.world_width_macro as usize;
+
+        // Resize voxel buffer if needed, otherwise, clear up the voxel buffer.
+        if self.voxel_buf.world_width_macro == new_world_width_macro {
+            self.voxel_buf.clear(&self.queue);
+        } else {
+            self.voxel_buf = VoxelBuf::new(&self.device, new_world_width_macro);
+        }
+
+        // Fill up all chunks for now. This could be dispatched to another thread later.
+        for chunk_y in 0..32 {
+            for chunk_x in 0..world_db.main.world_v2.world_width_macro {
+                let chunk_coord = ChunkCoord::new(chunk_x, chunk_y).unwrap();
+                if !self.voxel_buf.has_chunk(chunk_coord) {
+                    if let Some(Ok(chunk)) = world_db.blocks.chunk_at(chunk_coord) {
+                        let _ = self.voxel_buf.set_chunk(&self.queue, chunk_coord, chunk);
+                    }
+                }
+            }
+        }
+
+        self.world_db = Some(world_db);
+
+        Ok(())
     }
 
     fn create_depth_view(device: &wgpu::Device, width: u32, height: u32) -> wgpu::TextureView {
@@ -346,8 +358,26 @@ impl App {
             state.egui_renderer.begin_frame(window);
 
             let selected_block_info = state.selected_block_info();
+            let mut opened_path = None;
 
-            egui::Window::new("winit + egui + wgpu says hello!")
+            egui::TopBottomPanel::new(egui::panel::TopBottomSide::Top, "ok").show(
+                state.egui_renderer.context(),
+                |ui| {
+                    egui::menu::bar(ui, |ui| {
+                        ui.menu_button("File", |ui| {
+                            if ui.button("Open").clicked() {
+                                opened_path = rfd::FileDialog::new().pick_folder();
+                            }
+                        })
+                    })
+                },
+            );
+
+            if let Some(path) = opened_path {
+                state.open_world_db(path).unwrap();
+            }
+
+            egui::Window::new("Info")
                 .resizable(true)
                 .vscroll(true)
                 .show(state.egui_renderer.context(), |ui| {

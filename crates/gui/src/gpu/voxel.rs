@@ -166,6 +166,7 @@ pub struct VoxelBuf {
     // Contains flattened block type, 512 * 32 * (32 * 32 * 3) blocks
     pub buf: wgpu::Buffer,
     chunk_keys: HashSet<ChunkCoord>,
+    pub world_width_macro: usize,
 }
 
 impl VoxelBuf {
@@ -185,7 +186,21 @@ impl VoxelBuf {
                 usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             }),
             chunk_keys: HashSet::new(),
+            world_width_macro,
         }
+    }
+
+    /// Clean up all voxels and registered chunks.
+    pub fn clear(&mut self, queue: &wgpu::Queue) {
+        self.chunk_keys.clear();
+        queue.write_buffer(
+            &self.buf,
+            0,
+            bytemuck::cast_slice(&vec![
+                VoxelType(0);
+                Self::NUM_BLOCK_PER_CHUNK * 32 * self.world_width_macro
+            ]),
+        );
     }
 
     pub fn has_chunk<I: Into<ChunkCoord>>(&self, key: I) -> bool {

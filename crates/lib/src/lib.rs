@@ -100,19 +100,21 @@ pub struct WorldDbMain {
 }
 
 impl WorldDbMain {
-    fn from_db(db: &Database<Str, Bytes>, rtxn: &RoTxn) -> BhResult<Option<Self>> {
+    fn from_db(db: &Database<Str, Bytes>, rtxn: &RoTxn) -> BhResult<Self> {
         let (Some(blockheads), Some(dynamic_world_v2), Some(world_v2)) = (
             db.get(rtxn, "blockheads")?,
             db.get(rtxn, "dynamicWorldv2")?,
             db.get(rtxn, "worldv2")?,
         ) else {
-            return Ok(None);
+            return Err(BhError::MissingKey(
+                "One or more of `blockheads`, `dynamicWorldv2`, `worldv2` is missing from `main` database",
+            ));
         };
-        Ok(Some(Self {
+        Ok(Self {
             blockheads: blockheads.to_vec(),
             dynamic_world_v2: dynamic_world_v2.to_vec(),
             world_v2: plist::from_bytes::<WorldV2>(world_v2)?,
-        }))
+        })
     }
 }
 
@@ -323,7 +325,7 @@ pub struct WorldDb {
 }
 
 impl WorldDb {
-    pub fn from_path<P: AsRef<Path>>(path: P) -> BhResult<Option<Self>> {
+    pub fn from_path<P: AsRef<Path>>(path: P) -> BhResult<Self> {
         let mut options = EnvOpenOptions::new();
         options.map_size(10 * 1024 * 1024).max_dbs(100);
         let env = unsafe { options.open(path)? };
@@ -332,14 +334,13 @@ impl WorldDb {
         let (Some(blocks), Some(dw), Some(main)) =
             (open_db("blocks")?, open_db("dw")?, open_db("main")?)
         else {
-            return Ok(None);
+            return Err(BhError::MissingKey(
+                "One or more of `block`, `dw` or `main` is missing in the database",
+            ));
         };
         let blocks = Chunks::from_db(&blocks, &rtxn)?;
         let dw = Map::from_db(&dw, &rtxn)?;
         let main = WorldDbMain::from_db(&main, &rtxn)?;
-        let Some(main) = main else {
-            return Ok(None);
-        };
-        Ok(Some(Self { blocks, dw, main }))
+        Ok(Self { blocks, dw, main })
     }
 }
