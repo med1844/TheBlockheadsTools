@@ -88,8 +88,8 @@ impl<'chunk> DerefMut for BlockMut<'chunk> {
 pub trait BlockView {
     fn fg(&self) -> BhResult<BlockType>;
     fn fg_raw(&self) -> u8;
-    fn fg_content(&self) -> BhResult<BlockContent>;
-    fn fg_content_raw(&self) -> u8;
+    fn content(&self) -> BhResult<BlockContent>;
+    fn content_raw(&self) -> u8;
     fn bg(&self) -> BhResult<BlockType>;
     fn bg_raw(&self) -> u8;
 }
@@ -103,11 +103,11 @@ impl<T: Deref<Target = [u8; 64]>> BlockView for T {
         self.deref()[0]
     }
 
-    fn fg_content(&self) -> BhResult<BlockContent> {
-        BlockContent::try_from_u8(self.fg_content_raw())
+    fn content(&self) -> BhResult<BlockContent> {
+        BlockContent::try_from_u8(self.content_raw())
     }
 
-    fn fg_content_raw(&self) -> u8 {
+    fn content_raw(&self) -> u8 {
         self.deref()[3]
     }
 

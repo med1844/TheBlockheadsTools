@@ -126,7 +126,6 @@ fn fs_main(@builtin(position) clip_position: vec4<f32>) -> @location(0) vec4<f32
 
     let ndc_coords = vec2<f32>(
         (frag_coord.x / screen_width) * 2.0 - 1.0,
-        // (frag_coord.y / screen_height) * 2.0 - 1.0
         1.0 - (frag_coord.y / screen_height) * 2.0
     );
 
@@ -223,7 +222,7 @@ fn fs_main(@builtin(position) clip_position: vec4<f32>) -> @location(0) vec4<f32
 
         let voxel_type = get_voxel_type(current_voxel_coords);
 
-        if (voxel_type != 0u) { // If not air, we hit a voxel!
+        if (voxel_type != 0u && voxel_type != 2) { // If not air, we hit a voxel!
             var hit_face_id: u32;
 
             if (normal_of_entry_face.x != 0) {
