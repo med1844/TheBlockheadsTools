@@ -21,98 +21,98 @@ impl From<BlockIdType> for VoxelType {
 impl VoxelType {
     // [PX, NX, PY, NY, PZ, NZ]
     pub(crate) const UV_AT_FACE: &[[u32; 6]] = &[
-        [0; 6],                                // NONE,
-        [32; 6],                               // STONE,
-        [0; 6],                                // AIR
-        [14; 6],                               // WATER
-        [110; 6],                              // ICE
-        [129; 6],                              // SNOW
-        [64; 6],                               // DIRT
-        [65; 6],                               // SAND
-        [65; 6],                               // SAND_
-        [196; 6],                              // WOOD
-        [33; 6],                               // MINED_STONE
-        [34; 6],                               // RED_BRICK
-        [66; 6],                               // LIMESTONE
-        [35; 6],                               // MINED_LIMESTONE
-        [67; 6],                               // MARBLE
-        [76; 6],                               // MINED_MARBLE
-        [77; 6],                               // TIME_CRYSTAL
-        [79; 6],                               // SAND_STONE
-        [80; 6],                               // MINED_SAND_STONE
-        [81; 6],                               // RED_MARBLE
-        [82; 6],                               // MINED_RED_MARBLE
-        [0; 6],                                // Missing ID 21
-        [0; 6],                                // Missing ID 22
-        [0; 6],                                // Missing ID 23
-        [108; 6],                              // GLASS
-        [132; 6],                              // SPAWN_PORTAL_BASE
-        [288; 6],                              // GOLD_BLOCK
-        [160, 160, 161, 64, 160, 160],         // GRASS_DIRT
-        [162, 162, 163, 64, 162, 162],         // SNOW_DIRT
-        [86; 6],                               // LAPIS_LAZULI
-        [87; 6],                               // MINED_LAPIS_LAZULI
-        [46; 6],                               // LAVA
-        [164; 6],                              // REINFORCED_PLATFORM
-        [165; 6],                              // SPAWN_PORTAL_BASE_AMETHYST
-        [166; 6],                              // SPAWN_PORTAL_BASE_SAPPHIRE
-        [167; 6],                              // SPAWN_PORTAL_BASE_EMERALD
-        [168; 6],                              // SPAWN_PORTAL_BASE_RUBY
-        [169; 6],                              // SPAWN_PORTAL_BASE_DIAMOND
-        [89; 6],                               // NORTH_POLE
-        [112; 6],                              // SOUTH_POLE
-        [113; 6],                              // WEST_POLE
-        [114; 6],                              // EAST_POLE
-        [672; 6],                              // PORTAL_BASE
-        [190; 6],                              // PORTAL_BASE_AMETHYST
-        [188; 6],                              // PORTAL_BASE_SAPPHIRE
-        [478; 6],                              // PORTAL_BASE_EMERALD
-        [700; 6],                              // PORTAL_BASE_RUBY
-        [699; 6],                              // PORTAL_BASE_DIAMOND
-        [741; 6],                              // COMPOST
-        [746; 6],                              // GRASS_COMPOST
-        [0; 6],                                // SNOW_COMPOST
-        [97; 6],                               // BASALT
-        [294; 6],                              // MINED_BASALT
-        [130; 6],                              // COPPER_BLOCK
-        [0; 6],                                // TIN_BLOCK
-        [0; 6],                                // BRONZE_BLOCK
-        [0; 6],                                // IRON_BLOCK
-        [0; 6],                                // STEEL_BLOCK
-        [89; 6],                               // BLACK_SAND
-        [0; 6],                                // BLACK_GLASS
-        [170; 6],                              // TRADE_PORTAL_BASE
-        [171; 6],                              // TRADE_PORTAL_BASE_AMETHYST
-        [172; 6],                              // TRADE_PORTAL_BASE_SAPPHIRE
-        [173; 6],                              // TRADE_PORTAL_BASE_EMERALD
-        [174; 6],                              // TRADE_PORTAL_BASE_RUBY
-        [175; 6],                              // TRADE_PORTAL_BASE_DIAMOND
-        [0; 6],                                // Missing ID 66
-        [117; 6],                              // PLATINUM_BLOCK
-        [0; 6],                                // TITANIUM_BLOCK
-        [0; 6],                                // CARBON_FIBER_BLOCK
-        [170; 6],                              // GRAVEL
-        [171; 6],                              // AMETHYST_BLOCK
-        [172; 6],                              // SAPPHIRE_BLOCK
-        [173; 6],                              // EMERALD_BLOCK
-        [174; 6],                              // RUBY_BLOCK
-        [175; 6],                              // DIAMOND_BLOCK
-        [0; 6],                                // PLASTER
-        [0; 6],                                // LUMINOUS_PLASTER
-        [0x122; 6],                            // DIRT + CLAY
-        [0x120; 6],                            // DIRT + FLINT
-        [0x123, 0x123, 161, 64, 0x123, 0x123], // GRASS DIRT + CLAY
-        [0x121, 0x121, 161, 64, 0x121, 0x121], // GRASS DIRT + FLINT
-        [0x125, 0x125, 161, 64, 0x125, 0x125], // SNOW DIRT + CLAY
-        [0x124, 0x124, 161, 64, 0x124, 0x124], // SNOW DIRT + FLINT
-        [1; 6],                                // STONE + COPPER ORE
-        [3; 6],                                // STONE + TIN ORE
-        [2; 6],                                // STONE + IRON ORE
-        [83; 6],                               // STONE + COAL
-        [84; 6],                               // STONE + GOLD NUGGETS
-        [157; 6],                              // STONE + PLATINUM ORE
-        [219; 6],                              // STONE + TITANIUM ORE
-        [78; 6],                               // LIMESTONE + OIL
+        [0; 6],                        // NONE,
+        [32; 6],                       // STONE,
+        [0; 6],                        // AIR
+        [14; 6],                       // WATER
+        [110; 6],                      // ICE
+        [129; 6],                      // SNOW
+        [64; 6],                       // DIRT
+        [65; 6],                       // SAND
+        [65; 6],                       // MINED_SAND
+        [196; 6],                      // WOOD
+        [33; 6],                       // MINED_STONE
+        [34; 6],                       // RED_BRICK
+        [66; 6],                       // LIMESTONE
+        [35; 6],                       // MINED_LIMESTONE
+        [67; 6],                       // MARBLE
+        [76; 6],                       // MINED_MARBLE
+        [77; 6],                       // TIME_CRYSTAL
+        [79; 6],                       // SAND_STONE
+        [80; 6],                       // MINED_SAND_STONE
+        [81; 6],                       // RED_MARBLE
+        [82; 6],                       // MINED_RED_MARBLE
+        [0; 6],                        // Missing ID 21
+        [0; 6],                        // Missing ID 22
+        [0; 6],                        // Missing ID 23
+        [108; 6],                      // GLASS
+        [132; 6],                      // SPAWN_PORTAL_BASE
+        [85; 6],                       // GOLD_BLOCK
+        [160, 160, 161, 64, 160, 160], // GRASS_DIRT
+        [162, 162, 163, 64, 162, 162], // SNOW_DIRT
+        [86; 6],                       // LAPIS_LAZULI
+        [87; 6],                       // MINED_LAPIS_LAZULI
+        [46; 6],                       // LAVA
+        [164; 6],                      // REINFORCED_PLATFORM
+        [165; 6],                      // SPAWN_PORTAL_BASE_AMETHYST
+        [166; 6],                      // SPAWN_PORTAL_BASE_SAPPHIRE
+        [167; 6],                      // SPAWN_PORTAL_BASE_EMERALD
+        [168; 6],                      // SPAWN_PORTAL_BASE_RUBY
+        [169; 6],                      // SPAWN_PORTAL_BASE_DIAMOND
+        [552; 6],                      // NORTH_POLE
+        [553; 6],                      // SOUTH_POLE
+        [554; 6],                      // WEST_POLE
+        [554; 6],                      // EAST_POLE
+        [170; 6],                      // PORTAL_BASE
+        [171; 6],                      // PORTAL_BASE_AMETHYST
+        [172; 6],                      // PORTAL_BASE_SAPPHIRE
+        [173; 6],                      // PORTAL_BASE_EMERALD
+        [174; 6],                      // PORTAL_BASE_RUBY
+        [175; 6],                      // PORTAL_BASE_DIAMOND
+        [97; 6],                       // COMPOST
+        [98, 98, 294, 97, 98, 98],     // GRASS_COMPOST
+        [130, 130, 163, 97, 130, 130], // SNOW_COMPOST
+        [88; 6],                       // BASALT
+        [88; 6],                       // MINED_BASALT
+        [112; 6],                      // COPPER_BLOCK
+        [113; 6],                      // TIN_BLOCK
+        [114; 6],                      // BRONZE_BLOCK
+        [115; 6],                      // IRON_BLOCK
+        [116; 6],                      // STEEL_BLOCK
+        [89; 6],                       // BLACK_SAND
+        [117; 6],                      // BLACK_GLASS
+        [170; 6],                      // TRADE_PORTAL_BASE
+        [171; 6],                      // TRADE_PORTAL_BASE_AMETHYST
+        [172; 6],                      // TRADE_PORTAL_BASE_SAPPHIRE
+        [173; 6],                      // TRADE_PORTAL_BASE_EMERALD
+        [174; 6],                      // TRADE_PORTAL_BASE_RUBY
+        [175; 6],                      // TRADE_PORTAL_BASE_DIAMOND
+        [0; 6],                        // Missing ID 66
+        [672; 6],                      // PLATINUM_BLOCK
+        [190; 6],                      // TITANIUM_BLOCK
+        [188; 6],                      // CARBON_FIBER_BLOCK
+        [478; 6],                      // GRAVEL
+        [697; 6],                      // AMETHYST_BLOCK
+        [698; 6],                      // SAPPHIRE_BLOCK
+        [699; 6],                      // EMERALD_BLOCK
+        [700; 6],                      // RUBY_BLOCK
+        [701; 6],                      // DIAMOND_BLOCK
+        [741; 6],                      // PLASTER
+        [746; 6],                      // LUMINOUS_PLASTER
+        [290; 6],                      // DIRT + CLAY
+        [288; 6],                      // DIRT + FLINT
+        [291, 291, 161, 64, 291, 291], // GRASS DIRT + CLAY
+        [289, 289, 161, 64, 289, 289], // GRASS DIRT + FLINT
+        [293, 293, 161, 64, 293, 293], // SNOW DIRT + CLAY
+        [292, 292, 161, 64, 292, 292], // SNOW DIRT + FLINT
+        [1; 6],                        // STONE + COPPER ORE
+        [3; 6],                        // STONE + TIN ORE
+        [2; 6],                        // STONE + IRON ORE
+        [83; 6],                       // STONE + COAL
+        [84; 6],                       // STONE + GOLD NUGGETS
+        [157; 6],                      // STONE + PLATINUM ORE
+        [219; 6],                      // STONE + TITANIUM ORE
+        [78; 6],                       // LIMESTONE + OIL
     ];
 }
 
