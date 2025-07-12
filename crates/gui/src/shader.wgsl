@@ -58,7 +58,7 @@ fn get_voxel_type(global_voxel_coords: vec3<i32>) -> u32 {
     if global_voxel_coords.x < 0 || global_voxel_coords.x >= i32(WORLD_DIM_X) ||
        global_voxel_coords.y < 0 || global_voxel_coords.y >= i32(WORLD_DIM_Y) ||
        global_voxel_coords.z < 0 || global_voxel_coords.z >= i32(WORLD_DIM_Z) {
-        return 0u;
+        return 2u; // everything outside of the world is air
     }
 
     let chunk_coord_x = u32(global_voxel_coords.x) / CHUNK_DIM_X;
@@ -183,6 +183,15 @@ fn fs_main(@builtin(position) clip_position: vec4<f32>) -> @location(0) vec4<f32
     // The DDA starting voxel is found by pushing the ray slightly past the chunk boundary.
     var current_ray_pos = ray_origin_world + ray_dir_world * t_min_intersect;
     var current_voxel_coords = vec3<i32>(floor(current_ray_pos / VOXEL_SIZE));
+
+    // FIX: Clamp the initial voxel coordinates to be within the world bounds.
+    // This prevents floating-point errors from starting the DDA outside the world,
+    // which would cause an immediate, incorrect "hit" on an out-of-bounds voxel.
+    current_voxel_coords = clamp(
+        current_voxel_coords,
+        vec3<i32>(0),
+        vec3<i32>(i32(WORLD_DIM_X) - 1, i32(WORLD_DIM_Y) - 1, i32(WORLD_DIM_Z) - 1)
+    );
     
     var step_dir = sign(ray_dir_world);
     if (ray_dir_world.x == 0.0) { step_dir.x = 0.0; }
@@ -222,7 +231,7 @@ fn fs_main(@builtin(position) clip_position: vec4<f32>) -> @location(0) vec4<f32
 
         let voxel_type = get_voxel_type(current_voxel_coords);
 
-        if (voxel_type != 0u && voxel_type != 2) { // If not air, we hit a voxel!
+        if (voxel_type != 2) { // If not air, we hit a voxel!
             var hit_face_id: u32;
 
             if (normal_of_entry_face.x != 0) {

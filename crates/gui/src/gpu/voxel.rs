@@ -19,6 +19,8 @@ impl From<BlockIdType> for VoxelType {
 }
 
 impl VoxelType {
+    pub const AIR: Self = Self(2);
+
     // [PX, NX, PY, NY, PZ, NZ]
     pub(crate) const UV_AT_FACE: &[[u32; 6]] = &[
         [0; 6],                         // None
@@ -213,7 +215,7 @@ impl VoxelBuf {
             buf: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some("Global Voxel Data Buffer"),
                 contents: bytemuck::cast_slice(&vec![
-                    VoxelType(0);
+                    VoxelType::AIR;
                     Self::NUM_BLOCK_PER_CHUNK
                         * 32
                         * world_width_macro
@@ -232,7 +234,7 @@ impl VoxelBuf {
             &self.buf,
             0,
             bytemuck::cast_slice(&vec![
-                VoxelType(0);
+                VoxelType::AIR;
                 Self::NUM_BLOCK_PER_CHUNK * 32 * self.world_width_macro
             ]),
         );
