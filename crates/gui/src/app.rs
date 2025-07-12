@@ -107,7 +107,7 @@ impl AppState {
 
         let scale_factor = 1.5;
 
-        let camera = Camera::default().with_center(glam::Vec2::ZERO);
+        let camera = Camera::default();
         let camera_buf = camera.into_buffered(&device);
 
         let tile_map_texture = {
@@ -151,7 +151,7 @@ impl AppState {
         let y = world_db.main.world_v2.start_portal_pos_y - 1;
 
         // By default we look at start portal
-        self.camera_buf.camera.world_offset = glam::Vec2::new(x as f32, y as f32);
+        self.camera_buf.camera.world_offset = glam::Vec3::new(x as f32, y as f32, 5.0);
 
         let new_world_width_macro = world_db.main.world_v2.world_width_macro as usize;
 
@@ -326,7 +326,7 @@ impl App {
                     view: &surface_view,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
+                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
                         store: wgpu::StoreOp::Store,
                     },
                 })],
@@ -402,7 +402,7 @@ impl App {
                             .prefix("Viewport Center Y: "),
                     );
                     ui.add(
-                        egui::DragValue::new(&mut state.camera_buf.camera.distance)
+                        egui::DragValue::new(&mut state.camera_buf.camera.world_offset.z)
                             .speed(0.1)
                             .prefix("Distance: "),
                     );

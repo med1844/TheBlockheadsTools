@@ -6,3 +6,9 @@ In Ubuntu 24.04 there's no longer libdispatch in system. Manually download and i
 
 - [`libdispatch`](https://launchpad.net/ubuntu/zesty/amd64/libdispatch0/0~svn197-3.3ubuntu2)
 - [`libdispatch-dev`](https://launchpad.net/ubuntu/focal/amd64/libdispatch-dev/0~svn197-3.3ubuntu2)
+
+### Capturing server packets
+
+```bash
+sudo tcpdump -i any -w test.pcap port 15151
+```

@@ -143,7 +143,7 @@ fn fs_main(@builtin(position) clip_position: vec4<f32>) -> @location(0) vec4<f32
     let ray_dir_local = normalize((world_pos_far.xyz / world_pos_far.w) - ray_origin_local);
 
     // Now, translate the local-space ray into world-space for traversal.
-    let ray_origin_world = ray_origin_local + vec3<f32>(camera.world_offset.xy, 0.0);
+    let ray_origin_world = ray_origin_local + camera.world_offset.xyz;
     let ray_dir_world = ray_dir_local; // Direction is unaffected by translation.
 
     var hit_color = vec4<f32>(0.0, 0.0, 0.0, 0.0); // Default background color is nothing
