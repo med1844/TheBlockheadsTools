@@ -324,7 +324,15 @@ impl VoxelBuf {
                 } else {
                     fg_type
                 };
-                let bg_type = VoxelType::bg_from_block(block);
+                let bg_type = if block
+                    .content()
+                    .is_ok_and(|content| content == BlockContent::None)
+                    && fg_type != VoxelType::AIR
+                {
+                    fg_type
+                } else {
+                    VoxelType::bg_from_block(block)
+                };
                 let index = (y * Chunk::NUM_BLOCK_PER_ROW + x) * 3;
                 blocks[index + 0] = bg_type;
                 blocks[index + 1] = mg_type;
