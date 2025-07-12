@@ -20,10 +20,11 @@ impl From<BlockIdType> for VoxelType {
 
 impl VoxelType {
     pub const AIR: Self = Self(2);
+    pub const UNKNOWN: Self = Self(0);
 
     // [PX, NX, PY, NY, PZ, NZ]
     pub(crate) const UV_AT_FACE: &[[u32; 6]] = &[
-        [0; 6],                         // None
+        [371; 6],                       // Unknown
         [32; 6],                        // Stone
         [0; 6],                         // Air
         [14; 6],                        // Water
@@ -115,42 +116,57 @@ impl VoxelType {
         [157; 6],                       // Stone + PlatinumOre
         [219; 6],                       // Stone + TitaniumOre
         [78; 6],                        // Limestone + Oil
+        [256; 6],                       // AppleTreeLeafEarlySummer
+        [264, 264, 193, 193, 264, 264], // AppleTreeTrunk
+        [224; 6],                       // AppleTreeTrunkWithLeafEarlySummer
         [237; 6],                       // PineTreeLeaf
         [192, 192, 193, 193, 192, 192], // PineTreeTrunk,
         [236; 6],                       // PineTreeTrunkWithLeaf
+        [512; 6],                       // MapleTreeLeafEarlySummer
+        [488, 488, 193, 193, 488, 488], // MapleTreeTrunk
+        [480; 6],                       // MapleTreeTrunkWithLeafEarlySummer
+        [233; 6],                       // MangoTreeLeaf
+        [192, 192, 193, 193, 192, 192], // MangoTreeTrunk
+        [232; 6],                       // MangoTreeTrunkWithLeaf
+        [489; 6],                       // CoconutTreeLeaf
+        [490; 6],                       // CoconutTreeTrunk
         [493; 6],                       // OrangeTreeLeaf
         [495, 495, 193, 193, 495, 495], // OrangeTreeTrunk
         [494; 6],                       // OrangeTreeTrunkWithLeaf
+        [265; 6],                       // CherryTreeLeafEarlySummer
+        [273, 273, 193, 193, 273, 273], // CherryTreeTrunk
+        [274; 6],                       // CherryTreeTrunkWithLeafEarlySummer
+        [283; 6],                       // CoffeeTreeLeaf
+        [282, 282, 193, 193, 282, 282], // CoffeeTreeTrunk
+        [284; 6],                       // CoffeeTreeTrunkWithLeaf
+        [234; 6],                       // Cactus
+        [235; 6],                       // DeadCactus
+        [520; 6],                       // LimeTreeLeaf
+        [522, 522, 193, 193, 522, 522], // LimeTreeTrunk
+        [521; 6],                       // LimeTreeTrunkWithLeaf
+        [220, 220, 193, 193, 220, 220], // AmethystTreeTrunk
+        [570; 6],                       // AmethystTreeLeaf
+        [602; 6],                       // AmethystTreeTrunkWithLeaf
+        [221, 221, 193, 193, 221, 221], // SapphireTreeTrunk
+        [571; 6],                       // SapphireTreeLeaf
+        [603; 6],                       // SapphireTreeTrunkWithLeaf
+        [222, 222, 193, 193, 222, 222], // EmeraldTreeTrunk
+        [572; 6],                       // EmeraldTreeLeaf
+        [604; 6],                       // EmeraldTreeTrunkWithLeaf
+        [253, 253, 193, 193, 253, 253], // RubyTreeTrunk
+        [573; 6],                       // RubyTreeLeaf
+        [605; 6],                       // RubyTreeTrunkWithLeaf
+        [254, 254, 193, 193, 254, 254], // DiamondTreeTrunk
+        [574; 6],                       // DiamondTreeLeaf
+        [606; 6],                       // DiamondTreeTrunkWithLeaf
     ];
-}
-
-impl From<(BlockType, BlockContent)> for VoxelType {
-    fn from(value: (BlockType, BlockContent)) -> Self {
-        Self(match value {
-            (BlockType::Air, _) => 0,
-            (block_type, BlockContent::None) => block_type as u16,
-            (BlockType::Dirt, BlockContent::Clay) => 78,
-            (BlockType::Dirt, BlockContent::Flint) => 79,
-            (BlockType::GrassDirt, BlockContent::Clay) => 80,
-            (BlockType::GrassDirt, BlockContent::Flint) => 81,
-            (BlockType::SnowDirt, BlockContent::Clay) => 82,
-            (BlockType::SnowDirt, BlockContent::Flint) => 83,
-            (BlockType::Stone, BlockContent::CopperOre) => 84,
-            (BlockType::Stone, BlockContent::TinOre) => 85,
-            (BlockType::Stone, BlockContent::IronOre) => 86,
-            (BlockType::Stone, BlockContent::Coal) => 87,
-            (BlockType::Stone, BlockContent::GoldNuggets) => 88,
-            (BlockType::Stone, BlockContent::PlatinumOre) => 89,
-            (BlockType::Stone, BlockContent::TitaniumOre) => 90,
-            (BlockType::Limestone, BlockContent::Oil) => 91,
-            _ => 0,
-        })
-    }
 }
 
 impl VoxelType {
     fn fg_from_block_inner<'b>(block: Block<'b>) -> BhResult<Self> {
         Ok(Self(match (block.fg()?, block.content()?) {
+            (BlockType::Air, _) => 2,
+            (BlockType::Snow, _) => 5,
             (block_type, BlockContent::None) => block_type as u16,
             (BlockType::Dirt, BlockContent::Clay) => 78,
             (BlockType::Dirt, BlockContent::Flint) => 79,
@@ -171,23 +187,61 @@ impl VoxelType {
     }
 
     pub fn fg_from_block<'b>(block: Block<'b>) -> Self {
-        Self::fg_from_block_inner(block).unwrap_or(Self(0))
+        Self::fg_from_block_inner(block).unwrap_or(Self::UNKNOWN)
     }
 
     fn mg_from_block_inner<'b>(block: Block<'b>) -> BhResult<Self> {
         Ok(Self(match block.content()? {
-            BlockContent::PineTreeLeaf => 92,
-            BlockContent::PineTreeTrunk => 93,
-            BlockContent::PineTreeTrunkWithLeaf => 94,
-            BlockContent::OrangeTreeLeaf => 95,
-            BlockContent::OrangeTreeTrunk => 96,
-            BlockContent::OrangeTreeTrunkWithLeaf => 97,
+            BlockContent::None => 2,
+            BlockContent::AppleTreeLeafEarlySummer => 92,
+            BlockContent::AppleTreeTrunk => 93,
+            BlockContent::AppleTreeTrunkWithLeafEarlySummer => 94,
+            BlockContent::PineTreeLeaf => 95,
+            BlockContent::PineTreeTrunk => 96,
+            BlockContent::PineTreeTrunkWithLeaf => 97,
+            BlockContent::MapleTreeLeafEarlySummer => 98,
+            BlockContent::MapleTreeTrunk => 99,
+            BlockContent::MapleTreeTrunkWithLeafEarlySummer => 100,
+            BlockContent::MangoTreeLeaf => 101,
+            BlockContent::MangoTreeTrunk => 102,
+            BlockContent::MangoTreeTrunkWithLeaf => 103,
+            BlockContent::CoconutTreeLeaf => 104,
+            BlockContent::CoconutTreeTrunk => 105,
+            BlockContent::OrangeTreeLeaf => 106,
+            BlockContent::OrangeTreeTrunk => 107,
+            BlockContent::OrangeTreeTrunkWithLeaf => 108,
+            BlockContent::CherryTreeLeafEarlySummer => 109,
+            BlockContent::CherryTreeTrunk => 110,
+            BlockContent::CherryTreeTrunkWithLeafEarlySummer => 111,
+            BlockContent::CoffeeTreeLeaf => 112,
+            BlockContent::CoffeeTreeTrunk => 113,
+            BlockContent::CoffeeTreeTrunkWithLeaf => 114,
+            BlockContent::Cactus => 115,
+            BlockContent::DeadCactus => 116,
+            BlockContent::LimeTreeLeaf => 117,
+            BlockContent::LimeTreeTrunk => 118,
+            BlockContent::LimeTreeTrunkWithLeaf => 119,
+            BlockContent::AmethystTreeTrunk => 120,
+            BlockContent::AmethystTreeLeaf => 121,
+            BlockContent::AmethystTreeTrunkWithLeaf => 122,
+            BlockContent::SapphireTreeTrunk => 123,
+            BlockContent::SapphireTreeLeaf => 124,
+            BlockContent::SapphireTreeTrunkWithLeaf => 125,
+            BlockContent::EmeraldTreeTrunk => 126,
+            BlockContent::EmeraldTreeLeaf => 127,
+            BlockContent::EmeraldTreeTrunkWithLeaf => 128,
+            BlockContent::RubyTreeTrunk => 129,
+            BlockContent::RubyTreeLeaf => 130,
+            BlockContent::RubyTreeTrunkWithLeaf => 131,
+            BlockContent::DiamondTreeTrunk => 132,
+            BlockContent::DiamondTreeLeaf => 133,
+            BlockContent::DiamondTreeTrunkWithLeaf => 134,
             _ => 0,
         }))
     }
 
     pub fn mg_from_block<'b>(block: Block<'b>) -> Self {
-        Self::mg_from_block_inner(block).unwrap_or(Self(0))
+        Self::mg_from_block_inner(block).unwrap_or(Self::UNKNOWN)
     }
 
     fn bg_from_block_inner<'b>(block: Block<'b>) -> BhResult<Self> {
@@ -195,7 +249,7 @@ impl VoxelType {
     }
 
     pub fn bg_from_block<'b>(block: Block<'b>) -> Self {
-        Self::bg_from_block_inner(block).unwrap_or(Self(0))
+        Self::bg_from_block_inner(block).unwrap_or(Self::UNKNOWN)
     }
 }
 
@@ -255,7 +309,7 @@ impl VoxelBuf {
             for x in 0..Chunk::NUM_BLOCK_PER_ROW {
                 let block = chunk.block_at(&ChunkBlockCoord::new(x as u8, y as u8)?);
                 let fg_type = VoxelType::fg_from_block(block);
-                let mg_type = if fg_type == VoxelType(0) {
+                let mg_type = if fg_type == VoxelType::AIR {
                     VoxelType::mg_from_block(block)
                 } else {
                     fg_type
