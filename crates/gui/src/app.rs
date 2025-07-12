@@ -1,5 +1,6 @@
 use super::{
     egui_tools::EguiRenderer,
+    fps_counter::FpsCounter,
     gpu::{Camera, CameraBuf, RgbaTexture, VoxelBuf},
     input::{EventResponse, Input},
     renderer::{DEPTH_FORMAT, VoxelRenderer},
@@ -37,6 +38,9 @@ pub struct AppState {
 
     // inspections
     selected_block: Option<BlockCoord>,
+
+    // utils
+    fps_counter: FpsCounter,
 }
 
 impl AppState {
@@ -142,6 +146,8 @@ impl AppState {
             world_db: None,
 
             selected_block: None,
+
+            fps_counter: FpsCounter::new(2.0),
         }
     }
 
@@ -347,6 +353,8 @@ impl App {
             rpass.draw(0..3, 0..1);
         }
 
+        state.fps_counter.update();
+
         // egui Pass
         let window = self.window.as_ref().unwrap();
         let screen_descriptor = ScreenDescriptor {
@@ -381,6 +389,9 @@ impl App {
                 .resizable(true)
                 .vscroll(true)
                 .show(state.egui_renderer.context(), |ui| {
+                    ui.label(format!("fps: {:.1}", state.fps_counter.fps()));
+                    ui.separator();
+
                     if let Some((coord, bytes)) = selected_block_info {
                         ui.label(format!(
                             "Selected block: x = {}, y = {}",

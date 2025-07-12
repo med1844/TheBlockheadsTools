@@ -106,8 +106,8 @@ impl VoxelType {
         [288; 6],                       // Dirt + Flint
         [291, 291, 161, 64, 291, 291],  // GrassDirt + Clay
         [289, 289, 161, 64, 289, 289],  // GrassDirt + Flint
-        [293, 293, 161, 64, 293, 293],  // SnowDirt + Clay
-        [292, 292, 161, 64, 292, 292],  // SnowDirt + Flint
+        [293, 293, 163, 64, 293, 293],  // SnowDirt + Clay
+        [292, 292, 163, 64, 292, 292],  // SnowDirt + Flint
         [1; 6],                         // Stone + CopperOre
         [3; 6],                         // Stone + TinOre
         [2; 6],                         // Stone + IronOre
@@ -159,6 +159,8 @@ impl VoxelType {
         [254, 254, 193, 193, 254, 254], // DiamondTreeTrunk
         [574; 6],                       // DiamondTreeLeaf
         [606; 6],                       // DiamondTreeTrunkWithLeaf
+        [449; 6],                       // Any dead tree leaf
+        [194, 194, 195, 195, 194, 194], // Any dead tree trunk
     ];
 }
 
@@ -193,15 +195,15 @@ impl VoxelType {
     fn mg_from_block_inner<'b>(block: Block<'b>) -> BhResult<Self> {
         Ok(Self(match block.content()? {
             BlockContent::None => 2,
-            BlockContent::AppleTreeLeafEarlySummer => 92,
+            BlockContent::AppleTreeLeaf => 92,
             BlockContent::AppleTreeTrunk => 93,
-            BlockContent::AppleTreeTrunkWithLeafEarlySummer => 94,
+            BlockContent::AppleTreeTrunkWithLeaf => 94,
             BlockContent::PineTreeLeaf => 95,
             BlockContent::PineTreeTrunk => 96,
             BlockContent::PineTreeTrunkWithLeaf => 97,
-            BlockContent::MapleTreeLeafEarlySummer => 98,
+            BlockContent::MapleTreeLeaf => 98,
             BlockContent::MapleTreeTrunk => 99,
-            BlockContent::MapleTreeTrunkWithLeafEarlySummer => 100,
+            BlockContent::MapleTreeTrunkWithLeaf => 100,
             BlockContent::MangoTreeLeaf => 101,
             BlockContent::MangoTreeTrunk => 102,
             BlockContent::MangoTreeTrunkWithLeaf => 103,
@@ -210,9 +212,9 @@ impl VoxelType {
             BlockContent::OrangeTreeLeaf => 106,
             BlockContent::OrangeTreeTrunk => 107,
             BlockContent::OrangeTreeTrunkWithLeaf => 108,
-            BlockContent::CherryTreeLeafEarlySummer => 109,
+            BlockContent::CherryTreeLeaf => 109,
             BlockContent::CherryTreeTrunk => 110,
-            BlockContent::CherryTreeTrunkWithLeafEarlySummer => 111,
+            BlockContent::CherryTreeTrunkWithLeaf => 111,
             BlockContent::CoffeeTreeLeaf => 112,
             BlockContent::CoffeeTreeTrunk => 113,
             BlockContent::CoffeeTreeTrunkWithLeaf => 114,
@@ -236,6 +238,14 @@ impl VoxelType {
             BlockContent::DiamondTreeTrunk => 132,
             BlockContent::DiamondTreeLeaf => 133,
             BlockContent::DiamondTreeTrunkWithLeaf => 134,
+            BlockContent::DeadPineTreeLeaf
+            | BlockContent::DeadOrangeTreeLeaf
+            | BlockContent::DeadCherryTreeLeaf
+            | BlockContent::DeadLimeTreeLeaf => 135,
+            BlockContent::DeadPineTreeTrunk
+            | BlockContent::DeadOrangeTreeTrunk
+            | BlockContent::DeadCherryTreeTrunk
+            | BlockContent::DeadLimeTreeTrunk => 136,
             _ => 0,
         }))
     }
