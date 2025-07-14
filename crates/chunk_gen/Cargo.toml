@@ -1,0 +1,11 @@
+[package]
+name = "chunk_gen"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.98"
+enet = "0.3.0"
+flate2 = { workspace = true }
+plist = { workspace = true }
+

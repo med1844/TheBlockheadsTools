@@ -5,9 +5,9 @@ edition = "2024"
 
 [dependencies]
 byteorder = "1.5.0"
-flate2 = "1.1.2"
+flate2 = { workspace = true }
 heed = "0.22.0"
-plist = "1.7.2"
+plist = { workspace = true }
 serde = "1.0.219"
 serde_derive = "1.0.219"
 thiserror = "2.0.12"

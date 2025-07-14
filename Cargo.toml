@@ -9,6 +9,9 @@ authors = ["med1844"]
 license = "MIT"
 
 [workspace.dependencies]
+plist = "1.7.2"
+flate2 = "1.1.2"
+
 the-blockheads-tools-lib = { path = "crates/lib" }
 the-blockheads-tools-gui = { path = "crates/gui" }
 
