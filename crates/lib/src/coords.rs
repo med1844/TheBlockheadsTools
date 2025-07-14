@@ -56,7 +56,7 @@ impl ChunkOffset for &ChunkBlockCoord {
 /// Chunk coordinates in world. 0 <= x < world_v2.world_width_macro, 0 <= y < 32
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub struct ChunkCoord {
-    pub x: u64,
+    pub x: u32,
     pub y: u8,
 }
 
@@ -82,8 +82,8 @@ impl ChunkCoord {
             )));
         }
 
-        let x = x_str.parse::<u64>().map_err(|e| {
-            BhError::ParseError(format!("Failed to parse x coordinate as u64: {}", e))
+        let x = x_str.parse::<u32>().map_err(|e| {
+            BhError::ParseError(format!("Failed to parse x coordinate as u32: {}", e))
         })?;
         let y = y_str.parse::<u8>().map_err(|e| {
             BhError::ParseError(format!("Failed to parse y coordinate as u8: {}", e))
@@ -94,7 +94,7 @@ impl ChunkCoord {
 
     /// Creates a new `ChunkCoord` after validating its coordinates.
     /// Returns `Err(BhError::CoordError)` if `y` is out of its valid range (0..32).
-    pub fn new(x: u64, y: u8) -> BhResult<Self> {
+    pub fn new(x: u32, y: u8) -> BhResult<Self> {
         check_coord_limit(y as u64, 32)?;
         Ok(Self { x, y })
     }
@@ -103,19 +103,19 @@ impl ChunkCoord {
 /// Block coordinates in world. 0 <= x < world_v2.world_width_macro * 32, 0 <= y < 1024
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BlockCoord {
-    x: u64,
+    x: u32,
     y: u16,
 }
 
 impl BlockCoord {
     /// Creates a new `BlockCoord` after validating its coordinates.
     /// Returns `Err(BhError::CoordError)` if `y` is out of its valid range (0..1024).
-    pub fn new(x: u64, y: u16) -> BhResult<Self> {
+    pub fn new(x: u32, y: u16) -> BhResult<Self> {
         check_coord_limit(y as u64, 1024)?;
         Ok(Self { x, y: y as u16 })
     }
 
-    pub fn x(&self) -> u64 {
+    pub fn x(&self) -> u32 {
         self.x
     }
 

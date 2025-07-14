@@ -15,6 +15,7 @@ impl VoxelRenderer {
         config: &wgpu::SurfaceConfiguration,
         camera_buf: &wgpu::Buffer,
         voxel_buf: &wgpu::Buffer,
+        selected_block_buf: &wgpu::Buffer,
         texture: &RgbaTexture,
     ) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -80,6 +81,17 @@ impl VoxelRenderer {
                     },
                     count: None,
                 },
+                // selected block
+                wgpu::BindGroupLayoutEntry {
+                    binding: 5,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
             ],
             label: Some("bind_group_layout"),
         });
@@ -106,6 +118,10 @@ impl VoxelRenderer {
                 wgpu::BindGroupEntry {
                     binding: 4,
                     resource: uv_at_face_buf.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 5,
+                    resource: selected_block_buf.as_entire_binding(),
                 },
             ],
             label: Some("bind_group"),

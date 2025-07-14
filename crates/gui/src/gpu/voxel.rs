@@ -341,11 +341,11 @@ impl VoxelBuf {
         }
 
         let chunk_coord: ChunkCoord = coord.into();
-        let offset = (chunk_coord.x * 32 + chunk_coord.y as u64) * Self::NUM_BLOCK_PER_CHUNK as u64;
+        let offset = (chunk_coord.x * 32 + chunk_coord.y as u32) * Self::NUM_BLOCK_PER_CHUNK as u32;
 
         queue.write_buffer(
             &self.buf,
-            offset * size_of::<u16>() as u64,
+            offset as u64 * size_of::<u16>() as u64,
             bytemuck::cast_slice(&blocks),
         );
         self.chunk_keys.insert(chunk_coord);

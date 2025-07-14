@@ -1,7 +1,7 @@
 use super::{
     egui_tools::EguiRenderer,
     fps_counter::FpsCounter,
-    gpu::{Camera, CameraBuf, RgbaTexture, VoxelBuf},
+    gpu::{Camera, CameraBuf, RgbaTexture, SelectedBlock, VoxelBuf},
     input::{EventResponse, Input},
     renderer::{DEPTH_FORMAT, VoxelRenderer},
 };
@@ -37,7 +37,7 @@ pub struct AppState {
     world_db: Option<WorldDb>,
 
     // inspections
-    selected_block: Option<BlockCoord>,
+    selected_block: SelectedBlock,
 
     // utils
     fps_counter: FpsCounter,
@@ -120,11 +120,15 @@ impl AppState {
             let img = decoder.decode().unwrap().u8().unwrap();
             RgbaTexture::new(img.as_slice(), (512, 512), &device, &queue)
         };
+
+        let selected_block = SelectedBlock::new(&device);
+
         let voxel_renderer = VoxelRenderer::new(
             &device,
             &surface_config,
             &camera_buf.buf,
             &voxel_buf.buf,
+            &selected_block.buf,
             &tile_map_texture,
         );
 
@@ -145,7 +149,7 @@ impl AppState {
 
             world_db: None,
 
-            selected_block: None,
+            selected_block,
 
             fps_counter: FpsCounter::new(2.0),
         }
@@ -214,19 +218,15 @@ impl AppState {
         let response = self.input.handle_input(window, event);
         if response.click {
             let [x, y] = self.camera_buf.mouse_at(&self.input).floor().to_array();
-            let new_coord = BlockCoord::new(x as u64, y as u16).ok();
-            if self.selected_block == new_coord {
-                self.selected_block = None;
-            } else {
-                self.selected_block = new_coord;
-            }
+            let new_coord = BlockCoord::new(x as u32, y as u16).ok();
+            self.selected_block.update(&self.queue, new_coord);
         }
         self.camera_buf.handle_input(&self.input)
     }
 
     fn selected_block_info(&mut self) -> Option<(BlockCoord, String)> {
         let world_db = self.world_db.as_mut()?;
-        let selected_block_coord = self.selected_block.as_ref()?;
+        let selected_block_coord = self.selected_block.coord().as_ref()?;
         let block = world_db
             .blocks
             .block_at(selected_block_coord.clone())?

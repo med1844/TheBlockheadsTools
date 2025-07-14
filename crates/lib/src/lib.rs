@@ -89,7 +89,7 @@ pub struct WorldV2 {
     #[serde(rename = "worldTime")]
     pub world_time: f64,
     #[serde(rename = "worldWidthMacro")]
-    pub world_width_macro: u64,
+    pub world_width_macro: u32,
 }
 
 #[derive(Debug)]

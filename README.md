@@ -12,3 +12,10 @@ In Ubuntu 24.04 there's no longer libdispatch in system. Manually download and i
 ```bash
 sudo tcpdump -i any -w test.pcap port 15151
 ```
+
+### TODOs
+
+- [ ] MVP of modifing blocks & saving
+  MVP: ui exposing drop menu for block type
+- [ ] Dynamic world editing UI
+
