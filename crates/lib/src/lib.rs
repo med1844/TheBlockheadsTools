@@ -1,14 +1,20 @@
 use std::collections::HashMap;
 use std::io::Read;
+use std::io::Write;
 use std::ops::Deref;
 use std::path::Path;
 
 use coords::ChunkOffset;
+use flate2::Compression;
 use flate2::read::GzDecoder;
+use flate2::write::GzEncoder;
 use heed::Database;
 use heed::EnvOpenOptions;
 use heed::RoTxn;
+use heed::RwTxn;
 use heed::types::*;
+use maybe_owned::MaybeOwned;
+use plist::XmlWriteOptions;
 use serde::Deserialize;
 
 mod block;
@@ -20,18 +26,26 @@ pub use block::{Block, BlockMut, BlockView, BlockViewMut};
 pub use block_type::{BlockContent, BlockType};
 pub use coords::{BlockCoord, ChunkBlockCoord, ChunkCoord};
 pub use error::{BhError, BhResult};
+use serde::Serialize;
 
 #[derive(Debug)]
 pub struct Map(HashMap<String, Vec<u8>>);
 
 impl Map {
-    fn from_db(db: &Database<Str, Bytes>, rtxn: &RoTxn) -> Result<Self, heed::Error> {
+    fn from_db(db: &Database<Str, Bytes>, rtxn: &RoTxn) -> heed::Result<Self> {
         Ok(Self(
             db.iter(rtxn)?
                 .filter_map(|v| v.ok())
                 .map(|(k, v)| (k.to_owned(), v.to_owned()))
                 .collect(),
         ))
+    }
+
+    fn to_db(&self, db: &Database<Str, Bytes>, wtxn: &mut RwTxn) -> heed::Result<()> {
+        for (k, v) in self.0.iter() {
+            db.put(wtxn, k, v)?;
+        }
+        Ok(())
     }
 }
 
@@ -42,7 +56,7 @@ impl Deref for Map {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct WorldV2 {
     #[serde(rename = "blockheadDatasv2")]
     pub blockhead_datasv2: plist::Value,
@@ -116,6 +130,15 @@ impl WorldDbMain {
             world_v2: plist::from_bytes::<WorldV2>(world_v2)?,
         })
     }
+
+    fn to_db(&self, db: &Database<Str, Bytes>, wtxn: &mut RwTxn) -> BhResult<()> {
+        db.put(wtxn, "dynamicWorldv2", self.dynamic_world_v2.as_slice())?;
+        db.put(wtxn, "blockheads", self.blockheads.as_slice())?;
+        let mut world_v2_bytes = Vec::new();
+        plist::to_writer_xml(&mut world_v2_bytes, &self.world_v2)?;
+        db.put(wtxn, "worldv2", world_v2_bytes.as_slice())?;
+        Ok(())
+    }
 }
 
 #[derive(Debug)]
@@ -162,40 +185,32 @@ impl Chunk {
         );
         BlockMut::new(slice)
     }
+}
 
-    pub fn display_chunk_by_fg(&self) -> String {
-        let mut result = String::new();
-
-        for y in (0..Self::NUM_BLOCK_PER_COL).rev() {
-            let mut row_strings = Vec::new();
-            for x in 0..Self::NUM_BLOCK_PER_ROW {
-                let coord = ChunkBlockCoord::new(x as u8, y as u8).expect("Must be valid coord");
-                let block = self.block_at(coord);
-
-                let display_text = match block.fg() {
-                    Ok(block_type) => block_type.as_str().chars().take(5).collect::<String>(),
-                    Err(_) => {
-                        format!("{}", block.fg_raw())
-                    }
-                };
-
-                row_strings.push(format!("{:>7}", display_text));
-            }
-            result.push_str(&row_strings.join(""));
-
-            if y > 0 {
-                result.push('\n');
-            }
-        }
-        result
+impl AsRef<[u8]> for Chunk {
+    fn as_ref(&self) -> &[u8] {
+        self.inner()
     }
 }
 
-pub trait FromCompressedGzip: Sized {
+pub trait FromGzip: Sized {
     fn from_compressed_gzip(bytes: &[u8]) -> Result<Self, std::io::Error>;
 }
 
-impl FromCompressedGzip for Chunk {
+pub trait ToGzip: Sized {
+    fn to_gzip(&self) -> std::io::Result<Vec<u8>>;
+}
+
+impl<B: AsRef<[u8]>> ToGzip for B {
+    fn to_gzip(&self) -> std::io::Result<Vec<u8>> {
+        let a = self.as_ref();
+        let mut encoder = GzEncoder::new(Vec::new(), Compression::best());
+        encoder.write_all(a)?;
+        encoder.finish()
+    }
+}
+
+impl FromGzip for Chunk {
     fn from_compressed_gzip(bytes: &[u8]) -> Result<Self, std::io::Error> {
         let mut decoder = GzDecoder::new(bytes);
         let mut chunk = Self::new_empty();
@@ -210,7 +225,7 @@ pub enum Gzip<T> {
     Uncompressed(T),
 }
 
-impl<T: FromCompressedGzip> Gzip<T> {
+impl<T: FromGzip> Gzip<T> {
     fn ensure_decompressed(&mut self) -> Result<(), std::io::Error> {
         let current_state = std::mem::replace(self, Gzip::Compressed(Vec::new()));
         *self = match current_state {
@@ -251,6 +266,15 @@ impl<T: FromCompressedGzip> Gzip<T> {
     }
 }
 
+impl<T: ToGzip> Gzip<T> {
+    fn into_compressed<'s>(&'s self) -> std::io::Result<MaybeOwned<'s, Vec<u8>>> {
+        match self {
+            Gzip::Compressed(vec) => Ok(MaybeOwned::Borrowed(vec)),
+            Gzip::Uncompressed(t) => Ok(MaybeOwned::Owned(t.to_gzip()?)),
+        }
+    }
+}
+
 impl<T> Gzip<T> {
     fn from_compressed(bytes: Vec<u8>) -> Self {
         Self::Compressed(bytes)
@@ -272,6 +296,14 @@ impl Chunks {
                 })
                 .collect(),
         ))
+    }
+
+    pub fn to_db(&self, db: &Database<Str, Bytes>, wtxn: &mut RwTxn) -> BhResult<()> {
+        for (key, value) in self.0.iter() {
+            let data = value.into_compressed()?;
+            db.put(wtxn, key.to_string().as_str(), &data)?;
+        }
+        Ok(())
     }
 
     pub fn keys(&self) -> std::collections::hash_map::Keys<'_, ChunkCoord, Gzip<Chunk>> {
@@ -342,5 +374,23 @@ impl WorldDb {
         let dw = Map::from_db(&dw, &rtxn)?;
         let main = WorldDbMain::from_db(&main, &rtxn)?;
         Ok(Self { blocks, dw, main })
+    }
+
+    pub fn to_path<P: AsRef<Path>>(&self, path: P) -> BhResult<()> {
+        let mut options = EnvOpenOptions::new();
+        options.map_size(1024 * 1024 * 1024).max_dbs(100);
+
+        let env = unsafe { options.open(path)? };
+        let mut wtxn = env.write_txn()?;
+
+        let blocks_db: Database<Str, Bytes> = env.create_database(&mut wtxn, Some("blocks"))?;
+        self.blocks.to_db(&blocks_db, &mut wtxn)?;
+        let dw_db: Database<Str, Bytes> = env.create_database(&mut wtxn, Some("dw"))?;
+        self.dw.to_db(&dw_db, &mut wtxn)?;
+        let main_db: Database<Str, Bytes> = env.create_database(&mut wtxn, Some("main"))?;
+        self.main.to_db(&main_db, &mut wtxn)?;
+
+        wtxn.commit()?;
+        Ok(())
     }
 }

@@ -92,6 +92,10 @@ impl ChunkCoord {
         Self::new(x, y)
     }
 
+    pub fn to_string(&self) -> String {
+        format!("{}_{}", self.x, self.y)
+    }
+
     /// Creates a new `ChunkCoord` after validating its coordinates.
     /// Returns `Err(BhError::CoordError)` if `y` is out of its valid range (0..32).
     pub fn new(x: u32, y: u8) -> BhResult<Self> {
