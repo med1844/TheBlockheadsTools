@@ -401,14 +401,14 @@ impl App {
                     ui.label(format!("fps: {:.1}", state.fps_counter.fps()));
                     ui.separator();
 
-                    if let Some((coord, bytes)) = selected_block_info {
-                        ui.label(format!(
-                            "Selected block: x = {}, y = {}",
-                            coord.x(),
-                            coord.y()
-                        ));
-                        ui.code(bytes);
-                        if let Some(world_db) = state.world_db.as_mut() {
+                    if let Some(world_db) = state.world_db.as_mut() {
+                        if let Some((coord, bytes)) = selected_block_info {
+                            ui.label(format!(
+                                "Selected block: x = {}, y = {}",
+                                coord.x(),
+                                coord.y()
+                            ));
+                            ui.code(bytes);
                             if let Some(Ok(mut block)) = world_db.blocks.block_at_mut(coord) {
                                 let mut any_changed = false;
                                 any_changed |= ui
@@ -440,8 +440,16 @@ impl App {
                                         .unwrap();
                                 }
                             }
+                            ui.separator();
                         }
-                        ui.separator();
+                        ui.add(
+                            egui::TextEdit::singleline(&mut world_db.main.world_v2.save_id)
+                                .hint_text("save_id"),
+                        );
+                        ui.add(
+                            egui::TextEdit::singleline(&mut world_db.main.world_v2.world_name)
+                                .hint_text("world_name"),
+                        );
                     }
 
                     ui.add(
