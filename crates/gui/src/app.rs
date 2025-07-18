@@ -216,7 +216,7 @@ impl AppState {
 
     fn handle_input(&mut self, window: &Window, event: &WindowEvent) -> EventResponse {
         let response = self.input.handle_input(window, event);
-        if response.click {
+        if response.click && self.world_db.is_some() {
             let [x, y] = self.camera_buf.mouse_at(&self.input).floor().to_array();
             let new_coord = BlockCoord::new(x as u32, y as u16).ok();
             self.selected_block.update(&self.queue, new_coord);
@@ -367,6 +367,7 @@ impl App {
 
             let selected_block_info = state.selected_block_info();
             let mut opened_path = None;
+            let mut save_path = None;
 
             egui::TopBottomPanel::new(egui::panel::TopBottomSide::Top, "ok").show(
                 state.egui_renderer.context(),
@@ -376,6 +377,9 @@ impl App {
                             if ui.button("Open").clicked() {
                                 opened_path = rfd::FileDialog::new().pick_folder();
                             }
+                            if ui.button("Save as").clicked() {
+                                save_path = rfd::FileDialog::new().pick_folder();
+                            }
                         })
                     })
                 },
@@ -383,6 +387,11 @@ impl App {
 
             if let Some(path) = opened_path {
                 state.open_world_db(path).unwrap();
+            }
+            if let Some(path) = save_path {
+                if let Some(world_db) = &mut state.world_db {
+                    world_db.to_path(path).unwrap();
+                }
             }
 
             egui::Window::new("Info")
@@ -399,6 +408,39 @@ impl App {
                             coord.y()
                         ));
                         ui.code(bytes);
+                        if let Some(world_db) = state.world_db.as_mut() {
+                            if let Some(Ok(mut block)) = world_db.blocks.block_at_mut(coord) {
+                                let mut any_changed = false;
+                                any_changed |= ui
+                                    .add(
+                                        egui::DragValue::new(&mut block[0])
+                                            .speed(1)
+                                            .prefix("Fg raw type: "),
+                                    )
+                                    .changed();
+                                any_changed |= ui
+                                    .add(
+                                        egui::DragValue::new(&mut block[1])
+                                            .speed(1)
+                                            .prefix("Bg raw type: "),
+                                    )
+                                    .changed();
+                                any_changed |= ui
+                                    .add(
+                                        egui::DragValue::new(&mut block[3])
+                                            .speed(1)
+                                            .prefix("Content raw type: "),
+                                    )
+                                    .changed();
+                                if any_changed {
+                                    let chunk = world_db.blocks.chunk_at(coord).unwrap().unwrap();
+                                    state
+                                        .voxel_buf
+                                        .set_chunk(&state.queue, coord, chunk)
+                                        .unwrap();
+                                }
+                            }
+                        }
                         ui.separator();
                     }
 
