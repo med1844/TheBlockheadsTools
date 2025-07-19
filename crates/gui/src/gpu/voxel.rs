@@ -2,7 +2,12 @@ use std::collections::HashSet;
 
 use egui_wgpu::wgpu::{self, util::DeviceExt};
 use the_blockheads_tools_lib::{
-    BhResult, Block, BlockContent, BlockType, BlockView, Chunk, ChunkBlockCoord, ChunkCoord,
+    BhResult,
+    game::{
+        block::{Block, BlockContent, BlockType, BlockView},
+        chunk::Chunk,
+        coord::{ChunkBlockCoord, ChunkCoord},
+    },
 };
 
 type BlockIdType = u16;

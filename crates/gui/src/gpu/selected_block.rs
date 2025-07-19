@@ -1,5 +1,5 @@
 use egui_wgpu::wgpu::{self, util::DeviceExt};
-use the_blockheads_tools_lib::BlockCoord;
+use the_blockheads_tools_lib::game::coord::BlockCoord;
 
 pub struct SelectedBlock {
     coord: Option<BlockCoord>,

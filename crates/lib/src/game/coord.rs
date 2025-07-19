@@ -1,4 +1,4 @@
-use crate::error::{BhError, BhResult};
+use crate::{BhError, BhResult};
 
 // helper function to check if given coord is smaller than max value.
 fn check_coord_limit(val: u64, max_val: u64) -> BhResult<()> {
@@ -13,7 +13,7 @@ fn check_coord_limit(val: u64, max_val: u64) -> BhResult<()> {
 
 /// Block coordinate within a chunk. 0 <= x < 32, 0 <= y < 32.
 /// Block coords within the chunk and their corresponding offset:
-/// ```
+/// ```text
 /// 31| 992| 993| 994|     1023|
 /// 30| 960| 961| 962|      991|
 ///              ...

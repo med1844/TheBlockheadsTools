@@ -8,7 +8,13 @@ use super::{
 use egui_wgpu::wgpu::SurfaceError;
 use egui_wgpu::{ScreenDescriptor, wgpu};
 use std::{path::Path, sync::Arc};
-use the_blockheads_tools_lib::{BhResult, BlockCoord, ChunkCoord, WorldDb};
+use the_blockheads_tools_lib::{
+    BhResult,
+    game::{
+        coord::{BlockCoord, ChunkCoord},
+        db::world_db::WorldDb,
+    },
+};
 use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
 use winit::event::WindowEvent;
