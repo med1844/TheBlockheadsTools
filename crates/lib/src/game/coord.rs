@@ -56,15 +56,15 @@ impl ChunkOffset for &ChunkBlockCoord {
 /// Chunk coordinates in world. 0 <= x < world_v2.world_width_macro, 0 <= y < 32
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub struct ChunkCoord {
-    pub x: u32,
-    pub y: u8,
+    x: u32,
+    y: u8,
 }
 
 impl ChunkCoord {
     /// Attempts to create a `ChunkCoord` from a string in the format "x_y".
     /// Returns `Err(BhError::ParseError)` for malformed strings or invalid numbers,
     /// or `Err(BhError::CoordError)` if coordinates are out of their initial type bounds.
-    pub fn from_str<S: AsRef<str>>(s: S) -> BhResult<Self> {
+    pub fn try_from_str<S: AsRef<str>>(s: S) -> BhResult<Self> {
         let s = s.as_ref();
         let mut parts = s.split('_');
 
@@ -101,6 +101,14 @@ impl ChunkCoord {
     pub fn new(x: u32, y: u8) -> BhResult<Self> {
         check_coord_limit(y as u64, 32)?;
         Ok(Self { x, y })
+    }
+
+    pub fn x(&self) -> u32 {
+        self.x
+    }
+
+    pub fn y(&self) -> u8 {
+        self.y
     }
 }
 

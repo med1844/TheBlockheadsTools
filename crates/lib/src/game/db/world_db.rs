@@ -1,12 +1,15 @@
-use super::{super::chunk::Chunks, world_db_main::WorldDbMain};
-use crate::{BhError, BhResult, util::map::Map};
+use super::{
+    super::{chunk::Chunks, dw::dynamic_world::DynamicWorld},
+    world_db_main::WorldDbMain,
+};
+use crate::{BhError, BhResult};
 use heed::{Database, EnvOpenOptions, types::*};
 use std::path::Path;
 
 #[derive(Debug)]
 pub struct WorldDb {
     pub blocks: Chunks,
-    pub dw: Map, // ???
+    pub dw: DynamicWorld,
     pub main: WorldDbMain,
 }
 
@@ -25,7 +28,7 @@ impl WorldDb {
             ));
         };
         let blocks = Chunks::from_db(&blocks, &rtxn)?;
-        let dw = Map::from_db(&dw, &rtxn)?;
+        let dw = DynamicWorld::from_db(&dw, &rtxn)?;
         let main = WorldDbMain::from_db(&main, &rtxn)?;
         Ok(Self { blocks, dw, main })
     }

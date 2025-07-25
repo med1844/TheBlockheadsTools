@@ -1,14 +1,28 @@
+use std::ops::Deref;
+
 use serde::{Deserialize, Serialize};
 
 // We need a root struct to match the plist's top-level dictionary
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-struct DynamicObjectList<T> {
+pub struct DynamicObjectList<T> {
     #[serde(rename = "dynamicObjects")]
     dynamic_objects: Vec<T>,
 }
 
+impl<T> DynamicObjectList<T> {
+    pub fn new() -> Self {
+        Self {
+            dynamic_objects: Vec::new(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.dynamic_objects.is_empty()
+    }
+}
+
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-struct DynamicObject {
+pub struct DynamicObject {
     #[serde(rename = "floatPos")]
     float_pos: [f32; 2],
     pos_x: i32,
@@ -19,7 +33,7 @@ struct DynamicObject {
 
 // Corresponds to Plant
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-struct Plant {
+pub struct Plant {
     #[serde(flatten)]
     obj: DynamicObject,
 
@@ -45,7 +59,7 @@ struct Plant {
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-struct NormalPlant {
+pub struct NormalPlant {
     #[serde(flatten)]
     plant: Plant,
 
@@ -56,8 +70,24 @@ struct NormalPlant {
     light: Option<ArtificialLight>,
 }
 
+impl Deref for NormalPlant {
+    type Target = Plant;
+
+    fn deref(&self) -> &Self::Target {
+        &self.plant
+    }
+}
+
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-struct TomatoPlant(NormalPlant);
+pub struct TomatoPlant(NormalPlant);
+
+impl Deref for TomatoPlant {
+    type Target = NormalPlant;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 #[repr(u8)]
@@ -68,7 +98,7 @@ pub enum LightDirection {
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-struct ArtificialLight {
+pub struct ArtificialLight {
     #[serde(rename = "maxRed")]
     max_red: u32,
     #[serde(rename = "maxGreen")]

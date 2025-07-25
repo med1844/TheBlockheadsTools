@@ -1,0 +1,444 @@
+use super::{
+    super::coord::ChunkCoord,
+    dynamic_object::{DynamicObjectList, TomatoPlant},
+};
+use crate::{BhError, BhResult};
+use heed::{Database, RoTxn, RwTxn, types::*};
+use serde::Serialize;
+use std::collections::HashMap;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u16)]
+pub enum DynamicObjectType {
+    AppleTree = 1,
+    MapleTree = 2,
+    MangoTree = 3,
+    PineTree = 4,
+    CactusTree = 5,
+    CoconutTree = 6,
+    OrangeTree = 7,
+    CherryTree = 8,
+    CoffeeTree = 9,
+    FlaxPlant = 10,
+    SunflowerPlant = 11,
+    CornPlant = 12,
+    Dodo = 13,
+    Item = 14,
+    Fire = 16,
+    Torch = 17,
+    GlowBlock = 18,
+    Ladder = 19,
+    Door = 20,
+    ArtificialLight = 21,
+    Bed = 23,
+    Dropbear = 25,
+    GatherBlock = 26,
+    CarrotPlant = 27,
+    Donkey = 28,
+    Egg = 30,
+    Window = 31,
+    Boat = 32,
+    ChilliPlant = 33,
+    KelpPlant = 34,
+    ClownFish = 35,
+    Shark = 36,
+    LimeTree = 37,
+    Wire = 38,
+    CaveTroll = 39,
+    Rail = 40,
+    Workbench = 45,
+    Chest = 46,
+    Sign = 47,
+    TradingPost = 48,
+    TradePortal = 50,
+    Scorpion = 51,
+    Column = 53,
+    Stairs = 54,
+    ElevatorMotor = 55,
+    ElevatorShaft = 56,
+    GemTree = 57,
+    VinePlant = 58,
+    TulipPlant = 59,
+    WheatPlant = 61,
+    TomatoPlant = 62,
+    Yak = 63,
+}
+
+impl TryFrom<u16> for DynamicObjectType {
+    type Error = BhError;
+    fn try_from(value: u16) -> Result<Self, Self::Error> {
+        match value {
+            1 => Ok(Self::AppleTree),
+            2 => Ok(Self::MapleTree),
+            3 => Ok(Self::MangoTree),
+            4 => Ok(Self::PineTree),
+            5 => Ok(Self::CactusTree),
+            6 => Ok(Self::CoconutTree),
+            7 => Ok(Self::OrangeTree),
+            8 => Ok(Self::CherryTree),
+            9 => Ok(Self::CoffeeTree),
+            10 => Ok(Self::FlaxPlant),
+            11 => Ok(Self::SunflowerPlant),
+            12 => Ok(Self::CornPlant),
+            13 => Ok(Self::Dodo),
+            14 => Ok(Self::Item),
+            16 => Ok(Self::Fire),
+            17 => Ok(Self::Torch),
+            18 => Ok(Self::GlowBlock),
+            19 => Ok(Self::Ladder),
+            20 => Ok(Self::Door),
+            21 => Ok(Self::ArtificialLight),
+            23 => Ok(Self::Bed),
+            25 => Ok(Self::Dropbear),
+            26 => Ok(Self::GatherBlock),
+            27 => Ok(Self::CarrotPlant),
+            28 => Ok(Self::Donkey),
+            30 => Ok(Self::Egg),
+            31 => Ok(Self::Window),
+            32 => Ok(Self::Boat),
+            33 => Ok(Self::ChilliPlant),
+            34 => Ok(Self::KelpPlant),
+            35 => Ok(Self::ClownFish),
+            36 => Ok(Self::Shark),
+            37 => Ok(Self::LimeTree),
+            38 => Ok(Self::Wire),
+            39 => Ok(Self::CaveTroll),
+            40 => Ok(Self::Rail),
+            45 => Ok(Self::Workbench),
+            46 => Ok(Self::Chest),
+            47 => Ok(Self::Sign),
+            48 => Ok(Self::TradingPost),
+            50 => Ok(Self::TradePortal),
+            51 => Ok(Self::Scorpion),
+            53 => Ok(Self::Column),
+            54 => Ok(Self::Stairs),
+            55 => Ok(Self::ElevatorMotor),
+            56 => Ok(Self::ElevatorShaft),
+            57 => Ok(Self::GemTree),
+            58 => Ok(Self::VinePlant),
+            59 => Ok(Self::TulipPlant),
+            61 => Ok(Self::WheatPlant),
+            62 => Ok(Self::TomatoPlant),
+            63 => Ok(Self::Yak),
+            _ => Err(BhError::InvalidDynamicOjectId(value.to_string()))?,
+        }
+    }
+}
+
+impl DynamicObjectType {
+    fn try_from_str(s: &str) -> BhResult<Self> {
+        let value: u16 = s
+            .parse()
+            .map_err(|_| BhError::ParseError(format!("Dynamic object type {} is invalid", s)))?;
+        value.try_into()
+    }
+}
+
+trait IsEmpty {
+    fn is_empty(&self) -> bool;
+}
+
+impl IsEmpty for Vec<u8> {
+    fn is_empty(&self) -> bool {
+        self.is_empty()
+    }
+}
+
+impl<T> IsEmpty for DynamicObjectList<T> {
+    fn is_empty(&self) -> bool {
+        self.is_empty()
+    }
+}
+
+trait ToXmlPlist {
+    fn to_plist(&self) -> Vec<u8>;
+}
+
+impl ToXmlPlist for Vec<u8> {
+    fn to_plist(&self) -> Vec<u8> {
+        self.clone()
+    }
+}
+
+impl<T: Serialize> ToXmlPlist for DynamicObjectList<T> {
+    fn to_plist(&self) -> Vec<u8> {
+        let mut serialized = Vec::new();
+        plist::to_writer_xml(&mut serialized, self).unwrap();
+        serialized
+    }
+}
+
+/// Contains all different types of dynamic objects that one chunk might have.
+#[derive(Debug)]
+pub struct ChunkDynamicObjects {
+    apple_tree: Vec<u8>,
+    maple_tree: Vec<u8>,
+    mango_tree: Vec<u8>,
+    pine_tree: Vec<u8>,
+    cactus_tree: Vec<u8>,
+    coconut_tree: Vec<u8>,
+    orange_tree: Vec<u8>,
+    cherry_tree: Vec<u8>,
+    coffee_tree: Vec<u8>,
+    flax_plant: Vec<u8>,
+    sunflower_plant: Vec<u8>,
+    corn_plant: Vec<u8>,
+    dodo: Vec<u8>,
+    item: Vec<u8>,
+    fire: Vec<u8>,
+    torch: Vec<u8>,
+    glow_block: Vec<u8>,
+    ladder: Vec<u8>,
+    door: Vec<u8>,
+    artificiallight: Vec<u8>,
+    bed: Vec<u8>,
+    dropbear: Vec<u8>,
+    gather_block: Vec<u8>,
+    carrot_plant: Vec<u8>,
+    donkey: Vec<u8>,
+    egg: Vec<u8>,
+    window: Vec<u8>,
+    boat: Vec<u8>,
+    chilli_plant: Vec<u8>,
+    kelp_plant: Vec<u8>,
+    clown_fish: Vec<u8>,
+    shark: Vec<u8>,
+    lime_tree: Vec<u8>,
+    wire: Vec<u8>,
+    cave_troll: Vec<u8>,
+    rail: Vec<u8>,
+    workbench: Vec<u8>,
+    chest: Vec<u8>,
+    sign: Vec<u8>,
+    trading_post: Vec<u8>,
+    trade_portal: Vec<u8>,
+    scorpion: Vec<u8>,
+    column: Vec<u8>,
+    stairs: Vec<u8>,
+    elevator_motor: Vec<u8>,
+    elevator_shaft: Vec<u8>,
+    gem_tree: Vec<u8>,
+    vine_plant: Vec<u8>,
+    tulip_plant: Vec<u8>,
+    wheat_plant: Vec<u8>,
+    tomato_plants: DynamicObjectList<TomatoPlant>,
+    yak: Vec<u8>,
+}
+
+impl Default for ChunkDynamicObjects {
+    fn default() -> Self {
+        Self {
+            apple_tree: Vec::new(),
+            maple_tree: Vec::new(),
+            mango_tree: Vec::new(),
+            pine_tree: Vec::new(),
+            cactus_tree: Vec::new(),
+            coconut_tree: Vec::new(),
+            orange_tree: Vec::new(),
+            cherry_tree: Vec::new(),
+            coffee_tree: Vec::new(),
+            flax_plant: Vec::new(),
+            sunflower_plant: Vec::new(),
+            corn_plant: Vec::new(),
+            dodo: Vec::new(),
+            item: Vec::new(),
+            fire: Vec::new(),
+            torch: Vec::new(),
+            glow_block: Vec::new(),
+            ladder: Vec::new(),
+            door: Vec::new(),
+            artificiallight: Vec::new(),
+            bed: Vec::new(),
+            dropbear: Vec::new(),
+            gather_block: Vec::new(),
+            carrot_plant: Vec::new(),
+            donkey: Vec::new(),
+            egg: Vec::new(),
+            window: Vec::new(),
+            boat: Vec::new(),
+            chilli_plant: Vec::new(),
+            kelp_plant: Vec::new(),
+            clown_fish: Vec::new(),
+            shark: Vec::new(),
+            lime_tree: Vec::new(),
+            wire: Vec::new(),
+            cave_troll: Vec::new(),
+            rail: Vec::new(),
+            workbench: Vec::new(),
+            chest: Vec::new(),
+            sign: Vec::new(),
+            trading_post: Vec::new(),
+            trade_portal: Vec::new(),
+            scorpion: Vec::new(),
+            column: Vec::new(),
+            stairs: Vec::new(),
+            elevator_motor: Vec::new(),
+            elevator_shaft: Vec::new(),
+            gem_tree: Vec::new(),
+            vine_plant: Vec::new(),
+            tulip_plant: Vec::new(),
+            wheat_plant: Vec::new(),
+            tomato_plants: DynamicObjectList::new(),
+            yak: Vec::new(),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct DynamicWorld(HashMap<ChunkCoord, ChunkDynamicObjects>);
+
+impl DynamicWorld {
+    pub fn from_db(db: &Database<Str, Bytes>, rtxn: &RoTxn) -> BhResult<Self> {
+        let mut map = HashMap::new();
+        for (k, v) in db.iter(rtxn)?.filter_map(|v| v.ok()) {
+            let Some((coord_str, type_id_str)) = k.split_once("/") else {
+                continue;
+            };
+            let coord = ChunkCoord::try_from_str(coord_str)?;
+            let Ok(dyn_obj_type) = DynamicObjectType::try_from_str(type_id_str) else {
+                println!(
+                    "Found object type {} we don't understand in chunk {}",
+                    type_id_str, coord_str
+                );
+                continue;
+            };
+            let entry = map
+                .entry(coord)
+                .or_insert_with(|| ChunkDynamicObjects::default());
+            match dyn_obj_type {
+                DynamicObjectType::AppleTree => entry.apple_tree = v.to_vec(),
+                DynamicObjectType::MapleTree => entry.maple_tree = v.to_vec(),
+                DynamicObjectType::MangoTree => entry.mango_tree = v.to_vec(),
+                DynamicObjectType::PineTree => entry.pine_tree = v.to_vec(),
+                DynamicObjectType::CactusTree => entry.cactus_tree = v.to_vec(),
+                DynamicObjectType::CoconutTree => entry.coconut_tree = v.to_vec(),
+                DynamicObjectType::OrangeTree => entry.orange_tree = v.to_vec(),
+                DynamicObjectType::CherryTree => entry.cherry_tree = v.to_vec(),
+                DynamicObjectType::CoffeeTree => entry.coffee_tree = v.to_vec(),
+                DynamicObjectType::FlaxPlant => entry.flax_plant = v.to_vec(),
+                DynamicObjectType::SunflowerPlant => entry.sunflower_plant = v.to_vec(),
+                DynamicObjectType::CornPlant => entry.corn_plant = v.to_vec(),
+                DynamicObjectType::Dodo => entry.dodo = v.to_vec(),
+                DynamicObjectType::Item => entry.item = v.to_vec(),
+                DynamicObjectType::Fire => entry.fire = v.to_vec(),
+                DynamicObjectType::Torch => entry.torch = v.to_vec(),
+                DynamicObjectType::GlowBlock => entry.glow_block = v.to_vec(),
+                DynamicObjectType::Ladder => entry.ladder = v.to_vec(),
+                DynamicObjectType::Door => entry.door = v.to_vec(),
+                DynamicObjectType::ArtificialLight => entry.artificiallight = v.to_vec(),
+                DynamicObjectType::Bed => entry.bed = v.to_vec(),
+                DynamicObjectType::Dropbear => entry.dropbear = v.to_vec(),
+                DynamicObjectType::GatherBlock => entry.gather_block = v.to_vec(),
+                DynamicObjectType::CarrotPlant => entry.carrot_plant = v.to_vec(),
+                DynamicObjectType::Donkey => entry.donkey = v.to_vec(),
+                DynamicObjectType::Egg => entry.egg = v.to_vec(),
+                DynamicObjectType::Window => entry.window = v.to_vec(),
+                DynamicObjectType::Boat => entry.boat = v.to_vec(),
+                DynamicObjectType::ChilliPlant => entry.chilli_plant = v.to_vec(),
+                DynamicObjectType::KelpPlant => entry.kelp_plant = v.to_vec(),
+                DynamicObjectType::ClownFish => entry.clown_fish = v.to_vec(),
+                DynamicObjectType::Shark => entry.shark = v.to_vec(),
+                DynamicObjectType::LimeTree => entry.lime_tree = v.to_vec(),
+                DynamicObjectType::Wire => entry.wire = v.to_vec(),
+                DynamicObjectType::CaveTroll => entry.cave_troll = v.to_vec(),
+                DynamicObjectType::Rail => entry.rail = v.to_vec(),
+                DynamicObjectType::Workbench => entry.workbench = v.to_vec(),
+                DynamicObjectType::Chest => entry.chest = v.to_vec(),
+                DynamicObjectType::Sign => entry.sign = v.to_vec(),
+                DynamicObjectType::TradingPost => entry.trading_post = v.to_vec(),
+                DynamicObjectType::TradePortal => entry.trade_portal = v.to_vec(),
+                DynamicObjectType::Scorpion => entry.scorpion = v.to_vec(),
+                DynamicObjectType::Column => entry.column = v.to_vec(),
+                DynamicObjectType::Stairs => entry.stairs = v.to_vec(),
+                DynamicObjectType::ElevatorMotor => entry.elevator_motor = v.to_vec(),
+                DynamicObjectType::ElevatorShaft => entry.elevator_shaft = v.to_vec(),
+                DynamicObjectType::GemTree => entry.gem_tree = v.to_vec(),
+                DynamicObjectType::VinePlant => entry.vine_plant = v.to_vec(),
+                DynamicObjectType::TulipPlant => entry.tulip_plant = v.to_vec(),
+                DynamicObjectType::WheatPlant => entry.wheat_plant = v.to_vec(),
+                DynamicObjectType::TomatoPlant => entry.tomato_plants = plist::from_bytes(v)?,
+                DynamicObjectType::Yak => entry.yak = Vec::new(),
+            }
+        }
+        Ok(Self(map))
+    }
+
+    pub fn to_db(&self, db: &Database<Str, Bytes>, wtxn: &mut RwTxn) -> BhResult<()> {
+        #[inline(always)]
+        fn put<T: ToXmlPlist + IsEmpty>(
+            db: &Database<Str, Bytes>,
+            wtxn: &mut RwTxn,
+            coord_str: &str,
+            obj_type: DynamicObjectType,
+            value: &T,
+        ) -> BhResult<()> {
+            Ok(if !value.is_empty() {
+                db.put(
+                    wtxn,
+                    &format!("{}/{}", coord_str, obj_type as u16),
+                    &value.to_plist(),
+                )?
+            } else {
+                ()
+            })
+        }
+
+        for (coord, obj) in self.0.iter() {
+            let coord = coord.to_string();
+            use DynamicObjectType::*;
+            put(db, wtxn, &coord, AppleTree, &obj.apple_tree)?;
+            put(db, wtxn, &coord, MapleTree, &obj.maple_tree)?;
+            put(db, wtxn, &coord, MangoTree, &obj.mango_tree)?;
+            put(db, wtxn, &coord, PineTree, &obj.pine_tree)?;
+            put(db, wtxn, &coord, CactusTree, &obj.cactus_tree)?;
+            put(db, wtxn, &coord, CoconutTree, &obj.coconut_tree)?;
+            put(db, wtxn, &coord, OrangeTree, &obj.orange_tree)?;
+            put(db, wtxn, &coord, CherryTree, &obj.cherry_tree)?;
+            put(db, wtxn, &coord, CoffeeTree, &obj.coffee_tree)?;
+            put(db, wtxn, &coord, FlaxPlant, &obj.flax_plant)?;
+            put(db, wtxn, &coord, SunflowerPlant, &obj.sunflower_plant)?;
+            put(db, wtxn, &coord, CornPlant, &obj.corn_plant)?;
+            put(db, wtxn, &coord, Dodo, &obj.dodo)?;
+            put(db, wtxn, &coord, Item, &obj.item)?;
+            put(db, wtxn, &coord, Fire, &obj.fire)?;
+            put(db, wtxn, &coord, Torch, &obj.torch)?;
+            put(db, wtxn, &coord, GlowBlock, &obj.glow_block)?;
+            put(db, wtxn, &coord, Ladder, &obj.ladder)?;
+            put(db, wtxn, &coord, Door, &obj.door)?;
+            put(db, wtxn, &coord, ArtificialLight, &obj.artificiallight)?;
+            put(db, wtxn, &coord, Bed, &obj.bed)?;
+            put(db, wtxn, &coord, Dropbear, &obj.dropbear)?;
+            put(db, wtxn, &coord, GatherBlock, &obj.gather_block)?;
+            put(db, wtxn, &coord, CarrotPlant, &obj.carrot_plant)?;
+            put(db, wtxn, &coord, Donkey, &obj.donkey)?;
+            put(db, wtxn, &coord, Egg, &obj.egg)?;
+            put(db, wtxn, &coord, Window, &obj.window)?;
+            put(db, wtxn, &coord, Boat, &obj.boat)?;
+            put(db, wtxn, &coord, ChilliPlant, &obj.chilli_plant)?;
+            put(db, wtxn, &coord, KelpPlant, &obj.kelp_plant)?;
+            put(db, wtxn, &coord, ClownFish, &obj.clown_fish)?;
+            put(db, wtxn, &coord, Shark, &obj.shark)?;
+            put(db, wtxn, &coord, LimeTree, &obj.lime_tree)?;
+            put(db, wtxn, &coord, Wire, &obj.wire)?;
+            put(db, wtxn, &coord, CaveTroll, &obj.cave_troll)?;
+            put(db, wtxn, &coord, Rail, &obj.rail)?;
+            put(db, wtxn, &coord, Workbench, &obj.workbench)?;
+            put(db, wtxn, &coord, Chest, &obj.chest)?;
+            put(db, wtxn, &coord, Sign, &obj.sign)?;
+            put(db, wtxn, &coord, TradingPost, &obj.trading_post)?;
+            put(db, wtxn, &coord, TradePortal, &obj.trade_portal)?;
+            put(db, wtxn, &coord, Scorpion, &obj.scorpion)?;
+            put(db, wtxn, &coord, Column, &obj.column)?;
+            put(db, wtxn, &coord, Stairs, &obj.stairs)?;
+            put(db, wtxn, &coord, ElevatorMotor, &obj.elevator_motor)?;
+            put(db, wtxn, &coord, ElevatorShaft, &obj.elevator_shaft)?;
+            put(db, wtxn, &coord, GemTree, &obj.gem_tree)?;
+            put(db, wtxn, &coord, VinePlant, &obj.vine_plant)?;
+            put(db, wtxn, &coord, TulipPlant, &obj.tulip_plant)?;
+            put(db, wtxn, &coord, WheatPlant, &obj.wheat_plant)?;
+            put(db, wtxn, &coord, TomatoPlant, &obj.tomato_plants)?;
+            put(db, wtxn, &coord, Yak, &obj.tomato_plants)?;
+        }
+        Ok(())
+    }
+}

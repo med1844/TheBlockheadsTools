@@ -80,7 +80,7 @@ impl Chunks {
             db.iter(rtxn)?
                 .filter_map(|v| v.ok())
                 .filter_map(|(k, v)| {
-                    ChunkCoord::from_str(k)
+                    ChunkCoord::try_from_str(k)
                         .ok()
                         .map(|k| (k, Gzip::from_compressed(v.to_owned())))
                 })
