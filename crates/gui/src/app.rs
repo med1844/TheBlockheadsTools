@@ -1,9 +1,8 @@
 use super::{
-    egui_tools::EguiRenderer,
     fps_counter::FpsCounter,
     gpu::{Camera, CameraBuf, RgbaTexture, SelectedBlock, VoxelBuf},
     input::{EventResponse, Input},
-    renderer::{DEPTH_FORMAT, VoxelRenderer},
+    renderer::{DEPTH_FORMAT, DynamicObjectRenderer, EguiRenderer, VoxelRenderer},
 };
 use egui_wgpu::wgpu::SurfaceError;
 use egui_wgpu::{ScreenDescriptor, wgpu};
@@ -38,6 +37,7 @@ pub struct AppState {
     pub voxel_renderer: VoxelRenderer,
     pub voxel_buf: VoxelBuf,
     pub depth_view: wgpu::TextureView,
+    pub dw_renderer: DynamicObjectRenderer,
 
     // game save
     world_db: Option<WorldDb>,
@@ -127,6 +127,13 @@ impl AppState {
             RgbaTexture::new(img.as_slice(), (512, 512), &device, &queue)
         };
 
+        let items_texture = {
+            let bytes = include_bytes!("../resources/Items.png");
+            let mut decoder = PngDecoder::new(bytes);
+            let img = decoder.decode().unwrap().u8().unwrap();
+            RgbaTexture::new(img.as_slice(), (512, 256), &device, &queue)
+        };
+
         let selected_block = SelectedBlock::new(&device);
 
         let voxel_renderer = VoxelRenderer::new(
@@ -137,6 +144,15 @@ impl AppState {
             &selected_block.buf,
             &tile_map_texture,
         );
+
+        let dw_renderer = DynamicObjectRenderer::new(
+            &device,
+            &surface_config,
+            &camera_buf.buf,
+            &items_texture,
+            &tile_map_texture,
+        );
+        dw_renderer.update_instance_buffer(&queue, &vec![([0.0, 1.0], 3), ([2.0, 0.0], 1024)]);
 
         Self {
             device,
@@ -152,6 +168,7 @@ impl AppState {
             voxel_renderer,
             voxel_buf,
             depth_view,
+            dw_renderer,
 
             world_db: None,
 
@@ -357,6 +374,8 @@ impl App {
             rpass.set_pipeline(&state.voxel_renderer.pipeline);
             rpass.set_bind_group(0, &state.voxel_renderer.bind_group, &[]);
             rpass.draw(0..3, 0..1);
+
+            state.dw_renderer.render(&mut rpass, 2);
         }
 
         state.fps_counter.update();

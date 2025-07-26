@@ -37,8 +37,8 @@ impl RgbaTexture {
             img,
             wgpu::TexelCopyBufferLayout {
                 offset: 0,
-                bytes_per_row: Some(h as u32 * 4), // 4 bytes per pixel (RGBA)
-                rows_per_image: Some(w as u32),
+                bytes_per_row: Some(w as u32 * 4), // 4 bytes per pixel (RGBA)
+                rows_per_image: Some(h as u32),
             },
             texture_size,
         );

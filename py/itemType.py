@@ -5,7 +5,6 @@ from enum import Enum
 class ItemType(Enum):
     """
     The enumeration of item types.
-    物品枚举类。
     """
 
     UNKNOWN = 0
@@ -457,8 +456,6 @@ def item_name_to_id(item_name):
 class ItemExtra(Enum):
     """
     Common extra information that would be used when initializing item's extra.
-
-    在初始化物品extra信息时常用的模板。
     """
 
     BASKET = {"s": [[], [], [], []]}

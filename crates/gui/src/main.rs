@@ -1,6 +1,5 @@
 mod app;
 mod chunk_manager;
-mod egui_tools;
 mod fps_counter;
 mod gpu;
 mod input;
