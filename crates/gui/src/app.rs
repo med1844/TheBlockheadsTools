@@ -2,7 +2,7 @@ use super::{
     fps_counter::FpsCounter,
     gpu::{Camera, CameraBuf, RgbaTexture, SelectedBlock, VoxelBuf},
     input::{EventResponse, Input},
-    renderer::{DEPTH_FORMAT, DynamicObjectRenderer, EguiRenderer, VoxelRenderer},
+    renderer::{DEPTH_FORMAT, DwIconRenderer, DwRenderer, EguiRenderer, VoxelRenderer},
 };
 use egui_wgpu::wgpu::SurfaceError;
 use egui_wgpu::{ScreenDescriptor, wgpu};
@@ -37,7 +37,8 @@ pub struct AppState {
     pub voxel_renderer: VoxelRenderer,
     pub voxel_buf: VoxelBuf,
     pub depth_view: wgpu::TextureView,
-    pub dw_renderer: DynamicObjectRenderer,
+    pub dw_renderer: DwRenderer,
+    pub dw_icon_renderer: DwIconRenderer,
 
     // game save
     world_db: Option<WorldDb>,
@@ -145,14 +146,17 @@ impl AppState {
             &tile_map_texture,
         );
 
-        let dw_renderer = DynamicObjectRenderer::new(
+        let dw_icon_renderer = DwIconRenderer::new(
             &device,
             &surface_config,
             &camera_buf.buf,
             &items_texture,
             &tile_map_texture,
         );
-        dw_renderer.update_instance_buffer(&queue, &vec![([0.0, 1.0], 3), ([2.0, 0.0], 1024)]);
+        dw_icon_renderer.update_instance_buffer(&queue, &vec![([0.0, 1.0], 3), ([2.0, 0.0], 1024)]);
+
+        let dw_renderer =
+            DwRenderer::new(&device, &surface_config, &camera_buf.buf, &tile_map_texture);
 
         Self {
             device,
@@ -169,6 +173,7 @@ impl AppState {
             voxel_buf,
             depth_view,
             dw_renderer,
+            dw_icon_renderer,
 
             world_db: None,
 
@@ -375,7 +380,9 @@ impl App {
             rpass.set_bind_group(0, &state.voxel_renderer.bind_group, &[]);
             rpass.draw(0..3, 0..1);
 
-            state.dw_renderer.render(&mut rpass, 2);
+            state.dw_renderer.render(&mut rpass);
+
+            state.dw_icon_renderer.render(&mut rpass, 2);
         }
 
         state.fps_counter.update();

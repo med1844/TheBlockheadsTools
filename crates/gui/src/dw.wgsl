@@ -1,170 +1,37 @@
 struct CameraUniform {
     view_proj: mat4x4<f32>,
     inv_view_proj: mat4x4<f32>,
-    camera_pos: vec4<f32>, // xyz
-    screen_size: vec4<f32>, // x=width, y=height
+    camera_pos: vec4<f32>,
+    screen_size: vec4<f32>,
     world_offset: vec4<f32>,
 };
 
 @group(0) @binding(0) var<uniform> camera: CameraUniform;
-@group(0) @binding(1) var items_texture: texture_2d<f32>;
-@group(0) @binding(2) var items_sampler: sampler;
-@group(0) @binding(3) var tilemap_texture: texture_2d<f32>;
-@group(0) @binding(4) var tilemap_sampler: sampler;
-@group(0) @binding(5) var<storage, read> voxel_uv_atlas: array<u32>;
+@group(0) @binding(1) var tilemap_texture: texture_2d<f32>;
+@group(0) @binding(2) var tilemap_sampler: sampler;
 
-// --- Item Texture Atlas Constants ---
-const ITEMS_ATLAS_DIM_PX: vec2<f32> = vec2<f32>(512.0, 256.0);
-const ITEMS_TILE_DIM_PX: f32 = 16.0;
-const ITEMS_TILES_PER_ROW: u32 = 32u;
-const ITEMS_TILE_SIZE_UV: vec2<f32> = vec2<f32>(
-    ITEMS_TILE_DIM_PX / ITEMS_ATLAS_DIM_PX.x,
-    ITEMS_TILE_DIM_PX / ITEMS_ATLAS_DIM_PX.y
-);
-
-// --- Voxel/Block Texture Atlas Constants (for blocks rendered as items) ---
-const VOXEL_ATLAS_DIM_PX: f32 = 512.0;
-const VOXEL_TILE_DIM_PX: f32 = 16.0;
-const VOXEL_TILES_PER_ROW: u32 = 32u;
-const VOXEL_TILE_SIZE_UV: f32 = VOXEL_TILE_DIM_PX / VOXEL_ATLAS_DIM_PX;
-
-
-struct DynObjVertexInput {
-    @location(0) position: vec2<f32>,
+struct VertexInput {
+    @location(0) position: vec3<f32>,
+    @location(1) tex_coords: vec2<f32>,
 };
 
-struct DynObjInstanceInput {
-    @location(1) instance_pos: vec2<f32>,
-    @location(2) item_type: u32,
-};
-
-struct DynObjVSOutput {
+struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
-    @location(0) uv: vec2<f32>,
-    @location(1) @interpolate(flat) item_type: u32,
+    @location(0) tex_coords: vec2<f32>,
 };
 
 @vertex
-fn vs_dynamic_object(model: DynObjVertexInput, instance: DynObjInstanceInput) -> DynObjVSOutput {
-    var out: DynObjVSOutput;
-    
-    let world_pos = vec3<f32>(instance.instance_pos + model.position, 2.0);
-    let pos_in_view = world_pos - camera.world_offset.xyz;
+fn vs_main(model: VertexInput) -> VertexOutput {
+    var out: VertexOutput;
+    let pos_in_view = model.position - camera.world_offset.xyz;
     out.clip_position = camera.view_proj * vec4<f32>(pos_in_view, 1.0);
-    
-    // Pass model position to fragment shader for UV calculation
-    // Remap from [-0.5, 0.5] to [0, 1]
-    out.uv = model.position + 0.5;
-    out.uv.y = 1 - out.uv.y;
-    out.item_type = instance.item_type;
-
+    out.tex_coords = model.tex_coords;
     return out;
 }
 
-// --- 2.5D Block Icon Rendering Logic ---
-// This function simulates an orthographic view of a cube.
-fn render_block_icon(uv: vec2<f32>, block_type_id: u32) -> vec4<f32> {
-    // Define a fixed orthographic view projection for the icon
-    let view_dir = normalize(vec3<f32>(0.5, 0.25, 0.75));
-    let up = vec3<f32>(0.0, 1.0, 0.0);
-    let right = normalize(cross(view_dir, up));
-    let ortho_up = normalize(cross(right, view_dir));
-
-    let block_scale: f32 = 0.6;
-
-    // Convert fragment's UV coords to a ray origin
-    let ray_origin = vec3<f32>(
-        (uv.x - 0.5) * right.x + (uv.y - 0.5) * ortho_up.x,
-        (uv.x - 0.5) * right.y + (uv.y - 0.5) * ortho_up.y,
-        (uv.x - 0.5) * right.z + (uv.y - 0.5) * ortho_up.z
-    ) / block_scale - view_dir * 2.0;
-
-    let ray_dir = view_dir;
-
-    // Intersect ray with an axis-aligned unit cube centered at (0,0,0)
-    let inv_dir = 1.0 / ray_dir;
-    let t1 = (vec3<f32>(-0.5) - ray_origin) * inv_dir;
-    let t2 = (vec3<f32>(0.5) - ray_origin) * inv_dir;
-    let tmin = max(max(min(t1.x, t2.x), min(t1.y, t2.y)), min(t1.z, t2.z));
-    let tmax = min(min(max(t1.x, t2.x), max(t1.y, t2.y)), max(t1.z, t2.z));
-
-    if (tmin > tmax) {
-        discard;
-    }
-
-    let hit_pos = ray_origin + tmin * ray_dir;
-    let abs_hit_pos = abs(hit_pos);
-
-    var hit_face_id: u32;
-    var face_uv: vec2<f32>;
-    var face_normal: vec3<f32>; // Added to store the face normal
-
-    // Determine which face was hit and calculate its UVs
-    // We will only hit 3 of them but let's just keep the code as-is
-    if (abs_hit_pos.y > abs_hit_pos.x && abs_hit_pos.y > abs_hit_pos.z) {
-        // Top or Bottom face (PY or NY)
-        hit_face_id = select(3u, 2u, hit_pos.y > 0.0); // 2:PY, 3:NY
-
-        // face_uv = vec2<f32>(hit_pos.x + 0.5, 0.5 - hit_pos.z);
-        face_uv = hit_pos.xz + 0.5;
-        face_normal = select(vec3<f32>(0.0, -1.0, 0.0), vec3<f32>(0.0, 1.0, 0.0), hit_pos.y > 0.0); // Set normal
-    } else if (abs_hit_pos.x > abs_hit_pos.z) {
-        // Front or Back face (PX or NX)
-        hit_face_id = select(1u, 0u, hit_pos.x > 0.0); // 0:PX, 1:NX
-        face_uv = vec2<f32>(hit_pos.z + 0.5, 0.5 - hit_pos.y);
-        face_normal = select(vec3<f32>(-1.0, 0.0, 0.0), vec3<f32>(1.0, 0.0, 0.0), hit_pos.x > 0.0); // Set normal
-    } else {
-        // Right or Left face (PZ or NZ, but we map to our own indices)
-        hit_face_id = select(5u, 4u, hit_pos.z > 0.0); // 4:PZ, 5:NZ
-        face_uv = vec2<f32>(0.5 - hit_pos.x, 0.5 - hit_pos.y);
-        face_normal = select(vec3<f32>(0.0, 0.0, -1.0), vec3<f32>(0.0, 0.0, 1.0), hit_pos.z > 0.0); // Set normal
-    }
-    face_uv.y = 1.0 - face_uv.y;
-    
-    // Now sample the tilemap using the determined face
-    let atlas_lookup_idx = (block_type_id * 6u) + hit_face_id;
-    let tile_index = voxel_uv_atlas[atlas_lookup_idx];
-    
-    let tile_x = f32(tile_index % VOXEL_TILES_PER_ROW);
-    let tile_y = f32(tile_index / VOXEL_TILES_PER_ROW);
-    let uv_min_tile = vec2<f32>(tile_x * VOXEL_TILE_SIZE_UV, tile_y * VOXEL_TILE_SIZE_UV);
-    
-    let final_atlas_uv = uv_min_tile + face_uv * VOXEL_TILE_SIZE_UV;
-    var surface_color = textureSample(tilemap_texture, tilemap_sampler, final_atlas_uv);
-
-    // Apply lighting similar to voxel.wgsl
-    if (surface_color.a > 0.0) {
-        let light_direction = normalize(vec3<f32>(0.0, -1.0, -0.5));
-        let ambient_light = 0.05;
-        let diffuse_factor = max(dot(face_normal, light_direction), 0.0);
-        let final_light_factor = ambient_light + (1.0 - ambient_light) * diffuse_factor;
-        let final_rgb = surface_color.rgb * final_light_factor; // Apply lighting
-        surface_color = vec4<f32>(final_rgb, surface_color.a);
-    }
-    return surface_color;
-}
-
 @fragment
-fn fs_dynamic_object(in: DynObjVSOutput) -> @location(0) vec4<f32> {
-    var final_color: vec4<f32>;
-
-    if (in.item_type >= 1024u) {
-        // It's a block, render it as a 2.5D icon
-        let block_type_id = in.item_type - 1024u;
-        final_color = render_block_icon(in.uv, block_type_id);
-
-    } else {
-        // It's a regular item, use the Items texture
-        let tile_index = in.item_type;
-        let tile_x = f32(tile_index % ITEMS_TILES_PER_ROW);
-        let tile_y = f32(tile_index / ITEMS_TILES_PER_ROW);
-        let uv_min_tile = vec2<f32>(tile_x * ITEMS_TILE_SIZE_UV.x, tile_y * ITEMS_TILE_SIZE_UV.y);
-        
-        let final_atlas_uv = uv_min_tile + in.uv * ITEMS_TILE_SIZE_UV;
-        final_color = textureSample(items_texture, items_sampler, final_atlas_uv);
-    }
-    
-    return final_color;
+fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+    let color = textureSample(tilemap_texture, tilemap_sampler, in.tex_coords);
+    return color;
 }
-
 

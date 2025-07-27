@@ -33,6 +33,11 @@ const TILE_SIZE_UV: f32 = TILE_DIM_PX / TEXTURE_ATLAS_DIM_PX; // Normalized UV s
 
 const AIR_TYPE: u32 = 2u;
 
+struct FragmentOutput {
+    @location(0) color: vec4<f32>,
+    @builtin(frag_depth) depth: f32,
+}
+
 struct CameraUniform {
     view_proj: mat4x4<f32>,
     inv_view_proj: mat4x4<f32>,
@@ -168,7 +173,7 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> @builtin(position) vec4<
 }
 
 @fragment
-fn fs_main(@builtin(position) clip_position: vec4<f32>) -> @location(0) vec4<f32> {
+fn fs_main(@builtin(position) clip_position: vec4<f32>) -> FragmentOutput {
     let frag_coord = clip_position;
     let screen_width = camera.screen_size.x;
     let screen_height = camera.screen_size.y;
@@ -196,7 +201,12 @@ fn fs_main(@builtin(position) clip_position: vec4<f32>) -> @location(0) vec4<f32
     let t_min_intersect = max(t_min_v.x, max(t_min_v.y, t_min_v.z));
     let t_max_intersect = min(t_max_v.x, min(t_max_v.y, t_max_v.z));
 
-    if (t_min_intersect > t_max_intersect) { return vec4<f32>(0.0); }
+    if (t_min_intersect > t_max_intersect) {
+        var output: FragmentOutput;
+        output.color = vec4<f32>(0.0);
+        output.depth = 1 - 1e-6;
+        return output;
+    }
 
     var initial_normal = vec3<i32>(0);
     if (t_min_v.x > t_min_v.y && t_min_v.x > t_min_v.z) { initial_normal.x = -i32(sign(ray_dir_world.x)); }
@@ -228,9 +238,10 @@ fn fs_main(@builtin(position) clip_position: vec4<f32>) -> @location(0) vec4<f32
     var accumulated_color = vec4<f32>(0.0);
     var prev_voxel_type = AIR_TYPE;
     var ever_hit_selected_block = false;
+    var t_first_hit = -1.0;
 
     for (var i: u32 = 0u; i < MAX_VOXEL_TRAVERSAL_STEPS; i = i + 1u) {
-        if (t_hit > t_max_intersect || accumulated_color.a > 0.99) {
+        if (t_hit > t_max_intersect || accumulated_color.a == 1.0) {
             break;
         }
 
@@ -243,6 +254,9 @@ fn fs_main(@builtin(position) clip_position: vec4<f32>) -> @location(0) vec4<f32
             render_and_blend(prev_voxel_type, hit_point, normal_of_entry_face, &accumulated_color);
             // Render the front-face of the block we are ENTERING
             render_and_blend(current_voxel_type, hit_point, normal_of_entry_face, &accumulated_color);
+            if (t_first_hit < 0.0 && accumulated_color.a == 1.0) {
+                t_first_hit = t_hit;
+            }
         }
         
         prev_voxel_type = current_voxel_type;
@@ -266,7 +280,7 @@ fn fs_main(@builtin(position) clip_position: vec4<f32>) -> @location(0) vec4<f32
     }
 
     // After the loop, if the ray exited the world from a transparent block, render its final exit surface.
-    if (t_hit >= t_max_intersect && prev_voxel_type != AIR_TYPE && accumulated_color.a < 0.99) {
+    if (t_hit >= t_max_intersect && prev_voxel_type != AIR_TYPE && accumulated_color.a != 1.0) {
         let hit_point = ray_origin_world + ray_dir_world * t_max_intersect;
         let clamped_hit_point = clamp(hit_point, vec3<f32>(0.0), vec3<f32>(f32(WORLD_DIM_X), f32(WORLD_DIM_Y), f32(WORLD_DIM_Z)));
         render_and_blend(prev_voxel_type, clamped_hit_point, normal_of_entry_face, &accumulated_color);
@@ -286,6 +300,25 @@ fn fs_main(@builtin(position) clip_position: vec4<f32>) -> @location(0) vec4<f32
         accumulated_color = vec4<f32>(final_rgb, final_a);
     }    
 
-    // Return final composited color. The alpha channel is now meaningful.
-    return accumulated_color;
+    var output: FragmentOutput;
+    output.color = accumulated_color;
+
+    // If we never hit anything solid, discard the pixel.
+    if (t_first_hit < 0.0) {
+        output.depth = 1 - 1e-6;
+    } else {
+        // Calculate the world position of the first hit
+        let hit_point_world = ray_origin_world + ray_dir_world * t_first_hit;
+
+        // Transform world position to clip space
+        let hit_point_clip = camera.view_proj * vec4<f32>(hit_point_world - camera.world_offset.xyz, 1.0);
+
+        // The depth value is the Z component after perspective division.
+        // This works because glam's perspective_rh and wgpu use a 0-to-1 depth range.
+        let final_depth = hit_point_clip.z / hit_point_clip.w;
+
+        output.depth = final_depth;
+    }
+
+    return output;
 }
