@@ -1,4 +1,7 @@
-use crate::gpu::{RgbaTexture, VoxelType};
+use super::gpu::{
+    RgbaTexture, VoxelType,
+    dw::{DwChunkIconBuf, DwChunkSpriteBuf, DwIconInstanceRaw, DwIconVertex, DwSpriteVertex},
+};
 use egui::Context;
 use egui_wgpu::{
     Renderer, ScreenDescriptor,
@@ -300,62 +303,6 @@ impl VoxelRenderer {
     }
 }
 
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-struct DwIconVertex {
-    position: [f32; 2],
-}
-
-impl DwIconVertex {
-    const ATTRIBS: [wgpu::VertexAttribute; 1] = wgpu::vertex_attr_array![0 => Float32x2];
-    fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
-        wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<DwIconVertex>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &Self::ATTRIBS,
-        }
-    }
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-struct DwIconInstanceRaw {
-    position: [f32; 2],
-    item_type: u32,
-}
-
-impl DwIconInstanceRaw {
-    const ATTRIBS: [wgpu::VertexAttribute; 2] =
-        wgpu::vertex_attr_array![1 => Float32x2, 2 => Uint32];
-    fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
-        wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<DwIconInstanceRaw>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Instance,
-            attributes: &Self::ATTRIBS,
-        }
-    }
-}
-
-const DYN_OBJ_VERTICES: &[DwIconVertex] = &[
-    DwIconVertex {
-        position: [-0.5, -0.5],
-    }, // bottom-left
-    DwIconVertex {
-        position: [0.5, -0.5],
-    }, // bottom-right
-    DwIconVertex {
-        position: [0.5, 0.5],
-    }, // top-right
-    DwIconVertex {
-        position: [-0.5, 0.5],
-    }, // top-left
-];
-
-const DYN_OBJ_INDICES: &[u16] = &[0, 1, 2, 0, 2, 3];
-
-// We can support up to this many objects. This can be made dynamic later.
-const MAX_DYN_OBJS: u64 = 10000;
-
 #[repr(u16)]
 pub enum ItemType {
     CobbleStone = 1024,
@@ -369,7 +316,6 @@ pub struct DwIconRenderer {
     pipeline: wgpu::RenderPipeline,
     vertex_buf: wgpu::Buffer,
     index_buf: wgpu::Buffer,
-    instance_buf: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
 }
 
@@ -394,21 +340,14 @@ impl DwIconRenderer {
 
         let vertex_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Dynamic Object Icon Vertex Buffer"),
-            contents: bytemuck::cast_slice(DYN_OBJ_VERTICES),
+            contents: bytemuck::cast_slice(DwIconVertex::VERTICES),
             usage: wgpu::BufferUsages::VERTEX,
         });
 
         let index_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Dynamic Object Icon Index Buffer"),
-            contents: bytemuck::cast_slice(DYN_OBJ_INDICES),
+            contents: bytemuck::cast_slice(DwIconVertex::INDICES),
             usage: wgpu::BufferUsages::INDEX,
-        });
-
-        let instance_buf = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Dynamic Object Icon Instance Buffer"),
-            size: std::mem::size_of::<DwIconInstanceRaw>() as u64 * MAX_DYN_OBJS,
-            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
         });
 
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -553,71 +492,30 @@ impl DwIconRenderer {
             pipeline,
             vertex_buf,
             index_buf,
-            instance_buf,
             bind_group,
         }
     }
 
-    pub fn update_instance_buffer(&self, queue: &wgpu::Queue, instances: &[([f32; 2], u32)]) {
-        if instances.len() as u64 > MAX_DYN_OBJS {
-            println!(
-                "Warning: Exceeded MAX_DYN_OBJS ({} > {})",
-                instances.len(),
-                MAX_DYN_OBJS
-            );
-            return;
-        }
-        let instance_data = instances
-            .iter()
-            .map(|(pos, item_type)| DwIconInstanceRaw {
-                position: *pos,
-                item_type: *item_type,
-            })
-            .collect::<Vec<_>>();
-        queue.write_buffer(&self.instance_buf, 0, bytemuck::cast_slice(&instance_data));
-    }
-
-    pub fn render<'pass>(&'pass self, rpass: &mut wgpu::RenderPass<'pass>, num_instances: usize) {
-        if num_instances == 0 || num_instances as u64 > MAX_DYN_OBJS {
-            return;
-        }
+    pub fn render<'pass>(&'pass self, rpass: &mut wgpu::RenderPass<'pass>, buf: &DwChunkIconBuf) {
         rpass.set_pipeline(&self.pipeline);
         rpass.set_bind_group(0, &self.bind_group, &[]);
         rpass.set_vertex_buffer(0, self.vertex_buf.slice(..));
-        rpass.set_vertex_buffer(1, self.instance_buf.slice(..));
+        rpass.set_vertex_buffer(1, buf.instance_buf.slice(..));
         rpass.set_index_buffer(self.index_buf.slice(..), wgpu::IndexFormat::Uint16);
-        rpass.draw_indexed(0..DYN_OBJ_INDICES.len() as u32, 0, 0..num_instances as u32);
+        rpass.draw_indexed(
+            0..DwIconVertex::INDICES.len() as u32,
+            0,
+            0..buf.num_instances,
+        );
     }
 }
 
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-struct DwObjVertex {
-    position: [f32; 3],
-    tex_coords: [f32; 2],
-}
-
-impl DwObjVertex {
-    const ATTRIBS: [wgpu::VertexAttribute; 2] =
-        wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x2];
-    fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
-        wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<DwObjVertex>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &Self::ATTRIBS,
-        }
-    }
-}
-
-pub struct DwRenderer {
+pub struct DwSpriteRenderer {
     pipeline: wgpu::RenderPipeline,
-    vertex_buf: wgpu::Buffer,
-    index_buf: wgpu::Buffer,
-    num_indices: u32,
     bind_group: wgpu::BindGroup,
 }
 
-impl DwRenderer {
+impl DwSpriteRenderer {
     pub fn new(
         device: &wgpu::Device,
         config: &wgpu::SurfaceConfiguration,
@@ -625,53 +523,8 @@ impl DwRenderer {
         tilemap_texture: &RgbaTexture,
     ) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("DW Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("dw.wgsl").into()),
-        });
-
-        // Hard-coded tomato plant at (x=0, y=2), size 1x2.
-        // UVs are calculated from tile indices (22,27) and (23,27) for a 2x1 tile area.
-        // Texture atlas is 512x512, tiles are 16x16.
-        let v_min = 22.0 * 16.0 / 512.0;
-        let u_min = 27.0 * 16.0 / 512.0;
-        let v_max = (22.0 + 2.0) * 16.0 / 512.0;
-        let u_max = (27.0 + 1.0) * 16.0 / 512.0;
-
-        let center_x = 10739.5;
-        let center_y = 520.0;
-
-        let vertices = &[
-            // Position is in world units, Z=2.0 so it's in front of background voxels
-            DwObjVertex {
-                position: [center_x - 0.5, center_y, 2.0],
-                tex_coords: [u_min, v_max],
-            }, // Bottom-left
-            DwObjVertex {
-                position: [center_x + 0.5, center_y, 2.0],
-                tex_coords: [u_max, v_max],
-            }, // Bottom-right
-            DwObjVertex {
-                position: [center_x + 0.5, center_y + 2.0, 2.0],
-                tex_coords: [u_max, v_min],
-            }, // Top-right
-            DwObjVertex {
-                position: [center_x - 0.5, center_y + 2.0, 2.0],
-                tex_coords: [u_min, v_min],
-            }, // Top-left
-        ];
-
-        let indices: &[u16] = &[0, 1, 2, 0, 2, 3];
-
-        let vertex_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("DW Vertex Buffer"),
-            contents: bytemuck::cast_slice(vertices),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
-
-        let index_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("DW Index Buffer"),
-            contents: bytemuck::cast_slice(indices),
-            usage: wgpu::BufferUsages::INDEX,
+            label: Some("DW Sprite Shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("dw_sprite.wgsl").into()),
         });
 
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -740,7 +593,7 @@ impl DwRenderer {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: Some("vs_main"),
-                buffers: &[DwObjVertex::desc()],
+                buffers: &[DwSpriteVertex::desc()],
                 compilation_options: Default::default(),
             },
             fragment: Some(wgpu::FragmentState {
@@ -768,18 +621,15 @@ impl DwRenderer {
 
         Self {
             pipeline,
-            vertex_buf,
-            index_buf,
-            num_indices: indices.len() as u32,
             bind_group,
         }
     }
 
-    pub fn render<'pass>(&'pass self, rpass: &mut wgpu::RenderPass<'pass>) {
+    pub fn render<'pass>(&'pass self, rpass: &mut wgpu::RenderPass<'pass>, buf: &DwChunkSpriteBuf) {
         rpass.set_pipeline(&self.pipeline);
         rpass.set_bind_group(0, &self.bind_group, &[]);
-        rpass.set_vertex_buffer(0, self.vertex_buf.slice(..));
-        rpass.set_index_buffer(self.index_buf.slice(..), wgpu::IndexFormat::Uint16);
-        rpass.draw_indexed(0..self.num_indices, 0, 0..1);
+        rpass.set_vertex_buffer(0, buf.vertex_buf.slice(..));
+        rpass.set_index_buffer(buf.index_buf.slice(..), wgpu::IndexFormat::Uint32);
+        rpass.draw_indexed(0..buf.num_indices, 0, 0..1);
     }
 }

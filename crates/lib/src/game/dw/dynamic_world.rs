@@ -5,7 +5,7 @@ use super::{
 use crate::{BhError, BhResult};
 use heed::{Database, RoTxn, RwTxn, types::*};
 use serde::Serialize;
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Deref};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u16)]
@@ -146,7 +146,7 @@ impl IsEmpty for Vec<u8> {
 
 impl<T> IsEmpty for DynamicObjectList<T> {
     fn is_empty(&self) -> bool {
-        self.is_empty()
+        self.deref().is_empty()
     }
 }
 
@@ -171,58 +171,58 @@ impl<T: Serialize> ToXmlPlist for DynamicObjectList<T> {
 /// Contains all different types of dynamic objects that one chunk might have.
 #[derive(Debug)]
 pub struct ChunkDynamicObjects {
-    apple_tree: Vec<u8>,
-    maple_tree: Vec<u8>,
-    mango_tree: Vec<u8>,
-    pine_tree: Vec<u8>,
-    cactus_tree: Vec<u8>,
-    coconut_tree: Vec<u8>,
-    orange_tree: Vec<u8>,
-    cherry_tree: Vec<u8>,
-    coffee_tree: Vec<u8>,
-    flax_plant: Vec<u8>,
-    sunflower_plant: Vec<u8>,
-    corn_plant: Vec<u8>,
-    dodo: Vec<u8>,
-    item: Vec<u8>,
-    fire: Vec<u8>,
-    torch: Vec<u8>,
-    glow_block: Vec<u8>,
-    ladder: Vec<u8>,
-    door: Vec<u8>,
-    artificiallight: Vec<u8>,
-    bed: Vec<u8>,
-    dropbear: Vec<u8>,
-    gather_block: Vec<u8>,
-    carrot_plant: Vec<u8>,
-    donkey: Vec<u8>,
-    egg: Vec<u8>,
-    window: Vec<u8>,
-    boat: Vec<u8>,
-    chilli_plant: Vec<u8>,
-    kelp_plant: Vec<u8>,
-    clown_fish: Vec<u8>,
-    shark: Vec<u8>,
-    lime_tree: Vec<u8>,
-    wire: Vec<u8>,
-    cave_troll: Vec<u8>,
-    rail: Vec<u8>,
-    workbench: Vec<u8>,
-    chest: Vec<u8>,
-    sign: Vec<u8>,
-    trading_post: Vec<u8>,
-    trade_portal: Vec<u8>,
-    scorpion: Vec<u8>,
-    column: Vec<u8>,
-    stairs: Vec<u8>,
-    elevator_motor: Vec<u8>,
-    elevator_shaft: Vec<u8>,
-    gem_tree: Vec<u8>,
-    vine_plant: Vec<u8>,
-    tulip_plant: Vec<u8>,
-    wheat_plant: Vec<u8>,
-    tomato_plants: DynamicObjectList<TomatoPlant>,
-    yak: Vec<u8>,
+    pub apple_tree: Vec<u8>,
+    pub maple_tree: Vec<u8>,
+    pub mango_tree: Vec<u8>,
+    pub pine_tree: Vec<u8>,
+    pub cactus_tree: Vec<u8>,
+    pub coconut_tree: Vec<u8>,
+    pub orange_tree: Vec<u8>,
+    pub cherry_tree: Vec<u8>,
+    pub coffee_tree: Vec<u8>,
+    pub flax_plant: Vec<u8>,
+    pub sunflower_plant: Vec<u8>,
+    pub corn_plant: Vec<u8>,
+    pub dodo: Vec<u8>,
+    pub item: Vec<u8>,
+    pub fire: Vec<u8>,
+    pub torch: Vec<u8>,
+    pub glow_block: Vec<u8>,
+    pub ladder: Vec<u8>,
+    pub door: Vec<u8>,
+    pub artificiallight: Vec<u8>,
+    pub bed: Vec<u8>,
+    pub dropbear: Vec<u8>,
+    pub gather_block: Vec<u8>,
+    pub carrot_plant: Vec<u8>,
+    pub donkey: Vec<u8>,
+    pub egg: Vec<u8>,
+    pub window: Vec<u8>,
+    pub boat: Vec<u8>,
+    pub chilli_plant: Vec<u8>,
+    pub kelp_plant: Vec<u8>,
+    pub clown_fish: Vec<u8>,
+    pub shark: Vec<u8>,
+    pub lime_tree: Vec<u8>,
+    pub wire: Vec<u8>,
+    pub cave_troll: Vec<u8>,
+    pub rail: Vec<u8>,
+    pub workbench: Vec<u8>,
+    pub chest: Vec<u8>,
+    pub sign: Vec<u8>,
+    pub trading_post: Vec<u8>,
+    pub trade_portal: Vec<u8>,
+    pub scorpion: Vec<u8>,
+    pub column: Vec<u8>,
+    pub stairs: Vec<u8>,
+    pub elevator_motor: Vec<u8>,
+    pub elevator_shaft: Vec<u8>,
+    pub gem_tree: Vec<u8>,
+    pub vine_plant: Vec<u8>,
+    pub tulip_plant: Vec<u8>,
+    pub wheat_plant: Vec<u8>,
+    pub tomato_plants: DynamicObjectList<TomatoPlant>,
+    pub yak: Vec<u8>,
 }
 
 impl Default for ChunkDynamicObjects {
@@ -284,10 +284,20 @@ impl Default for ChunkDynamicObjects {
     }
 }
 
+impl ChunkDynamicObjects {
+    pub fn num_objects(&self) -> usize {
+        self.tomato_plants.len()
+    }
+}
+
 #[derive(Debug)]
 pub struct DynamicWorld(HashMap<ChunkCoord, ChunkDynamicObjects>);
 
 impl DynamicWorld {
+    pub fn chunk_at<I: Into<ChunkCoord>>(&self, coord: I) -> Option<&ChunkDynamicObjects> {
+        self.0.get(&coord.into())
+    }
+
     pub fn from_db(db: &Database<Str, Bytes>, rtxn: &RoTxn) -> BhResult<Self> {
         let mut map = HashMap::new();
         for (k, v) in db.iter(rtxn)?.filter_map(|v| v.ok()) {

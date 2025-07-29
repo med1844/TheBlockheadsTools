@@ -1,11 +1,12 @@
 use super::{
     fps_counter::FpsCounter,
-    gpu::{Camera, CameraBuf, RgbaTexture, SelectedBlock, VoxelBuf},
+    gpu::{Camera, CameraBuf, RgbaTexture, SelectedBlock, VoxelBuf, dw::DwBuf},
     input::{EventResponse, Input},
-    renderer::{DEPTH_FORMAT, DwIconRenderer, DwRenderer, EguiRenderer, VoxelRenderer},
+    renderer::{DEPTH_FORMAT, DwIconRenderer, DwSpriteRenderer, EguiRenderer, VoxelRenderer},
 };
 use egui_wgpu::wgpu::SurfaceError;
 use egui_wgpu::{ScreenDescriptor, wgpu};
+use glam::Vec3Swizzles;
 use std::{path::Path, sync::Arc};
 use the_blockheads_tools_lib::{
     BhResult,
@@ -32,12 +33,15 @@ pub struct AppState {
     // input
     pub input: Input,
 
-    // 3d rendering related
+    // voxel rendering
     pub camera_buf: CameraBuf,
     pub voxel_renderer: VoxelRenderer,
     pub voxel_buf: VoxelBuf,
     pub depth_view: wgpu::TextureView,
-    pub dw_renderer: DwRenderer,
+
+    // dynamic object rendering
+    pub dw_buf: DwBuf,
+    pub dw_sprite_renderer: DwSpriteRenderer,
     pub dw_icon_renderer: DwIconRenderer,
 
     // game save
@@ -153,10 +157,11 @@ impl AppState {
             &items_texture,
             &tile_map_texture,
         );
-        dw_icon_renderer.update_instance_buffer(&queue, &vec![([0.0, 1.0], 3), ([2.0, 0.0], 1024)]);
 
         let dw_renderer =
-            DwRenderer::new(&device, &surface_config, &camera_buf.buf, &tile_map_texture);
+            DwSpriteRenderer::new(&device, &surface_config, &camera_buf.buf, &tile_map_texture);
+
+        let dw_buf = DwBuf::new();
 
         Self {
             device,
@@ -172,7 +177,9 @@ impl AppState {
             voxel_renderer,
             voxel_buf,
             depth_view,
-            dw_renderer,
+
+            dw_buf,
+            dw_sprite_renderer: dw_renderer,
             dw_icon_renderer,
 
             world_db: None,
@@ -193,12 +200,14 @@ impl AppState {
 
         let new_world_width_macro = world_db.main.world_v2.world_width_macro as usize;
 
-        // Resize voxel buffer if needed, otherwise, clear up the voxel buffer.
+        // Resize voxel buffer if needed, otherwise, clean up the voxel buffer.
         if self.voxel_buf.world_width_macro == new_world_width_macro {
             self.voxel_buf.clear(&self.queue);
         } else {
             self.voxel_buf = VoxelBuf::new(&self.device, new_world_width_macro);
         }
+
+        self.dw_buf.clear();
 
         // Fill up all chunks for now. This could be dispatched to another thread later.
         for chunk_y in 0..32 {
@@ -207,6 +216,11 @@ impl AppState {
                 if !self.voxel_buf.has_chunk(chunk_coord) {
                     if let Some(Ok(chunk)) = world_db.blocks.chunk_at(chunk_coord) {
                         let _ = self.voxel_buf.set_chunk(&self.queue, chunk_coord, chunk);
+                    }
+                }
+                if !self.dw_buf.has_chunk(chunk_coord) {
+                    if let Some(chunk) = world_db.dw.chunk_at(chunk_coord) {
+                        self.dw_buf.set_chunk(&self.device, chunk_coord, chunk);
                     }
                 }
             }
@@ -380,9 +394,32 @@ impl App {
             rpass.set_bind_group(0, &state.voxel_renderer.bind_group, &[]);
             rpass.draw(0..3, 0..1);
 
-            state.dw_renderer.render(&mut rpass);
+            let [min_coords, max_coords] = state.camera_buf.visible_world_region_2d();
+            let center = state.camera_buf.camera.world_offset.xy();
+            const MAX_DIST: f32 = 48.0;
 
-            state.dw_icon_renderer.render(&mut rpass, 2);
+            let min_x = min_coords.x.max(center.x - MAX_DIST).max(0.0);
+            let min_y = min_coords.y.max(center.y - MAX_DIST).max(0.0);
+            let max_x = max_coords.x.min(center.x + MAX_DIST);
+            let max_y = max_coords.y.min(center.y + MAX_DIST).min(1024.0);
+
+            let chunk_min_x = (min_x / 32.0).floor() as u32;
+            let chunk_min_y = (min_y / 32.0).floor() as u8;
+            let chunk_max_x = (max_x / 32.0).ceil() as u32;
+            let chunk_max_y = (max_y / 32.0).ceil() as u8;
+            for x in chunk_min_x..chunk_max_x {
+                for y in chunk_min_y..chunk_max_y {
+                    if let Some(chunk_buf) = state.dw_buf.get_chunk(ChunkCoord::new(x, y).unwrap())
+                    {
+                        state
+                            .dw_sprite_renderer
+                            .render(&mut rpass, &chunk_buf.sprite_buf);
+                        state
+                            .dw_icon_renderer
+                            .render(&mut rpass, &chunk_buf.icon_buf);
+                    }
+                }
+            }
         }
 
         state.fps_counter.update();

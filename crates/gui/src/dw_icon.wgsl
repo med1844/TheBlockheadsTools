@@ -104,8 +104,6 @@ fn render_block_icon(uv: vec2<f32>, block_type_id: u32) -> vec4<f32> {
     if (abs_hit_pos.y > abs_hit_pos.x && abs_hit_pos.y > abs_hit_pos.z) {
         // Top or Bottom face (PY or NY)
         hit_face_id = select(3u, 2u, hit_pos.y > 0.0); // 2:PY, 3:NY
-
-        // face_uv = vec2<f32>(hit_pos.x + 0.5, 0.5 - hit_pos.z);
         face_uv = hit_pos.xz + 0.5;
         face_normal = select(vec3<f32>(0.0, -1.0, 0.0), vec3<f32>(0.0, 1.0, 0.0), hit_pos.y > 0.0); // Set normal
     } else if (abs_hit_pos.x > abs_hit_pos.z) {
@@ -162,6 +160,20 @@ fn fs_dynamic_object_icon(in: DynObjVSOutput) -> @location(0) vec4<f32> {
         
         let final_atlas_uv = uv_min_tile + in.uv * ITEMS_TILE_SIZE_UV;
         final_color = textureSample(items_texture, items_sampler, final_atlas_uv);
+    }
+
+    // Add outline
+    let outline_width: f32 = 0.03; // Adjust as needed for desired thickness
+    let dist_from_edge_x = min(in.uv.x, 1.0 - in.uv.x);
+    let dist_from_edge_y = min(in.uv.y, 1.0 - in.uv.y);
+
+    if (dist_from_edge_x < outline_width || dist_from_edge_y < outline_width) {
+        let outline_alpha: f32 = 0.5;
+        let outline_color: vec4<f32> = vec4<f32>(1.0, 1.0, 1.0, outline_alpha); // White with 0.5 alpha
+
+        // Simple blend, overlaying the outline
+        // You might want a more sophisticated blend mode depending on desired effect
+        final_color = mix(final_color, outline_color, outline_color.a);
     }
     
     return final_color;

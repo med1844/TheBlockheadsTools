@@ -145,6 +145,26 @@ impl CameraBuf {
         ) + self.camera.world_offset.xy()
     }
 
+    pub fn visible_world_region_2d(&self) -> [glam::Vec2; 2] {
+        let window_size = self.uniform.window_size();
+
+        let top_right = self.screen_to_xy_at_z(
+            (window_size.0, 0.0),
+            window_size,
+            -self.camera.world_offset.z,
+        );
+        let bottom_left = self.screen_to_xy_at_z(
+            (0.0, window_size.1),
+            window_size,
+            -self.camera.world_offset.z,
+        );
+
+        [
+            bottom_left + self.camera.world_offset.xy(),
+            top_right + self.camera.world_offset.xy(),
+        ]
+    }
+
     pub fn handle_input(&mut self, input: &Input) -> EventResponse {
         let mut any_update = false;
         if input.is_mouse_left_down {

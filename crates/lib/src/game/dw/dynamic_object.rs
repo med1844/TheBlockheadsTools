@@ -1,4 +1,4 @@
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 
 use serde::{Deserialize, Serialize};
 
@@ -9,65 +9,82 @@ pub struct DynamicObjectList<T> {
     dynamic_objects: Vec<T>,
 }
 
+impl<T> Deref for DynamicObjectList<T> {
+    type Target = Vec<T>;
+    fn deref(&self) -> &Self::Target {
+        &self.dynamic_objects
+    }
+}
+
+impl<T> DerefMut for DynamicObjectList<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.dynamic_objects
+    }
+}
+
 impl<T> DynamicObjectList<T> {
     pub fn new() -> Self {
         Self {
             dynamic_objects: Vec::new(),
         }
     }
-
-    pub fn is_empty(&self) -> bool {
-        self.dynamic_objects.is_empty()
-    }
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct DynamicObject {
     #[serde(rename = "floatPos")]
-    float_pos: [f32; 2],
-    pos_x: i32,
-    pos_y: i32,
+    pub float_pos: [f32; 2],
+    pub pos_x: i32,
+    pub pos_y: i32,
     #[serde(rename = "uniqueID")]
-    unique_id: u64,
+    pub unique_id: u64,
 }
 
 // Corresponds to Plant
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Plant {
     #[serde(flatten)]
-    obj: DynamicObject,
+    pub obj: DynamicObject,
 
     #[serde(rename = "saveTime")]
-    save_time: f64,
+    pub save_time: f64,
     #[serde(rename = "seasonOffset")]
-    season_offset: i32,
+    pub season_offset: i32,
     #[serde(rename = "gatherProgress")]
-    gather_progress: i32,
+    pub gather_progress: i32,
     #[serde(rename = "hasFloweredThisSeason")]
-    has_flowered_this_season: bool,
-    flowering: bool,
-    frozen: bool,
-    age: f32,
+    pub has_flowered_this_season: bool,
+    pub flowering: bool,
+    pub frozen: bool,
+    pub age: f32,
     #[serde(rename = "maxAge")]
-    max_age: f32,
+    pub max_age: f32,
     #[serde(rename = "maxAgeGene")]
-    max_age_gene: u16,
+    pub max_age_gene: u16,
     #[serde(rename = "growthRate")]
-    growth_rate: f32,
+    pub growth_rate: f32,
     #[serde(rename = "growthRateGene")]
-    growth_rate_gene: u16,
+    pub growth_rate_gene: u16,
+}
+
+impl Deref for Plant {
+    type Target = DynamicObject;
+
+    fn deref(&self) -> &Self::Target {
+        &self.obj
+    }
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct NormalPlant {
     #[serde(flatten)]
-    plant: Plant,
+    pub plant: Plant,
 
     #[serde(rename = "availableFood")]
-    available_food: f32,
+    pub available_food: f32,
 
     #[serde(rename = "lightDict")]
-    light: Option<ArtificialLight>,
+    pub light: Option<ArtificialLight>,
 }
 
 impl Deref for NormalPlant {
@@ -79,7 +96,7 @@ impl Deref for NormalPlant {
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-pub struct TomatoPlant(NormalPlant);
+pub struct TomatoPlant(pub NormalPlant);
 
 impl Deref for TomatoPlant {
     type Target = NormalPlant;
