@@ -96,6 +96,28 @@ impl Deref for NormalPlant {
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub struct CornPlant(pub NormalPlant);
+
+impl Deref for CornPlant {
+    type Target = NormalPlant;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub struct CarrotPlant(pub NormalPlant);
+
+impl Deref for CarrotPlant {
+    type Target = NormalPlant;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct TomatoPlant(pub NormalPlant);
 
 impl Deref for TomatoPlant {

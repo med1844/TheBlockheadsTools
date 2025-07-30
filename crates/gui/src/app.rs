@@ -220,6 +220,9 @@ impl AppState {
                 }
                 if !self.dw_buf.has_chunk(chunk_coord) {
                     if let Some(chunk) = world_db.dw.chunk_at(chunk_coord) {
+                        if !chunk.carrot_plant.is_empty() {
+                            dbg!(chunk_coord);
+                        }
                         self.dw_buf.set_chunk(&self.device, chunk_coord, chunk);
                     }
                 }

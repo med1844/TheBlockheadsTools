@@ -154,8 +154,10 @@ impl DwChunkBuf {
             sprite_builder: &mut DwSpriteBufBuilder,
         ) {
             for obj in i {
-                let (v, i) = obj.to_sprite().to_vertices();
-                sprite_builder.add(v, i);
+                if let Some(sprite) = obj.to_sprite() {
+                    let (v, i) = sprite.to_vertices();
+                    sprite_builder.add(v, i);
+                }
                 icon_instances.push(obj.to_icon_instance());
             }
         }
@@ -167,6 +169,9 @@ impl DwChunkBuf {
 
         let mut icons = Vec::with_capacity(num_objs);
         let mut builder = DwSpriteBufBuilder::with_capacity(num_objs);
+
+        add(chunk.corn_plant.iter(), &mut icons, &mut builder);
+        add(chunk.carrot_plant.iter(), &mut icons, &mut builder);
         add(chunk.tomato_plants.iter(), &mut icons, &mut builder);
 
         let (vertex_buf, index_buf, num_indices) = builder.build(device);
