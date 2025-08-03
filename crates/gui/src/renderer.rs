@@ -1,6 +1,9 @@
-use super::gpu::{
-    RgbaTexture, VoxelType,
-    dw::{DwChunkIconBuf, DwChunkSpriteBuf, DwIconInstanceRaw, DwIconVertex, DwSpriteVertex},
+use super::{
+    gpu::{
+        RgbaTexture, VoxelType,
+        dw::{DwChunkIconBuf, DwChunkSpriteBuf, DwIconInstanceRaw, DwIconVertex, DwSpriteVertex},
+    },
+    image_type::ImageType,
 };
 use egui::Context;
 use egui_wgpu::{
@@ -151,9 +154,13 @@ impl VoxelRenderer {
             source: wgpu::ShaderSource::Wgsl(include_str!("voxel.wgsl").into()),
         });
 
+        let uv_face_u32 = VoxelType::UV_AT_FACE
+            .iter()
+            .flat_map(|v| v.map(|v| v as u32))
+            .collect::<Vec<_>>();
         let uv_at_face_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Texture UV Atlas Buffer"),
-            contents: bytemuck::cast_slice(VoxelType::UV_AT_FACE),
+            contents: bytemuck::cast_slice(&uv_face_u32),
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
         });
 
@@ -303,15 +310,6 @@ impl VoxelRenderer {
     }
 }
 
-#[repr(u16)]
-pub enum ItemType {
-    CobbleStone = 1024,
-}
-
-impl ItemType {
-    pub(crate) const IMAGE_TYPE: &[[u32; 6]] = &[[196; 6]];
-}
-
 pub struct DwIconRenderer {
     pipeline: wgpu::RenderPipeline,
     vertex_buf: wgpu::Buffer,
@@ -320,6 +318,94 @@ pub struct DwIconRenderer {
 }
 
 impl DwIconRenderer {
+    const ITEM_IMAGE_TYPE: &[[ImageType; 6]] = {
+        use ImageType::*;
+        &[
+            [MinedStone; 6], // Stone
+                             // Kiln
+                             // Brick
+                             // Limestone
+                             // MinedLimestone
+                             // Marble
+                             // MinedMarble
+                             // Furnace
+                             // WoodworkBench
+                             // TaylorsBench
+                             // Press
+                             // Sandstone
+                             // MinedSandstone
+                             // RedMarble
+                             // MinedRedMarble
+                             // WovenFlaxMat
+                             // YellowFlaxMat
+                             // RedFlaxMat
+                             // Glass
+                             // Chest
+                             // DeprecatedFood
+                             // GoldBlock
+                             // DeprecatedMango
+                             // Rock
+                             // Dirt
+                             // Wood
+                             // WorkBench
+                             // Sand
+                             // ToolBench
+                             // LapisLazuli
+                             // MinedLapisLazuli
+                             // CraftBench
+                             // MixingBench
+                             // ReinforcedPlatform
+                             // DeprecatedStonePickaxe
+                             // DeprecatedCopperIngot
+                             // Ice
+                             // DyeBench
+                             // Compost
+                             // Basalt
+                             // MinedBasalt
+                             // Safe
+                             // CopperBlock
+                             // TinBlock
+                             // BronzeBlock
+                             // IronBlock
+                             // SteelBlock
+                             // MetalworkBench
+                             // GoldenChest
+                             // DeprecatedBronzeMachete
+                             // PortalChest
+                             // BlackSand
+                             // BlackGlass
+                             // SteamGenerator
+                             // ElectricKiln
+                             // ElectricFurnace
+                             // ElectricMetalworkBench
+                             // ElectricStove
+                             // SolarPanel
+                             // Flywheel
+                             // ArmorBench
+                             // TrainYard
+                             // BuildersBench
+                             // ElevatorShaft
+                             // ElectricElevatorMotor
+                             // PlatiumBlock
+                             // CarbonFiberBlock
+                             // TitaniumBlock
+                             // DeprecatedIronSword
+                             // ElectricPress
+                             // Gravel
+                             // CompostBin
+                             // EggExtractor
+                             // PizzaOven
+                             // AmethystBlock
+                             // SapphireBlock
+                             // EmeraldBlock
+                             // RubyBlock
+                             // DiamondBlock
+                             // Plaster
+                             // FeederChest
+                             // LuminousPlaster
+        ]
+    };
+
     pub fn new(
         device: &wgpu::Device,
         config: &wgpu::SurfaceConfiguration,
@@ -332,9 +418,14 @@ impl DwIconRenderer {
             source: wgpu::ShaderSource::Wgsl(include_str!("dw_icon.wgsl").into()),
         });
 
+        let block_image_types = Self::ITEM_IMAGE_TYPE
+            .iter()
+            .flat_map(|v| v.map(|v| v as u32))
+            .collect::<Vec<_>>();
+
         let uv_at_face_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Texture UV Atlas Buffer"),
-            contents: bytemuck::cast_slice(ItemType::IMAGE_TYPE),
+            contents: bytemuck::cast_slice(&block_image_types),
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
         });
 

@@ -3,6 +3,7 @@ mod chunk_manager;
 mod dw_impl;
 mod fps_counter;
 mod gpu;
+mod image_type;
 mod input;
 mod renderer;
 
