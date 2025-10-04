@@ -8,7 +8,7 @@ use std::path::Path;
 
 #[derive(Debug)]
 pub struct WorldDb {
-    pub blocks: Chunks,
+    pub chunks: Chunks,
     pub dw: DynamicWorld,
     pub main: WorldDbMain,
 }
@@ -27,10 +27,10 @@ impl WorldDb {
                 "One or more of `block`, `dw` or `main` is missing in the database",
             ));
         };
-        let blocks = Chunks::from_db(&blocks, &rtxn)?;
+        let chunks = Chunks::from_db(&blocks, &rtxn)?;
         let dw = DynamicWorld::from_db(&dw, &rtxn)?;
         let main = WorldDbMain::from_db(&main, &rtxn)?;
-        Ok(Self { blocks, dw, main })
+        Ok(Self { chunks, dw, main })
     }
 
     pub fn to_path<P: AsRef<Path>>(&self, path: P) -> BhResult<()> {
@@ -41,7 +41,7 @@ impl WorldDb {
         let mut wtxn = env.write_txn()?;
 
         let blocks_db: Database<Str, Bytes> = env.create_database(&mut wtxn, Some("blocks"))?;
-        self.blocks.to_db(&blocks_db, &mut wtxn)?;
+        self.chunks.to_db(&blocks_db, &mut wtxn)?;
         let dw_db: Database<Str, Bytes> = env.create_database(&mut wtxn, Some("dw"))?;
         self.dw.to_db(&dw_db, &mut wtxn)?;
         let main_db: Database<Str, Bytes> = env.create_database(&mut wtxn, Some("main"))?;

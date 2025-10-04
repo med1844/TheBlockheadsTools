@@ -35,6 +35,18 @@ impl ChunkBlockCoord {
         check_coord_limit(y as u64, 32)?;
         Ok(Self { x, y })
     }
+
+    pub fn x(&self) -> u8 {
+        self.x
+    }
+
+    pub fn y(&self) -> u8 {
+        self.y
+    }
+
+    pub fn to_string(&self) -> String {
+        format!("ChunkBlockCoord({}, {})", self.x, self.y)
+    }
 }
 
 pub trait ChunkOffset {
@@ -127,12 +139,25 @@ impl BlockCoord {
         Ok(Self { x, y: y as u16 })
     }
 
+    pub fn from_decomposed(chunk_coord: ChunkCoord, chunk_block_coord: ChunkBlockCoord) -> Self {
+        // Both type has y checked at creation, we can trust them and unwrap.
+        Self::new(
+            chunk_coord.x << 5 + chunk_block_coord.x,
+            (chunk_coord.y as u16) << 5 + chunk_block_coord.y as u16,
+        )
+        .unwrap()
+    }
+
     pub fn x(&self) -> u32 {
         self.x
     }
 
     pub fn y(&self) -> u16 {
         self.y
+    }
+
+    pub fn to_string(&self) -> String {
+        format!("BlockCoord({}, {})", self.x, self.y)
     }
 }
 

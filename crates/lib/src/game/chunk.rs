@@ -8,7 +8,7 @@ use crate::util::{
 };
 use flate2::read::GzDecoder;
 use heed::{Database, RoTxn, RwTxn, types::*};
-use std::{collections::HashMap, io::Read};
+use std::{borrow::Borrow, collections::HashMap, io::Read};
 
 #[derive(Debug)]
 pub struct Chunk(
@@ -20,7 +20,7 @@ impl Chunk {
     pub const NUM_BLOCK_PER_COL: usize = 32;
     pub const NUM_BYTES_PER_BLOCK: usize = 64;
 
-    fn new_empty() -> Self {
+    pub fn new_empty() -> Self {
         Self([0; 32 * 32 * 64 + 5])
     }
 
@@ -32,7 +32,7 @@ impl Chunk {
         &mut self.0
     }
 
-    pub fn block_at<O: ChunkOffset>(&self, coord: O) -> Block {
+    pub fn block_at<O: ChunkOffset>(&'_ self, coord: O) -> Block<'_> {
         let offset = coord.to_offset();
         let slice =
             <&[u8; 64]>::try_from(&self.inner()[offset..offset + Self::NUM_BYTES_PER_BLOCK])
@@ -43,7 +43,7 @@ impl Chunk {
         Block::new(slice)
     }
 
-    pub fn block_at_mut<O: ChunkOffset>(&mut self, coord: O) -> BlockMut {
+    pub fn block_at_mut<O: ChunkOffset>(&'_ mut self, coord: O) -> BlockMut<'_> {
         let offset = coord.to_offset();
         let slice = <&mut [u8; 64]>::try_from(
             &mut self.inner_mut()[offset..offset + Self::NUM_BYTES_PER_BLOCK],
@@ -100,8 +100,8 @@ impl Chunks {
         self.0.keys()
     }
 
-    pub fn contains_key(&self, key: &ChunkCoord) -> bool {
-        self.0.contains_key(key)
+    pub fn contains_key<Q: Borrow<ChunkCoord>>(&self, key: Q) -> bool {
+        self.0.contains_key(key.borrow())
     }
 
     pub fn chunk_at<I: Into<ChunkCoord>>(&mut self, coord: I) -> Option<std::io::Result<&Chunk>> {
@@ -117,7 +117,10 @@ impl Chunks {
             .map(|v| v.as_uncompressed_mut())
     }
 
-    pub fn block_at<I: Into<BlockCoord>>(&mut self, coord: I) -> Option<std::io::Result<Block>> {
+    pub fn block_at<I: Into<BlockCoord>>(
+        &'_ mut self,
+        coord: I,
+    ) -> Option<std::io::Result<Block<'_>>> {
         let block_coord = coord.into();
         let (chunk_coord, chunk_block_coord) = block_coord.decompose();
         self.0.get_mut(&chunk_coord).map(|v| {
@@ -127,9 +130,9 @@ impl Chunks {
     }
 
     pub fn block_at_mut<I: Into<BlockCoord>>(
-        &mut self,
+        &'_ mut self,
         coord: I,
-    ) -> Option<std::io::Result<BlockMut>> {
+    ) -> Option<std::io::Result<BlockMut<'_>>> {
         let block_coord = coord.into();
         let (chunk_coord, chunk_block_coord) = block_coord.decompose();
         self.0.get_mut(&chunk_coord).map(|v| {

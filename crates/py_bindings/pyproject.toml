@@ -1,0 +1,25 @@
+[project]
+name = "the_blockheads_tools_py"
+version = "0.1.0"
+description = "Python binding of tools to read and write the blockheads save files."
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "maturin>=1.9.4",
+]
+
+[tool.uv]
+cache-keys = [{file = "pyproject.toml"}, {file = "rust/Cargo.toml"}, {file = "**/*.rs"}]
+
+[build-system]
+requires = ["maturin>=1.5,<2.0"]
+build-backend = "maturin"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.2",
+]
+
+[tool.maturin]
+features = ["pyo3/extension-module"]
+

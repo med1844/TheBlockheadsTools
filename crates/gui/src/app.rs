@@ -214,7 +214,7 @@ impl AppState {
             for chunk_x in 0..world_db.main.world_v2.world_width_macro {
                 let chunk_coord = ChunkCoord::new(chunk_x, chunk_y).unwrap();
                 if !self.voxel_buf.has_chunk(chunk_coord) {
-                    if let Some(Ok(chunk)) = world_db.blocks.chunk_at(chunk_coord) {
+                    if let Some(Ok(chunk)) = world_db.chunks.chunk_at(chunk_coord) {
                         let _ = self.voxel_buf.set_chunk(&self.queue, chunk_coord, chunk);
                     }
                 }
@@ -273,7 +273,7 @@ impl AppState {
         let world_db = self.world_db.as_mut()?;
         let selected_block_coord = self.selected_block.coord().as_ref()?;
         let block = world_db
-            .blocks
+            .chunks
             .block_at(selected_block_coord.clone())?
             .ok()?;
         Some((
@@ -481,7 +481,7 @@ impl App {
                                 coord.y()
                             ));
                             ui.code(bytes);
-                            if let Some(Ok(mut block)) = world_db.blocks.block_at_mut(coord) {
+                            if let Some(Ok(mut block)) = world_db.chunks.block_at_mut(coord) {
                                 let mut any_changed = false;
                                 any_changed |= ui
                                     .add(
@@ -505,7 +505,7 @@ impl App {
                                     )
                                     .changed();
                                 if any_changed {
-                                    let chunk = world_db.blocks.chunk_at(coord).unwrap().unwrap();
+                                    let chunk = world_db.chunks.chunk_at(coord).unwrap().unwrap();
                                     state
                                         .voxel_buf
                                         .set_chunk(&state.queue, coord, chunk)

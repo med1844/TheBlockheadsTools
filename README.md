@@ -1,4 +1,6 @@
-WIP. Developing GUI for the blockheads world editor.
+WIP. Library for reading & writing the save file of "The Blockheads", in Rust and Python.
+
+There's a half-baked GUI that can be used to view the world.
 
 ### `libdispatch` to run server
 
