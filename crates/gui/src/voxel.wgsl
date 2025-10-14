@@ -33,11 +33,6 @@ const TILE_SIZE_UV: f32 = TILE_DIM_PX / TEXTURE_ATLAS_DIM_PX; // Normalized UV s
 
 const AIR_TYPE: u32 = 2u;
 
-struct FragmentOutput {
-    @location(0) color: vec4<f32>,
-    @builtin(frag_depth) depth: f32,
-}
-
 struct CameraUniform {
     view_proj: mat4x4<f32>,
     inv_view_proj: mat4x4<f32>,
@@ -173,7 +168,7 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> @builtin(position) vec4<
 }
 
 @fragment
-fn fs_main(@builtin(position) clip_position: vec4<f32>) -> FragmentOutput {
+fn fs_main(@builtin(position) clip_position: vec4<f32>) -> @location(0) vec4<f32> {
     let frag_coord = clip_position;
     let screen_width = camera.screen_size.x;
     let screen_height = camera.screen_size.y;
@@ -202,10 +197,7 @@ fn fs_main(@builtin(position) clip_position: vec4<f32>) -> FragmentOutput {
     let t_max_intersect = min(t_max_v.x, min(t_max_v.y, t_max_v.z));
 
     if (t_min_intersect > t_max_intersect) {
-        var output: FragmentOutput;
-        output.color = vec4<f32>(0.0);
-        output.depth = 1 - 1e-6;
-        return output;
+        return vec4<f32>(0.0);
     }
 
     var initial_normal = vec3<i32>(0);
@@ -300,25 +292,5 @@ fn fs_main(@builtin(position) clip_position: vec4<f32>) -> FragmentOutput {
         accumulated_color = vec4<f32>(final_rgb, final_a);
     }    
 
-    var output: FragmentOutput;
-    output.color = accumulated_color;
-
-    // If we never hit anything solid, discard the pixel.
-    if (t_first_hit < 0.0) {
-        output.depth = 1 - 1e-6;
-    } else {
-        // Calculate the world position of the first hit
-        let hit_point_world = ray_origin_world + ray_dir_world * t_first_hit;
-
-        // Transform world position to clip space
-        let hit_point_clip = camera.view_proj * vec4<f32>(hit_point_world - camera.world_offset.xyz, 1.0);
-
-        // The depth value is the Z component after perspective division.
-        // This works because glam's perspective_rh and wgpu use a 0-to-1 depth range.
-        let final_depth = hit_point_clip.z / hit_point_clip.w;
-
-        output.depth = final_depth;
-    }
-
-    return output;
+    return accumulated_color;
 }

@@ -2,7 +2,7 @@ use super::{
     fps_counter::FpsCounter,
     gpu::{Camera, CameraBuf, RgbaTexture, SelectedBlock, VoxelBuf, dw::DwBuf},
     input::{EventResponse, Input},
-    renderer::{DEPTH_FORMAT, DwIconRenderer, DwSpriteRenderer, EguiRenderer, VoxelRenderer},
+    renderer::{DEPTH_FORMAT, DwIconRenderer, EguiRenderer, VoxelRenderer},
 };
 use egui_wgpu::wgpu::SurfaceError;
 use egui_wgpu::{ScreenDescriptor, wgpu};
@@ -41,7 +41,6 @@ pub struct AppState {
 
     // dynamic object rendering
     pub dw_buf: DwBuf,
-    pub dw_sprite_renderer: DwSpriteRenderer,
     pub dw_icon_renderer: DwIconRenderer,
 
     // game save
@@ -158,9 +157,6 @@ impl AppState {
             &tile_map_texture,
         );
 
-        let dw_renderer =
-            DwSpriteRenderer::new(&device, &surface_config, &camera_buf.buf, &tile_map_texture);
-
         let dw_buf = DwBuf::new();
 
         Self {
@@ -179,7 +175,6 @@ impl AppState {
             depth_view,
 
             dw_buf,
-            dw_sprite_renderer: dw_renderer,
             dw_icon_renderer,
 
             world_db: None,
@@ -220,9 +215,6 @@ impl AppState {
                 }
                 if !self.dw_buf.has_chunk(chunk_coord) {
                     if let Some(chunk) = world_db.dw.chunk_at(chunk_coord) {
-                        if !chunk.carrot_plant.is_empty() {
-                            dbg!(chunk_coord);
-                        }
                         self.dw_buf.set_chunk(&self.device, chunk_coord, chunk);
                     }
                 }
@@ -414,9 +406,6 @@ impl App {
                 for y in chunk_min_y..chunk_max_y {
                     if let Some(chunk_buf) = state.dw_buf.get_chunk(ChunkCoord::new(x, y).unwrap())
                     {
-                        state
-                            .dw_sprite_renderer
-                            .render(&mut rpass, &chunk_buf.sprite_buf);
                         state
                             .dw_icon_renderer
                             .render(&mut rpass, &chunk_buf.icon_buf);

@@ -1,26 +1,6 @@
-use super::ToSprite;
 use egui_wgpu::wgpu::{self, util::DeviceExt};
 use std::collections::HashMap;
 use the_blockheads_tools_lib::game::{coord::ChunkCoord, dw::dynamic_world::ChunkDynamicObjects};
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct DwSpriteVertex {
-    pub position: [f32; 3],
-    pub tex_coords: [f32; 2],
-}
-
-impl DwSpriteVertex {
-    const ATTRIBS: [wgpu::VertexAttribute; 2] =
-        wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x2];
-    pub fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
-        wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<DwSpriteVertex>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &Self::ATTRIBS,
-        }
-    }
-}
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
@@ -81,83 +61,23 @@ pub trait ToIconInstance {
     fn to_icon_instance(&self) -> DwIconInstanceRaw;
 }
 
-// Concats vertex buf and index buf
-struct DwSpriteBufBuilder {
-    vi_pairs: Vec<([DwSpriteVertex; 4], [u32; 6])>,
-}
-
-impl DwSpriteBufBuilder {
-    fn new() -> Self {
-        Self {
-            vi_pairs: Vec::new(),
-        }
-    }
-
-    fn with_capacity(capacity: usize) -> Self {
-        Self {
-            vi_pairs: Vec::with_capacity(capacity),
-        }
-    }
-
-    fn add(&mut self, vertices: [DwSpriteVertex; 4], indices: [u32; 6]) {
-        self.vi_pairs.push((vertices, indices));
-    }
-
-    fn build(self, device: &wgpu::Device) -> (wgpu::Buffer, wgpu::Buffer, u32) {
-        let mut acc_vertices = 0;
-        let mut vertices = Vec::with_capacity(self.vi_pairs.len() * 4);
-        let mut indices = Vec::with_capacity(self.vi_pairs.len() * 6);
-        for (v, i) in self.vi_pairs {
-            vertices.extend_from_slice(&v);
-            indices.extend(i.into_iter().map(|i| i + acc_vertices));
-            acc_vertices += v.len() as u32;
-        }
-
-        let vertex_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("DW Vertex Buffer"),
-            contents: bytemuck::cast_slice(&vertices),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
-
-        let index_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("DW Index Buffer"),
-            contents: bytemuck::cast_slice(&indices),
-            usage: wgpu::BufferUsages::INDEX,
-        });
-
-        (vertex_buf, index_buf, indices.len() as u32)
-    }
-}
-
 pub struct DwChunkIconBuf {
     pub instance_buf: wgpu::Buffer,
     pub capacity: u32,
     pub num_instances: u32,
 }
 
-pub struct DwChunkSpriteBuf {
-    pub vertex_buf: wgpu::Buffer,
-    pub index_buf: wgpu::Buffer,
-    pub num_indices: u32,
-}
-
 pub struct DwChunkBuf {
     pub icon_buf: DwChunkIconBuf,
-    pub sprite_buf: DwChunkSpriteBuf,
 }
 
 impl DwChunkBuf {
     pub fn from_chunk(chunk: &ChunkDynamicObjects, device: &wgpu::Device) -> Option<Self> {
-        fn add<'a, T: ToSprite + ToIconInstance + 'a, I: Iterator<Item = &'a T>>(
+        fn add<'a, T: ToIconInstance + 'a, I: Iterator<Item = &'a T>>(
             i: I,
             icon_instances: &mut Vec<DwIconInstanceRaw>,
-            sprite_builder: &mut DwSpriteBufBuilder,
         ) {
             for obj in i {
-                if let Some(sprite) = obj.to_sprite() {
-                    let (v, i) = sprite.to_vertices();
-                    sprite_builder.add(v, i);
-                }
                 icon_instances.push(obj.to_icon_instance());
             }
         }
@@ -168,13 +88,11 @@ impl DwChunkBuf {
         }
 
         let mut icons = Vec::with_capacity(num_objs);
-        let mut builder = DwSpriteBufBuilder::with_capacity(num_objs);
 
-        add(chunk.corn_plant.iter(), &mut icons, &mut builder);
-        add(chunk.carrot_plant.iter(), &mut icons, &mut builder);
-        add(chunk.tomato_plants.iter(), &mut icons, &mut builder);
+        add(chunk.corn_plant.iter(), &mut icons);
+        add(chunk.carrot_plant.iter(), &mut icons);
+        add(chunk.tomato_plants.iter(), &mut icons);
 
-        let (vertex_buf, index_buf, num_indices) = builder.build(device);
         let icon_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Dynamic Object Icon Instance Buffer"),
             contents: bytemuck::cast_slice(&icons),
@@ -187,11 +105,6 @@ impl DwChunkBuf {
                 instance_buf: icon_buf,
                 capacity: num_instances,
                 num_instances,
-            },
-            sprite_buf: DwChunkSpriteBuf {
-                vertex_buf,
-                index_buf,
-                num_indices,
             },
         })
     }
