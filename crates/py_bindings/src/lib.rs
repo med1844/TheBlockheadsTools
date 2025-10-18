@@ -40,12 +40,14 @@ create_exception!(
 );
 
 mod coord {
+    use std::hash::Hash;
+
     use crate::{into_py_err, lib};
     use lib::game::coord::{BlockCoord, ChunkBlockCoord, ChunkCoord};
     use pyo3::prelude::*;
 
     #[derive(Clone, Hash, PartialEq, Eq)]
-    #[pyclass(name = "ChunkCoord")]
+    #[pyclass(frozen, eq, hash, name = "ChunkCoord")]
     pub struct ChunkCoordPy {
         pub(crate) inner: ChunkCoord,
     }
@@ -72,10 +74,14 @@ mod coord {
         fn __str__(&self) -> String {
             self.inner.to_string()
         }
+
+        fn __repr__(&self) -> String {
+            format!("ChunkCoord({}, {})", self.inner.x(), self.inner.y())
+        }
     }
 
-    #[derive(Clone)]
-    #[pyclass(name = "ChunkBlockCoord")]
+    #[derive(Clone, Hash, PartialEq, Eq)]
+    #[pyclass(frozen, eq, hash, name = "ChunkBlockCoord")]
     pub struct ChunkBlockCoordPy {
         pub(crate) inner: ChunkBlockCoord,
     }
@@ -102,10 +108,14 @@ mod coord {
         fn __str__(&self) -> String {
             self.inner.to_string()
         }
+
+        fn __repr__(&self) -> String {
+            self.__str__()
+        }
     }
 
-    #[derive(Clone)]
-    #[pyclass(name = "BlockCoord")]
+    #[derive(Clone, Hash, PartialEq, Eq)]
+    #[pyclass(frozen, eq, hash, name = "BlockCoord")]
     pub struct BlockCoordPy {
         pub(crate) inner: BlockCoord,
     }
@@ -132,6 +142,10 @@ mod coord {
         fn __str__(&self) -> String {
             self.inner.to_string()
         }
+
+        fn __repr__(&self) -> String {
+            self.__str__()
+        }
     }
 }
 
@@ -145,7 +159,7 @@ mod block {
     };
     use pyo3::prelude::*;
 
-    #[pyclass(eq, eq_int)]
+    #[pyclass(eq, eq_int, name = "BlockType")]
     #[derive(PartialEq)]
     #[repr(u8)]
     pub enum BlockTypePy {
@@ -421,12 +435,6 @@ mod chunk {
     use lib::game::coord::{BlockCoord, ChunkCoord};
     use pyo3::prelude::*;
 
-    #[derive(FromPyObject)]
-    enum IntoBlockCoord {
-        BlockCoord(BlockCoordPy),
-        ChunkBlockCoord(ChunkBlockCoordPy),
-    }
-
     #[pyclass(name = "Chunk")]
     pub struct ChunkPy {
         world_db: SharedWorldDb,
@@ -447,16 +455,10 @@ mod chunk {
             }
         }
 
-        fn block_at(&self, coord: IntoBlockCoord) -> BlockPy {
-            let block_coord = match coord {
-                IntoBlockCoord::BlockCoord(block_coord_py) => block_coord_py.inner,
-                IntoBlockCoord::ChunkBlockCoord(chunk_block_coord_py) => {
-                    BlockCoord::from_decomposed(self.coord, chunk_block_coord_py.inner)
-                }
-            };
+        fn block_at(&self, coord: ChunkBlockCoordPy) -> BlockPy {
             BlockPy {
                 world_db: self.world_db.clone(),
-                block_coord: block_coord,
+                block_coord: BlockCoord::from_decomposed(self.coord, coord.inner),
             }
         }
     }
@@ -505,6 +507,18 @@ mod chunk {
                 world_db: self.world_db.clone(),
                 coord: chunk_coord,
             })
+        }
+
+        fn block_at(&self, coord: BlockCoordPy) -> Option<BlockPy> {
+            let (chunk_coord, _) = coord.inner.decompose();
+            let world_db = self.world_db.lock().unwrap();
+            world_db
+                .chunks
+                .contains_key(&chunk_coord)
+                .then_some(BlockPy {
+                    world_db: self.world_db.clone(),
+                    block_coord: coord.inner,
+                })
         }
     }
 }

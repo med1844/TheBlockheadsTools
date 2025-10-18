@@ -10,6 +10,8 @@ save_structure*
 !crates/gui/resources/*.png
 server
 test.py
+lock.mdb
+__pycache__
 
 # Added by cargo
 

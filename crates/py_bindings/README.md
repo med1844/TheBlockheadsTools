@@ -20,5 +20,6 @@ Add `-r` if you want it to be fast.
 ### Run python tests
 
 ```fish
+cd tests
 pytest
 ```

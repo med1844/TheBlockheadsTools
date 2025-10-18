@@ -23,7 +23,7 @@ fn check_coord_limit(val: u64, max_val: u64) -> BhResult<()> {
 ///  Y`----|----|----|---------|
 ///   X   0|   1|   2|  ...  31|
 /// ```
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub struct ChunkBlockCoord {
     x: u8,
     y: u8,
@@ -125,7 +125,7 @@ impl ChunkCoord {
 }
 
 /// Block coordinates in world. 0 <= x < world_v2.world_width_macro * 32, 0 <= y < 1024
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub struct BlockCoord {
     x: u32,
     y: u16,
@@ -142,8 +142,8 @@ impl BlockCoord {
     pub fn from_decomposed(chunk_coord: ChunkCoord, chunk_block_coord: ChunkBlockCoord) -> Self {
         // Both type has y checked at creation, we can trust them and unwrap.
         Self::new(
-            chunk_coord.x << 5 + chunk_block_coord.x,
-            (chunk_coord.y as u16) << 5 + chunk_block_coord.y as u16,
+            (chunk_coord.x << 5) + chunk_block_coord.x as u32,
+            ((chunk_coord.y as u16) << 5) + chunk_block_coord.y as u16,
         )
         .unwrap()
     }

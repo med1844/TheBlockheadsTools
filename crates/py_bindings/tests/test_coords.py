@@ -5,6 +5,7 @@ from the_blockheads_tools_py import ChunkCoord, ChunkBlockCoord, BlockCoord
 def test_chunk_coord():
     coord = ChunkCoord(432, 10)
     assert str(coord) == "432_10"
+    assert repr(coord) == "ChunkCoord(432, 10)"
     assert coord.x == 432
     assert coord.y == 10
 
