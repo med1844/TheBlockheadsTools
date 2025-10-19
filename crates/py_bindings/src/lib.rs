@@ -526,17 +526,295 @@ mod chunk {
 pub use chunk::{ChunkPy, ChunksPy};
 
 mod world_db {
-    use std::sync::{Arc, Mutex};
+    use std::{
+        borrow::Cow,
+        sync::{Arc, Mutex},
+    };
 
     use crate::{into_py_err, lib, ChunksPy, SharedWorldDb};
     use lib::game::db::world_db::WorldDb;
     use pyo3::prelude::*;
+
+    #[pyclass(name = "WorldV2")]
+    pub struct WorldV2Py {
+        inner: SharedWorldDb,
+    }
+
+    #[pymethods]
+    impl WorldV2Py {
+        #[getter]
+        fn get_blockhead_datas_v2(&self) -> String {
+            let world_db = self.inner.lock().unwrap();
+            format!("{:?}", world_db.main.world_v2.blockhead_datas_v2)
+        }
+
+        #[getter]
+        fn get_circum_navigate_booleans_data(&'_ self) -> Cow<'_, [u8]> {
+            let world_db = self.inner.lock().unwrap();
+            Cow::Owned(
+                world_db
+                    .main
+                    .world_v2
+                    .circum_navigate_booleans_data
+                    .as_ref()
+                    .to_vec(),
+            )
+        }
+
+        #[setter]
+        fn set_circum_navigate_booleans_data(&self, value: Vec<u8>) {
+            let mut world_db = self.inner.lock().unwrap();
+            world_db.main.world_v2.circum_navigate_booleans_data = value.into();
+        }
+
+        #[getter]
+        fn get_creation_date(&self) -> String {
+            let world_db = self.inner.lock().unwrap();
+            format!("{:?}", world_db.main.world_v2.creation_date)
+        }
+
+        #[getter]
+        fn get_distance_ordered_food_types(&self) -> Cow<'_, [u8]> {
+            let world_db = self.inner.lock().unwrap();
+            Cow::Owned(
+                world_db
+                    .main
+                    .world_v2
+                    .distance_ordered_food_types
+                    .as_ref()
+                    .to_vec(),
+            )
+        }
+
+        #[setter]
+        fn set_distance_ordered_food_types(&self, value: Vec<u8>) {
+            let mut world_db = self.inner.lock().unwrap();
+            world_db.main.world_v2.distance_ordered_food_types = value.into();
+        }
+
+        #[getter]
+        fn get_expert_mode(&self) -> bool {
+            self.inner.lock().unwrap().main.world_v2.expert_mode
+        }
+
+        #[setter]
+        fn set_expert_mode(&self, value: bool) {
+            self.inner.lock().unwrap().main.world_v2.expert_mode = value;
+        }
+
+        #[getter]
+        fn get_found_items(&'_ self) -> Cow<'_, [u8]> {
+            let world_db = self.inner.lock().unwrap();
+            Cow::Owned(world_db.main.world_v2.found_items.as_ref().to_vec())
+        }
+
+        #[setter]
+        fn set_found_items(&self, value: Vec<u8>) {
+            self.inner.lock().unwrap().main.world_v2.found_items = value.into();
+        }
+
+        #[getter]
+        fn get_host_port(&self) -> String {
+            self.inner.lock().unwrap().main.world_v2.host_port.clone()
+        }
+
+        #[setter]
+        fn set_host_port(&self, value: &str) {
+            self.inner.lock().unwrap().main.world_v2.host_port = value.to_string();
+        }
+
+        #[getter]
+        fn get_max_players(&self) -> String {
+            self.inner.lock().unwrap().main.world_v2.max_players.clone()
+        }
+
+        #[setter]
+        fn set_max_players(&self, value: &str) {
+            self.inner.lock().unwrap().main.world_v2.max_players = value.to_string();
+        }
+
+        #[getter]
+        fn get_migration_complete_v1_7(&self) -> bool {
+            self.inner
+                .lock()
+                .unwrap()
+                .main
+                .world_v2
+                .migration_complete_v1_7
+        }
+
+        #[setter]
+        fn set_migration_complete_v1_7(&self, value: bool) {
+            self.inner
+                .lock()
+                .unwrap()
+                .main
+                .world_v2
+                .migration_complete_v1_7 = value;
+        }
+
+        #[getter]
+        fn get_no_rain_timer(&self) -> f64 {
+            self.inner.lock().unwrap().main.world_v2.no_rain_timer
+        }
+
+        #[setter]
+        fn set_no_rain_timer(&self, value: f64) {
+            self.inner.lock().unwrap().main.world_v2.no_rain_timer = value;
+        }
+
+        #[getter]
+        fn get_portal_level(&self) -> u64 {
+            self.inner.lock().unwrap().main.world_v2.portal_level
+        }
+
+        #[setter]
+        fn set_portal_level(&self, value: u64) {
+            self.inner.lock().unwrap().main.world_v2.portal_level = value;
+        }
+
+        #[getter]
+        fn get_random_seed(&self) -> u64 {
+            self.inner.lock().unwrap().main.world_v2.random_seed
+        }
+
+        #[setter]
+        fn set_random_seed(&self, value: u64) {
+            self.inner.lock().unwrap().main.world_v2.random_seed = value;
+        }
+
+        #[getter]
+        fn get_remote_game(&self) -> bool {
+            self.inner.lock().unwrap().main.world_v2.remote_game
+        }
+
+        #[setter]
+        fn set_remote_game(&self, value: bool) {
+            self.inner.lock().unwrap().main.world_v2.remote_game = value;
+        }
+
+        #[getter]
+        fn get_run_at_launch(&self) -> bool {
+            self.inner.lock().unwrap().main.world_v2.run_at_launch
+        }
+
+        #[setter]
+        fn set_run_at_launch(&self, value: bool) {
+            self.inner.lock().unwrap().main.world_v2.run_at_launch = value;
+        }
+
+        #[getter]
+        fn get_save_date(&self) -> String {
+            let world_db = self.inner.lock().unwrap();
+            format!("{:?}", world_db.main.world_v2.save_date)
+        }
+
+        #[getter]
+        fn get_save_id(&self) -> String {
+            self.inner.lock().unwrap().main.world_v2.save_id.clone()
+        }
+
+        #[setter]
+        fn set_save_id(&self, value: &str) {
+            self.inner.lock().unwrap().main.world_v2.save_id = value.to_string();
+        }
+
+        #[getter]
+        fn get_save_version(&self) -> u64 {
+            self.inner.lock().unwrap().main.world_v2.save_version
+        }
+
+        #[setter]
+        fn set_save_version(&self, value: u64) {
+            self.inner.lock().unwrap().main.world_v2.save_version = value;
+        }
+
+        #[getter]
+        fn get_start_portal_pos_x(&self) -> u64 {
+            self.inner.lock().unwrap().main.world_v2.start_portal_pos_x
+        }
+
+        #[setter]
+        fn set_start_portal_pos_x(&self, value: u64) {
+            self.inner.lock().unwrap().main.world_v2.start_portal_pos_x = value;
+        }
+
+        #[getter]
+        fn get_start_portal_pos_y(&self) -> u64 {
+            self.inner.lock().unwrap().main.world_v2.start_portal_pos_y
+        }
+
+        #[setter]
+        fn set_start_portal_pos_y(&self, value: u64) {
+            self.inner.lock().unwrap().main.world_v2.start_portal_pos_y = value;
+        }
+
+        #[getter]
+        fn get_translation(&self) -> (f64, f64) {
+            self.inner.lock().unwrap().main.world_v2.translation
+        }
+
+        #[setter]
+        fn set_translation(&self, value: (f64, f64)) {
+            self.inner.lock().unwrap().main.world_v2.translation = value;
+        }
+
+        #[getter]
+        fn get_world_name(&self) -> String {
+            self.inner.lock().unwrap().main.world_v2.world_name.clone()
+        }
+
+        #[setter]
+        fn set_world_name(&self, value: &str) {
+            self.inner.lock().unwrap().main.world_v2.world_name = value.to_string();
+        }
+
+        #[getter]
+        fn get_world_time(&self) -> f64 {
+            self.inner.lock().unwrap().main.world_v2.world_time
+        }
+
+        #[setter]
+        fn set_world_time(&self, value: f64) {
+            self.inner.lock().unwrap().main.world_v2.world_time = value;
+        }
+
+        #[getter]
+        fn get_world_width_macro(&self) -> u32 {
+            self.inner.lock().unwrap().main.world_v2.world_width_macro
+        }
+
+        #[setter]
+        fn set_world_width_macro(&self, value: u32) {
+            self.inner.lock().unwrap().main.world_v2.world_width_macro = value;
+        }
+
+        fn __repr__(&self) -> String {
+            format!("{:?}", self.inner.lock().unwrap().main.world_v2)
+        }
+    }
+
+    #[pyclass(name = "WorldDbMain")]
+    pub struct WorldDbMainPy {
+        inner: SharedWorldDb,
+    }
+
+    #[pymethods]
+    impl WorldDbMainPy {
+        #[getter]
+        fn get_world_v2(&self) -> WorldV2Py {
+            WorldV2Py {
+                inner: self.inner.clone(),
+            }
+        }
+    }
 
     #[pyclass(name = "WorldDb")]
     pub struct WorldDbPy {
         // Python doesn't care about lifetimes. Thus we model the save file in the pythonic way.
         // This imposes severe runtime expense - each time some downstream accessor accesses some data in world_db,
         // we need to get the mutex lock, which is slow as hell.
+        // Every object other than trivial ones like coords will hold a shared reference.
         inner: SharedWorldDb,
     }
 
@@ -563,6 +841,13 @@ mod world_db {
         fn get_chunks(&self) -> ChunksPy {
             ChunksPy {
                 world_db: self.inner.clone(),
+            }
+        }
+
+        #[getter]
+        fn get_main(&self) -> WorldDbMainPy {
+            WorldDbMainPy {
+                inner: self.inner.clone(),
             }
         }
     }

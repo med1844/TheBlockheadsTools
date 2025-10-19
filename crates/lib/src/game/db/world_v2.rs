@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WorldV2 {
     #[serde(rename = "blockheadDatasv2")]
-    pub blockhead_datasv2: plist::Value,
+    pub blockhead_datas_v2: plist::Value,
     #[serde(rename = "circumNavigateBooleansData")]
     pub circum_navigate_booleans_data: plist::Data, // bplist dict
     #[serde(rename = "creationDate")]
