@@ -445,9 +445,9 @@ mod chunk {
     impl ChunkPy {
         fn as_bytes(&'_ self) -> PyResult<Cow<'_, [u8]>> {
             let mut world_db = self.world_db.lock().unwrap();
-            let chunk = world_db.chunks.chunk_at(self.coord);
+            let chunk = world_db.chunks.chunk_at_mut(self.coord);
             match chunk {
-                Some(chunk) => Ok(Cow::Owned(chunk?.inner().to_owned())),
+                Some(chunk) => Ok(Cow::Owned(chunk.as_uncompressed()?.inner().to_owned())),
                 None => Err(InvalidAccessorError::new_err(format!(
                     "The chunk at {} doesn't exist.",
                     self.coord.to_string()
@@ -794,6 +794,122 @@ mod world_db {
         }
     }
 
+    #[pyclass(name = "DynamicWorldV2")]
+    pub struct DynamicWorldV2Py {
+        inner: SharedWorldDb,
+    }
+
+    #[pymethods]
+    impl DynamicWorldV2Py {
+        #[getter]
+        fn get_active_blockhead_index(&self) -> u64 {
+            self.inner
+                .lock()
+                .unwrap()
+                .main
+                .dynamic_world_v2
+                .active_blockhead_index
+        }
+
+        #[setter]
+        fn set_active_blockhead_index(&self, value: u64) {
+            self.inner
+                .lock()
+                .unwrap()
+                .main
+                .dynamic_world_v2
+                .active_blockhead_index = value;
+        }
+
+        #[getter]
+        fn get_dynamic_object_id_count(&self) -> u64 {
+            self.inner
+                .lock()
+                .unwrap()
+                .main
+                .dynamic_world_v2
+                .dynamic_object_id_count
+        }
+
+        #[setter]
+        fn set_dynamic_object_id_count(&self, value: u64) {
+            self.inner
+                .lock()
+                .unwrap()
+                .main
+                .dynamic_world_v2
+                .dynamic_object_id_count = value;
+        }
+
+        #[getter]
+        fn get_save_version(&self) -> u8 {
+            self.inner
+                .lock()
+                .unwrap()
+                .main
+                .dynamic_world_v2
+                .save_version
+        }
+
+        #[setter]
+        fn set_save_version(&self, value: u8) {
+            self.inner
+                .lock()
+                .unwrap()
+                .main
+                .dynamic_world_v2
+                .save_version = value;
+        }
+
+        #[getter]
+        fn get_saved_glow_indices(&'_ self) -> Cow<'_, [u8]> {
+            Cow::Owned(
+                self.inner
+                    .lock()
+                    .unwrap()
+                    .main
+                    .dynamic_world_v2
+                    .saved_glow_indices
+                    .as_ref()
+                    .to_vec(),
+            )
+        }
+
+        #[setter]
+        fn set_saved_glow_indices(&self, value: Vec<u8>) {
+            self.inner
+                .lock()
+                .unwrap()
+                .main
+                .dynamic_world_v2
+                .saved_glow_indices = value.into();
+        }
+
+        #[getter]
+        fn get_workbench_has_been_crafted(&self) -> bool {
+            self.inner
+                .lock()
+                .unwrap()
+                .main
+                .dynamic_world_v2
+                .workbench_has_been_crafted
+        }
+
+        #[setter]
+        fn set_workbench_has_been_crafted(&self, value: bool) {
+            self.inner
+                .lock()
+                .unwrap()
+                .main
+                .dynamic_world_v2
+                .workbench_has_been_crafted = value;
+        }
+
+        fn __repr__(&self) -> String {
+            format!("{:?}", self.inner.lock().unwrap().main.dynamic_world_v2)
+        }
+    }
+
     #[pyclass(name = "WorldDbMain")]
     pub struct WorldDbMainPy {
         inner: SharedWorldDb,
@@ -807,8 +923,10 @@ mod world_db {
         }
 
         #[getter]
-        fn get_dynamic_world_v2(&'_ self) -> Cow<'_, [u8]> {
-            Cow::Owned(self.inner.lock().unwrap().main.dynamic_world_v2.to_vec())
+        fn get_dynamic_world_v2(&'_ self) -> DynamicWorldV2Py {
+            DynamicWorldV2Py {
+                inner: self.inner.clone(),
+            }
         }
 
         #[getter]

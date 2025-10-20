@@ -1,11 +1,11 @@
-use super::world_v2::WorldV2;
+use super::{dynamic_world_v2::DynamicWorldV2, world_v2::WorldV2};
 use crate::{BhError, BhResult};
 use heed::{Database, RoTxn, RwTxn, types::*};
 
 #[derive(Debug)]
 pub struct WorldDbMain {
-    pub blockheads: Vec<u8>,       // Vec<Blockheads>
-    pub dynamic_world_v2: Vec<u8>, // ???
+    pub blockheads: Vec<u8>, // Vec<Blockheads>
+    pub dynamic_world_v2: DynamicWorldV2,
     pub world_v2: WorldV2,
 }
 
@@ -22,13 +22,15 @@ impl WorldDbMain {
         };
         Ok(Self {
             blockheads: blockheads.to_vec(),
-            dynamic_world_v2: dynamic_world_v2.to_vec(),
-            world_v2: plist::from_bytes::<WorldV2>(world_v2)?, // TODO this should be handled by WorldV2
+            dynamic_world_v2: plist::from_reader_xml::<_, DynamicWorldV2>(dynamic_world_v2)?,
+            world_v2: plist::from_bytes::<WorldV2>(world_v2)?,
         })
     }
 
     pub fn to_db(&self, db: &Database<Str, Bytes>, wtxn: &mut RwTxn) -> BhResult<()> {
-        db.put(wtxn, "dynamicWorldv2", self.dynamic_world_v2.as_slice())?;
+        let mut dynamic_world_v2_bytes = Vec::new();
+        plist::to_writer_xml(&mut dynamic_world_v2_bytes, &self.dynamic_world_v2)?;
+        db.put(wtxn, "dynamicWorldv2", dynamic_world_v2_bytes.as_slice())?;
         db.put(wtxn, "blockheads", self.blockheads.as_slice())?;
         let mut world_v2_bytes = Vec::new();
         plist::to_writer_xml(&mut world_v2_bytes, &self.world_v2)?;
