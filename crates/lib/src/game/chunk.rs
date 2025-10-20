@@ -8,7 +8,11 @@ use crate::util::{
 };
 use flate2::read::GzDecoder;
 use heed::{Database, RoTxn, RwTxn, types::*};
-use std::{borrow::Borrow, collections::HashMap, io::Read};
+use std::{
+    borrow::Borrow,
+    collections::{HashMap, hash_map::Entry},
+    io::Read,
+};
 
 #[derive(Debug)]
 pub struct Chunk(
@@ -104,17 +108,19 @@ impl Chunks {
         self.0.contains_key(key.borrow())
     }
 
-    pub fn chunk_at<I: Into<ChunkCoord>>(&mut self, coord: I) -> Option<std::io::Result<&Chunk>> {
-        self.0.get_mut(&coord.into()).map(|v| v.as_uncompressed())
+    pub fn chunk_at<I: Into<ChunkCoord>>(&self, coord: I) -> Option<&Gzip<Chunk>> {
+        self.0.get(&coord.into())
     }
 
-    pub fn chunk_at_mut<I: Into<ChunkCoord>>(
+    pub fn chunk_at_mut<I: Into<ChunkCoord>>(&mut self, coord: I) -> Option<&mut Gzip<Chunk>> {
+        self.0.get_mut(&coord.into())
+    }
+
+    pub fn chunk_at_entry<I: Into<ChunkCoord>>(
         &mut self,
         coord: I,
-    ) -> Option<std::io::Result<&mut Chunk>> {
-        self.0
-            .get_mut(&coord.into())
-            .map(|v| v.as_uncompressed_mut())
+    ) -> Entry<'_, ChunkCoord, Gzip<Chunk>> {
+        self.0.entry(coord.into())
     }
 
     pub fn block_at<I: Into<BlockCoord>>(

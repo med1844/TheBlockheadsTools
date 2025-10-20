@@ -3,6 +3,7 @@ use super::{
     gpu::{Camera, CameraBuf, RgbaTexture, SelectedBlock, VoxelBuf, dw::DwBuf},
     input::{EventResponse, Input},
     renderer::{DEPTH_FORMAT, DwIconRenderer, EguiRenderer, VoxelRenderer},
+    worker::decompressor::GzipDecompressWorker,
 };
 use egui_wgpu::wgpu::SurfaceError;
 use egui_wgpu::{ScreenDescriptor, wgpu};
@@ -14,6 +15,7 @@ use the_blockheads_tools_lib::{
         coord::{BlockCoord, ChunkCoord},
         db::world_db::WorldDb,
     },
+    util::gzip::Gzip,
 };
 use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
@@ -51,6 +53,9 @@ pub struct AppState {
 
     // utils
     fps_counter: FpsCounter,
+
+    // async chunk source
+    decompressor: GzipDecompressWorker,
 }
 
 impl AppState {
@@ -159,6 +164,8 @@ impl AppState {
 
         let dw_buf = DwBuf::new();
 
+        let decompressor = GzipDecompressWorker::new();
+
         Self {
             device,
             queue,
@@ -182,16 +189,18 @@ impl AppState {
             selected_block,
 
             fps_counter: FpsCounter::new(2.0),
+
+            decompressor,
         }
     }
 
     fn open_world_db<P: AsRef<Path>>(&mut self, path: P) -> BhResult<()> {
-        let mut world_db = WorldDb::from_path(path)?;
-        let x = world_db.main.world_v2.start_portal_pos_x;
-        let y = world_db.main.world_v2.start_portal_pos_y - 1;
+        let world_db = WorldDb::from_path(path)?;
+        let spawn_x = world_db.main.world_v2.start_portal_pos_x;
+        let spawn_y = world_db.main.world_v2.start_portal_pos_y - 1;
 
         // By default we look at start portal
-        self.camera_buf.camera.world_offset = glam::Vec3::new(x as f32, y as f32, 5.0);
+        self.camera_buf.camera.world_offset = glam::Vec3::new(spawn_x as f32, spawn_y as f32, 5.0);
 
         let new_world_width_macro = world_db.main.world_v2.world_width_macro as usize;
 
@@ -204,15 +213,25 @@ impl AppState {
 
         self.dw_buf.clear();
 
-        // Fill up all chunks for now. This could be dispatched to another thread later.
+        let mut coords = (0..world_db.main.world_v2.world_width_macro)
+            .flat_map(move |x| {
+                (0..32).map(move |y| {
+                    let coord = ChunkCoord::new(x, y).unwrap();
+                    let center_x = ((coord.x() as u64) << 5) | 16;
+                    let center_y = ((coord.y() as u64) << 5) | 16;
+                    let dx = center_x.abs_diff(spawn_x);
+                    let dy = center_y.abs_diff(spawn_y);
+                    let dist_sq = (dx * dx) + (dy * dy);
+                    (dist_sq, coord)
+                })
+            })
+            .collect::<Vec<_>>();
+        coords.sort_unstable_by_key(|(dist, _)| *dist);
+        self.decompressor
+            .add_coords(coords.into_iter().map(|(_, coord)| coord));
         for chunk_y in 0..32 {
             for chunk_x in 0..world_db.main.world_v2.world_width_macro {
                 let chunk_coord = ChunkCoord::new(chunk_x, chunk_y).unwrap();
-                if !self.voxel_buf.has_chunk(chunk_coord) {
-                    if let Some(Ok(chunk)) = world_db.chunks.chunk_at(chunk_coord) {
-                        let _ = self.voxel_buf.set_chunk(&self.queue, chunk_coord, chunk);
-                    }
-                }
                 if !self.dw_buf.has_chunk(chunk_coord) {
                     if let Some(chunk) = world_db.dw.chunk_at(chunk_coord) {
                         self.dw_buf.set_chunk(&self.device, chunk_coord, chunk);
@@ -224,6 +243,29 @@ impl AppState {
         self.world_db = Some(world_db);
 
         Ok(())
+    }
+
+    pub(crate) fn update_decompressed_chunks(&mut self) {
+        if let Some(world_db) = self.world_db.as_mut() {
+            while let Some((coord, chunk)) = self.decompressor.try_recv_chunk() {
+                let _ = self.voxel_buf.set_chunk(&self.queue, coord, &chunk);
+                world_db
+                    .chunks
+                    .chunk_at_entry(coord)
+                    .insert_entry(Gzip::Uncompressed(chunk));
+            }
+        }
+    }
+
+    pub(crate) fn decompress_more_chunks(&mut self) {
+        if let Some(world_db) = self.world_db.as_ref() {
+            let chunks = &world_db.chunks;
+            while let Some(coord) = self.decompressor.need_byte_of_chunk() {
+                if let Some(Gzip::Compressed(bytes)) = chunks.chunk_at(coord) {
+                    self.decompressor.start_decompress(coord, bytes.clone());
+                }
+            }
+        }
     }
 
     fn create_depth_view(device: &wgpu::Device, width: u32, height: u32) -> wgpu::TextureView {
@@ -330,6 +372,10 @@ impl App {
         }
 
         let state = self.state.as_mut().unwrap();
+
+        state.update_decompressed_chunks();
+        state.decompress_more_chunks();
+
         state.camera_buf.update_uniforms(
             &state.queue,
             state.surface_config.width,
@@ -494,7 +540,12 @@ impl App {
                                     )
                                     .changed();
                                 if any_changed {
-                                    let chunk = world_db.chunks.chunk_at(coord).unwrap().unwrap();
+                                    let chunk = world_db
+                                        .chunks
+                                        .chunk_at_mut(coord)
+                                        .unwrap()
+                                        .as_uncompressed()
+                                        .unwrap();
                                     state
                                         .voxel_buf
                                         .set_chunk(&state.queue, coord, chunk)
