@@ -233,6 +233,10 @@ class WorldV2:
 
 class WorldDbMain:
     @property
+    def blockheads(self) -> bytes: ...
+    @property
+    def dynamic_world_v2(self) -> bytes: ...
+    @property
     def world_v2(self) -> WorldV2: ...
 
 

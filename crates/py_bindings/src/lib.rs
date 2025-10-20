@@ -802,6 +802,16 @@ mod world_db {
     #[pymethods]
     impl WorldDbMainPy {
         #[getter]
+        fn get_blockheads(&'_ self) -> Cow<'_, [u8]> {
+            Cow::Owned(self.inner.lock().unwrap().main.blockheads.to_vec())
+        }
+
+        #[getter]
+        fn get_dynamic_world_v2(&'_ self) -> Cow<'_, [u8]> {
+            Cow::Owned(self.inner.lock().unwrap().main.dynamic_world_v2.to_vec())
+        }
+
+        #[getter]
         fn get_world_v2(&self) -> WorldV2Py {
             WorldV2Py {
                 inner: self.inner.clone(),
