@@ -11,8 +11,8 @@ impl RgbaTexture {
         let (w, h) = size;
 
         let texture_size = wgpu::Extent3d {
-            width: w as u32,
-            height: h as u32,
+            width: w,
+            height: h,
             depth_or_array_layers: 1, // It's a 2D texture
         };
 
@@ -37,8 +37,8 @@ impl RgbaTexture {
             img,
             wgpu::TexelCopyBufferLayout {
                 offset: 0,
-                bytes_per_row: Some(w as u32 * 4), // 4 bytes per pixel (RGBA)
-                rows_per_image: Some(h as u32),
+                bytes_per_row: Some(w * 4), // 4 bytes per pixel (RGBA)
+                rows_per_image: Some(h),
             },
             texture_size,
         );

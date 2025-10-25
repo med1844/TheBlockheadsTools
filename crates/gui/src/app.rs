@@ -232,10 +232,10 @@ impl AppState {
         for chunk_y in 0..32 {
             for chunk_x in 0..world_db.main.world_v2.world_width_macro {
                 let chunk_coord = ChunkCoord::new(chunk_x, chunk_y).unwrap();
-                if !self.dw_buf.has_chunk(chunk_coord) {
-                    if let Some(chunk) = world_db.dw.chunk_at(chunk_coord) {
-                        self.dw_buf.set_chunk(&self.device, chunk_coord, chunk);
-                    }
+                if !self.dw_buf.has_chunk(chunk_coord)
+                    && let Some(chunk) = world_db.dw.chunk_at(chunk_coord)
+                {
+                    self.dw_buf.set_chunk(&self.device, chunk_coord, chunk);
                 }
             }
         }
@@ -306,12 +306,9 @@ impl AppState {
     fn selected_block_info(&mut self) -> Option<(BlockCoord, String)> {
         let world_db = self.world_db.as_mut()?;
         let selected_block_coord = self.selected_block.coord().as_ref()?;
-        let block = world_db
-            .chunks
-            .block_at(selected_block_coord.clone())?
-            .ok()?;
+        let block = world_db.chunks.block_at(*selected_block_coord)?.ok()?;
         Some((
-            selected_block_coord.clone(),
+            *selected_block_coord,
             block.to_hex_string_single_allocation(),
         ))
     }
@@ -495,10 +492,10 @@ impl App {
             if let Some(path) = opened_path {
                 state.open_world_db(path).unwrap();
             }
-            if let Some(path) = save_path {
-                if let Some(world_db) = &mut state.world_db {
-                    world_db.to_path(path).unwrap();
-                }
+            if let Some(path) = save_path
+                && let Some(world_db) = &mut state.world_db
+            {
+                world_db.to_path(path).unwrap();
             }
 
             egui::Window::new("Info")

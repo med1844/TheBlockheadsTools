@@ -3,20 +3,20 @@ use winit::{
     window::Window,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct EventResponse {
     pub repaint: bool,
     pub click: bool, // an click release event, no drag when pressed
 }
 
-impl Default for EventResponse {
-    fn default() -> Self {
-        Self {
-            repaint: false,
-            click: false,
-        }
-    }
-}
+// impl Default for EventResponse {
+//     fn default() -> Self {
+//         Self {
+//             repaint: false,
+//             click: false,
+//         }
+//     }
+// }
 
 pub struct Input {
     pub is_mouse_left_down: bool,

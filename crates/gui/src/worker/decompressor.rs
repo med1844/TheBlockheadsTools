@@ -48,9 +48,8 @@ impl GzipDecompressWorker {
     }
 
     pub fn try_recv_chunk(&mut self) -> Option<(ChunkCoord, Chunk)> {
-        self.result_recv.try_recv().ok().map(|val| {
+        self.result_recv.try_recv().ok().inspect(|_| {
             self.num_task_running -= 1;
-            val
         })
     }
 }

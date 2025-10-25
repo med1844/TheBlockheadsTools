@@ -446,10 +446,6 @@ impl VoxelBuf {
         );
     }
 
-    pub fn has_chunk<I: Into<ChunkCoord>>(&self, key: I) -> bool {
-        self.chunk_keys.contains(&key.into())
-    }
-
     pub fn set_chunk<I: Into<ChunkCoord>>(
         &mut self,
         queue: &wgpu::Queue,
@@ -459,7 +455,7 @@ impl VoxelBuf {
         let mut blocks = [VoxelType(0); Self::NUM_BLOCK_PER_CHUNK];
         for y in 0..Chunk::NUM_BLOCK_PER_COL {
             for x in 0..Chunk::NUM_BLOCK_PER_ROW {
-                let block = chunk.block_at(&ChunkBlockCoord::new(x as u8, y as u8)?);
+                let block = chunk.block_at(ChunkBlockCoord::new(x as u8, y as u8)?);
                 let fg_type = VoxelType::fg_from_block(block);
                 let mg_type = if fg_type == VoxelType::AIR {
                     VoxelType::mg_from_block(block)
@@ -471,7 +467,7 @@ impl VoxelBuf {
                     bg_type = fg_type;
                 }
                 let index = (y * Chunk::NUM_BLOCK_PER_ROW + x) * 3;
-                blocks[index + 0] = bg_type;
+                blocks[index] = bg_type;
                 blocks[index + 1] = mg_type;
                 blocks[index + 2] = fg_type;
             }

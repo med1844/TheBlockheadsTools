@@ -63,7 +63,6 @@ pub trait ToIconInstance {
 
 pub struct DwChunkIconBuf {
     pub instance_buf: wgpu::Buffer,
-    pub capacity: u32,
     pub num_instances: u32,
 }
 
@@ -103,7 +102,6 @@ impl DwChunkBuf {
         Some(Self {
             icon_buf: DwChunkIconBuf {
                 instance_buf: icon_buf,
-                capacity: num_instances,
                 num_instances,
             },
         })
@@ -127,7 +125,7 @@ impl DwBuf {
     }
 
     pub fn get_chunk<I: Into<ChunkCoord>>(&self, coord: I) -> Option<&DwChunkBuf> {
-        self.chunks.get(&coord.into()).map(|v| v.as_ref()).flatten()
+        self.chunks.get(&coord.into()).and_then(|v| v.as_ref())
     }
 
     pub fn has_chunk<I: Into<ChunkCoord>>(&self, coord: I) -> bool {

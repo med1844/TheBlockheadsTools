@@ -22,10 +22,10 @@ impl<T> DerefMut for DynamicObjectList<T> {
     }
 }
 
-impl<T> DynamicObjectList<T> {
-    pub fn new() -> Self {
+impl<T> Default for DynamicObjectList<T> {
+    fn default() -> Self {
         Self {
-            dynamic_objects: Vec::new(),
+            dynamic_objects: vec![],
         }
     }
 }

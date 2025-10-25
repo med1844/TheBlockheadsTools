@@ -34,7 +34,7 @@ impl SelectedBlock {
             match &self.coord {
                 Some(coord) => {
                     self.uniform[0] = 1;
-                    self.uniform[1] = coord.x() as u32;
+                    self.uniform[1] = coord.x();
                     self.uniform[2] = coord.y() as u32;
                 }
                 None => {

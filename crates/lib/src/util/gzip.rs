@@ -48,8 +48,7 @@ impl<T: FromGzip> Gzip<T> {
         if let Self::Uncompressed(val) = self {
             Ok(val)
         } else {
-            Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
+            Err(std::io::Error::other(
                 "Internal error: Gzip state unexpected after decompression",
             ))
         }
@@ -60,8 +59,7 @@ impl<T: FromGzip> Gzip<T> {
         if let Self::Uncompressed(val) = self {
             Ok(val)
         } else {
-            Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
+            Err(std::io::Error::other(
                 "Internal error: Gzip state unexpected after decompression",
             ))
         }

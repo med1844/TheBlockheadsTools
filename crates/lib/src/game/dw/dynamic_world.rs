@@ -169,7 +169,7 @@ impl<T: Serialize> ToXmlPlist for DynamicObjectList<T> {
 }
 
 /// Contains all different types of dynamic objects that one chunk might have.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct ChunkDynamicObjects {
     pub apple_tree: Vec<u8>,
     pub maple_tree: Vec<u8>,
@@ -225,65 +225,6 @@ pub struct ChunkDynamicObjects {
     pub yak: Vec<u8>,
 }
 
-impl Default for ChunkDynamicObjects {
-    fn default() -> Self {
-        Self {
-            apple_tree: Vec::new(),
-            maple_tree: Vec::new(),
-            mango_tree: Vec::new(),
-            pine_tree: Vec::new(),
-            cactus_tree: Vec::new(),
-            coconut_tree: Vec::new(),
-            orange_tree: Vec::new(),
-            cherry_tree: Vec::new(),
-            coffee_tree: Vec::new(),
-            flax_plant: Vec::new(),
-            sunflower_plant: Vec::new(),
-            corn_plant: DynamicObjectList::new(),
-            dodo: Vec::new(),
-            item: Vec::new(),
-            fire: Vec::new(),
-            torch: Vec::new(),
-            glow_block: Vec::new(),
-            ladder: Vec::new(),
-            door: Vec::new(),
-            artificiallight: Vec::new(),
-            bed: Vec::new(),
-            dropbear: Vec::new(),
-            gather_block: Vec::new(),
-            carrot_plant: DynamicObjectList::new(),
-            donkey: Vec::new(),
-            egg: Vec::new(),
-            window: Vec::new(),
-            boat: Vec::new(),
-            chilli_plant: Vec::new(),
-            kelp_plant: Vec::new(),
-            clown_fish: Vec::new(),
-            shark: Vec::new(),
-            lime_tree: Vec::new(),
-            wire: Vec::new(),
-            cave_troll: Vec::new(),
-            rail: Vec::new(),
-            workbench: Vec::new(),
-            chest: Vec::new(),
-            sign: Vec::new(),
-            trading_post: Vec::new(),
-            trade_portal: Vec::new(),
-            scorpion: Vec::new(),
-            column: Vec::new(),
-            stairs: Vec::new(),
-            elevator_motor: Vec::new(),
-            elevator_shaft: Vec::new(),
-            gem_tree: Vec::new(),
-            vine_plant: Vec::new(),
-            tulip_plant: Vec::new(),
-            wheat_plant: Vec::new(),
-            tomato_plants: DynamicObjectList::new(),
-            yak: Vec::new(),
-        }
-    }
-}
-
 impl ChunkDynamicObjects {
     pub fn num_objects(&self) -> usize {
         self.tomato_plants.len()
@@ -314,7 +255,7 @@ impl DynamicWorld {
             };
             let entry = map
                 .entry(coord)
-                .or_insert_with(|| ChunkDynamicObjects::default());
+                .or_insert_with(ChunkDynamicObjects::default);
             match dyn_obj_type {
                 DynamicObjectType::AppleTree => entry.apple_tree = v.to_vec(),
                 DynamicObjectType::MapleTree => entry.maple_tree = v.to_vec(),
@@ -382,15 +323,14 @@ impl DynamicWorld {
             obj_type: DynamicObjectType,
             value: &T,
         ) -> BhResult<()> {
-            Ok(if !value.is_empty() {
+            if !value.is_empty() {
                 db.put(
                     wtxn,
                     &format!("{}/{}", coord_str, obj_type as u16),
                     &value.to_plist(),
-                )?
-            } else {
-                ()
-            })
+                )?;
+            }
+            Ok(())
         }
 
         for (coord, obj) in self.0.iter() {

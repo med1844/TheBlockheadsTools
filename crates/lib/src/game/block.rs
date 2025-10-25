@@ -266,10 +266,9 @@ impl BlockType {
     }
 }
 
-impl Into<u8> for BlockType {
-    fn into(self) -> u8 {
-        // We can safely cast to u8 because the values are within the u8 range.
-        self as u8
+impl From<BlockType> for u8 {
+    fn from(value: BlockType) -> Self {
+        value as u8
     }
 }
 

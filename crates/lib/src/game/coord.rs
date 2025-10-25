@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::{BhError, BhResult};
 
 // helper function to check if given coord is smaller than max value.
@@ -43,9 +45,11 @@ impl ChunkBlockCoord {
     pub fn y(&self) -> u8 {
         self.y
     }
+}
 
-    pub fn to_string(&self) -> String {
-        format!("ChunkBlockCoord({}, {})", self.x, self.y)
+impl Display for ChunkBlockCoord {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ChunkBlockCoord({}, {})", self.x, self.y)
     }
 }
 
@@ -104,10 +108,6 @@ impl ChunkCoord {
         Self::new(x, y)
     }
 
-    pub fn to_string(&self) -> String {
-        format!("{}_{}", self.x, self.y)
-    }
-
     /// Creates a new `ChunkCoord` after validating its coordinates.
     /// Returns `Err(BhError::CoordError)` if `y` is out of its valid range (0..32).
     pub fn new(x: u32, y: u8) -> BhResult<Self> {
@@ -124,6 +124,12 @@ impl ChunkCoord {
     }
 }
 
+impl Display for ChunkCoord {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}_{}", self.x, self.y)
+    }
+}
+
 /// Block coordinates in world. 0 <= x < world_v2.world_width_macro * 32, 0 <= y < 1024
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub struct BlockCoord {
@@ -136,7 +142,7 @@ impl BlockCoord {
     /// Returns `Err(BhError::CoordError)` if `y` is out of its valid range (0..1024).
     pub fn new(x: u32, y: u16) -> BhResult<Self> {
         check_coord_limit(y as u64, 1024)?;
-        Ok(Self { x, y: y as u16 })
+        Ok(Self { x, y })
     }
 
     pub fn from_decomposed(chunk_coord: ChunkCoord, chunk_block_coord: ChunkBlockCoord) -> Self {
@@ -155,21 +161,23 @@ impl BlockCoord {
     pub fn y(&self) -> u16 {
         self.y
     }
+}
 
-    pub fn to_string(&self) -> String {
-        format!("BlockCoord({}, {})", self.x, self.y)
+impl Display for BlockCoord {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "BlockCoord({}, {})", self.x, self.y)
     }
 }
 
-impl Into<ChunkCoord> for BlockCoord {
-    fn into(self) -> ChunkCoord {
-        ChunkCoord::new(self.x >> 5, (self.y >> 5) as u8).expect("y < 1024, thus y >> 5 < 32")
+impl From<BlockCoord> for ChunkCoord {
+    fn from(value: BlockCoord) -> Self {
+        ChunkCoord::new(value.x >> 5, (value.y >> 5) as u8).expect("y < 1024, thus y >> 5 < 32")
     }
 }
 
-impl Into<ChunkBlockCoord> for BlockCoord {
-    fn into(self) -> ChunkBlockCoord {
-        ChunkBlockCoord::new((self.x & 31) as u8, (self.y & 31) as u8)
+impl From<BlockCoord> for ChunkBlockCoord {
+    fn from(value: BlockCoord) -> Self {
+        ChunkBlockCoord::new((value.x & 31) as u8, (value.y & 31) as u8)
             .expect("x & 31 < 32 for all x: u64")
     }
 }

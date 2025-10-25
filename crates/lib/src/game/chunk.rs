@@ -143,7 +143,7 @@ impl Chunks {
         let (chunk_coord, chunk_block_coord) = block_coord.decompose();
         self.0.get_mut(&chunk_coord).map(|v| {
             v.as_uncompressed_mut()
-                .map(|chunk| chunk.block_at_mut(&chunk_block_coord))
+                .map(|chunk| chunk.block_at_mut(chunk_block_coord))
         })
     }
 }
