@@ -1,3 +1,5 @@
+use crate::renderer::GridRenderer;
+
 use super::{
     fps_counter::FpsCounter,
     gpu::{Camera, CameraBuf, RgbaTexture, SelectedBlock, VoxelBuf, dw::DwBuf},
@@ -56,6 +58,10 @@ pub struct AppState {
 
     // async chunk source
     decompressor: GzipDecompressWorker,
+
+    // grid. Is None when world_db is None
+    pub grid_renderer: Option<GridRenderer>,
+    pub grid_enabled: bool, // option should be persistent against grid_renderer change
 }
 
 impl AppState {
@@ -166,6 +172,8 @@ impl AppState {
 
         let decompressor = GzipDecompressWorker::new();
 
+        // let grid_renderer = GridRenderer::new(&device, &surface_config, &camera_buf.buf, 512);
+
         Self {
             device,
             queue,
@@ -191,6 +199,9 @@ impl AppState {
             fps_counter: FpsCounter::new(2.0),
 
             decompressor,
+
+            grid_renderer: None,
+            grid_enabled: true,
         }
     }
 
@@ -210,6 +221,13 @@ impl AppState {
         } else {
             self.voxel_buf = VoxelBuf::new(&self.device, new_world_width_macro);
         }
+
+        self.grid_renderer = Some(GridRenderer::new(
+            &self.device,
+            &self.surface_config,
+            &self.camera_buf.buf,
+            new_world_width_macro,
+        ));
 
         self.dw_buf.clear();
 
@@ -456,6 +474,12 @@ impl App {
                     }
                 }
             }
+
+            if state.grid_enabled
+                && let Some(grid_renderer) = state.grid_renderer.as_ref()
+            {
+                grid_renderer.render(&mut rpass);
+            }
         }
 
         state.fps_counter.update();
@@ -479,6 +503,7 @@ impl App {
                 |ui| {
                     egui::menu::bar(ui, |ui| {
                         ui.toggle_value(&mut self.show_info, "Info");
+                        ui.toggle_value(&mut state.grid_enabled, "Grid");
                         ui.separator();
                         ui.menu_button("File", |ui| {
                             if ui.button("Open").clicked() {
