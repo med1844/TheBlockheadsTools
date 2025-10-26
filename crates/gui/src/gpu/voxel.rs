@@ -32,7 +32,7 @@ impl VoxelType {
     pub(crate) const UV_AT_FACE: &[[ImageType; 6]] = {
         use ImageType::*;
         &[
-            [Lava0; 6],                                                // Unknown
+            [WorkbenchTool5Top; 6],                                    // Unknown
             [Stone; 6],                                                // Stone
             [Air; 6],                                                  // Air
             [Water0; 6],                                               // Water

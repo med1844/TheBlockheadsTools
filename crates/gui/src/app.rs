@@ -201,7 +201,7 @@ impl AppState {
             decompressor,
 
             grid_renderer: None,
-            grid_enabled: true,
+            grid_enabled: false,
         }
     }
 
@@ -601,6 +601,7 @@ impl App {
                     ui.add(
                         egui::DragValue::new(&mut state.camera_buf.camera.world_offset.z)
                             .speed(0.1)
+                            .range(CameraBuf::MAX_BLOCK_Z..=CameraBuf::MAX_Z)
                             .prefix("Distance: "),
                     );
                 });

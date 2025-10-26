@@ -90,7 +90,8 @@ pub struct CameraBuf {
 }
 
 impl CameraBuf {
-    const MAX_Z: f32 = 3.0;
+    pub const MAX_BLOCK_Z: f32 = 3.0;
+    pub const MAX_Z: f32 = 1e8;
 
     pub fn update_uniforms(&mut self, queue: &wgpu::Queue, width: u32, height: u32) {
         self.uniform = self.camera.uniform((width as f32, height as f32));
@@ -141,7 +142,7 @@ impl CameraBuf {
         self.screen_to_xy_at_z(
             input.current_mouse_pos,
             window_size,
-            Self::MAX_Z - self.camera.world_offset.z,
+            Self::MAX_BLOCK_Z - self.camera.world_offset.z,
         ) + self.camera.world_offset.xy()
     }
 
@@ -172,12 +173,12 @@ impl CameraBuf {
             let prev_world_pos_at_z3 = self.screen_to_xy_at_z(
                 input.prev_mouse_pos,
                 window_size,
-                Self::MAX_Z - self.camera.world_offset.z,
+                Self::MAX_BLOCK_Z - self.camera.world_offset.z,
             );
             let curr_world_pos_at_z3 = self.screen_to_xy_at_z(
                 input.current_mouse_pos,
                 window_size,
-                Self::MAX_Z - self.camera.world_offset.z,
+                Self::MAX_BLOCK_Z - self.camera.world_offset.z,
             );
             let diff = curr_world_pos_at_z3 - prev_world_pos_at_z3;
             self.camera.world_offset -= diff.extend(0.0);
@@ -185,6 +186,11 @@ impl CameraBuf {
         }
         if input.mouse_wheel_delta != 0.0 {
             self.camera.world_offset.z *= 1.0 - input.mouse_wheel_delta * 1e-1;
+            self.camera.world_offset.z = self
+                .camera
+                .world_offset
+                .z
+                .clamp(Self::MAX_BLOCK_Z, Self::MAX_Z);
             any_update = true;
         }
         EventResponse {
