@@ -318,6 +318,7 @@ pub struct App {
     instance: wgpu::Instance,
     state: Option<AppState>,
     window: Option<Arc<Window>>,
+    show_info: bool,
 }
 
 impl App {
@@ -327,6 +328,7 @@ impl App {
             instance,
             state: None,
             window: None,
+            show_info: false,
         }
     }
 
@@ -477,6 +479,8 @@ impl App {
                 state.egui_renderer.context(),
                 |ui| {
                     egui::menu::bar(ui, |ui| {
+                        ui.toggle_value(&mut self.show_info, "Info");
+                        ui.separator();
                         ui.menu_button("File", |ui| {
                             if ui.button("Open").clicked() {
                                 opened_path = rfd::FileDialog::new().pick_folder();
@@ -498,10 +502,9 @@ impl App {
                 world_db.to_path(path).unwrap();
             }
 
-            egui::Window::new("Info")
-                .resizable(true)
-                .vscroll(true)
-                .show(state.egui_renderer.context(), |ui| {
+            egui::SidePanel::left("Info")
+                .resizable(false)
+                .show_animated(state.egui_renderer.context(), self.show_info, |ui| {
                     ui.label(format!("fps: {:.1}", state.fps_counter.fps()));
                     ui.separator();
 
@@ -608,7 +611,7 @@ impl ApplicationHandler for App {
         if self.window.is_none() {
             let window_attributes = Window::default_attributes()
                 .with_title("Egui + WGPU")
-                .with_inner_size(PhysicalSize::new(1360, 768));
+                .with_inner_size(PhysicalSize::new(1920, 1080));
             let window = event_loop.create_window(window_attributes).unwrap();
             pollster::block_on(self.set_window(window));
         }
