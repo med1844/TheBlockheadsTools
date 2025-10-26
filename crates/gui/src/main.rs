@@ -5,7 +5,6 @@ mod gpu;
 mod image_type;
 mod input;
 mod renderer;
-mod worker;
 
 use winit::event_loop::{ControlFlow, EventLoop};
 

@@ -5,7 +5,6 @@ use super::{
     gpu::{Camera, CameraBuf, RgbaTexture, SelectedBlock, VoxelBuf, dw::DwBuf},
     input::{EventResponse, Input},
     renderer::{DEPTH_FORMAT, DwIconRenderer, EguiRenderer, VoxelRenderer},
-    worker::decompressor::GzipDecompressWorker,
 };
 use egui_wgpu::wgpu::SurfaceError;
 use egui_wgpu::{ScreenDescriptor, wgpu};
@@ -17,7 +16,6 @@ use the_blockheads_tools_lib::{
         coord::{BlockCoord, ChunkCoord},
         db::world_db::WorldDb,
     },
-    util::gzip::Gzip,
 };
 use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
@@ -56,9 +54,6 @@ pub struct AppState {
     // utils
     fps_counter: FpsCounter,
 
-    // async chunk source
-    decompressor: GzipDecompressWorker,
-
     // grid. Is None when world_db is None
     pub grid_renderer: Option<GridRenderer>,
     pub grid_enabled: bool, // option should be persistent against grid_renderer change
@@ -72,7 +67,7 @@ impl AppState {
         width: u32,
         height: u32,
     ) -> Self {
-        let power_pref = wgpu::PowerPreference::default();
+        let power_pref = wgpu::PowerPreference::from_env().unwrap_or_default();
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: power_pref,
@@ -170,10 +165,6 @@ impl AppState {
 
         let dw_buf = DwBuf::new();
 
-        let decompressor = GzipDecompressWorker::new();
-
-        // let grid_renderer = GridRenderer::new(&device, &surface_config, &camera_buf.buf, 512);
-
         Self {
             device,
             queue,
@@ -198,15 +189,13 @@ impl AppState {
 
             fps_counter: FpsCounter::new(2.0),
 
-            decompressor,
-
             grid_renderer: None,
             grid_enabled: false,
         }
     }
 
     fn open_world_db<P: AsRef<Path>>(&mut self, path: P) -> BhResult<()> {
-        let world_db = WorldDb::from_path(path)?;
+        let mut world_db = WorldDb::from_path(path)?;
         let spawn_x = world_db.main.world_v2.start_portal_pos_x;
         let spawn_y = world_db.main.world_v2.start_portal_pos_y - 1;
 
@@ -231,22 +220,8 @@ impl AppState {
 
         self.dw_buf.clear();
 
-        let mut coords = (0..world_db.main.world_v2.world_width_macro)
-            .flat_map(move |x| {
-                (0..32).map(move |y| {
-                    let coord = ChunkCoord::new(x, y).unwrap();
-                    let center_x = ((coord.x() as u64) << 5) | 16;
-                    let center_y = ((coord.y() as u64) << 5) | 16;
-                    let dx = center_x.abs_diff(spawn_x);
-                    let dy = center_y.abs_diff(spawn_y);
-                    let dist_sq = (dx * dx) + (dy * dy);
-                    (dist_sq, coord)
-                })
-            })
-            .collect::<Vec<_>>();
-        coords.sort_unstable_by_key(|(dist, _)| *dist);
-        self.decompressor
-            .add_coords(coords.into_iter().map(|(_, coord)| coord));
+        self.voxel_buf
+            .from_chunks(&self.queue, &mut world_db.chunks);
         for chunk_y in 0..32 {
             for chunk_x in 0..world_db.main.world_v2.world_width_macro {
                 let chunk_coord = ChunkCoord::new(chunk_x, chunk_y).unwrap();
@@ -261,28 +236,6 @@ impl AppState {
         self.world_db = Some(world_db);
 
         Ok(())
-    }
-
-    pub(crate) fn update_decompressed_chunks(&mut self) {
-        if let Some(world_db) = self.world_db.as_mut() {
-            while let Some((coord, chunk)) = self.decompressor.try_recv_chunk() {
-                let _ = self.voxel_buf.set_chunk(&self.queue, coord, &chunk);
-                world_db
-                    .chunks
-                    .set_chunk_at(coord, Gzip::Uncompressed(chunk));
-            }
-        }
-    }
-
-    pub(crate) fn decompress_more_chunks(&mut self) {
-        if let Some(world_db) = self.world_db.as_ref() {
-            let chunks = &world_db.chunks;
-            while let Some(coord) = self.decompressor.need_byte_of_chunk() {
-                if let Some(Gzip::Compressed(bytes)) = chunks.chunk_at(coord) {
-                    self.decompressor.start_decompress(coord, bytes.clone());
-                }
-            }
-        }
     }
 
     fn create_depth_view(device: &wgpu::Device, width: u32, height: u32) -> wgpu::TextureView {
@@ -388,9 +341,6 @@ impl App {
         }
 
         let state = self.state.as_mut().unwrap();
-
-        state.update_decompressed_chunks();
-        state.decompress_more_chunks();
 
         state.camera_buf.update_uniforms(
             &state.queue,

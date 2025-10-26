@@ -99,6 +99,10 @@ impl Chunks {
         coord.x() as usize * Self::NUM_CHUNK_PER_COL + coord.y() as usize
     }
 
+    pub fn inner_mut(&mut self) -> &mut Vec<Option<Gzip<Chunk>>> {
+        &mut self.0
+    }
+
     pub fn from_db(
         db: &Database<Str, Bytes>,
         rtxn: &RoTxn,

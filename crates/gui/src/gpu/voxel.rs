@@ -2,11 +2,15 @@ use std::collections::HashSet;
 
 use super::super::image_type::ImageType;
 use egui_wgpu::wgpu::{self, util::DeviceExt};
+use rayon::{
+    iter::{IndexedParallelIterator, IntoParallelRefMutIterator, ParallelIterator},
+    slice::ParallelSliceMut,
+};
 use the_blockheads_tools_lib::{
     BhResult,
     game::{
         block::{Block, BlockContent, BlockType, BlockView},
-        chunk::Chunk,
+        chunk::{Chunk, Chunks},
         coord::{ChunkBlockCoord, ChunkCoord},
     },
 };
@@ -413,24 +417,26 @@ pub struct VoxelBuf {
 }
 
 impl VoxelBuf {
-    const NUM_BLOCK_PER_CHUNK: usize = Chunk::NUM_BLOCK_PER_ROW * Chunk::NUM_BLOCK_PER_COL * 3;
+    const NUM_BLOCK_PER_CHUNK: usize = Chunk::NUM_BLOCK_PER_ROW * Chunk::NUM_BLOCK_PER_COL * 3; // 3 layers
 
     // Costly function - only call this once or VRAM nuked
     pub fn new(device: &wgpu::Device, world_width_macro: usize) -> Self {
         Self {
             buf: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some("Global Voxel Data Buffer"),
-                contents: bytemuck::cast_slice(&vec![
-                    VoxelType::AIR;
-                    Self::NUM_BLOCK_PER_CHUNK
-                        * 32
-                        * world_width_macro
-                ]),
+                contents: bytemuck::cast_slice(&Self::new_world_voxel(world_width_macro)),
                 usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             }),
             chunk_keys: HashSet::new(),
             world_width_macro,
         }
+    }
+
+    fn new_world_voxel(world_width_macro: usize) -> Vec<VoxelType> {
+        vec![
+            VoxelType::AIR;
+            Self::NUM_BLOCK_PER_CHUNK * Chunks::NUM_CHUNK_PER_COL * world_width_macro
+        ]
     }
 
     /// Clean up all voxels and registered chunks.
@@ -439,20 +445,11 @@ impl VoxelBuf {
         queue.write_buffer(
             &self.buf,
             0,
-            bytemuck::cast_slice(&vec![
-                VoxelType::AIR;
-                Self::NUM_BLOCK_PER_CHUNK * 32 * self.world_width_macro
-            ]),
+            bytemuck::cast_slice(&Self::new_world_voxel(self.world_width_macro)),
         );
     }
 
-    pub fn set_chunk<I: Into<ChunkCoord>>(
-        &mut self,
-        queue: &wgpu::Queue,
-        coord: I,
-        chunk: &Chunk,
-    ) -> BhResult<()> {
-        let mut blocks = [VoxelType(0); Self::NUM_BLOCK_PER_CHUNK];
+    fn fill_chunk_voxel(chunk: &Chunk, chunk_voxel: &mut [VoxelType]) -> BhResult<()> {
         for y in 0..Chunk::NUM_BLOCK_PER_COL {
             for x in 0..Chunk::NUM_BLOCK_PER_ROW {
                 let block = chunk.block_at(ChunkBlockCoord::new(x as u8, y as u8)?);
@@ -467,11 +464,38 @@ impl VoxelBuf {
                     bg_type = fg_type;
                 }
                 let index = (y * Chunk::NUM_BLOCK_PER_ROW + x) * 3;
-                blocks[index] = bg_type;
-                blocks[index + 1] = mg_type;
-                blocks[index + 2] = fg_type;
+                chunk_voxel[index] = bg_type;
+                chunk_voxel[index + 1] = mg_type;
+                chunk_voxel[index + 2] = fg_type;
             }
         }
+        Ok(())
+    }
+
+    pub fn from_chunks(&mut self, queue: &wgpu::Queue, chunks: &mut Chunks) {
+        let mut world_voxel = Self::new_world_voxel(self.world_width_macro);
+        chunks
+            .inner_mut()
+            .par_iter_mut()
+            .zip(world_voxel.par_chunks_exact_mut(Self::NUM_BLOCK_PER_CHUNK))
+            .for_each(|(chunk, chunk_voxel)| {
+                if let Some(chunk) = chunk
+                    && let Ok(chunk) = chunk.as_uncompressed()
+                {
+                    let _ = Self::fill_chunk_voxel(chunk, chunk_voxel);
+                }
+            });
+        queue.write_buffer(&self.buf, 0, bytemuck::cast_slice(&world_voxel));
+    }
+
+    pub fn set_chunk<I: Into<ChunkCoord>>(
+        &mut self,
+        queue: &wgpu::Queue,
+        coord: I,
+        chunk: &Chunk,
+    ) -> BhResult<()> {
+        let mut blocks = [VoxelType(0); Self::NUM_BLOCK_PER_CHUNK];
+        Self::fill_chunk_voxel(chunk, &mut blocks)?;
 
         let chunk_coord: ChunkCoord = coord.into();
         let offset =
