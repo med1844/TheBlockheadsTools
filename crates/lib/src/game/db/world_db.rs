@@ -27,9 +27,10 @@ impl WorldDb {
                 "One or more of `block`, `dw` or `main` is missing in the database",
             ));
         };
-        let chunks = Chunks::from_db(&blocks, &rtxn)?;
-        let dw = DynamicWorld::from_db(&dw, &rtxn)?;
         let main = WorldDbMain::from_db(&main, &rtxn)?;
+
+        let chunks = Chunks::from_db(&blocks, &rtxn, main.world_v2.world_width_macro)?;
+        let dw = DynamicWorld::from_db(&dw, &rtxn)?;
         Ok(Self { chunks, dw, main })
     }
 

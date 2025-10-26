@@ -478,7 +478,7 @@ mod chunk {
     impl ChunksPy {
         fn __contains__(&self, coord: &ChunkCoordPy) -> bool {
             let world_db = self.world_db.lock().unwrap();
-            world_db.chunks.contains_key(&coord.inner)
+            world_db.chunks.contains_key(coord.inner)
         }
 
         fn keys(&self) -> HashSet<ChunkCoordPy> {
@@ -489,7 +489,6 @@ mod chunk {
                     .chunks
                     .keys()
                     .into_iter()
-                    .copied()
                     .map(|value| ChunkCoordPy { inner: value }),
             )
         }
@@ -503,7 +502,7 @@ mod chunk {
                 IntoChunkCoord::ChunkCoord(chunk_coord_py) => chunk_coord_py.inner,
             };
             let world_db = self.world_db.lock().unwrap();
-            world_db.chunks.contains_key(&chunk_coord).then(|| ChunkPy {
+            world_db.chunks.contains_key(chunk_coord).then(|| ChunkPy {
                 world_db: self.world_db.clone(),
                 coord: chunk_coord,
             })
@@ -514,7 +513,7 @@ mod chunk {
             let world_db = self.world_db.lock().unwrap();
             world_db
                 .chunks
-                .contains_key(&chunk_coord)
+                .contains_key(chunk_coord)
                 .then_some(BlockPy {
                     world_db: self.world_db.clone(),
                     block_coord: coord.inner,

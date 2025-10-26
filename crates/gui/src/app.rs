@@ -251,8 +251,7 @@ impl AppState {
                 let _ = self.voxel_buf.set_chunk(&self.queue, coord, &chunk);
                 world_db
                     .chunks
-                    .chunk_at_entry(coord)
-                    .insert_entry(Gzip::Uncompressed(chunk));
+                    .set_chunk_at(coord, Gzip::Uncompressed(chunk));
             }
         }
     }

@@ -21,7 +21,7 @@ impl<B: AsRef<[u8]>> ToGzip for B {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Gzip<T> {
     Compressed(Vec<u8>),
     Uncompressed(T),
@@ -67,7 +67,7 @@ impl<T: FromGzip> Gzip<T> {
 }
 
 impl<T: ToGzip> Gzip<T> {
-    pub fn into_compressed<'s>(&'s self) -> std::io::Result<MaybeOwned<'s, Vec<u8>>> {
+    pub fn to_compressed<'s>(&'s self) -> std::io::Result<MaybeOwned<'s, Vec<u8>>> {
         match self {
             Gzip::Compressed(vec) => Ok(MaybeOwned::Borrowed(vec)),
             Gzip::Uncompressed(t) => Ok(MaybeOwned::Owned(t.to_gzip()?)),
