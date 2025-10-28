@@ -9,15 +9,6 @@ pub struct EventResponse {
     pub click: bool, // an click release event, no drag when pressed
 }
 
-// impl Default for EventResponse {
-//     fn default() -> Self {
-//         Self {
-//             repaint: false,
-//             click: false,
-//         }
-//     }
-// }
-
 pub struct Input {
     pub is_mouse_left_down: bool,
     pub prev_mouse_pos: (f32, f32),

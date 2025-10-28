@@ -152,12 +152,12 @@ impl CameraBuf {
         let top_right = self.screen_to_xy_at_z(
             (window_size.0, 0.0),
             window_size,
-            -self.camera.world_offset.z,
+            Self::MAX_BLOCK_Z - self.camera.world_offset.z,
         );
         let bottom_left = self.screen_to_xy_at_z(
             (0.0, window_size.1),
             window_size,
-            -self.camera.world_offset.z,
+            Self::MAX_BLOCK_Z - self.camera.world_offset.z,
         );
 
         [
@@ -185,13 +185,27 @@ impl CameraBuf {
             any_update |= diff != glam::Vec2::ZERO;
         }
         if input.mouse_wheel_delta != 0.0 {
-            self.camera.world_offset.z *= 1.0 - input.mouse_wheel_delta * 1e-1;
+            let world_pos_before_zoom = self.mouse_at(input);
+            let old_z = self.camera.world_offset.z;
+
+            self.camera.world_offset.z *= 1.0 - input.mouse_wheel_delta * 2e-1;
             self.camera.world_offset.z = self
                 .camera
                 .world_offset
                 .z
                 .clamp(Self::MAX_BLOCK_Z, Self::MAX_Z);
-            any_update = true;
+            let new_z = self.camera.world_offset.z;
+
+            if new_z != old_z {
+                let world_pos_after_zoom = self.mouse_at(input);
+
+                let drift = world_pos_after_zoom - world_pos_before_zoom;
+
+                self.camera.world_offset.x -= drift.x;
+                self.camera.world_offset.y -= drift.y;
+
+                any_update = true;
+            }
         }
         EventResponse {
             repaint: any_update,
