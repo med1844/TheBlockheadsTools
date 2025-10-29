@@ -306,6 +306,14 @@ impl VoxelType {
                 DeadTrunk,
                 DeadTrunk,
             ], // Any dead tree trunk
+            [
+                ChestGold,
+                ChestGold,
+                ChestGoldTop,
+                ChestGoldTop,
+                ChestGold,
+                ChestGold,
+            ], // GoldChest
         ]
     };
 }
@@ -392,6 +400,7 @@ impl VoxelType {
             | BlockContent::DeadOrangeTreeTrunk
             | BlockContent::DeadCherryTreeTrunk
             | BlockContent::DeadLimeTreeTrunk => 136,
+            BlockContent::GoldChest => 137,
             _ => 0,
         }))
     }

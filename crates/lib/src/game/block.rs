@@ -392,6 +392,7 @@ impl BlockContent {
             91 => Ok(Self::LimeTreeTrunkLeaf),
             92 => Ok(Self::DeadLimeTreeLeaf),
             93 => Ok(Self::DeadLimeTreeTrunk),
+            94 => Ok(Self::GoldChest),
             106 => Ok(Self::PlatinumOre),
             107 => Ok(Self::TitaniumOre),
             109 => Ok(Self::AmethystTreeTrunk),
