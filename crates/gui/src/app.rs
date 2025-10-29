@@ -1,8 +1,8 @@
-use crate::renderer::GridRenderer;
+use crate::{gpu::HoverOnBlockBuf, renderer::GridRenderer};
 
 use super::{
     fps_counter::FpsCounter,
-    gpu::{Camera, CameraBuf, RgbaTexture, SelectedBlock, VoxelBuf, dw::DwBuf},
+    gpu::{Camera, CameraBuf, RgbaTexture, SelectedBlockBuf, VoxelBuf, dw::DwBuf},
     input::{EventResponse, Input},
     renderer::{DEPTH_FORMAT, DwIconRenderer, EguiRenderer, VoxelRenderer},
 };
@@ -49,7 +49,8 @@ pub struct AppState {
     world_db: Option<WorldDb>,
 
     // inspections
-    selected_block: SelectedBlock,
+    selected_block: SelectedBlockBuf,
+    hover_on_block: HoverOnBlockBuf,
 
     // utils
     fps_counter: FpsCounter,
@@ -144,7 +145,8 @@ impl AppState {
             RgbaTexture::new(img.as_slice(), (512, 256), &device, &queue)
         };
 
-        let selected_block = SelectedBlock::new(&device);
+        let selected_block = SelectedBlockBuf::new(&device);
+        let hover_on_block = HoverOnBlockBuf::new(&device);
 
         let voxel_renderer = VoxelRenderer::new(
             &device,
@@ -152,6 +154,7 @@ impl AppState {
             &camera_buf.buf,
             &voxel_buf.buf,
             &selected_block.buf,
+            &hover_on_block.buf,
             &tile_map_texture,
         );
 
@@ -186,6 +189,7 @@ impl AppState {
             world_db: None,
 
             selected_block,
+            hover_on_block,
 
             fps_counter: FpsCounter::new(2.0),
 
@@ -264,12 +268,13 @@ impl AppState {
     }
 
     fn handle_input(&mut self, window: &Window, event: &WindowEvent) -> EventResponse {
+        let [x, y] = self.camera_buf.mouse_at(&self.input).floor().to_array();
+        let mouse_coord = BlockCoord::new(x as u32, y as u16).ok();
         let response = self.input.handle_input(window, event);
         if response.click && self.world_db.is_some() {
-            let [x, y] = self.camera_buf.mouse_at(&self.input).floor().to_array();
-            let new_coord = BlockCoord::new(x as u32, y as u16).ok();
-            self.selected_block.update(&self.queue, new_coord);
+            self.selected_block.update(&self.queue, mouse_coord);
         }
+        self.hover_on_block.update(&self.queue, mouse_coord);
         self.camera_buf.handle_input(&self.input)
     }
 

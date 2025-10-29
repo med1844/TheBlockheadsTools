@@ -59,6 +59,9 @@ var<storage, read> texture_uv_atlas_indices: array<u32>; // UV atlas storing sin
 @group(0) @binding(5)
 var<uniform> selected_block: vec4<u32>;
 
+@group(0) @binding(6)
+var<uniform> hover_on_block: vec4<u32>;
+
 fn get_voxel_type(global_voxel_coords: vec3<i32>) -> u32 {
     if global_voxel_coords.x < 0 || global_voxel_coords.x >= i32(WORLD_DIM_X) ||
        global_voxel_coords.y < 0 || global_voxel_coords.y >= i32(WORLD_DIM_Y) ||
@@ -230,6 +233,7 @@ fn fs_main(@builtin(position) clip_position: vec4<f32>) -> @location(0) vec4<f32
     var accumulated_color = vec4<f32>(0.0);
     var prev_voxel_type = AIR_TYPE;
     var ever_hit_selected_block = false;
+    var ever_hit_hover_on_block = false;
     var t_first_hit = -1.0;
 
     for (var i: u32 = 0u; i < MAX_VOXEL_TRAVERSAL_STEPS; i = i + 1u) {
@@ -238,6 +242,7 @@ fn fs_main(@builtin(position) clip_position: vec4<f32>) -> @location(0) vec4<f32
         }
 
         ever_hit_selected_block |= selected_block.x == 1 && all(vec3<u32>(current_voxel_coords).xy == selected_block.yz);
+        ever_hit_hover_on_block |= hover_on_block.x == 1 && all(vec3<u32>(current_voxel_coords).xy == hover_on_block.yz);
 
         let current_voxel_type = get_voxel_type(current_voxel_coords);
         if (current_voxel_type != prev_voxel_type) {
@@ -291,6 +296,20 @@ fn fs_main(@builtin(position) clip_position: vec4<f32>) -> @location(0) vec4<f32
 
         accumulated_color = vec4<f32>(final_rgb, final_a);
     }    
+
+    if (ever_hit_hover_on_block) {
+        let highlight_color = vec4<f32>(0.0, 0.0, 1.0, 0.1);
+
+        // Blend the semi-transparent highlight color ON TOP of the accumulated scene color.
+        // This is the standard "over" alpha blending operation.
+        // Final RGB = Highlight RGB + Scene RGB * (1 - Highlight Alpha)
+        let final_rgb = mix(accumulated_color.rgb, highlight_color.rgb, highlight_color.a);
+        
+        // The final alpha is also a combination of the highlight and scene alphas.
+        let final_a = highlight_color.a + accumulated_color.a * (1.0 - highlight_color.a);
+
+        accumulated_color = vec4<f32>(final_rgb, final_a);
+    }
 
     return accumulated_color;
 }

@@ -147,6 +147,7 @@ impl VoxelRenderer {
         camera_buf: &wgpu::Buffer,
         voxel_buf: &wgpu::Buffer,
         selected_block_buf: &wgpu::Buffer,
+        hover_on_block_buf: &wgpu::Buffer,
         texture: &RgbaTexture,
     ) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -227,6 +228,17 @@ impl VoxelRenderer {
                     },
                     count: None,
                 },
+                // hover on block
+                wgpu::BindGroupLayoutEntry {
+                    binding: 6,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
             ],
             label: Some("bind_group_layout"),
         });
@@ -257,6 +269,10 @@ impl VoxelRenderer {
                 wgpu::BindGroupEntry {
                     binding: 5,
                     resource: selected_block_buf.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 6,
+                    resource: hover_on_block_buf.as_entire_binding(),
                 },
             ],
             label: Some("bind_group"),
