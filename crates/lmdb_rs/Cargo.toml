@@ -1,0 +1,14 @@
+[package]
+name = "lmdb-rs"
+version = "0.1.0"
+edition = "2024"
+
+[dev-dependencies]
+clap = { version = "4.5.54", features = ["derive"] }
+divan = "0.1.21"
+memmap2 = "0.9.9"
+stats_alloc = "0.1.10"
+
+[[bench]]
+name = "audit_bench"
+harness = false

@@ -7,8 +7,12 @@ use crate::util::{
     gzip::{FromGzip, Gzip},
 };
 use flate2::read::GzDecoder;
-use heed::{Database, RoTxn, RwTxn, types::*};
-use std::io::Read;
+use lmdb_rs::{
+    codec::types::{Bytes, Str},
+    database::Database,
+    txn::{RoTxn, RwTxn},
+};
+use std::io::{Read, Write};
 
 #[derive(Debug, Clone)]
 pub struct Chunk(
@@ -103,11 +107,7 @@ impl Chunks {
         &mut self.0
     }
 
-    pub fn from_db(
-        db: &Database<Str, Bytes>,
-        rtxn: &RoTxn,
-        world_width: u32,
-    ) -> Result<Self, heed::Error> {
+    pub fn from_db(db: &Database<Str, Bytes>, rtxn: &RoTxn, world_width: u32) -> BhResult<Self> {
         let mut chunks = vec![None; world_width as usize * Self::NUM_CHUNK_PER_COL];
         for pair in db.iter(rtxn)? {
             if let Ok((k, v)) = pair
@@ -119,7 +119,7 @@ impl Chunks {
         Ok(Self(chunks))
     }
 
-    pub fn to_db(&self, db: &Database<Str, Bytes>, wtxn: &mut RwTxn) -> BhResult<()> {
+    pub fn to_db<W: Write>(&self, db: &Database<Str, Bytes>, wtxn: &mut RwTxn<W>) -> BhResult<()> {
         for (coord, chunk) in ChunkIndexIter::default().zip(self.0.iter()) {
             if let Some(chunk) = chunk {
                 let data = chunk.to_compressed()?;

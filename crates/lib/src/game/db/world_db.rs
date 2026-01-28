@@ -3,8 +3,16 @@ use super::{
     world_db_main::WorldDbMain,
 };
 use crate::{BhError, BhResult};
-use heed::{Database, EnvOpenOptions, types::*};
-use std::path::Path;
+use lmdb_rs::{
+    arch::DynArch,
+    codec::types::{Bytes, Str},
+    env::{Env, EnvWrite},
+};
+use std::{
+    fs::File,
+    io::{Read, Write},
+    path::Path,
+};
 
 #[derive(Debug)]
 pub struct WorldDb {
@@ -14,11 +22,10 @@ pub struct WorldDb {
 }
 
 impl WorldDb {
-    pub fn from_path<P: AsRef<Path>>(path: P) -> BhResult<Self> {
-        let mut options = EnvOpenOptions::new();
-        options.map_size(10 * 1024 * 1024).max_dbs(100);
-        let env = unsafe { options.open(path)? };
+    pub fn from_bytes(data: &[u8]) -> BhResult<Self> {
+        let env = Env::new(data)?;
         let rtxn = env.read_txn()?;
+
         let open_db = |name: &str| env.open_database::<Str, Bytes>(&rtxn, Some(name));
         let (Some(blocks), Some(dw), Some(main)) =
             (open_db("blocks")?, open_db("dw")?, open_db("main")?)
@@ -28,27 +35,39 @@ impl WorldDb {
             ));
         };
         let main = WorldDbMain::from_db(&main, &rtxn)?;
-
         let chunks = Chunks::from_db(&blocks, &rtxn, main.world_v2.world_width_macro)?;
         let dw = DynamicWorld::from_db(&dw, &rtxn)?;
+
         Ok(Self { chunks, dw, main })
     }
 
-    pub fn to_path<P: AsRef<Path>>(&self, path: P) -> BhResult<()> {
-        let mut options = EnvOpenOptions::new();
-        options.map_size(1024 * 1024 * 1024).max_dbs(100);
+    pub fn write_to<W: Write>(&self, writer: W) -> BhResult<()> {
+        let mut env = EnvWrite::new(writer, DynArch::Arch64);
 
-        let env = unsafe { options.open(path)? };
         let mut wtxn = env.write_txn()?;
 
-        let blocks_db: Database<Str, Bytes> = env.create_database(&mut wtxn, Some("blocks"))?;
+        let blocks_db = wtxn.create_database(Some("blocks"))?;
         self.chunks.to_db(&blocks_db, &mut wtxn)?;
-        let dw_db: Database<Str, Bytes> = env.create_database(&mut wtxn, Some("dw"))?;
+        let dw_db = wtxn.create_database(Some("dw"))?;
         self.dw.to_db(&dw_db, &mut wtxn)?;
-        let main_db: Database<Str, Bytes> = env.create_database(&mut wtxn, Some("main"))?;
+        let main_db = wtxn.create_database(Some("main"))?;
         self.main.to_db(&main_db, &mut wtxn)?;
 
         wtxn.commit()?;
         Ok(())
+    }
+
+    pub fn from_path<P: AsRef<Path>>(path: P) -> BhResult<Self> {
+        let mut data = Vec::new();
+        {
+            let mut file = File::open(path.as_ref().join("data.mdb"))?;
+            let _ = file.read_to_end(&mut data)?;
+        }
+        Self::from_bytes(&data)
+    }
+
+    pub fn to_path<P: AsRef<Path>>(&self, path: P) -> BhResult<()> {
+        let file = File::open(path)?;
+        self.write_to(file)
     }
 }

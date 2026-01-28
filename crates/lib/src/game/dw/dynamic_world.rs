@@ -3,9 +3,13 @@ use super::{
     dynamic_object::{CarrotPlant, CornPlant, DynamicObjectList, TomatoPlant},
 };
 use crate::{BhError, BhResult};
-use heed::{Database, RoTxn, RwTxn, types::*};
+use lmdb_rs::{
+    codec::types::{Bytes, Str},
+    database::Database,
+    txn::{RoTxn, RwTxn},
+};
 use serde::Serialize;
-use std::{collections::HashMap, ops::Deref};
+use std::{collections::HashMap, io::Write, ops::Deref};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u16)]
@@ -314,11 +318,11 @@ impl DynamicWorld {
         Ok(Self(map))
     }
 
-    pub fn to_db(&self, db: &Database<Str, Bytes>, wtxn: &mut RwTxn) -> BhResult<()> {
+    pub fn to_db<W: Write>(&self, db: &Database<Str, Bytes>, wtxn: &mut RwTxn<W>) -> BhResult<()> {
         #[inline(always)]
-        fn put<T: ToXmlPlist + IsEmpty>(
+        fn put<W: Write, T: ToXmlPlist + IsEmpty>(
             db: &Database<Str, Bytes>,
-            wtxn: &mut RwTxn,
+            wtxn: &mut RwTxn<W>,
             coord_str: &str,
             obj_type: DynamicObjectType,
             value: &T,

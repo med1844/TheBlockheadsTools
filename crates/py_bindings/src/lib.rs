@@ -613,23 +613,23 @@ mod world_db {
         }
 
         #[getter]
-        fn get_host_port(&self) -> String {
+        fn get_host_port(&self) -> Option<String> {
             self.inner.lock().unwrap().main.world_v2.host_port.clone()
         }
 
         #[setter]
-        fn set_host_port(&self, value: &str) {
-            self.inner.lock().unwrap().main.world_v2.host_port = value.to_string();
+        fn set_host_port(&self, value: Option<&str>) {
+            self.inner.lock().unwrap().main.world_v2.host_port = value.map(ToString::to_string);
         }
 
         #[getter]
-        fn get_max_players(&self) -> String {
+        fn get_max_players(&self) -> Option<String> {
             self.inner.lock().unwrap().main.world_v2.max_players.clone()
         }
 
         #[setter]
-        fn set_max_players(&self, value: &str) {
-            self.inner.lock().unwrap().main.world_v2.max_players = value.to_string();
+        fn set_max_players(&self, value: Option<&str>) {
+            self.inner.lock().unwrap().main.world_v2.max_players = value.map(ToString::to_string);
         }
 
         #[getter]

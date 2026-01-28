@@ -11,7 +11,7 @@ use egui_wgpu::{ScreenDescriptor, wgpu};
 use glam::Vec3Swizzles;
 use std::{path::Path, sync::Arc};
 use the_blockheads_tools_lib::{
-    BhResult,
+    BhError, BhResult,
     game::{
         coord::{BlockCoord, ChunkCoord},
         db::world_db::WorldDb,
@@ -126,7 +126,7 @@ impl AppState {
             window,
         );
 
-        let scale_factor = 1.5;
+        let scale_factor = 1.0;
 
         let camera = Camera::default();
         let camera_buf = camera.into_buffered(&device);
@@ -294,6 +294,8 @@ pub struct App {
     state: Option<AppState>,
     window: Option<Arc<Window>>,
     show_info: bool,
+    load_err: Option<BhError>,
+    save_err: Option<BhError>,
 }
 
 impl App {
@@ -304,6 +306,8 @@ impl App {
             state: None,
             window: None,
             show_info: false,
+            load_err: None,
+            save_err: None,
         }
     }
 
@@ -472,13 +476,43 @@ impl App {
                 },
             );
 
-            if let Some(path) = opened_path {
-                state.open_world_db(path).unwrap();
+            if let Some(path) = opened_path
+                && let Err(e) = state.open_world_db(path)
+            {
+                self.load_err = Some(e);
             }
+            if let Some(e) = self.load_err.as_ref() {
+                let mut open = true;
+                egui::Window::new("Failed to load world")
+                    .open(&mut open)
+                    .resizable(false)
+                    .show(state.egui_renderer.context(), |ui| {
+                        ui.heading("Error message");
+                        ui.label(e.to_string());
+                    });
+                if !open {
+                    self.load_err = None;
+                }
+            }
+
             if let Some(path) = save_path
                 && let Some(world_db) = &mut state.world_db
+                && let Err(e) = world_db.to_path(path)
             {
-                world_db.to_path(path).unwrap();
+                self.save_err = Some(e);
+            }
+            if let Some(e) = self.save_err.as_ref() {
+                let mut open = true;
+                egui::Window::new("Failed to save world")
+                    .open(&mut open)
+                    .resizable(false)
+                    .show(state.egui_renderer.context(), |ui| {
+                        ui.heading("Error message");
+                        ui.label(e.to_string());
+                    });
+                if !open {
+                    self.save_err = None;
+                }
             }
 
             egui::SidePanel::left("Info")

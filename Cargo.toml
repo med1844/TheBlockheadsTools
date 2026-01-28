@@ -14,4 +14,5 @@ flate2 = "1.1.2"
 
 the-blockheads-tools-lib = { path = "crates/lib" }
 the-blockheads-tools-gui = { path = "crates/gui" }
+lmdb-rs = { path = "crates/lmdb_rs" }
 

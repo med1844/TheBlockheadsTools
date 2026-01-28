@@ -1,6 +1,12 @@
+use std::io::Write;
+
 use super::{dynamic_world_v2::DynamicWorldV2, world_v2::WorldV2};
 use crate::{BhError, BhResult};
-use heed::{Database, RoTxn, RwTxn, types::*};
+use lmdb_rs::{
+    codec::types::{Bytes, Str},
+    database::Database,
+    txn::{RoTxn, RwTxn},
+};
 
 #[derive(Debug)]
 pub struct WorldDbMain {
@@ -27,7 +33,7 @@ impl WorldDbMain {
         })
     }
 
-    pub fn to_db(&self, db: &Database<Str, Bytes>, wtxn: &mut RwTxn) -> BhResult<()> {
+    pub fn to_db<W: Write>(&self, db: &Database<Str, Bytes>, wtxn: &mut RwTxn<W>) -> BhResult<()> {
         let mut dynamic_world_v2_bytes = Vec::new();
         plist::to_writer_xml(&mut dynamic_world_v2_bytes, &self.dynamic_world_v2)?;
         db.put(wtxn, "dynamicWorldv2", dynamic_world_v2_bytes.as_slice())?;

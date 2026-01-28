@@ -2,8 +2,6 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum BhError {
-    #[error("Database error: {0}")]
-    DbError(#[from] heed::Error),
     #[error("Plist deserialization error: {0}")]
     PlistError(#[from] plist::Error),
     #[error("Gzip I/O error: {0}")]
@@ -20,6 +18,8 @@ pub enum BhError {
     InvalidDynamicOjectId(String),
     #[error("Missing key: {0}")]
     MissingKey(&'static str),
+    #[error("Lmdb error: {0}")]
+    LmdbError(#[from] lmdb_rs::error::Error),
 }
 
 pub type BhResult<T> = Result<T, BhError>;

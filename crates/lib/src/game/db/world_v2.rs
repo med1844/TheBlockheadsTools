@@ -15,9 +15,11 @@ pub struct WorldV2 {
     #[serde(rename = "foundItems")]
     pub found_items: plist::Data, // bplist dict
     #[serde(rename = "hostPort")]
-    pub host_port: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub host_port: Option<String>,
     #[serde(rename = "maxPlayers")]
-    pub max_players: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_players: Option<String>,
     #[serde(rename = "migrationComplete_1.7")]
     pub migration_complete_v1_7: bool,
     #[serde(rename = "noRainTimer")]

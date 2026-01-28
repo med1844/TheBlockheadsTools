@@ -18,5 +18,11 @@ fn main() -> BhResult<()> {
     dbg!(mem::size_of::<Option<Gzip<Chunk>>>());
     dbg!(mem::size_of::<Vec<u8>>());
 
+    let args: Vec<String> = std::env::args().collect();
+    dbg!(&args);
+    assert!(args.len() == 2);
+
+    let world_db = WorldDb::from_path(args.last().unwrap()).unwrap();
+
     Ok(())
 }
