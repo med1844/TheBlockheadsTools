@@ -37,7 +37,6 @@ struct CameraUniform {
     view_proj: mat4x4<f32>,
     inv_view_proj: mat4x4<f32>,
     camera_pos: vec4<f32>, // xyz
-    screen_size: vec4<f32>, // x=width, y=height
     world_offset: vec4<f32>,
 };
 
@@ -162,20 +161,28 @@ fn render_and_blend(
     }
 }
 
+struct VertexOutput {
+    @builtin(position) position: vec4<f32>,
+    @location(0) uv: vec2<f32>,
+};
+
 @vertex
-fn vs_main(@builtin(vertex_index) vertex_index: u32) -> @builtin(position) vec4<f32> {
+fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
     var positions = array<vec2<f32>, 3>(
-        vec2<f32>(-1.0, -1.0), vec2<f32>( 3.0, -1.0), vec2<f32>(-1.0,  3.0)
+        vec2<f32>(-1.0, -1.0),
+        vec2<f32>( 3.0, -1.0),
+        vec2<f32>(-1.0,  3.0)
     );
-    return vec4<f32>(positions[vertex_index], 0.0, 1.0);
+    var out: VertexOutput;
+    out.position = vec4<f32>(positions[vertex_index], 0.0, 1.0);
+    out.uv = positions[vertex_index] * vec2<f32>(0.5, -0.5) + vec2<f32>(0.5, 0.5);
+    return out;
 }
 
 @fragment
-fn fs_main(@builtin(position) clip_position: vec4<f32>) -> @location(0) vec4<f32> {
-    let frag_coord = clip_position;
-    let screen_width = camera.screen_size.x;
-    let screen_height = camera.screen_size.y;
-    let ndc_coords = vec2<f32>((frag_coord.x/screen_width)*2.0-1.0, 1.0-(frag_coord.y/screen_height)*2.0);
+fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+    let frag_coord = in.uv;
+    let ndc_coords = vec2<f32>(frag_coord.x*2.0-1.0, (1.0-frag_coord.y)*2.0 - 1.0);
 
     let inv_view_proj = camera.inv_view_proj;
     let clip_pos_near = vec4<f32>(ndc_coords.x, ndc_coords.y, 0.0, 1.0);
@@ -311,5 +318,8 @@ fn fs_main(@builtin(position) clip_position: vec4<f32>) -> @location(0) vec4<f32
         accumulated_color = vec4<f32>(final_rgb, final_a);
     }
 
-    return accumulated_color;
+    // eframe uses Bgra8Unorm so we have to manually do gamma correction
+    let gamma = 2.2;
+    let corrected_color = pow(accumulated_color.rgb, vec3<f32>(1.0 / gamma));
+    return vec4<f32>(corrected_color, accumulated_color.a);
 }

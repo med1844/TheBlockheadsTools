@@ -3,24 +3,14 @@ mod dw_impl;
 mod fps_counter;
 mod gpu;
 mod image_type;
-mod input;
 mod renderer;
 
-use winit::event_loop::{ControlFlow, EventLoop};
-
 fn main() {
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        pollster::block_on(run());
-    }
-}
-
-async fn run() {
-    let event_loop = EventLoop::new().unwrap();
-
-    event_loop.set_control_flow(ControlFlow::Poll);
-
-    let mut app = app::App::new();
-
-    event_loop.run_app(&mut app).expect("Failed to run app");
+    let native_options = eframe::NativeOptions::default();
+    eframe::run_native(
+        "My egui App",
+        native_options,
+        Box::new(|cc| Ok(Box::new(app::EditorApp::new(cc)))),
+    )
+    .unwrap();
 }

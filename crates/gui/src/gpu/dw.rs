@@ -1,4 +1,4 @@
-use egui_wgpu::wgpu::{self, util::DeviceExt};
+use eframe::wgpu::{self, util::DeviceExt};
 use std::collections::HashMap;
 use the_blockheads_tools_lib::game::{coord::ChunkCoord, dw::dynamic_world::ChunkDynamicObjects};
 
@@ -61,13 +61,10 @@ pub trait ToIconInstance {
     fn to_icon_instance(&self) -> DwIconInstanceRaw;
 }
 
-pub struct DwChunkIconBuf {
+#[derive(Clone)]
+pub struct DwChunkBuf {
     pub instance_buf: wgpu::Buffer,
     pub num_instances: u32,
-}
-
-pub struct DwChunkBuf {
-    pub icon_buf: DwChunkIconBuf,
 }
 
 impl DwChunkBuf {
@@ -92,7 +89,7 @@ impl DwChunkBuf {
         add(chunk.carrot_plant.iter(), &mut icons);
         add(chunk.tomato_plants.iter(), &mut icons);
 
-        let icon_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        let instance_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Dynamic Object Icon Instance Buffer"),
             contents: bytemuck::cast_slice(&icons),
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
@@ -100,10 +97,8 @@ impl DwChunkBuf {
 
         let num_instances = icons.len() as u32;
         Some(Self {
-            icon_buf: DwChunkIconBuf {
-                instance_buf: icon_buf,
-                num_instances,
-            },
+            instance_buf,
+            num_instances,
         })
     }
 }

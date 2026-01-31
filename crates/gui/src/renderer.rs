@@ -1,154 +1,34 @@
+use crate::gpu::dw::DwChunkBuf;
+
 use super::{
     gpu::{
         RgbaTexture, VoxelType,
-        dw::{DwChunkIconBuf, DwIconInstanceRaw, DwIconVertex},
+        dw::{DwIconInstanceRaw, DwIconVertex},
     },
     image_type::ImageType,
 };
-use egui::Context;
-use egui_wgpu::{
-    Renderer, ScreenDescriptor,
-    wgpu::{
-        self, CommandEncoder, Device, Queue, RenderPassDepthStencilAttachment, StoreOp,
-        TextureFormat, TextureView, util::DeviceExt,
-    },
+use eframe::{
+    egui_wgpu,
+    wgpu::{self, util::DeviceExt},
 };
-use egui_winit::{EventResponse, State};
-use winit::event::WindowEvent;
-use winit::window::Window;
-
-pub struct EguiRenderer {
-    state: State,
-    renderer: Renderer,
-    frame_started: bool,
-}
-
-impl EguiRenderer {
-    pub fn context(&self) -> &Context {
-        self.state.egui_ctx()
-    }
-
-    pub fn new(
-        device: &Device,
-        output_color_format: TextureFormat,
-        output_depth_format: Option<TextureFormat>,
-        msaa_samples: u32,
-        window: &Window,
-    ) -> EguiRenderer {
-        let egui_context = Context::default();
-
-        let egui_state = egui_winit::State::new(
-            egui_context,
-            egui::viewport::ViewportId::ROOT,
-            &window,
-            Some(window.scale_factor() as f32),
-            None,
-            Some(2 * 1024), // default dimension is 2048
-        );
-        let egui_renderer = Renderer::new(
-            device,
-            output_color_format,
-            output_depth_format,
-            msaa_samples,
-            true,
-        );
-
-        EguiRenderer {
-            state: egui_state,
-            renderer: egui_renderer,
-            frame_started: false,
-        }
-    }
-
-    pub fn handle_input(&mut self, window: &Window, event: &WindowEvent) -> EventResponse {
-        self.state.on_window_event(window, event)
-    }
-
-    pub fn ppp(&mut self, v: f32) {
-        self.context().set_pixels_per_point(v);
-    }
-
-    pub fn begin_frame(&mut self, window: &Window) {
-        let raw_input = self.state.take_egui_input(window);
-        self.state.egui_ctx().begin_pass(raw_input);
-        self.frame_started = true;
-    }
-
-    pub fn end_frame_and_draw(
-        &mut self,
-        device: &Device,
-        queue: &Queue,
-        encoder: &mut CommandEncoder,
-        window: &Window,
-        window_surface_view: &TextureView,
-        screen_descriptor: ScreenDescriptor,
-        depth_stencil_attachment: Option<RenderPassDepthStencilAttachment>,
-    ) {
-        if !self.frame_started {
-            panic!("begin_frame must be called before end_frame_and_draw can be called!");
-        }
-
-        self.ppp(screen_descriptor.pixels_per_point);
-
-        let full_output = self.state.egui_ctx().end_pass();
-
-        self.state
-            .handle_platform_output(window, full_output.platform_output);
-
-        let tris = self
-            .state
-            .egui_ctx()
-            .tessellate(full_output.shapes, self.state.egui_ctx().pixels_per_point());
-        for (id, image_delta) in &full_output.textures_delta.set {
-            self.renderer
-                .update_texture(device, queue, *id, image_delta);
-        }
-        self.renderer
-            .update_buffers(device, queue, encoder, &tris, &screen_descriptor);
-
-        let rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: window_surface_view,
-                resolve_target: None,
-                ops: egui_wgpu::wgpu::Operations {
-                    load: egui_wgpu::wgpu::LoadOp::Load,
-                    store: StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment,
-            timestamp_writes: None,
-            label: Some("egui main render pass"),
-            occlusion_query_set: None,
-        });
-
-        self.renderer
-            .render(&mut rpass.forget_lifetime(), &tris, &screen_descriptor);
-
-        for x in &full_output.textures_delta.free {
-            self.renderer.free_texture(x)
-        }
-
-        self.frame_started = false;
-    }
-}
-
-pub const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
+use zune_png::PngDecoder;
 
 // Raymarch voxel renderer
 pub struct VoxelRenderer {
-    pub pipeline: wgpu::RenderPipeline,
-    pub bind_group: wgpu::BindGroup,
+    voxel_buf: wgpu::Buffer,
+    pipeline: wgpu::RenderPipeline,
+    bind_group: wgpu::BindGroup,
 }
 
 impl VoxelRenderer {
     pub fn new(
         device: &wgpu::Device,
-        config: &wgpu::SurfaceConfiguration,
+        voxel_buf: wgpu::Buffer,
         camera_buf: &wgpu::Buffer,
-        voxel_buf: &wgpu::Buffer,
         selected_block_buf: &wgpu::Buffer,
         hover_on_block_buf: &wgpu::Buffer,
         texture: &RgbaTexture,
+        target_format: wgpu::TextureFormat,
     ) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Shader"),
@@ -297,7 +177,7 @@ impl VoxelRenderer {
                 module: &shader,
                 entry_point: Some("fs_main"),
                 targets: &[Some(wgpu::ColorTargetState {
-                    format: config.format,
+                    format: target_format,
                     blend: Some(wgpu::BlendState::ALPHA_BLENDING),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
@@ -308,21 +188,22 @@ impl VoxelRenderer {
                 cull_mode: Some(wgpu::Face::Back), // Prevent rendering the inside of the cube
                 ..Default::default()
             },
-            depth_stencil: Some(wgpu::DepthStencilState {
-                format: DEPTH_FORMAT,
-                depth_write_enabled: true,
-                depth_compare: wgpu::CompareFunction::Less,
-                stencil: wgpu::StencilState::default(),
-                bias: wgpu::DepthBiasState::default(),
-            }),
+            depth_stencil: None,
             multisample: wgpu::MultisampleState::default(),
             multiview: None,
             cache: None,
         });
         Self {
+            voxel_buf,
             pipeline,
             bind_group,
         }
+    }
+
+    pub fn render(&self, render_pass: &mut wgpu::RenderPass<'_>) {
+        render_pass.set_pipeline(&self.pipeline);
+        render_pass.set_bind_group(0, &self.bind_group, &[]);
+        render_pass.draw(0..3, 0..1);
     }
 }
 
@@ -424,10 +305,10 @@ impl DwIconRenderer {
 
     pub fn new(
         device: &wgpu::Device,
-        config: &wgpu::SurfaceConfiguration,
         camera_buf: &wgpu::Buffer,
         items_texture: &RgbaTexture,
         tilemap_texture: &RgbaTexture,
+        target_format: wgpu::TextureFormat,
     ) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Dynamic Object Icon Shader"),
@@ -572,7 +453,7 @@ impl DwIconRenderer {
                 module: &shader,
                 entry_point: Some("fs_dynamic_object_icon"),
                 targets: &[Some(wgpu::ColorTargetState {
-                    format: config.format,
+                    format: target_format,
                     blend: Some(wgpu::BlendState::ALPHA_BLENDING),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
@@ -583,13 +464,8 @@ impl DwIconRenderer {
                 cull_mode: None,
                 ..Default::default()
             },
-            depth_stencil: Some(wgpu::DepthStencilState {
-                format: DEPTH_FORMAT,
-                depth_write_enabled: false,
-                depth_compare: wgpu::CompareFunction::Always,
-                stencil: wgpu::StencilState::default(),
-                bias: wgpu::DepthBiasState::default(),
-            }),
+
+            depth_stencil: None,
             multisample: wgpu::MultisampleState::default(),
             multiview: None,
             cache: None,
@@ -603,17 +479,19 @@ impl DwIconRenderer {
         }
     }
 
-    pub fn render<'pass>(&'pass self, rpass: &mut wgpu::RenderPass<'pass>, buf: &DwChunkIconBuf) {
-        rpass.set_pipeline(&self.pipeline);
-        rpass.set_bind_group(0, &self.bind_group, &[]);
-        rpass.set_vertex_buffer(0, self.vertex_buf.slice(..));
-        rpass.set_vertex_buffer(1, buf.instance_buf.slice(..));
-        rpass.set_index_buffer(self.index_buf.slice(..), wgpu::IndexFormat::Uint16);
-        rpass.draw_indexed(
-            0..DwIconVertex::INDICES.len() as u32,
-            0,
-            0..buf.num_instances,
-        );
+    pub fn render(&self, render_pass: &mut wgpu::RenderPass<'_>, dw_buf: &[DwChunkBuf]) {
+        render_pass.set_pipeline(&self.pipeline);
+        render_pass.set_bind_group(0, &self.bind_group, &[]);
+        for dw_chunk_buf in dw_buf {
+            render_pass.set_vertex_buffer(0, self.vertex_buf.slice(..));
+            render_pass.set_vertex_buffer(1, dw_chunk_buf.instance_buf.slice(..));
+            render_pass.set_index_buffer(self.index_buf.slice(..), wgpu::IndexFormat::Uint16);
+            render_pass.draw_indexed(
+                0..DwIconVertex::INDICES.len() as u32,
+                0,
+                0..dw_chunk_buf.num_instances,
+            );
+        }
     }
 }
 
@@ -625,9 +503,8 @@ pub struct GridRenderer {
 impl GridRenderer {
     pub fn new(
         device: &wgpu::Device,
-        config: &wgpu::SurfaceConfiguration,
         camera_buf: &wgpu::Buffer,
-        _world_width: usize,
+        target_format: wgpu::TextureFormat,
     ) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Grid Shader"),
@@ -679,7 +556,7 @@ impl GridRenderer {
                 module: &shader,
                 entry_point: Some("fs_grid"),
                 targets: &[Some(wgpu::ColorTargetState {
-                    format: config.format,
+                    format: target_format,
                     blend: Some(wgpu::BlendState::ALPHA_BLENDING),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
@@ -690,13 +567,7 @@ impl GridRenderer {
                 cull_mode: None,
                 ..Default::default()
             },
-            depth_stencil: Some(wgpu::DepthStencilState {
-                format: DEPTH_FORMAT,
-                depth_write_enabled: false,
-                depth_compare: wgpu::CompareFunction::Always,
-                stencil: wgpu::StencilState::default(),
-                bias: wgpu::DepthBiasState::default(),
-            }),
+            depth_stencil: None,
             multisample: wgpu::MultisampleState::default(),
             multiview: None,
             cache: None,
@@ -708,9 +579,98 @@ impl GridRenderer {
         }
     }
 
-    pub fn render<'pass>(&'pass self, rpass: &mut wgpu::RenderPass<'pass>) {
-        rpass.set_pipeline(&self.pipeline);
-        rpass.set_bind_group(0, &self.bind_group, &[]);
-        rpass.draw(0..3, 0..1);
+    pub fn render(&self, render_pass: &mut wgpu::RenderPass<'_>) {
+        render_pass.set_pipeline(&self.pipeline);
+        render_pass.set_bind_group(0, &self.bind_group, &[]);
+        render_pass.draw(0..3, 0..1);
+    }
+}
+
+pub struct RenderResources {
+    camera_buf: wgpu::Buffer,
+    selected_block_buf: wgpu::Buffer,
+    hover_on_block_buf: wgpu::Buffer,
+
+    voxel: VoxelRenderer,
+    dw: DwIconRenderer,
+    grid: GridRenderer,
+}
+
+impl RenderResources {
+    pub fn new(
+        state: &egui_wgpu::RenderState,
+        camera_buf: wgpu::Buffer,
+        voxel_buf: wgpu::Buffer,
+        selected_block_buf: wgpu::Buffer,
+        hover_on_block_buf: wgpu::Buffer,
+    ) -> Self {
+        let device = &state.device;
+        let queue = &state.queue;
+        let target_format = state.target_format;
+
+        let tile_map_texture = {
+            let bytes = include_bytes!("../resources/TileMap.png");
+            let mut decoder = PngDecoder::new(bytes);
+            let img = decoder.decode().unwrap().u8().unwrap();
+            RgbaTexture::new(img.as_slice(), (512, 512), device, queue)
+        };
+        let items_texture = {
+            let bytes = include_bytes!("../resources/Items.png");
+            let mut decoder = PngDecoder::new(bytes);
+            let img = decoder.decode().unwrap().u8().unwrap();
+            RgbaTexture::new(img.as_slice(), (512, 256), device, queue)
+        };
+
+        Self {
+            voxel: VoxelRenderer::new(
+                device,
+                voxel_buf,
+                &camera_buf,
+                &selected_block_buf,
+                &hover_on_block_buf,
+                &tile_map_texture,
+                target_format,
+            ),
+            dw: DwIconRenderer::new(
+                device,
+                &camera_buf,
+                &items_texture,
+                &tile_map_texture,
+                target_format,
+            ),
+            grid: GridRenderer::new(device, &camera_buf, target_format),
+            camera_buf,
+            selected_block_buf,
+            hover_on_block_buf,
+        }
+    }
+
+    pub fn camera_buf(&self) -> &wgpu::Buffer {
+        &self.camera_buf
+    }
+
+    pub fn selected_block_buf(&self) -> &wgpu::Buffer {
+        &self.selected_block_buf
+    }
+
+    pub fn hover_on_block_buf(&self) -> &wgpu::Buffer {
+        &self.hover_on_block_buf
+    }
+
+    pub fn voxel_buf(&self) -> &wgpu::Buffer {
+        &self.voxel.voxel_buf
+    }
+
+    pub fn render(
+        &self,
+        render_pass: &mut wgpu::RenderPass<'_>,
+        dw_buf: &[DwChunkBuf],
+        show_grid: bool,
+    ) {
+        self.voxel.render(render_pass);
+        self.dw.render(render_pass, dw_buf);
+        if show_grid {
+            self.grid.render(render_pass);
+        }
     }
 }

@@ -1,25 +1,25 @@
-use crate::input::{EventResponse, Input};
-use egui_wgpu::wgpu::{self, util::DeviceExt};
+// use crate::input::{EventResponse, Input};
+use eframe::wgpu::{self, util::DeviceExt};
 use glam::{Mat4, Vec3, Vec3Swizzles, Vec4Swizzles};
 
 // Define how to connect the vertices to form triangles.
 pub struct Camera {
     // we always look at (0, 0)
-    pub up: Vec3,
-    pub fovy: f32,   // Field of view in radians
-    pub z_near: f32, // Near clipping plane
-    pub z_far: f32,  // Far clipping plane
-    pub world_offset: Vec3,
+    fovy: f32,   // Field of view in radians
+    z_near: f32, // Near clipping plane
+    z_far: f32,  // Far clipping plane
+    world_offset: Vec3,
+    aspect: f32,
 }
 
 impl Default for Camera {
     fn default() -> Self {
         Self {
             world_offset: Vec3::new(0.0, 0.0, 5.0),
-            up: Vec3::Y,
             fovy: 45.0_f32.to_radians(),
             z_near: 0.01,
             z_far: 10000.0,
+            aspect: 1.0,
         }
     }
 }
@@ -30,11 +30,13 @@ pub struct CameraUniform {
     view_proj: [[f32; 4]; 4],     // Combined view and projection matrix
     inv_view_proj: [[f32; 4]; 4], // Combined view and projection matrix
     camera_pos: [f32; 4],         // Camera's world position (vec3 + padding)
-    screen_size: [f32; 4],        // Screen width and height (vec2 + padding)
     world_offset: [f32; 4],       // World offset
 }
 
 impl Camera {
+    pub const MAX_BLOCK_Z: f32 = 3.0;
+    pub const MAX_Z: f32 = 1e8;
+
     fn eye(&self) -> Vec3 {
         Vec3::Z
     }
@@ -43,17 +45,33 @@ impl Camera {
         Vec3::ZERO
     }
 
-    pub fn uniform(&self, window_size: (f32, f32)) -> CameraUniform {
-        let (width, height) = window_size;
-        let aspect = width / height;
-        let view = Mat4::look_at_rh(self.eye(), self.target(), self.up);
-        let proj = Mat4::perspective_rh(self.fovy, aspect, self.z_near, self.z_far);
-        let pv = proj * view;
+    fn view_proj(&self) -> Mat4 {
+        let view = Mat4::look_at_rh(self.eye(), self.target(), Vec3::Y);
+        let proj = Mat4::perspective_rh(self.fovy, self.aspect, self.z_near, self.z_far);
+        proj * view
+    }
+
+    fn inv_view_proj(&self) -> Mat4 {
+        self.view_proj().inverse()
+    }
+
+    pub fn set_aspect(&mut self, new_aspect: f32) {
+        self.aspect = new_aspect;
+    }
+
+    pub fn world_offset(&self) -> &Vec3 {
+        &self.world_offset
+    }
+
+    pub fn world_offset_mut(&mut self) -> &mut Vec3 {
+        &mut self.world_offset
+    }
+
+    pub fn uniform(&self) -> CameraUniform {
         CameraUniform {
-            view_proj: pv.to_cols_array_2d(),
-            inv_view_proj: pv.inverse().to_cols_array_2d(),
+            view_proj: self.view_proj().to_cols_array_2d(),
+            inv_view_proj: self.inv_view_proj().to_cols_array_2d(),
             camera_pos: self.eye().extend(1.0).into(),
-            screen_size: [width, height, 0.0, 0.0],
             world_offset: [
                 self.world_offset.x,
                 self.world_offset.y,
@@ -63,51 +81,29 @@ impl Camera {
         }
     }
 
-    pub fn into_buffered(self, device: &wgpu::Device) -> CameraBuf {
-        let uniform = self.uniform((1280.0, 720.0)); // placeholder value
-        CameraBuf {
-            camera: self,
-            uniform,
-            buf: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Camera Uniform Buffer"),
-                contents: bytemuck::cast_slice(&[uniform]),
-                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            }),
-        }
-    }
-}
-
-impl CameraUniform {
-    fn window_size(&self) -> (f32, f32) {
-        (self.screen_size[0], self.screen_size[1])
-    }
-}
-
-pub struct CameraBuf {
-    pub camera: Camera,
-    pub uniform: CameraUniform,
-    pub buf: wgpu::Buffer,
-}
-
-impl CameraBuf {
-    pub const MAX_BLOCK_Z: f32 = 3.0;
-    pub const MAX_Z: f32 = 1e8;
-
-    pub fn update_uniforms(&mut self, queue: &wgpu::Queue, width: u32, height: u32) {
-        self.uniform = self.camera.uniform((width as f32, height as f32));
-        queue.write_buffer(&self.buf, 0, bytemuck::cast_slice(&[self.uniform]));
+    pub fn to_buf(&self, device: &wgpu::Device) -> wgpu::Buffer {
+        let uniform = self.uniform();
+        device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Camera Uniform Buffer"),
+            contents: bytemuck::cast_slice(&[uniform]),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        })
     }
 
-    fn screen_to_world_ray(&self, screen_pos: (f32, f32), window_size: (f32, f32)) -> (Vec3, Vec3) {
-        let (screen_x, screen_y) = screen_pos;
-        let (window_width, window_height) = window_size;
+    fn viewport_to_world_ray(
+        &self,
+        viewport_pos: (f32, f32),
+        viewport_size: (f32, f32),
+    ) -> (Vec3, Vec3) {
+        let (viewport_x, viewport_y) = viewport_pos;
+        let (viewport_width, viewport_height) = viewport_size;
 
         // Convert screen coordinates to normalized device coordinates (NDC)
         // NDC range from -1 to 1
-        let ndc_x = (screen_x / window_width) * 2.0 - 1.0;
-        let ndc_y = (1.0 - (screen_y / window_height)) * 2.0 - 1.0; // Y is inverted in screen space
+        let ndc_x = (viewport_x / viewport_width) * 2.0 - 1.0;
+        let ndc_y = (1.0 - (viewport_y / viewport_height)) * 2.0 - 1.0; // Y is inverted in screen space
 
-        let inv_view_proj = Mat4::from_cols_array_2d(&self.uniform.inv_view_proj);
+        let inv_view_proj = self.inv_view_proj();
 
         // Create a ray in clip space (start at z=-1 for near plane, end at z=1 for far plane)
         let ray_clip_start = Vec3::new(ndc_x, ndc_y, -1.0).extend(1.0);
@@ -126,90 +122,80 @@ impl CameraBuf {
         (ray_origin, ray_direction)
     }
 
-    fn screen_to_xy_at_z(
+    fn viewport_to_xy_at_z(
         &self,
-        screen_pos: (f32, f32),
-        window_size: (f32, f32),
+        viewport_pos: (f32, f32),
+        viewport_size: (f32, f32),
         z_plane: f32,
     ) -> glam::Vec2 {
-        let (ray_origin, ray_direction) = self.screen_to_world_ray(screen_pos, window_size);
+        let (ray_origin, ray_direction) = self.viewport_to_world_ray(viewport_pos, viewport_size);
         let t = (z_plane - ray_origin.z) / ray_direction.z;
         (ray_origin + t * ray_direction).xy()
     }
 
-    pub fn mouse_at(&self, input: &Input) -> glam::Vec2 {
-        let window_size = self.uniform.window_size();
-        self.screen_to_xy_at_z(
-            input.current_mouse_pos,
-            window_size,
-            Self::MAX_BLOCK_Z - self.camera.world_offset.z,
-        ) + self.camera.world_offset.xy()
+    pub fn handle_drag(
+        &mut self,
+        prev_pos: (f32, f32),
+        cur_pos: (f32, f32),
+        viewport_size: (f32, f32),
+    ) {
+        let prev_world_pos_at_z3 = self.viewport_to_xy_at_z(
+            prev_pos,
+            viewport_size,
+            Self::MAX_BLOCK_Z - self.world_offset.z,
+        );
+        let curr_world_pos_at_z3 = self.viewport_to_xy_at_z(
+            cur_pos,
+            viewport_size,
+            Self::MAX_BLOCK_Z - self.world_offset.z,
+        );
+        let diff = curr_world_pos_at_z3 - prev_world_pos_at_z3;
+        self.world_offset -= diff.extend(0.0);
     }
 
-    pub fn visible_world_region_2d(&self) -> [glam::Vec2; 2] {
-        let window_size = self.uniform.window_size();
+    pub fn handle_zoom(&mut self, pos: (f32, f32), viewport_size: (f32, f32), scroll_y: f32) {
+        let world_pos_before_zoom = self.mouse_at(pos, viewport_size);
+        let old_z = self.world_offset.z;
 
-        let top_right = self.screen_to_xy_at_z(
-            (window_size.0, 0.0),
-            window_size,
-            Self::MAX_BLOCK_Z - self.camera.world_offset.z,
+        self.world_offset.z *= 1.0 - scroll_y * 8e-3;
+        self.world_offset.z = self.world_offset.z.clamp(Self::MAX_BLOCK_Z, Self::MAX_Z);
+        let new_z = self.world_offset.z;
+
+        if new_z != old_z {
+            let world_pos_after_zoom = self.mouse_at(pos, viewport_size);
+
+            let drift = world_pos_after_zoom - world_pos_before_zoom;
+
+            self.world_offset.x -= drift.x;
+            self.world_offset.y -= drift.y;
+        }
+    }
+
+    pub fn visible_world_region_2d(&self, screen_size: (f32, f32)) -> [glam::Vec2; 2] {
+        let (width, height) = screen_size;
+
+        let top_right = self.viewport_to_xy_at_z(
+            (width, 0.0),
+            screen_size,
+            Self::MAX_BLOCK_Z - self.world_offset.z,
         );
-        let bottom_left = self.screen_to_xy_at_z(
-            (0.0, window_size.1),
-            window_size,
-            Self::MAX_BLOCK_Z - self.camera.world_offset.z,
+        let bottom_left = self.viewport_to_xy_at_z(
+            (0.0, height),
+            screen_size,
+            Self::MAX_BLOCK_Z - self.world_offset.z,
         );
 
         [
-            bottom_left + self.camera.world_offset.xy(),
-            top_right + self.camera.world_offset.xy(),
+            bottom_left + self.world_offset.xy(),
+            top_right + self.world_offset.xy(),
         ]
     }
 
-    pub fn handle_input(&mut self, input: &Input) -> EventResponse {
-        let mut any_update = false;
-        if input.is_mouse_left_down {
-            let window_size = self.uniform.window_size();
-            let prev_world_pos_at_z3 = self.screen_to_xy_at_z(
-                input.prev_mouse_pos,
-                window_size,
-                Self::MAX_BLOCK_Z - self.camera.world_offset.z,
-            );
-            let curr_world_pos_at_z3 = self.screen_to_xy_at_z(
-                input.current_mouse_pos,
-                window_size,
-                Self::MAX_BLOCK_Z - self.camera.world_offset.z,
-            );
-            let diff = curr_world_pos_at_z3 - prev_world_pos_at_z3;
-            self.camera.world_offset -= diff.extend(0.0);
-            any_update |= diff != glam::Vec2::ZERO;
-        }
-        if input.mouse_wheel_delta != 0.0 {
-            let world_pos_before_zoom = self.mouse_at(input);
-            let old_z = self.camera.world_offset.z;
-
-            self.camera.world_offset.z *= 1.0 - input.mouse_wheel_delta * 2e-1;
-            self.camera.world_offset.z = self
-                .camera
-                .world_offset
-                .z
-                .clamp(Self::MAX_BLOCK_Z, Self::MAX_Z);
-            let new_z = self.camera.world_offset.z;
-
-            if new_z != old_z {
-                let world_pos_after_zoom = self.mouse_at(input);
-
-                let drift = world_pos_after_zoom - world_pos_before_zoom;
-
-                self.camera.world_offset.x -= drift.x;
-                self.camera.world_offset.y -= drift.y;
-
-                any_update = true;
-            }
-        }
-        EventResponse {
-            repaint: any_update,
-            ..Default::default()
-        }
+    pub fn mouse_at(&self, viewport_pos: (f32, f32), viewport_size: (f32, f32)) -> glam::Vec2 {
+        self.viewport_to_xy_at_z(
+            viewport_pos,
+            viewport_size,
+            Self::MAX_BLOCK_Z - self.world_offset.z,
+        ) + self.world_offset.xy()
     }
 }

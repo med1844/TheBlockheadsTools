@@ -1,18 +1,7 @@
-use std::collections::HashSet;
-
-use super::super::image_type::ImageType;
-use egui_wgpu::wgpu::{self, util::DeviceExt};
-use rayon::{
-    iter::{IndexedParallelIterator, IntoParallelRefMutIterator, ParallelIterator},
-    slice::ParallelSliceMut,
-};
+use crate::image_type::ImageType;
 use the_blockheads_tools_lib::{
     BhResult,
-    game::{
-        block::{Block, BlockContent, BlockType, BlockView},
-        chunk::{Chunk, Chunks},
-        coord::{ChunkBlockCoord, ChunkCoord},
-    },
+    game::block::{Block, BlockContent, BlockType, BlockView},
 };
 
 type BlockIdType = u16;
@@ -418,44 +407,35 @@ impl VoxelType {
     }
 }
 
-pub struct VoxelBuf {
-    // Contains flattened block type, 512 * 32 * (32 * 32 * 3) blocks
-    pub buf: wgpu::Buffer,
-    chunk_keys: HashSet<ChunkCoord>,
-    pub world_width_macro: usize,
-}
+pub mod voxel_util {
+    use super::VoxelType;
+    use eframe::wgpu::{self, util::DeviceExt};
+    use rayon::{
+        iter::{IndexedParallelIterator, IntoParallelRefMutIterator, ParallelIterator},
+        slice::ParallelSliceMut,
+    };
+    use the_blockheads_tools_lib::{
+        BhResult,
+        game::{
+            chunk::{Chunk, Chunks},
+            coord::{ChunkBlockCoord, ChunkCoord},
+        },
+    };
 
-impl VoxelBuf {
     const NUM_BLOCK_PER_CHUNK: usize = Chunk::NUM_BLOCK_PER_ROW * Chunk::NUM_BLOCK_PER_COL * 3; // 3 layers
 
     // Costly function - only call this once or VRAM nuked
-    pub fn new(device: &wgpu::Device, world_width_macro: usize) -> Self {
-        Self {
-            buf: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Global Voxel Data Buffer"),
-                contents: bytemuck::cast_slice(&Self::new_world_voxel(world_width_macro)),
-                usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-            }),
-            chunk_keys: HashSet::new(),
-            world_width_macro,
-        }
+    // Contains flattened block type, 512 * 32 * (32 * 32 * 3) blocks
+    pub fn create_buffer(device: &wgpu::Device, world_width_macro: usize) -> wgpu::Buffer {
+        device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Global Voxel Data Buffer"),
+            contents: bytemuck::cast_slice(&new_world_voxel(world_width_macro)),
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+        })
     }
 
     fn new_world_voxel(world_width_macro: usize) -> Vec<VoxelType> {
-        vec![
-            VoxelType::AIR;
-            Self::NUM_BLOCK_PER_CHUNK * Chunks::NUM_CHUNK_PER_COL * world_width_macro
-        ]
-    }
-
-    /// Clean up all voxels and registered chunks.
-    pub fn clear(&mut self, queue: &wgpu::Queue) {
-        self.chunk_keys.clear();
-        queue.write_buffer(
-            &self.buf,
-            0,
-            bytemuck::cast_slice(&Self::new_world_voxel(self.world_width_macro)),
-        );
+        vec![VoxelType::AIR; NUM_BLOCK_PER_CHUNK * Chunks::NUM_CHUNK_PER_COL * world_width_macro]
     }
 
     fn fill_chunk_voxel(chunk: &Chunk, chunk_voxel: &mut [VoxelType]) -> BhResult<()> {
@@ -481,41 +461,45 @@ impl VoxelBuf {
         Ok(())
     }
 
-    pub fn from_chunks(&mut self, queue: &wgpu::Queue, chunks: &mut Chunks) {
-        let mut world_voxel = Self::new_world_voxel(self.world_width_macro);
+    pub fn set_chunks_par(
+        queue: &wgpu::Queue,
+        voxel_buffer: &wgpu::Buffer,
+        chunks: &mut Chunks,
+        world_width_macro: usize,
+    ) {
+        let mut world_voxel = new_world_voxel(world_width_macro);
         chunks
             .inner_mut()
             .par_iter_mut()
-            .zip(world_voxel.par_chunks_exact_mut(Self::NUM_BLOCK_PER_CHUNK))
+            .zip(world_voxel.par_chunks_exact_mut(NUM_BLOCK_PER_CHUNK))
             .for_each(|(chunk, chunk_voxel)| {
                 if let Some(chunk) = chunk
                     && let Ok(chunk) = chunk.as_uncompressed()
                 {
-                    let _ = Self::fill_chunk_voxel(chunk, chunk_voxel);
+                    let _ = fill_chunk_voxel(chunk, chunk_voxel);
                 }
             });
-        queue.write_buffer(&self.buf, 0, bytemuck::cast_slice(&world_voxel));
+        queue.write_buffer(voxel_buffer, 0, bytemuck::cast_slice(&world_voxel));
     }
 
+    #[allow(dead_code)] // will be used once we support edit modes
     pub fn set_chunk<I: Into<ChunkCoord>>(
-        &mut self,
         queue: &wgpu::Queue,
+        voxel_buffer: &wgpu::Buffer,
         coord: I,
         chunk: &Chunk,
     ) -> BhResult<()> {
-        let mut blocks = [VoxelType(0); Self::NUM_BLOCK_PER_CHUNK];
-        Self::fill_chunk_voxel(chunk, &mut blocks)?;
+        let mut blocks = [VoxelType(0); NUM_BLOCK_PER_CHUNK];
+        fill_chunk_voxel(chunk, &mut blocks)?;
 
         let chunk_coord: ChunkCoord = coord.into();
-        let offset =
-            (chunk_coord.x() * 32 + chunk_coord.y() as u32) * Self::NUM_BLOCK_PER_CHUNK as u32;
+        let offset = (chunk_coord.x() * 32 + chunk_coord.y() as u32) * NUM_BLOCK_PER_CHUNK as u32;
 
         queue.write_buffer(
-            &self.buf,
+            voxel_buffer,
             offset as u64 * size_of::<u16>() as u64,
             bytemuck::cast_slice(&blocks),
         );
-        self.chunk_keys.insert(chunk_coord);
         Ok(())
     }
 }

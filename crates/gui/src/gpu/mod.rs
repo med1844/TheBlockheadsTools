@@ -4,7 +4,7 @@ pub mod dw;
 mod texture;
 mod voxel;
 
-pub use block::{HoverOnBlockBuf, SelectedBlockBuf};
-pub use camera::{Camera, CameraBuf};
+pub use block::{GpuBlockCoord, GpuBlockCoordUniform};
+pub use camera::{Camera, CameraUniform};
 pub use texture::RgbaTexture;
-pub use voxel::{VoxelBuf, VoxelType};
+pub use voxel::{VoxelType, voxel_util};

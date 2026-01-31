@@ -2,7 +2,6 @@ struct CameraUniform {
     view_proj: mat4x4<f32>,
     inv_view_proj: mat4x4<f32>,
     camera_pos: vec4<f32>, // xyz
-    screen_size: vec4<f32>, // x=width, y=height
     world_offset: vec4<f32>,
 };
 
@@ -176,7 +175,9 @@ fn fs_dynamic_object_icon(in: DynObjVSOutput) -> @location(0) vec4<f32> {
         final_color = mix(final_color, outline_color, outline_color.a);
     }
     
-    return final_color;
+    let gamma = 2.2;
+    let corrected_color = pow(final_color.rgb, vec3<f32>(1.0 / gamma));
+    return vec4<f32>(corrected_color, final_color.a);
 }
 
 

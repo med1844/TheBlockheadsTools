@@ -1,4 +1,4 @@
-use egui_wgpu::wgpu;
+use eframe::wgpu;
 
 pub struct RgbaTexture {
     // pub texture: wgpu::Texture,

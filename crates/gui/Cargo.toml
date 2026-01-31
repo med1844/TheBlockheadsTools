@@ -4,11 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-egui = "0.31.1"
-egui-wgpu = { version = "0.31.1",features = ["winit"] }
-egui-winit = "0.31.1"
-winit = "0.30.9"
-pollster = "0.4.0"
+eframe = { version = "0.33.3", features = ["wgpu"] }
 bytemuck = { version = "1.12", features = ["derive"] }
 glam = { version = "0.30.4", features = ["bytemuck"] }
 the-blockheads-tools-lib = { workspace = true }
