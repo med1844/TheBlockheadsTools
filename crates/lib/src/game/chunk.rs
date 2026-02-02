@@ -12,20 +12,23 @@ use lmdb_rs::{
     database::Database,
     txn::{RoTxn, RwTxn},
 };
-use std::io::{Read, Write};
+use std::{
+    io::{Read, Write},
+    ops::{Deref, DerefMut},
+};
 
 #[derive(Debug, Clone)]
-pub struct Chunk(
-    Box<[u8; Self::NUM_BLOCK_PER_ROW * Self::NUM_BLOCK_PER_COL * Self::NUM_BYTES_PER_BLOCK + 5]>,
-); // 5 unknown bytes
+pub struct Chunk(Box<[u8; Self::NUM_BYTES]>); // 5 unknown bytes
 
 impl Chunk {
     pub const NUM_BLOCK_PER_ROW: usize = 32;
     pub const NUM_BLOCK_PER_COL: usize = 32;
     pub const NUM_BYTES_PER_BLOCK: usize = 64;
+    pub const NUM_BYTES: usize =
+        Self::NUM_BLOCK_PER_ROW * Self::NUM_BLOCK_PER_COL * Self::NUM_BYTES_PER_BLOCK + 5;
 
     pub fn new_empty() -> Self {
-        Self(Box::new([0; 32 * 32 * 64 + 5]))
+        Self(Box::new([0; Self::NUM_BYTES]))
     }
 
     pub fn inner(&self) -> &[u8] {
@@ -35,34 +38,60 @@ impl Chunk {
     pub fn inner_mut(&mut self) -> &mut [u8] {
         self.0.as_mut()
     }
+}
 
-    pub fn block_at<O: ChunkOffset>(&'_ self, coord: O) -> Block<'_> {
+impl AsRef<[u8]> for Chunk {
+    fn as_ref(&self) -> &[u8] {
+        self.inner()
+    }
+}
+
+impl Deref for Chunk {
+    type Target = [u8; Self::NUM_BYTES];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for Chunk {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+pub trait ChunkView {
+    fn block_at<O: ChunkOffset>(&'_ self, coord: O) -> Block<'_>;
+}
+
+impl<T: Deref<Target = [u8; Chunk::NUM_BYTES]>> ChunkView for T {
+    fn block_at<O: ChunkOffset>(&'_ self, coord: O) -> Block<'_> {
         let offset = coord.to_offset();
         let slice =
-            <&[u8; 64]>::try_from(&self.inner()[offset..offset + Self::NUM_BYTES_PER_BLOCK])
+            <&[u8; 64]>::try_from(&self.deref()[offset..offset + Chunk::NUM_BYTES_PER_BLOCK])
                 .expect(
                     "Return value of `ChunkBlockCoord.to_offset()` is guaranteed \
                 to be smaller than chunk bytes len - 32",
                 );
         Block::new(slice)
     }
+}
 
-    pub fn block_at_mut<O: ChunkOffset>(&'_ mut self, coord: O) -> BlockMut<'_> {
+pub trait ChunkViewMut {
+    fn block_at_mut<O: ChunkOffset>(&'_ mut self, coord: O) -> BlockMut<'_>;
+}
+
+impl<T: DerefMut<Target = [u8; Chunk::NUM_BYTES]>> ChunkViewMut for T {
+    fn block_at_mut<O: ChunkOffset>(&'_ mut self, coord: O) -> BlockMut<'_> {
         let offset = coord.to_offset();
         let slice = <&mut [u8; 64]>::try_from(
-            &mut self.inner_mut()[offset..offset + Self::NUM_BYTES_PER_BLOCK],
+            &mut self.deref_mut()[offset..offset + Chunk::NUM_BYTES_PER_BLOCK],
         )
         .expect(
             "Return value of `ChunkBlockCoord.to_offset()` is guaranteed \
                 to be smaller than chunk bytes len - 32",
         );
         BlockMut::new(slice)
-    }
-}
-
-impl AsRef<[u8]> for Chunk {
-    fn as_ref(&self) -> &[u8] {
-        self.inner()
     }
 }
 
@@ -103,6 +132,10 @@ impl Chunks {
         coord.x() as usize * Self::NUM_CHUNK_PER_COL + coord.y() as usize
     }
 
+    pub fn inner(&self) -> &Vec<Option<Gzip<Chunk>>> {
+        &self.0
+    }
+
     pub fn inner_mut(&mut self) -> &mut Vec<Option<Gzip<Chunk>>> {
         &mut self.0
     }
@@ -129,11 +162,10 @@ impl Chunks {
         Ok(())
     }
 
-    pub fn keys(&self) -> Vec<ChunkCoord> {
+    pub fn keys(&self) -> impl Iterator<Item = ChunkCoord> {
         ChunkIndexIter::default()
             .zip(self.0.iter())
             .filter_map(|(coord, chunk)| chunk.is_some().then_some(coord))
-            .collect()
     }
 
     pub fn contains_key(&self, key: ChunkCoord) -> bool {

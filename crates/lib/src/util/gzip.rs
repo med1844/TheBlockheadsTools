@@ -1,8 +1,8 @@
-use std::io::Write;
-
 use flate2::Compression;
+use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
 use maybe_owned::MaybeOwned;
+use std::io::{Read, Write};
 
 pub trait FromGzip: Sized {
     fn from_compressed_gzip(bytes: &[u8]) -> Result<Self, std::io::Error>;
@@ -19,6 +19,11 @@ impl<B: AsRef<[u8]>> ToGzip for B {
         encoder.write_all(a)?;
         encoder.finish()
     }
+}
+
+pub fn decompress_gzip_to(bytes: &[u8], output: &mut Vec<u8>) -> Result<usize, std::io::Error> {
+    let mut decoder = GzDecoder::new(bytes);
+    decoder.read_to_end(output)
 }
 
 #[derive(Debug, Clone)]

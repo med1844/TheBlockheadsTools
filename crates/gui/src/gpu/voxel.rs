@@ -408,8 +408,10 @@ impl VoxelType {
 }
 
 pub mod voxel_util {
+
     use super::VoxelType;
     use eframe::wgpu::{self, util::DeviceExt};
+    #[cfg(not(target_arch = "wasm32"))]
     use rayon::{
         iter::{IndexedParallelIterator, IntoParallelRefMutIterator, ParallelIterator},
         slice::ParallelSliceMut,
@@ -417,10 +419,15 @@ pub mod voxel_util {
     use the_blockheads_tools_lib::{
         BhResult,
         game::{
-            chunk::{Chunk, Chunks},
+            chunk::{Chunk, ChunkView, Chunks},
             coord::{ChunkBlockCoord, ChunkCoord},
         },
     };
+
+    #[cfg(target_arch = "wasm32")]
+    use std::ops::Deref;
+    #[cfg(target_arch = "wasm32")]
+    use the_blockheads_tools_lib::util::gzip::{Gzip, decompress_gzip_to};
 
     const NUM_BLOCK_PER_CHUNK: usize = Chunk::NUM_BLOCK_PER_ROW * Chunk::NUM_BLOCK_PER_COL * 3; // 3 layers
 
@@ -438,7 +445,7 @@ pub mod voxel_util {
         vec![VoxelType::AIR; NUM_BLOCK_PER_CHUNK * Chunks::NUM_CHUNK_PER_COL * world_width_macro]
     }
 
-    fn fill_chunk_voxel(chunk: &Chunk, chunk_voxel: &mut [VoxelType]) -> BhResult<()> {
+    fn fill_chunk_voxel<C: ChunkView>(chunk: &C, chunk_voxel: &mut [VoxelType]) -> BhResult<()> {
         for y in 0..Chunk::NUM_BLOCK_PER_COL {
             for x in 0..Chunk::NUM_BLOCK_PER_ROW {
                 let block = chunk.block_at(ChunkBlockCoord::new(x as u8, y as u8)?);
@@ -461,12 +468,8 @@ pub mod voxel_util {
         Ok(())
     }
 
-    pub fn set_chunks_par(
-        queue: &wgpu::Queue,
-        voxel_buffer: &wgpu::Buffer,
-        chunks: &mut Chunks,
-        world_width_macro: usize,
-    ) {
+    #[cfg(not(target_arch = "wasm32"))]
+    fn build_world_voxel(chunks: &mut Chunks, world_width_macro: usize) -> Vec<VoxelType> {
         let mut world_voxel = new_world_voxel(world_width_macro);
         chunks
             .inner_mut()
@@ -479,6 +482,49 @@ pub mod voxel_util {
                     let _ = fill_chunk_voxel(chunk, chunk_voxel);
                 }
             });
+        world_voxel
+    }
+
+    // On wasm32, malloc is extremely slow (20-30ms PER call) if we do too much.
+    // This is a specialized version of building world_voxel with only 2 malloc!
+    #[cfg(target_arch = "wasm32")]
+    fn build_world_voxel(chunks: &Chunks, world_width_macro: usize) -> Vec<VoxelType> {
+        let mut world_voxel = new_world_voxel(world_width_macro);
+        let mut decompress_output = Vec::with_capacity(Chunk::NUM_BYTES);
+        chunks
+            .inner()
+            .iter()
+            .zip(world_voxel.chunks_exact_mut(NUM_BLOCK_PER_CHUNK))
+            .for_each(|(chunk, chunk_voxel)| {
+                if let Some(chunk) = chunk {
+                    let chunk_bytes = match chunk {
+                        Gzip::Compressed(bytes) => {
+                            decompress_output.clear();
+                            decompress_gzip_to(bytes, &mut decompress_output)
+                                .ok()
+                                .and_then(|_| {
+                                    let chunk_bytes: Option<&[u8; Chunk::NUM_BYTES]> =
+                                        decompress_output.as_slice().try_into().ok();
+                                    chunk_bytes
+                                })
+                        }
+                        Gzip::Uncompressed(chunk) => Some(chunk.deref()),
+                    };
+                    if let Some(chunk_bytes) = chunk_bytes {
+                        let _ = fill_chunk_voxel(&chunk_bytes, chunk_voxel);
+                    }
+                }
+            });
+        world_voxel
+    }
+
+    pub fn set_chunks(
+        queue: &wgpu::Queue,
+        voxel_buffer: &wgpu::Buffer,
+        chunks: &mut Chunks,
+        world_width_macro: usize,
+    ) {
+        let world_voxel = build_world_voxel(chunks, world_width_macro);
         queue.write_buffer(voxel_buffer, 0, bytemuck::cast_slice(&world_voxel));
     }
 

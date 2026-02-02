@@ -211,7 +211,7 @@ impl EditorApp {
         let new_world_width_macro = world_db.main.world_v2.world_width_macro as usize;
 
         // TODO: if width_macro doesn't match the old one, create new buffer and update voxel renderer bind group
-        voxel_util::set_chunks_par(
+        voxel_util::set_chunks(
             queue,
             voxel_buffer,
             &mut world_db.chunks,
