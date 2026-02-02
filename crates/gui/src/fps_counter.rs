@@ -1,25 +1,23 @@
 use std::collections::VecDeque;
-use std::time::{Duration, Instant};
 
 pub struct FpsCounter {
-    timestamps: VecDeque<Instant>,
-    window_duration: Duration,
+    timestamps: VecDeque<f64>,
+    window_duration: f64,
 }
 
 impl FpsCounter {
     pub fn new(window_seconds: f32) -> Self {
         Self {
             timestamps: VecDeque::new(),
-            window_duration: Duration::from_secs_f32(window_seconds),
+            window_duration: window_seconds as f64,
         }
     }
 
-    pub fn update(&mut self) {
-        let now = Instant::now();
-        self.timestamps.push_back(now);
+    pub fn update(&mut self, current_time: f64) {
+        self.timestamps.push_back(current_time);
 
-        while let Some(&oldest_timestamp) = self.timestamps.front() {
-            if now.duration_since(oldest_timestamp) > self.window_duration {
+        while let Some(&oldest) = self.timestamps.front() {
+            if current_time - oldest > self.window_duration {
                 self.timestamps.pop_front();
             } else {
                 break;
@@ -32,17 +30,11 @@ impl FpsCounter {
             return 0.0;
         }
 
-        let oldest_timestamp = self.timestamps.front().unwrap();
-        let newest_timestamp = self.timestamps.back().unwrap();
-
-        let duration = newest_timestamp.duration_since(*oldest_timestamp);
-
-        if duration.as_secs_f32() == 0.0 {
+        let duration = self.timestamps.back().unwrap() - self.timestamps.front().unwrap();
+        if duration <= 0.0 {
             return 0.0;
         }
 
-        let num_frames = (self.timestamps.len() - 1) as f32;
-
-        num_frames / duration.as_secs_f32()
+        ((self.timestamps.len() - 1) as f64 / duration) as f32
     }
 }

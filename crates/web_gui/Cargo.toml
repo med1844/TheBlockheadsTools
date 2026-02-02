@@ -1,0 +1,18 @@
+[package]
+name = "web_gui"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+console_error_panic_hook = "0.1.7"
+wasm-bindgen = "0.2.108"
+web-sys = { version = "0.3.85", features = ["Window", "Document", "HtmlElement", "Text", "HtmlCanvasElement"] }
+the-blockheads-tools-gui = { workspace = true, features = ["web"] }
+eframe = { workspace = true }
+log = "0.4.29"
+web-time = "1.1.0"
+chrono = { version = "0.4.42", default-features = false, features = ["js-sys", "wasmbind"] }
+wasm-bindgen-futures = { workspace = true }

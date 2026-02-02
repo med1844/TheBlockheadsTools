@@ -9,7 +9,10 @@ use super::{
 };
 use eframe::{egui, egui_wgpu, emath::Rect, wgpu};
 use glam::Vec3Swizzles;
-use std::path::Path;
+#[cfg(not(target_arch = "wasm32"))]
+use std::path::PathBuf;
+#[cfg(target_arch = "wasm32")]
+use std::sync::mpsc::{Receiver, Sender, channel};
 use the_blockheads_tools_lib::{
     BhError, BhResult,
     game::{
@@ -65,6 +68,67 @@ impl egui_wgpu::CallbackTrait for Render3dCallback {
     }
 }
 
+enum ReaderState {
+    #[cfg(not(target_arch = "wasm32"))]
+    Native { open_path: Option<PathBuf> },
+
+    #[cfg(target_arch = "wasm32")]
+    Wasm {
+        sender: Sender<Vec<u8>>,
+        receiver: Receiver<Vec<u8>>,
+    },
+}
+
+// Helper function to unify sync and async file reading on native & wasm
+struct FileReader {
+    state: ReaderState,
+}
+
+impl FileReader {
+    fn new() -> Self {
+        #[cfg(target_arch = "wasm32")]
+        let (tx, rx) = channel();
+
+        Self {
+            #[cfg(not(target_arch = "wasm32"))]
+            state: ReaderState::Native { open_path: None },
+            #[cfg(target_arch = "wasm32")]
+            state: ReaderState::Wasm {
+                sender: tx,
+                receiver: rx,
+            },
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn set_open_path(&mut self, new_open_path: Option<PathBuf>) {
+        match &mut self.state {
+            ReaderState::Native { open_path } => {
+                *open_path = new_open_path;
+            }
+        }
+    }
+
+    // Platform-specific helpers
+    #[cfg(target_arch = "wasm32")]
+    fn get_sender(&self) -> Sender<Vec<u8>> {
+        match &self.state {
+            ReaderState::Wasm { sender, .. } => sender.clone(),
+        }
+    }
+
+    fn read_file(&mut self) -> Option<BhResult<Vec<u8>>> {
+        match &mut self.state {
+            #[cfg(not(target_arch = "wasm32"))]
+            ReaderState::Native { open_path } => open_path
+                .take()
+                .map(|path| std::fs::read(path).map_err(Into::into)),
+            #[cfg(target_arch = "wasm32")]
+            ReaderState::Wasm { receiver, .. } => receiver.try_recv().ok().map(Ok),
+        }
+    }
+}
+
 pub struct EditorApp {
     world_db: Option<WorldDb>,
     dw_buf: DwBuf,
@@ -77,6 +141,7 @@ pub struct EditorApp {
     selected_block_coord: GpuBlockCoord,
     hover_on_block_coord: GpuBlockCoord,
 
+    file_reader: FileReader,
     load_err: Option<BhError>,
     save_err: Option<BhError>,
 
@@ -121,6 +186,7 @@ impl EditorApp {
             selected_block_coord,
             hover_on_block_coord,
 
+            file_reader: FileReader::new(),
             load_err: None,
             save_err: None,
 
@@ -128,14 +194,14 @@ impl EditorApp {
         }
     }
 
-    fn open_world_db<P: AsRef<Path>>(
+    fn open_world_db(
         &mut self,
-        path: P,
+        data: Vec<u8>,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         voxel_buffer: &wgpu::Buffer,
     ) -> BhResult<()> {
-        let mut world_db = WorldDb::from_path(path)?;
+        let mut world_db = WorldDb::from_bytes(&data)?;
         let spawn_x = world_db.main.world_v2.start_portal_pos_x;
         let spawn_y = world_db.main.world_v2.start_portal_pos_y - 1;
 
@@ -169,8 +235,9 @@ impl EditorApp {
         Ok(())
     }
 
+    #[allow(unused_variables)] // ctx is only used in async
     fn render_menu_bar(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
-        let mut open_path = None;
+        #[cfg(not(target_arch = "wasm32"))]
         let mut save_path = None;
 
         egui::MenuBar::new().ui(ui, |ui| {
@@ -178,36 +245,56 @@ impl EditorApp {
             ui.toggle_value(&mut self.show_grid, "Grid");
             ui.separator();
             ui.menu_button("File", |ui| {
-                if ui.button("Open").clicked() {
-                    open_path = rfd::FileDialog::new().pick_folder();
+                #[cfg(not(target_arch = "wasm32"))]
+                {
+                    if ui.button("Open").clicked() {
+                        self.file_reader
+                            .set_open_path(rfd::FileDialog::new().pick_file());
+                    }
+                    if ui.button("Save as").clicked() {
+                        save_path = rfd::FileDialog::new().pick_folder();
+                    }
                 }
-                if ui.button("Save as").clicked() {
-                    save_path = rfd::FileDialog::new().pick_folder();
+                #[cfg(target_arch = "wasm32")]
+                {
+                    if ui.button("Open").clicked() {
+                        let sender = self.file_reader.get_sender();
+                        let task = rfd::AsyncFileDialog::new().pick_file();
+                        let ctx = ui.ctx().clone();
+                        wasm_bindgen_futures::spawn_local(async move {
+                            if let Some(file) = task.await {
+                                let bytes = file.read().await;
+                                let _ = sender.send(bytes);
+                                ctx.request_repaint();
+                            }
+                        })
+                    }
                 }
             });
         });
 
         if let Some(state) = frame.wgpu_render_state()
-            && let Some(open_path) = open_path
-            && let Some(Err(e)) = {
-                state
-                    .renderer
-                    .read()
+            && let Some(read_result) = self.file_reader.read_file()
+            && let Err(e) = read_result.and_then(|bytes| {
+                let read_renderer = state.renderer.read();
+                let r = read_renderer
                     .callback_resources
                     .get::<RenderResources>()
-                    .map(|r| {
-                        self.open_world_db(open_path, &state.device, &state.queue, r.voxel_buf())
-                    })
-            }
+                    .expect("should have render resources");
+                self.open_world_db(bytes, &state.device, &state.queue, r.voxel_buf())
+            })
         {
             self.load_err = Some(e);
         }
 
-        if let Some(world_db) = self.world_db.as_ref()
-            && let Some(save_path) = save_path
-            && let Err(e) = world_db.to_path(save_path)
+        #[cfg(not(target_arch = "wasm32"))]
         {
-            self.save_err = Some(e);
+            if let Some(world_db) = self.world_db.as_ref()
+                && let Some(save_path) = save_path
+                && let Err(e) = world_db.to_path(save_path)
+            {
+                self.save_err = Some(e);
+            }
         }
     }
 
@@ -375,7 +462,7 @@ impl EditorApp {
 
 impl eframe::App for EditorApp {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
-        self.fps_counter.update();
+        self.fps_counter.update(ctx.input(|i| i.time));
 
         egui::TopBottomPanel::new(egui::panel::TopBottomSide::Top, "menu").show(ctx, |ui| {
             self.render_menu_bar(ui, frame);

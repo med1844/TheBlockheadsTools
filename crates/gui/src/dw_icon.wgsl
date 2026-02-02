@@ -127,7 +127,7 @@ fn render_block_icon(uv: vec2<f32>, block_type_id: u32) -> vec4<f32> {
     let uv_min_tile = vec2<f32>(tile_x * VOXEL_TILE_SIZE_UV, tile_y * VOXEL_TILE_SIZE_UV);
     
     let final_atlas_uv = uv_min_tile + face_uv * VOXEL_TILE_SIZE_UV;
-    var surface_color = textureSample(tilemap_texture, tilemap_sampler, final_atlas_uv);
+    var surface_color = textureSampleLevel(tilemap_texture, tilemap_sampler, final_atlas_uv, 0.0);
 
     // Apply lighting similar to voxel.wgsl
     if (surface_color.a > 0.0) {
@@ -158,7 +158,7 @@ fn fs_dynamic_object_icon(in: DynObjVSOutput) -> @location(0) vec4<f32> {
         let uv_min_tile = vec2<f32>(tile_x * ITEMS_TILE_SIZE_UV.x, tile_y * ITEMS_TILE_SIZE_UV.y);
         
         let final_atlas_uv = uv_min_tile + in.uv * ITEMS_TILE_SIZE_UV;
-        final_color = textureSample(items_texture, items_sampler, final_atlas_uv);
+        final_color = textureSampleLevel(items_texture, items_sampler, final_atlas_uv, 0.0);
     }
 
     // Add outline

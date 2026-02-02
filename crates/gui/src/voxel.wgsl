@@ -98,7 +98,7 @@ fn sample_texture_by_face(voxel_type: u32, hit_face_id: u32, uv_on_face: vec2<f3
     let tile_y = f32(tile_index / TILES_PER_ROW);
     let uv_min_tile = vec2<f32>(tile_x * TILE_SIZE_UV, tile_y * TILE_SIZE_UV);
     let final_atlas_uv = uv_min_tile + uv_on_face * TILE_SIZE_UV;
-    return textureSample(texture_atlas, texture_sampler, final_atlas_uv);
+    return textureSampleLevel(texture_atlas, texture_sampler, final_atlas_uv, 0.0);
 }
 
 fn blend_colors(current_color: vec4<f32>, new_color: vec4<f32>) -> vec4<f32> {
