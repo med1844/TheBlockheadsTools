@@ -7,10 +7,12 @@ on:
       - rust
 
 permissions:
-  contents: write # for committing to gh-pages branch.
+  contents: read
+  pages: write
+  id-token: write
 
 jobs:
-  build-github-pages:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4 # repo checkout
@@ -38,10 +40,18 @@ jobs:
         run: trunk build --release --public-url $public_url
         env:
           public_url: "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
-      - name: Deploy
-        uses: JamesIves/github-pages-deploy-action@v4
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          folder: crates/web_gui/dist
-          # this option will not maintain any history of your previous pages deployment
-          # set to false if you want all page build to be committed to your gh-pages branch history
-          single-commit: true
+          path: crates/web_gui/dist
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
