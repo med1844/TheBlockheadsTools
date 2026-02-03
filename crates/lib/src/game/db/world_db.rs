@@ -67,7 +67,7 @@ impl WorldDb {
     }
 
     pub fn to_path<P: AsRef<Path>>(&self, path: P) -> BhResult<()> {
-        let file = File::open(path)?;
+        let file = File::create_new(path.as_ref().join("data.mdb"))?;
         self.write_to(file)
     }
 }
