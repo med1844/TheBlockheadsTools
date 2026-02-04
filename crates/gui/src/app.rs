@@ -251,10 +251,11 @@ impl EditorApp {
                         self.file_reader
                             .set_open_path(rfd::FileDialog::new().pick_file());
                     }
-                    if ui.button("Save as").clicked() {
+                    if ui.button("Save As").clicked() {
                         save_path = rfd::FileDialog::new().pick_folder();
                     }
                 }
+
                 #[cfg(target_arch = "wasm32")]
                 {
                     if ui.button("Open").clicked() {
@@ -268,6 +269,28 @@ impl EditorApp {
                                 ctx.request_repaint();
                             }
                         })
+                    }
+                    if ui.button("Save As").clicked() {
+                        if let Some(world_db) = self.world_db.as_ref() {
+                            let mut out_bytes = Vec::new();
+                            match world_db.write_to(&mut out_bytes) {
+                                Ok(()) => {
+                                    let task = rfd::AsyncFileDialog::new()
+                                        .set_file_name("data.mdb")
+                                        .save_file();
+                                    let ctx = ui.ctx().clone();
+                                    wasm_bindgen_futures::spawn_local(async move {
+                                        if let Some(file) = task.await {
+                                            let _ = file.write(&out_bytes).await;
+                                            ctx.request_repaint();
+                                        }
+                                    })
+                                }
+                                Err(e) => {
+                                    self.save_err = Some(e);
+                                }
+                            }
+                        }
                     }
                 }
             });
