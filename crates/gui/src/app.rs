@@ -237,9 +237,6 @@ impl EditorApp {
 
     #[allow(unused_variables)] // ctx is only used in async
     fn render_menu_bar(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
-        #[cfg(not(target_arch = "wasm32"))]
-        let mut save_path = None;
-
         egui::MenuBar::new().ui(ui, |ui| {
             ui.toggle_value(&mut self.show_info, "Info");
             ui.toggle_value(&mut self.show_grid, "Grid");
@@ -252,7 +249,13 @@ impl EditorApp {
                             .set_open_path(rfd::FileDialog::new().pick_file());
                     }
                     if ui.button("Save As").clicked() {
-                        save_path = rfd::FileDialog::new().pick_folder();
+                        // TODO if world_db is empty we should return as error
+                        if let Some(world_db) = self.world_db.as_ref()
+                            && let Some(save_path) = rfd::FileDialog::new().pick_folder()
+                            && let Err(e) = world_db.to_path(save_path)
+                        {
+                            self.save_err = Some(e);
+                        }
                     }
                 }
 
@@ -270,7 +273,7 @@ impl EditorApp {
                             }
                         })
                     }
-                    if ui.button("Save As").clicked() {
+                    if ui.button("Export").clicked() {
                         if let Some(world_db) = self.world_db.as_ref() {
                             let mut out_bytes = Vec::new();
                             match world_db.write_to(&mut out_bytes) {
@@ -308,16 +311,6 @@ impl EditorApp {
             })
         {
             self.load_err = Some(e);
-        }
-
-        #[cfg(not(target_arch = "wasm32"))]
-        {
-            if let Some(world_db) = self.world_db.as_ref()
-                && let Some(save_path) = save_path
-                && let Err(e) = world_db.to_path(save_path)
-            {
-                self.save_err = Some(e);
-            }
         }
     }
 

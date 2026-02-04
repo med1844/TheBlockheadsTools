@@ -411,23 +411,15 @@ pub mod voxel_util {
 
     use super::VoxelType;
     use eframe::wgpu::{self, util::DeviceExt};
-    #[cfg(not(target_arch = "wasm32"))]
-    use rayon::{
-        iter::{IndexedParallelIterator, IntoParallelRefMutIterator, ParallelIterator},
-        slice::ParallelSliceMut,
-    };
+    use std::ops::Deref;
     use the_blockheads_tools_lib::{
         BhResult,
         game::{
             chunk::{Chunk, ChunkView, Chunks},
             coord::{ChunkBlockCoord, ChunkCoord},
         },
+        util::gzip::{Gzip, decompress_gzip_to},
     };
-
-    #[cfg(target_arch = "wasm32")]
-    use std::ops::Deref;
-    #[cfg(target_arch = "wasm32")]
-    use the_blockheads_tools_lib::util::gzip::{Gzip, decompress_gzip_to};
 
     const NUM_BLOCK_PER_CHUNK: usize = Chunk::NUM_BLOCK_PER_ROW * Chunk::NUM_BLOCK_PER_COL * 3; // 3 layers
 
@@ -468,26 +460,10 @@ pub mod voxel_util {
         Ok(())
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
-    fn build_world_voxel(chunks: &mut Chunks, world_width_macro: usize) -> Vec<VoxelType> {
-        let mut world_voxel = new_world_voxel(world_width_macro);
-        chunks
-            .inner_mut()
-            .par_iter_mut()
-            .zip(world_voxel.par_chunks_exact_mut(NUM_BLOCK_PER_CHUNK))
-            .for_each(|(chunk, chunk_voxel)| {
-                if let Some(chunk) = chunk
-                    && let Ok(chunk) = chunk.as_uncompressed()
-                {
-                    let _ = fill_chunk_voxel(chunk, chunk_voxel);
-                }
-            });
-        world_voxel
-    }
-
     // On wasm32, malloc is extremely slow (20-30ms PER call) if we do too much.
-    // This is a specialized version of building world_voxel with only 2 malloc!
-    #[cfg(target_arch = "wasm32")]
+    // This method builds world_voxel with only 2 malloc!
+    // This also turns out to help with I/O speed, based on observation that the editor
+    // will likely never edit >95% of the chunks decompressed.
     fn build_world_voxel(chunks: &Chunks, world_width_macro: usize) -> Vec<VoxelType> {
         let mut world_voxel = new_world_voxel(world_width_macro);
         let mut decompress_output = Vec::with_capacity(Chunk::NUM_BYTES);
