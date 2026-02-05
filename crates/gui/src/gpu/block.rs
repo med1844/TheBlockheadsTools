@@ -21,6 +21,10 @@ impl GpuBlockCoord {
         GpuBlockCoordUniform(uniform)
     }
 
+    pub fn coord(&self) -> Option<BlockCoord> {
+        self.coord
+    }
+
     pub fn to_buf(&self, device: &wgpu::Device) -> wgpu::Buffer {
         let uniform = self.to_uniform();
         device.create_buffer_init(&wgpu::util::BufferInitDescriptor {

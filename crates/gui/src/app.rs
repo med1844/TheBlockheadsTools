@@ -16,6 +16,8 @@ use std::sync::mpsc::{Receiver, Sender, channel};
 use the_blockheads_tools_lib::{
     BhError, BhResult,
     game::{
+        block::{Block, BlockView},
+        chunk::ChunkView,
         coord::{BlockCoord, ChunkCoord},
         db::world_db::WorldDb,
     },
@@ -235,7 +237,6 @@ impl EditorApp {
         Ok(())
     }
 
-    #[allow(unused_variables)] // ctx is only used in async
     fn render_menu_bar(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
         egui::MenuBar::new().ui(ui, |ui| {
             ui.toggle_value(&mut self.show_info, "Info");
@@ -314,6 +315,38 @@ impl EditorApp {
         }
     }
 
+    fn render_selected_block_info(ui: &mut egui::Ui, block: Block<'_>) {
+        let add_row = |ui: &mut egui::Ui, key: &str, value: &str| {
+            ui.label(key);
+            ui.label(egui::RichText::new(value).family(egui::FontFamily::Monospace));
+            ui.end_row();
+        };
+        add_row(
+            ui,
+            "Foreground",
+            &block.fg().map_or_else(
+                |_| block.fg_raw().to_string(),
+                |block_type| block_type.as_str().to_string(),
+            ),
+        );
+        add_row(
+            ui,
+            "Background",
+            &block.bg().map_or_else(
+                |_| block.bg_raw().to_string(),
+                |block_type| block_type.as_str().to_string(),
+            ),
+        );
+        add_row(
+            ui,
+            "Content",
+            &block.content().map_or_else(
+                |_| block.content_raw().to_string(),
+                |content_type| content_type.as_str().to_string(),
+            ),
+        );
+    }
+
     fn render_side_panel(&mut self, ui: &mut egui::Ui) {
         ui.label(format!("fps: {:.1}", self.fps_counter.fps()));
         ui.separator();
@@ -333,6 +366,26 @@ impl EditorApp {
                 .range(Camera::MAX_BLOCK_Z..=Camera::MAX_Z)
                 .prefix("Distance: "),
         );
+        if let Some(world_db) = self.world_db.as_mut()
+            && let Some(selected_block_coord) = self.selected_block_coord.coord()
+            && let Some(chunk) = world_db.chunks.chunk_at_mut(selected_block_coord)
+            && let Ok(chunk) = chunk.as_uncompressed()
+        {
+            let block = chunk.block_at(selected_block_coord);
+            ui.separator();
+            ui.heading(format!(
+                "Block {}, {}",
+                selected_block_coord.x(),
+                selected_block_coord.y(),
+            ));
+            egui::Grid::new("my_grid")
+                .num_columns(2)
+                .spacing([40.0, 4.0])
+                .striped(true)
+                .show(ui, |ui| {
+                    Self::render_selected_block_info(ui, block);
+                });
+        }
     }
 
     fn update_camera_pos(&mut self, ui: &mut egui::Ui, response: &egui::Response) {

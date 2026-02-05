@@ -8,6 +8,9 @@ byteorder = "1.5.0"
 flate2 = { workspace = true }
 lmdb-rs = { workspace = true }
 maybe-owned = "0.3.4"
+num-derive = "0.4.2"
+num-traits = "0.2.19"
 plist = { workspace = true }
 serde = { version = "1.0.219", features = ["derive"] }
+strum_macros = "0.27.2"
 thiserror = "2.0.12"
