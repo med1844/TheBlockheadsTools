@@ -8,6 +8,7 @@ save_structure*
 .ruff_cache
 *.png
 !crates/gui/resources/*.png
+!imgs/*.png
 server
 test.py
 lock.mdb
