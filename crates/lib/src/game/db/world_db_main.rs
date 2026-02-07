@@ -1,6 +1,10 @@
 use std::io::Write;
 
-use super::{dynamic_world_v2::DynamicWorldV2, world_v2::WorldV2};
+use super::{
+    super::dw::dynamic_object::{Blockhead, DynamicObjectList},
+    dynamic_world_v2::DynamicWorldV2,
+    world_v2::WorldV2,
+};
 use crate::{BhError, BhResult};
 use lmdb_rs::{
     codec::types::{Bytes, Str},
@@ -10,7 +14,7 @@ use lmdb_rs::{
 
 #[derive(Debug)]
 pub struct WorldDbMain {
-    pub blockheads: Vec<u8>, // Vec<Blockheads>
+    pub blockheads: DynamicObjectList<Blockhead>,
     pub dynamic_world_v2: DynamicWorldV2,
     pub world_v2: WorldV2,
 }
@@ -27,9 +31,9 @@ impl WorldDbMain {
             ));
         };
         Ok(Self {
-            blockheads: blockheads.to_vec(),
-            dynamic_world_v2: plist::from_reader_xml::<_, DynamicWorldV2>(dynamic_world_v2)?,
-            world_v2: plist::from_bytes::<WorldV2>(world_v2)?,
+            blockheads: plist::from_reader_xml(blockheads)?,
+            dynamic_world_v2: plist::from_reader_xml(dynamic_world_v2)?,
+            world_v2: plist::from_bytes(world_v2)?,
         })
     }
 
@@ -37,9 +41,11 @@ impl WorldDbMain {
         let mut dynamic_world_v2_bytes = Vec::new();
         plist::to_writer_xml(&mut dynamic_world_v2_bytes, &self.dynamic_world_v2)?;
         db.put(wtxn, "dynamicWorldv2", dynamic_world_v2_bytes.as_slice())?;
-        db.put(wtxn, "blockheads", self.blockheads.as_slice())?;
+        let mut blockheads_bytes = Vec::new();
+        plist::to_writer_xml(&mut blockheads_bytes, &self.blockheads)?;
+        db.put(wtxn, "blockheads", blockheads_bytes.as_slice())?;
         let mut world_v2_bytes = Vec::new();
-        plist::to_writer_xml(&mut world_v2_bytes, &self.world_v2)?;
+        plist::to_writer_binary(&mut world_v2_bytes, &self.world_v2)?;
         db.put(wtxn, "worldv2", world_v2_bytes.as_slice())?;
         Ok(())
     }

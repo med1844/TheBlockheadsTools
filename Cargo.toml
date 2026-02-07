@@ -14,6 +14,7 @@ flate2 = "1.1.2"
 eframe = { version = "0.33.3", default-features = false, features = ["wgpu", "default_fonts"] }
 wgpu = { version = "27.0.1", default-features = false, features = ["std", "parking_lot", "web", "webgpu", "webgl", "fragile-send-sync-non-atomic-wasm"] }
 wasm-bindgen-futures = "0.4.58"
+num_enum = "0.7.5"
 
 the-blockheads-tools-lib = { path = "crates/lib" }
 the-blockheads-tools-gui = { path = "crates/gui" }

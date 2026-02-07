@@ -8,10 +8,11 @@ use lmdb_rs::{
     database::Database,
     txn::{RoTxn, RwTxn},
 };
+use num_enum::TryFromPrimitive;
 use serde::Serialize;
 use std::{collections::HashMap, io::Write, ops::Deref};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, TryFromPrimitive)]
 #[repr(u16)]
 pub enum DynamicObjectType {
     AppleTree = 1,
@@ -68,73 +69,12 @@ pub enum DynamicObjectType {
     Yak = 63,
 }
 
-impl TryFrom<u16> for DynamicObjectType {
-    type Error = BhError;
-    fn try_from(value: u16) -> Result<Self, Self::Error> {
-        match value {
-            1 => Ok(Self::AppleTree),
-            2 => Ok(Self::MapleTree),
-            3 => Ok(Self::MangoTree),
-            4 => Ok(Self::PineTree),
-            5 => Ok(Self::CactusTree),
-            6 => Ok(Self::CoconutTree),
-            7 => Ok(Self::OrangeTree),
-            8 => Ok(Self::CherryTree),
-            9 => Ok(Self::CoffeeTree),
-            10 => Ok(Self::FlaxPlant),
-            11 => Ok(Self::SunflowerPlant),
-            12 => Ok(Self::CornPlant),
-            13 => Ok(Self::Dodo),
-            14 => Ok(Self::Item),
-            16 => Ok(Self::Fire),
-            17 => Ok(Self::Torch),
-            18 => Ok(Self::GlowBlock),
-            19 => Ok(Self::Ladder),
-            20 => Ok(Self::Door),
-            21 => Ok(Self::ArtificialLight),
-            23 => Ok(Self::Bed),
-            25 => Ok(Self::Dropbear),
-            26 => Ok(Self::GatherBlock),
-            27 => Ok(Self::CarrotPlant),
-            28 => Ok(Self::Donkey),
-            30 => Ok(Self::Egg),
-            31 => Ok(Self::Window),
-            32 => Ok(Self::Boat),
-            33 => Ok(Self::ChilliPlant),
-            34 => Ok(Self::KelpPlant),
-            35 => Ok(Self::ClownFish),
-            36 => Ok(Self::Shark),
-            37 => Ok(Self::LimeTree),
-            38 => Ok(Self::Wire),
-            39 => Ok(Self::CaveTroll),
-            40 => Ok(Self::Rail),
-            45 => Ok(Self::Workbench),
-            46 => Ok(Self::Chest),
-            47 => Ok(Self::Sign),
-            48 => Ok(Self::TradingPost),
-            50 => Ok(Self::TradePortal),
-            51 => Ok(Self::Scorpion),
-            53 => Ok(Self::Column),
-            54 => Ok(Self::Stairs),
-            55 => Ok(Self::ElevatorMotor),
-            56 => Ok(Self::ElevatorShaft),
-            57 => Ok(Self::GemTree),
-            58 => Ok(Self::VinePlant),
-            59 => Ok(Self::TulipPlant),
-            61 => Ok(Self::WheatPlant),
-            62 => Ok(Self::TomatoPlant),
-            63 => Ok(Self::Yak),
-            _ => Err(BhError::InvalidDynamicOjectId(value.to_string()))?,
-        }
-    }
-}
-
 impl DynamicObjectType {
     fn try_from_str(s: &str) -> BhResult<Self> {
         let value: u16 = s
             .parse()
             .map_err(|_| BhError::ParseError(format!("Dynamic object type {} is invalid", s)))?;
-        value.try_into()
+        Self::try_from(value).map_err(|e| BhError::InvalidDynamicOjectId(e.number))
     }
 }
 

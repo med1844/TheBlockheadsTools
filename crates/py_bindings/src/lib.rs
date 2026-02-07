@@ -1,19 +1,18 @@
-use std::sync::{Arc, Mutex};
-
 use pyo3::{
     create_exception,
     exceptions::{PyException, PyValueError},
     prelude::*,
 };
+use std::sync::{Arc, RwLock};
 use the_blockheads_tools_lib as lib;
 
-pub type SharedWorldDb = Arc<Mutex<lib::game::db::world_db::WorldDb>>;
+pub type SharedWorldDb = Arc<RwLock<lib::game::db::world_db::WorldDb>>;
 
 pub fn into_py_err(err: lib::BhError) -> PyErr {
     let error_message = err.to_string();
 
     match err {
-        lib::BhError::DbError(_)
+        lib::BhError::LmdbError(_)
         | lib::BhError::PlistError(_)
         | lib::BhError::GzipError(_)
         | lib::BhError::MissingKey(_) => PyException::new_err(error_message),
@@ -157,10 +156,11 @@ mod block {
         block::{BlockType, BlockView},
         coord::BlockCoord,
     };
+    use num_enum::TryFromPrimitive;
     use pyo3::prelude::*;
 
     #[pyclass(eq, eq_int, name = "BlockType")]
-    #[derive(PartialEq)]
+    #[derive(PartialEq, TryFromPrimitive)]
     #[repr(u8)]
     pub enum BlockTypePy {
         Stone = 1,
@@ -240,161 +240,13 @@ mod block {
 
     impl From<BlockType> for BlockTypePy {
         fn from(value: BlockType) -> Self {
-            match value {
-                BlockType::Stone => Self::Stone,
-                BlockType::Air => Self::Air,
-                BlockType::Water => Self::Water,
-                BlockType::Ice => Self::Ice,
-                BlockType::Snow => Self::Snow,
-                BlockType::Dirt => Self::Dirt,
-                BlockType::DesertSand => Self::DesertSand,
-                BlockType::BeachSand => Self::BeachSand,
-                BlockType::Wood => Self::Wood,
-                BlockType::MinedStone => Self::MinedStone,
-                BlockType::RedBrick => Self::RedBrick,
-                BlockType::Limestone => Self::Limestone,
-                BlockType::MinedLimestone => Self::MinedLimestone,
-                BlockType::Marble => Self::Marble,
-                BlockType::MinedMarble => Self::MinedMarble,
-                BlockType::TimeCrystal => Self::TimeCrystal,
-                BlockType::SandStone => Self::SandStone,
-                BlockType::MinedSandStone => Self::MinedSandStone,
-                BlockType::RedMarble => Self::RedMarble,
-                BlockType::MinedRedMarble => Self::MinedRedMarble,
-                BlockType::Glass => Self::Glass,
-                BlockType::SpawnPortalBase => Self::SpawnPortalBase,
-                BlockType::GoldBlock => Self::GoldBlock,
-                BlockType::GrassDirt => Self::GrassDirt,
-                BlockType::SnowDirt => Self::SnowDirt,
-                BlockType::LapisLazuli => Self::LapisLazuli,
-                BlockType::MinedLapisLazuli => Self::MinedLapisLazuli,
-                BlockType::Lava => Self::Lava,
-                BlockType::ReinforcedPlatform => Self::ReinforcedPlatform,
-                BlockType::SpawnPortalBaseAmethyst => Self::SpawnPortalBaseAmethyst,
-                BlockType::SpawnPortalBaseSapphire => Self::SpawnPortalBaseSapphire,
-                BlockType::SpawnPortalBaseEmerald => Self::SpawnPortalBaseEmerald,
-                BlockType::SpawnPortalBaseRuby => Self::SpawnPortalBaseRuby,
-                BlockType::SpawnPortalBaseDiamond => Self::SpawnPortalBaseDiamond,
-                BlockType::NorthPole => Self::NorthPole,
-                BlockType::SouthPole => Self::SouthPole,
-                BlockType::WestPole => Self::WestPole,
-                BlockType::EastPole => Self::EastPole,
-                BlockType::PortalBase => Self::PortalBase,
-                BlockType::PortalBaseAmethyst => Self::PortalBaseAmethyst,
-                BlockType::PortalBaseSapphire => Self::PortalBaseSapphire,
-                BlockType::PortalBaseEmerald => Self::PortalBaseEmerald,
-                BlockType::PortalBaseRuby => Self::PortalBaseRuby,
-                BlockType::PortalBaseDiamond => Self::PortalBaseDiamond,
-                BlockType::Compost => Self::Compost,
-                BlockType::GrassCompost => Self::GrassCompost,
-                BlockType::SnowCompost => Self::SnowCompost,
-                BlockType::Basalt => Self::Basalt,
-                BlockType::MinedBasalt => Self::MinedBasalt,
-                BlockType::CopperBlock => Self::CopperBlock,
-                BlockType::TinBlock => Self::TinBlock,
-                BlockType::BronzeBlock => Self::BronzeBlock,
-                BlockType::IronBlock => Self::IronBlock,
-                BlockType::SteelBlock => Self::SteelBlock,
-                BlockType::BlackSand => Self::BlackSand,
-                BlockType::BlackGlass => Self::BlackGlass,
-                BlockType::TradePortalBase => Self::TradePortalBase,
-                BlockType::TradePortalBaseAmethyst => Self::TradePortalBaseAmethyst,
-                BlockType::TradePortalBaseSapphire => Self::TradePortalBaseSapphire,
-                BlockType::TradePortalBaseEmerald => Self::TradePortalBaseEmerald,
-                BlockType::TradePortalBaseRuby => Self::TradePortalBaseRuby,
-                BlockType::TradePortalBaseDiamond => Self::TradePortalBaseDiamond,
-                BlockType::PlatinumBlock => Self::PlatinumBlock,
-                BlockType::TitaniumBlock => Self::TitaniumBlock,
-                BlockType::CarbonFiberBlock => Self::CarbonFiberBlock,
-                BlockType::Gravel => Self::Gravel,
-                BlockType::AmethystBlock => Self::AmethystBlock,
-                BlockType::SapphireBlock => Self::SapphireBlock,
-                BlockType::EmeraldBlock => Self::EmeraldBlock,
-                BlockType::RubyBlock => Self::RubyBlock,
-                BlockType::DiamondBlock => Self::DiamondBlock,
-                BlockType::Plaster => Self::Plaster,
-                BlockType::LuminousPlaster => Self::LuminousPlaster,
-            }
+            Self::try_from(value as u8).expect("Enums are out of sync!")
         }
     }
 
     impl Into<BlockType> for BlockTypePy {
         fn into(self) -> BlockType {
-            match self {
-                Self::Stone => BlockType::Stone,
-                Self::Air => BlockType::Air,
-                Self::Water => BlockType::Water,
-                Self::Ice => BlockType::Ice,
-                Self::Snow => BlockType::Snow,
-                Self::Dirt => BlockType::Dirt,
-                Self::DesertSand => BlockType::DesertSand,
-                Self::BeachSand => BlockType::BeachSand,
-                Self::Wood => BlockType::Wood,
-                Self::MinedStone => BlockType::MinedStone,
-                Self::RedBrick => BlockType::RedBrick,
-                Self::Limestone => BlockType::Limestone,
-                Self::MinedLimestone => BlockType::MinedLimestone,
-                Self::Marble => BlockType::Marble,
-                Self::MinedMarble => BlockType::MinedMarble,
-                Self::TimeCrystal => BlockType::TimeCrystal,
-                Self::SandStone => BlockType::SandStone,
-                Self::MinedSandStone => BlockType::MinedSandStone,
-                Self::RedMarble => BlockType::RedMarble,
-                Self::MinedRedMarble => BlockType::MinedRedMarble,
-                Self::Glass => BlockType::Glass,
-                Self::SpawnPortalBase => BlockType::SpawnPortalBase,
-                Self::GoldBlock => BlockType::GoldBlock,
-                Self::GrassDirt => BlockType::GrassDirt,
-                Self::SnowDirt => BlockType::SnowDirt,
-                Self::LapisLazuli => BlockType::LapisLazuli,
-                Self::MinedLapisLazuli => BlockType::MinedLapisLazuli,
-                Self::Lava => BlockType::Lava,
-                Self::ReinforcedPlatform => BlockType::ReinforcedPlatform,
-                Self::SpawnPortalBaseAmethyst => BlockType::SpawnPortalBaseAmethyst,
-                Self::SpawnPortalBaseSapphire => BlockType::SpawnPortalBaseSapphire,
-                Self::SpawnPortalBaseEmerald => BlockType::SpawnPortalBaseEmerald,
-                Self::SpawnPortalBaseRuby => BlockType::SpawnPortalBaseRuby,
-                Self::SpawnPortalBaseDiamond => BlockType::SpawnPortalBaseDiamond,
-                Self::NorthPole => BlockType::NorthPole,
-                Self::SouthPole => BlockType::SouthPole,
-                Self::WestPole => BlockType::WestPole,
-                Self::EastPole => BlockType::EastPole,
-                Self::PortalBase => BlockType::PortalBase,
-                Self::PortalBaseAmethyst => BlockType::PortalBaseAmethyst,
-                Self::PortalBaseSapphire => BlockType::PortalBaseSapphire,
-                Self::PortalBaseEmerald => BlockType::PortalBaseEmerald,
-                Self::PortalBaseRuby => BlockType::PortalBaseRuby,
-                Self::PortalBaseDiamond => BlockType::PortalBaseDiamond,
-                Self::Compost => BlockType::Compost,
-                Self::GrassCompost => BlockType::GrassCompost,
-                Self::SnowCompost => BlockType::SnowCompost,
-                Self::Basalt => BlockType::Basalt,
-                Self::MinedBasalt => BlockType::MinedBasalt,
-                Self::CopperBlock => BlockType::CopperBlock,
-                Self::TinBlock => BlockType::TinBlock,
-                Self::BronzeBlock => BlockType::BronzeBlock,
-                Self::IronBlock => BlockType::IronBlock,
-                Self::SteelBlock => BlockType::SteelBlock,
-                Self::BlackSand => BlockType::BlackSand,
-                Self::BlackGlass => BlockType::BlackGlass,
-                Self::TradePortalBase => BlockType::TradePortalBase,
-                Self::TradePortalBaseAmethyst => BlockType::TradePortalBaseAmethyst,
-                Self::TradePortalBaseSapphire => BlockType::TradePortalBaseSapphire,
-                Self::TradePortalBaseEmerald => BlockType::TradePortalBaseEmerald,
-                Self::TradePortalBaseRuby => BlockType::TradePortalBaseRuby,
-                Self::TradePortalBaseDiamond => BlockType::TradePortalBaseDiamond,
-                Self::PlatinumBlock => BlockType::PlatinumBlock,
-                Self::TitaniumBlock => BlockType::TitaniumBlock,
-                Self::CarbonFiberBlock => BlockType::CarbonFiberBlock,
-                Self::Gravel => BlockType::Gravel,
-                Self::AmethystBlock => BlockType::AmethystBlock,
-                Self::SapphireBlock => BlockType::SapphireBlock,
-                Self::EmeraldBlock => BlockType::EmeraldBlock,
-                Self::RubyBlock => BlockType::RubyBlock,
-                Self::DiamondBlock => BlockType::DiamondBlock,
-                Self::Plaster => BlockType::Plaster,
-                Self::LuminousPlaster => BlockType::LuminousPlaster,
-            }
+            BlockType::try_from(self as u8).expect("Enums are out of sync!")
         }
     }
 
@@ -407,7 +259,7 @@ mod block {
     #[pymethods]
     impl BlockPy {
         fn fg(&self) -> PyResult<BlockTypePy> {
-            let mut world_db = self.world_db.lock().unwrap();
+            let mut world_db = self.world_db.write().unwrap();
             let block = world_db.chunks.block_at(self.block_coord);
             match block {
                 Some(block) => {
@@ -444,7 +296,7 @@ mod chunk {
     #[pymethods]
     impl ChunkPy {
         fn as_bytes(&'_ self) -> PyResult<Cow<'_, [u8]>> {
-            let mut world_db = self.world_db.lock().unwrap();
+            let mut world_db = self.world_db.write().unwrap();
             let chunk = world_db.chunks.chunk_at_mut(self.coord);
             match chunk {
                 Some(chunk) => Ok(Cow::Owned(chunk.as_uncompressed()?.inner().to_owned())),
@@ -477,13 +329,13 @@ mod chunk {
     #[pymethods]
     impl ChunksPy {
         fn __contains__(&self, coord: &ChunkCoordPy) -> bool {
-            let world_db = self.world_db.lock().unwrap();
+            let world_db = self.world_db.read().unwrap();
             world_db.chunks.contains_key(coord.inner)
         }
 
         fn keys(&self) -> HashSet<ChunkCoordPy> {
             // Ton's of allocation, but I guess python users will be ok with that.
-            let world_db = self.world_db.lock().unwrap();
+            let world_db = self.world_db.read().unwrap();
             HashSet::from_iter(
                 world_db
                     .chunks
@@ -501,7 +353,7 @@ mod chunk {
                 }
                 IntoChunkCoord::ChunkCoord(chunk_coord_py) => chunk_coord_py.inner,
             };
-            let world_db = self.world_db.lock().unwrap();
+            let world_db = self.world_db.read().unwrap();
             world_db.chunks.contains_key(chunk_coord).then(|| ChunkPy {
                 world_db: self.world_db.clone(),
                 coord: chunk_coord,
@@ -510,7 +362,7 @@ mod chunk {
 
         fn block_at(&self, coord: BlockCoordPy) -> Option<BlockPy> {
             let (chunk_coord, _) = coord.inner.decompose();
-            let world_db = self.world_db.lock().unwrap();
+            let world_db = self.world_db.read().unwrap();
             world_db
                 .chunks
                 .contains_key(chunk_coord)
@@ -525,14 +377,14 @@ mod chunk {
 pub use chunk::{ChunkPy, ChunksPy};
 
 mod world_db {
+    use super::{Arc, RwLock};
+    use crate::{into_py_err, lib, ChunksPy, SharedWorldDb};
+    use lib::game::{db::world_db::WorldDb, dw::dynamic_object::Blockhead};
+    use pyo3::prelude::*;
     use std::{
         borrow::Cow,
-        sync::{Arc, Mutex},
+        sync::{RwLockReadGuard, RwLockWriteGuard},
     };
-
-    use crate::{into_py_err, lib, ChunksPy, SharedWorldDb};
-    use lib::game::db::world_db::WorldDb;
-    use pyo3::prelude::*;
 
     #[pyclass(name = "WorldV2")]
     pub struct WorldV2Py {
@@ -543,13 +395,13 @@ mod world_db {
     impl WorldV2Py {
         #[getter]
         fn get_blockhead_datas_v2(&self) -> String {
-            let world_db = self.inner.lock().unwrap();
+            let world_db = self.inner.read().unwrap();
             format!("{:?}", world_db.main.world_v2.blockhead_datas_v2)
         }
 
         #[getter]
         fn get_circum_navigate_booleans_data(&'_ self) -> Cow<'_, [u8]> {
-            let world_db = self.inner.lock().unwrap();
+            let world_db = self.inner.read().unwrap();
             Cow::Owned(
                 world_db
                     .main
@@ -562,19 +414,19 @@ mod world_db {
 
         #[setter]
         fn set_circum_navigate_booleans_data(&self, value: Vec<u8>) {
-            let mut world_db = self.inner.lock().unwrap();
+            let mut world_db = self.inner.write().unwrap();
             world_db.main.world_v2.circum_navigate_booleans_data = value.into();
         }
 
         #[getter]
         fn get_creation_date(&self) -> String {
-            let world_db = self.inner.lock().unwrap();
+            let world_db = self.inner.read().unwrap();
             format!("{:?}", world_db.main.world_v2.creation_date)
         }
 
         #[getter]
         fn get_distance_ordered_food_types(&self) -> Cow<'_, [u8]> {
-            let world_db = self.inner.lock().unwrap();
+            let world_db = self.inner.read().unwrap();
             Cow::Owned(
                 world_db
                     .main
@@ -587,55 +439,55 @@ mod world_db {
 
         #[setter]
         fn set_distance_ordered_food_types(&self, value: Vec<u8>) {
-            let mut world_db = self.inner.lock().unwrap();
+            let mut world_db = self.inner.write().unwrap();
             world_db.main.world_v2.distance_ordered_food_types = value.into();
         }
 
         #[getter]
         fn get_expert_mode(&self) -> bool {
-            self.inner.lock().unwrap().main.world_v2.expert_mode
+            self.inner.read().unwrap().main.world_v2.expert_mode
         }
 
         #[setter]
         fn set_expert_mode(&self, value: bool) {
-            self.inner.lock().unwrap().main.world_v2.expert_mode = value;
+            self.inner.write().unwrap().main.world_v2.expert_mode = value;
         }
 
         #[getter]
         fn get_found_items(&'_ self) -> Cow<'_, [u8]> {
-            let world_db = self.inner.lock().unwrap();
+            let world_db = self.inner.read().unwrap();
             Cow::Owned(world_db.main.world_v2.found_items.as_ref().to_vec())
         }
 
         #[setter]
         fn set_found_items(&self, value: Vec<u8>) {
-            self.inner.lock().unwrap().main.world_v2.found_items = value.into();
+            self.inner.write().unwrap().main.world_v2.found_items = value.into();
         }
 
         #[getter]
         fn get_host_port(&self) -> Option<String> {
-            self.inner.lock().unwrap().main.world_v2.host_port.clone()
+            self.inner.read().unwrap().main.world_v2.host_port.clone()
         }
 
         #[setter]
         fn set_host_port(&self, value: Option<&str>) {
-            self.inner.lock().unwrap().main.world_v2.host_port = value.map(ToString::to_string);
+            self.inner.write().unwrap().main.world_v2.host_port = value.map(ToString::to_string);
         }
 
         #[getter]
         fn get_max_players(&self) -> Option<String> {
-            self.inner.lock().unwrap().main.world_v2.max_players.clone()
+            self.inner.read().unwrap().main.world_v2.max_players.clone()
         }
 
         #[setter]
         fn set_max_players(&self, value: Option<&str>) {
-            self.inner.lock().unwrap().main.world_v2.max_players = value.map(ToString::to_string);
+            self.inner.write().unwrap().main.world_v2.max_players = value.map(ToString::to_string);
         }
 
         #[getter]
         fn get_migration_complete_v1_7(&self) -> bool {
             self.inner
-                .lock()
+                .read()
                 .unwrap()
                 .main
                 .world_v2
@@ -645,7 +497,7 @@ mod world_db {
         #[setter]
         fn set_migration_complete_v1_7(&self, value: bool) {
             self.inner
-                .lock()
+                .write()
                 .unwrap()
                 .main
                 .world_v2
@@ -654,142 +506,142 @@ mod world_db {
 
         #[getter]
         fn get_no_rain_timer(&self) -> f64 {
-            self.inner.lock().unwrap().main.world_v2.no_rain_timer
+            self.inner.read().unwrap().main.world_v2.no_rain_timer
         }
 
         #[setter]
         fn set_no_rain_timer(&self, value: f64) {
-            self.inner.lock().unwrap().main.world_v2.no_rain_timer = value;
+            self.inner.write().unwrap().main.world_v2.no_rain_timer = value;
         }
 
         #[getter]
         fn get_portal_level(&self) -> u64 {
-            self.inner.lock().unwrap().main.world_v2.portal_level
+            self.inner.read().unwrap().main.world_v2.portal_level
         }
 
         #[setter]
         fn set_portal_level(&self, value: u64) {
-            self.inner.lock().unwrap().main.world_v2.portal_level = value;
+            self.inner.write().unwrap().main.world_v2.portal_level = value;
         }
 
         #[getter]
         fn get_random_seed(&self) -> u64 {
-            self.inner.lock().unwrap().main.world_v2.random_seed
+            self.inner.read().unwrap().main.world_v2.random_seed
         }
 
         #[setter]
         fn set_random_seed(&self, value: u64) {
-            self.inner.lock().unwrap().main.world_v2.random_seed = value;
+            self.inner.write().unwrap().main.world_v2.random_seed = value;
         }
 
         #[getter]
         fn get_remote_game(&self) -> bool {
-            self.inner.lock().unwrap().main.world_v2.remote_game
+            self.inner.read().unwrap().main.world_v2.remote_game
         }
 
         #[setter]
         fn set_remote_game(&self, value: bool) {
-            self.inner.lock().unwrap().main.world_v2.remote_game = value;
+            self.inner.write().unwrap().main.world_v2.remote_game = value;
         }
 
         #[getter]
         fn get_run_at_launch(&self) -> bool {
-            self.inner.lock().unwrap().main.world_v2.run_at_launch
+            self.inner.read().unwrap().main.world_v2.run_at_launch
         }
 
         #[setter]
         fn set_run_at_launch(&self, value: bool) {
-            self.inner.lock().unwrap().main.world_v2.run_at_launch = value;
+            self.inner.write().unwrap().main.world_v2.run_at_launch = value;
         }
 
         #[getter]
         fn get_save_date(&self) -> String {
-            let world_db = self.inner.lock().unwrap();
+            let world_db = self.inner.read().unwrap();
             format!("{:?}", world_db.main.world_v2.save_date)
         }
 
         #[getter]
         fn get_save_id(&self) -> String {
-            self.inner.lock().unwrap().main.world_v2.save_id.clone()
+            self.inner.read().unwrap().main.world_v2.save_id.clone()
         }
 
         #[setter]
         fn set_save_id(&self, value: &str) {
-            self.inner.lock().unwrap().main.world_v2.save_id = value.to_string();
+            self.inner.write().unwrap().main.world_v2.save_id = value.to_string();
         }
 
         #[getter]
         fn get_save_version(&self) -> u64 {
-            self.inner.lock().unwrap().main.world_v2.save_version
+            self.inner.read().unwrap().main.world_v2.save_version
         }
 
         #[setter]
         fn set_save_version(&self, value: u64) {
-            self.inner.lock().unwrap().main.world_v2.save_version = value;
+            self.inner.write().unwrap().main.world_v2.save_version = value;
         }
 
         #[getter]
         fn get_start_portal_pos_x(&self) -> u64 {
-            self.inner.lock().unwrap().main.world_v2.start_portal_pos_x
+            self.inner.read().unwrap().main.world_v2.start_portal_pos_x
         }
 
         #[setter]
         fn set_start_portal_pos_x(&self, value: u64) {
-            self.inner.lock().unwrap().main.world_v2.start_portal_pos_x = value;
+            self.inner.write().unwrap().main.world_v2.start_portal_pos_x = value;
         }
 
         #[getter]
         fn get_start_portal_pos_y(&self) -> u64 {
-            self.inner.lock().unwrap().main.world_v2.start_portal_pos_y
+            self.inner.read().unwrap().main.world_v2.start_portal_pos_y
         }
 
         #[setter]
         fn set_start_portal_pos_y(&self, value: u64) {
-            self.inner.lock().unwrap().main.world_v2.start_portal_pos_y = value;
+            self.inner.write().unwrap().main.world_v2.start_portal_pos_y = value;
         }
 
         #[getter]
         fn get_translation(&self) -> (f64, f64) {
-            self.inner.lock().unwrap().main.world_v2.translation
+            self.inner.read().unwrap().main.world_v2.translation
         }
 
         #[setter]
         fn set_translation(&self, value: (f64, f64)) {
-            self.inner.lock().unwrap().main.world_v2.translation = value;
+            self.inner.write().unwrap().main.world_v2.translation = value;
         }
 
         #[getter]
         fn get_world_name(&self) -> String {
-            self.inner.lock().unwrap().main.world_v2.world_name.clone()
+            self.inner.read().unwrap().main.world_v2.world_name.clone()
         }
 
         #[setter]
         fn set_world_name(&self, value: &str) {
-            self.inner.lock().unwrap().main.world_v2.world_name = value.to_string();
+            self.inner.write().unwrap().main.world_v2.world_name = value.to_string();
         }
 
         #[getter]
         fn get_world_time(&self) -> f64 {
-            self.inner.lock().unwrap().main.world_v2.world_time
+            self.inner.read().unwrap().main.world_v2.world_time
         }
 
         #[setter]
         fn set_world_time(&self, value: f64) {
-            self.inner.lock().unwrap().main.world_v2.world_time = value;
+            self.inner.write().unwrap().main.world_v2.world_time = value;
         }
 
         #[getter]
         fn get_world_width_macro(&self) -> u32 {
-            self.inner.lock().unwrap().main.world_v2.world_width_macro
+            self.inner.read().unwrap().main.world_v2.world_width_macro
         }
 
         #[setter]
         fn set_world_width_macro(&self, value: u32) {
-            self.inner.lock().unwrap().main.world_v2.world_width_macro = value;
+            self.inner.write().unwrap().main.world_v2.world_width_macro = value;
         }
 
         fn __repr__(&self) -> String {
-            format!("{:?}", self.inner.lock().unwrap().main.world_v2)
+            format!("{:?}", self.inner.read().unwrap().main.world_v2)
         }
     }
 
@@ -798,74 +650,52 @@ mod world_db {
         inner: SharedWorldDb,
     }
 
+    impl DynamicWorldV2Py {
+        fn read(&self) -> RwLockReadGuard<'_, WorldDb> {
+            self.inner.read().unwrap()
+        }
+
+        fn write(&self) -> RwLockWriteGuard<'_, WorldDb> {
+            self.inner.write().unwrap()
+        }
+    }
+
     #[pymethods]
     impl DynamicWorldV2Py {
         #[getter]
         fn get_active_blockhead_index(&self) -> u64 {
-            self.inner
-                .lock()
-                .unwrap()
-                .main
-                .dynamic_world_v2
-                .active_blockhead_index
+            self.read().main.dynamic_world_v2.active_blockhead_index
         }
 
         #[setter]
         fn set_active_blockhead_index(&self, value: u64) {
-            self.inner
-                .lock()
-                .unwrap()
-                .main
-                .dynamic_world_v2
-                .active_blockhead_index = value;
+            self.write().main.dynamic_world_v2.active_blockhead_index = value;
         }
 
         #[getter]
         fn get_dynamic_object_id_count(&self) -> u64 {
-            self.inner
-                .lock()
-                .unwrap()
-                .main
-                .dynamic_world_v2
-                .dynamic_object_id_count
+            self.read().main.dynamic_world_v2.dynamic_object_id_count
         }
 
         #[setter]
         fn set_dynamic_object_id_count(&self, value: u64) {
-            self.inner
-                .lock()
-                .unwrap()
-                .main
-                .dynamic_world_v2
-                .dynamic_object_id_count = value;
+            self.write().main.dynamic_world_v2.dynamic_object_id_count = value;
         }
 
         #[getter]
         fn get_save_version(&self) -> u8 {
-            self.inner
-                .lock()
-                .unwrap()
-                .main
-                .dynamic_world_v2
-                .save_version
+            self.read().main.dynamic_world_v2.save_version
         }
 
         #[setter]
         fn set_save_version(&self, value: u8) {
-            self.inner
-                .lock()
-                .unwrap()
-                .main
-                .dynamic_world_v2
-                .save_version = value;
+            self.write().main.dynamic_world_v2.save_version = value;
         }
 
         #[getter]
         fn get_saved_glow_indices(&'_ self) -> Cow<'_, [u8]> {
             Cow::Owned(
-                self.inner
-                    .lock()
-                    .unwrap()
+                self.read()
                     .main
                     .dynamic_world_v2
                     .saved_glow_indices
@@ -876,36 +706,107 @@ mod world_db {
 
         #[setter]
         fn set_saved_glow_indices(&self, value: Vec<u8>) {
-            self.inner
-                .lock()
-                .unwrap()
-                .main
-                .dynamic_world_v2
-                .saved_glow_indices = value.into();
+            self.write().main.dynamic_world_v2.saved_glow_indices = value.into();
         }
 
         #[getter]
         fn get_workbench_has_been_crafted(&self) -> bool {
-            self.inner
-                .lock()
-                .unwrap()
-                .main
-                .dynamic_world_v2
-                .workbench_has_been_crafted
+            self.read().main.dynamic_world_v2.workbench_has_been_crafted
         }
 
         #[setter]
         fn set_workbench_has_been_crafted(&self, value: bool) {
-            self.inner
-                .lock()
-                .unwrap()
+            self.write()
                 .main
                 .dynamic_world_v2
                 .workbench_has_been_crafted = value;
         }
 
         fn __repr__(&self) -> String {
-            format!("{:?}", self.inner.lock().unwrap().main.dynamic_world_v2)
+            format!("{:?}", self.inner.read().unwrap().main.dynamic_world_v2)
+        }
+    }
+
+    #[pyclass(name = "Blockhead")]
+    pub struct BlockheadPy {
+        inner: SharedWorldDb,
+        index: usize,
+    }
+
+    impl BlockheadPy {
+        fn read(&self) -> RwLockReadGuard<'_, WorldDb> {
+            self.inner.read().unwrap()
+        }
+
+        fn write(&self) -> RwLockWriteGuard<'_, WorldDb> {
+            self.inner.write().unwrap()
+        }
+    }
+
+    #[pymethods]
+    impl BlockheadPy {
+        #[getter]
+        fn get_name(&self) -> String {
+            self.read().main.blockheads[self.index].name.clone()
+        }
+
+        #[setter]
+        fn set_name(&self, value: String) {
+            self.write().main.blockheads[self.index].name = value;
+        }
+
+        #[getter]
+        fn get_clothing_increment_timer(&self) -> u64 {
+            self.read().main.blockheads[self.index].clothing_increment_timer
+        }
+
+        #[setter]
+        fn set_clothing_increment_timer(&self, value: u64) {
+            self.write().main.blockheads[self.index].clothing_increment_timer = value;
+        }
+
+        #[getter]
+        fn get_double_time_unlocked(&self) -> bool {
+            self.read().main.blockheads[self.index].double_time_unlocked
+        }
+
+        #[setter]
+        fn set_double_time_unlocked(&self, value: bool) {
+            self.write().main.blockheads[self.index].double_time_unlocked = value;
+        }
+
+        #[getter]
+        fn get_skin_options(&self) -> Cow<'_, [u8]> {
+            Cow::Owned(
+                self.read().main.blockheads[self.index]
+                    .skin_options
+                    .as_ref()
+                    .to_vec(),
+            )
+        }
+
+        #[setter]
+        fn set_skin_options(&self, value: Vec<u8>) {
+            self.write().main.blockheads[self.index].skin_options = value.into();
+        }
+
+        #[getter]
+        fn get_state(&self) -> Cow<'_, [u8]> {
+            Cow::Owned(
+                self.read().main.blockheads[self.index]
+                    .state
+                    .as_ref()
+                    .to_vec(),
+            )
+        }
+
+        #[setter]
+        fn set_state(&self, value: Vec<u8>) {
+            self.write().main.blockheads[self.index].state = value.into();
+        }
+
+        fn __repr__(&self) -> String {
+            format!("{:?}", self.read().main.blockheads[self.index])
         }
     }
 
@@ -917,8 +818,19 @@ mod world_db {
     #[pymethods]
     impl WorldDbMainPy {
         #[getter]
-        fn get_blockheads(&'_ self) -> Cow<'_, [u8]> {
-            Cow::Owned(self.inner.lock().unwrap().main.blockheads.to_vec())
+        fn get_blockheads(&'_ self) -> Vec<BlockheadPy> {
+            self.inner
+                .read()
+                .unwrap()
+                .main
+                .blockheads
+                .iter()
+                .enumerate()
+                .map(|(index, _)| BlockheadPy {
+                    inner: self.inner.clone(),
+                    index,
+                })
+                .collect()
         }
 
         #[getter]
@@ -951,13 +863,13 @@ mod world_db {
         fn open(path: &str) -> PyResult<Self> {
             let world_db = WorldDb::from_path(path).map_err(into_py_err)?;
             Ok(Self {
-                inner: Arc::new(Mutex::new(world_db)),
+                inner: Arc::new(RwLock::new(world_db)),
             })
         }
 
         fn save(&self, path: &str) -> PyResult<()> {
             self.inner
-                .lock()
+                .read()
                 .unwrap()
                 .to_path(path)
                 .map_err(into_py_err)?;

@@ -1,6 +1,39 @@
+use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
 
-use serde::{Deserialize, Serialize};
+// Rust doesn't have inheritance, yet game is built on that.
+// Thus we have to emulate that, and thankfully it's not too hard.
+macro_rules! inherit {
+    ($child:ident -> $parent:ty, $field:ident) => {
+        impl Deref for $child {
+            type Target = $parent;
+            fn deref(&self) -> &Self::Target {
+                &self.$field
+            }
+        }
+
+        impl DerefMut for $child {
+            fn deref_mut(&mut self) -> &mut Self::Target {
+                &mut self.$field
+            }
+        }
+    };
+
+    ($child:ident -> $parent:ty) => {
+        impl Deref for $child {
+            type Target = $parent;
+            fn deref(&self) -> &Self::Target {
+                &self.0
+            }
+        }
+
+        impl DerefMut for $child {
+            fn deref_mut(&mut self) -> &mut Self::Target {
+                &mut self.0
+            }
+        }
+    };
+}
 
 // We need a root struct to match the plist's top-level dictionary
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -42,91 +75,63 @@ pub struct DynamicObject {
 
 // Corresponds to Plant
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Plant {
     #[serde(flatten)]
     pub obj: DynamicObject,
-
-    #[serde(rename = "saveTime")]
     pub save_time: f64,
-    #[serde(rename = "seasonOffset")]
     pub season_offset: i32,
-    #[serde(rename = "gatherProgress")]
     pub gather_progress: i32,
-    #[serde(rename = "hasFloweredThisSeason")]
     pub has_flowered_this_season: bool,
     pub flowering: bool,
     pub frozen: bool,
     pub age: f32,
-    #[serde(rename = "maxAge")]
     pub max_age: f32,
-    #[serde(rename = "maxAgeGene")]
     pub max_age_gene: u16,
-    #[serde(rename = "growthRate")]
     pub growth_rate: f32,
-    #[serde(rename = "growthRateGene")]
     pub growth_rate_gene: u16,
 }
 
-impl Deref for Plant {
-    type Target = DynamicObject;
+inherit!(Plant -> DynamicObject, obj);
 
-    fn deref(&self) -> &Self::Target {
-        &self.obj
-    }
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ArtificialLight {
+    pub max_red: u32,
+    pub max_green: u32,
+    pub max_blue: u32,
+    pub max_heat: u32,
+    pub radius: u32,
+    #[serde(rename = "contributionGridOrigin.x")]
+    pub contribution_grid_origin_x: i32,
+    #[serde(rename = "contributionGridOrigin.y")]
+    pub contribution_grid_origin_y: i32,
+    pub light_direction: LightDirection,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct NormalPlant {
     #[serde(flatten)]
     pub plant: Plant,
-
-    #[serde(rename = "availableFood")]
     pub available_food: f32,
-
-    #[serde(rename = "lightDict")]
     pub light: Option<ArtificialLight>,
 }
 
-impl Deref for NormalPlant {
-    type Target = Plant;
-
-    fn deref(&self) -> &Self::Target {
-        &self.plant
-    }
-}
+inherit!(NormalPlant -> Plant, plant);
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct CornPlant(pub NormalPlant);
 
-impl Deref for CornPlant {
-    type Target = NormalPlant;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+inherit!(CornPlant -> NormalPlant);
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct CarrotPlant(pub NormalPlant);
-
-impl Deref for CarrotPlant {
-    type Target = NormalPlant;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+inherit!(CarrotPlant -> NormalPlant);
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct TomatoPlant(pub NormalPlant);
-
-impl Deref for TomatoPlant {
-    type Target = NormalPlant;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+inherit!(TomatoPlant -> NormalPlant);
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 #[repr(u8)]
@@ -136,23 +141,23 @@ pub enum LightDirection {
     Up = 2,
 }
 
+// NOTE: final_goal_square_x/y, load_requires_recalculation are optional and needs serde(default)
+// which doesn't work together with serde(flatten), which is needed for DynamicObject.
+// Either manually flatten DynamicObject, or remove these fields. For now we go latter.
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-pub struct ArtificialLight {
-    #[serde(rename = "maxRed")]
-    max_red: u32,
-    #[serde(rename = "maxGreen")]
-    max_green: u32,
-    #[serde(rename = "maxBlue")]
-    max_blue: u32,
-    #[serde(rename = "maxHeat")]
-    max_heat: u32,
-    radius: u32,
-    #[serde(rename = "contributionGridOrigin.x")]
-    contribution_grid_origin_x: i32,
-    #[serde(rename = "contributionGridOrigin.y")]
-    contribution_grid_origin_y: i32,
-    #[serde(rename = "lightDirection")]
-    light_direction: LightDirection,
+#[serde(rename_all = "camelCase")]
+pub struct Blockhead {
+    #[serde(flatten)]
+    pub obj: DynamicObject,
+    pub actions: plist::Value,
+    pub clothing_increment_timer: u64,
+    pub double_time_unlocked: bool,
+    pub interaction_item_index: u64,
+    pub interaction_item_sub_index: i64,
+    pub name: String,
+    pub selected_tool_index: u64,
+    pub skin_options: plist::Data,
+    pub state: plist::Data,
 }
 
 #[cfg(test)]

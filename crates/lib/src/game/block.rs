@@ -1,13 +1,12 @@
 use crate::{BhError, BhResult};
-use num_derive::FromPrimitive;
-use num_traits::FromPrimitive;
+use num_enum::TryFromPrimitive;
 use std::ops::{Deref, DerefMut};
 use strum_macros::{Display, IntoStaticStr};
 
 /// An enumeration of block types.
 ///
 /// Records the ID of each type of block.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, IntoStaticStr, Display, FromPrimitive)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, IntoStaticStr, Display, TryFromPrimitive)]
 #[repr(u8)]
 pub enum BlockType {
     Stone = 1,
@@ -86,25 +85,6 @@ pub enum BlockType {
 }
 
 impl BlockType {
-    /// Converts a `u8` integer into a `BlockType` enum variant.
-    ///
-    /// This function returns a `Result` to handle cases where the integer
-    /// does not correspond to a valid `BlockType`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use the_blockheads_tools_lib::game::block::BlockType;
-    ///
-    /// let block_type = BlockType::try_from_u8(1).unwrap();
-    /// assert_eq!(block_type, BlockType::Stone);
-    ///
-    /// let error = BlockType::try_from_u8(99).unwrap_err();
-    /// ```
-    pub fn try_from_u8(value: u8) -> Result<Self, BhError> {
-        BlockType::from_u8(value).ok_or(BhError::InvalidBlockIdError(value))
-    }
-
     /// Converts the `BlockType` enum variant to its corresponding string slice.
     ///
     /// # Examples
@@ -125,7 +105,7 @@ impl From<BlockType> for u8 {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, IntoStaticStr, Display, FromPrimitive)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, IntoStaticStr, Display, TryFromPrimitive)]
 #[repr(u8)]
 pub enum BlockContent {
     None = 0,
@@ -196,10 +176,6 @@ pub enum BlockContent {
 }
 
 impl BlockContent {
-    pub fn try_from_u8(value: u8) -> Result<Self, BhError> {
-        Self::from_u8(value).ok_or(BhError::InvalidBlockIdError(value))
-    }
-
     pub fn as_str(&self) -> &'static str {
         self.into()
     }
@@ -255,7 +231,7 @@ pub trait BlockView {
 
 impl<T: Deref<Target = [u8; 64]>> BlockView for T {
     fn fg(&self) -> BhResult<BlockType> {
-        BlockType::try_from_u8(self.fg_raw())
+        BlockType::try_from(self.fg_raw()).map_err(|e| BhError::InvalidBlockIdError(e.number))
     }
 
     fn fg_raw(&self) -> u8 {
@@ -263,7 +239,8 @@ impl<T: Deref<Target = [u8; 64]>> BlockView for T {
     }
 
     fn content(&self) -> BhResult<BlockContent> {
-        BlockContent::try_from_u8(self.content_raw())
+        BlockContent::try_from(self.content_raw())
+            .map_err(|e| BhError::InvalidBlockContentIdError(e.number))
     }
 
     fn content_raw(&self) -> u8 {
@@ -271,7 +248,7 @@ impl<T: Deref<Target = [u8; 64]>> BlockView for T {
     }
 
     fn bg(&self) -> BhResult<BlockType> {
-        BlockType::try_from_u8(self.bg_raw())
+        BlockType::try_from(self.bg_raw()).map_err(|e| BhError::InvalidBlockIdError(e.number))
     }
 
     fn bg_raw(&self) -> u8 {

@@ -15,7 +15,7 @@ pub enum BhError {
     #[error("Invalid block content ID: {0}")]
     InvalidBlockContentIdError(u8),
     #[error("Invalid dynamic object ID: {0}")]
-    InvalidDynamicOjectId(String),
+    InvalidDynamicOjectId(u16),
     #[error("Missing key: {0}")]
     MissingKey(&'static str),
     #[error("Lmdb error: {0}")]
