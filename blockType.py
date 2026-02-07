@@ -7,6 +7,7 @@ class BlockType(Enum):
     The enumeration of block types. Records the ID of each type of block.
     """
 
+    EMPTY = 0
     STONE = 1
     AIR = 2
     WATER = 3
