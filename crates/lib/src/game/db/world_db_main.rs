@@ -1,7 +1,8 @@
-use std::io::Write;
-
 use super::{
-    super::dw::dynamic_object::{Blockhead, DynamicObjectList},
+    super::{
+        dw::dynamic_object::{Blockhead, DynamicObjectList, UniqueID},
+        item::Inventory,
+    },
     dynamic_world_v2::DynamicWorldV2,
     world_v2::WorldV2,
 };
@@ -11,12 +12,14 @@ use lmdb_rs::{
     database::Database,
     txn::{RoTxn, RwTxn},
 };
+use std::{collections::HashMap, io::Write};
 
 #[derive(Debug)]
 pub struct WorldDbMain {
     pub blockheads: DynamicObjectList<Blockhead>,
     pub dynamic_world_v2: DynamicWorldV2,
     pub world_v2: WorldV2,
+    pub blockhead_inventories: HashMap<UniqueID, Inventory>,
 }
 
 impl WorldDbMain {
@@ -30,10 +33,23 @@ impl WorldDbMain {
                 "One or more of `blockheads`, `dynamicWorldv2`, `worldv2` is missing from `main` database",
             ));
         };
+        let mut blockhead_inventories = HashMap::new();
+        for entry in db.iter(rtxn)? {
+            let (key, value) = entry?;
+            if let Some(blockhead_id_str) = key
+                .strip_prefix("blockhead_")
+                .and_then(|key| key.strip_suffix("_inventory"))
+                && let Ok(blockhead_id) = blockhead_id_str.parse()
+            {
+                let _ = blockhead_inventories
+                    .insert(UniqueID::new(blockhead_id), plist::from_reader_xml(value)?);
+            }
+        }
         Ok(Self {
             blockheads: plist::from_reader_xml(blockheads)?,
             dynamic_world_v2: plist::from_reader_xml(dynamic_world_v2)?,
             world_v2: plist::from_bytes(world_v2)?,
+            blockhead_inventories,
         })
     }
 

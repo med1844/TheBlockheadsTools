@@ -26,6 +26,25 @@ pub fn decompress_gzip_to(bytes: &[u8], output: &mut Vec<u8>) -> Result<usize, s
     decoder.read_to_end(output)
 }
 
+pub fn decompress_gzip(bytes: &[u8]) -> std::io::Result<Vec<u8>> {
+    let mut output = Vec::new();
+    decompress_gzip_to(bytes, &mut output)?;
+    Ok(output)
+}
+
+pub fn compress_gzip_to<W: Write>(bytes: &[u8], output: W) -> std::io::Result<()> {
+    let mut encoder = GzEncoder::new(output, Compression::best());
+    encoder.write_all(bytes)?;
+    encoder.finish()?;
+    Ok(())
+}
+
+pub fn compress_gzip(bytes: &[u8]) -> std::io::Result<Vec<u8>> {
+    let mut output = Vec::new();
+    compress_gzip_to(bytes, &mut output)?;
+    Ok(output)
+}
+
 #[derive(Debug, Clone)]
 pub enum Gzip<T> {
     Compressed(Vec<u8>),

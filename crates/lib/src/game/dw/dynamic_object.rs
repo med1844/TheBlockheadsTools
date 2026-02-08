@@ -1,7 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
+use typed_floats::NonNaNFinite;
 
-// Rust doesn't have inheritance, yet game is built on that.
+// Rust doesn't have inheritance, yet the game was build on that.
 // Thus we have to emulate that, and thankfully it's not too hard.
 macro_rules! inherit {
     ($child:ident -> $parent:ty, $field:ident) => {
@@ -63,14 +64,29 @@ impl<T> Default for DynamicObjectList<T> {
     }
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
+#[serde(transparent)]
+pub struct UniqueID(u64);
+inherit!(UniqueID -> u64);
+
+impl UniqueID {
+    pub fn new(id: u64) -> Self {
+        Self(id)
+    }
+
+    pub fn inner(&self) -> &u64 {
+        &self.0
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DynamicObject {
     #[serde(rename = "floatPos")]
-    pub float_pos: [f32; 2],
-    pub pos_x: i32,
-    pub pos_y: i32,
+    pub float_pos: [NonNaNFinite<f32>; 2],
+    pub pos_x: u64,
+    pub pos_y: u16,
     #[serde(rename = "uniqueID")]
-    pub unique_id: u64,
+    pub unique_id: UniqueID,
 }
 
 // Corresponds to Plant
@@ -152,7 +168,7 @@ pub struct Blockhead {
     pub actions: plist::Value,
     pub clothing_increment_timer: u64,
     pub double_time_unlocked: bool,
-    pub interaction_item_index: u64,
+    pub interaction_item_index: i64, // could be -1... my god
     pub interaction_item_sub_index: i64,
     pub name: String,
     pub selected_tool_index: u64,

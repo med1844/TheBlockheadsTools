@@ -1,3 +1,18 @@
+use crate::{
+    BhError, BhResult,
+    game::dw::dynamic_object::DynamicObject,
+    util::gzip::{compress_gzip_to, decompress_gzip},
+};
+use num_enum::{FromPrimitive, TryFromPrimitive};
+use serde::{Deserialize, Serialize, de::Error as DeError, ser::Error as SerError};
+use std::{
+    fmt::Display,
+    ops::{Deref, DerefMut},
+};
+use strum_macros::IntoStaticStr;
+use typed_floats::NonNaNFinite;
+
+#[derive(Debug, IntoStaticStr, TryFromPrimitive)]
 #[repr(u16)]
 pub enum ItemType {
     Unknown = 0,
@@ -427,4 +442,602 @@ pub enum ItemType {
     Plaster = 1103,
     FeederChest = 1104,
     LuminousPlaster = 1105,
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InteractionObject {
+    #[serde(flatten)]
+    parent: DynamicObject,
+    interaction_object_type: u64,
+    is_in_use: bool,
+    flipped: bool,
+    paint_color: u16,
+}
+
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, IntoStaticStr, FromPrimitive,
+)]
+#[serde(from = "u8", into = "u8")]
+#[repr(u8)]
+pub enum ChestType {
+    #[default]
+    Standard = 0,
+    Safe = 1,
+    Shelf = 2,
+    Gold = 3,
+    Portal = 4,
+    DisplayCabinet = 5,
+    Feeder = 6,
+}
+
+impl From<ChestType> for u8 {
+    fn from(value: ChestType) -> Self {
+        value as u8
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChestData {
+    #[serde(flatten)]
+    parent: InteractionObject,
+    chest_type: ChestType,
+    save_item_slots: [StackedItem; Self::NUM_SLOTS],
+    #[serde(rename = "ownerID")]
+    pub owner_id: String,
+}
+
+impl ChestData {
+    pub const NUM_SLOTS: usize = 16;
+}
+
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, IntoStaticStr, FromPrimitive,
+)]
+#[serde(from = "u8", into = "u8")]
+#[repr(u8)]
+pub enum WorkbenchType {
+    #[default]
+    Undefined = 0,
+    BasicPortal = 1,
+    Workbench = 2,
+    Campfire = 3,
+    Weave = 4,
+    Wood = 5,
+    Tool = 6,
+    Press = 7,
+    Kiln = 8,
+    Furnace = 9,
+    Craft = 10,
+    Mix = 11,
+    Dye = 12,
+    PlacedPortal = 13,
+    Metalwork = 14,
+    SteamGenerator = 15,
+    ElectricKiln = 16,
+    ElectricFurnace = 17,
+    ElectricMetalworkBench = 18,
+    ElectricStove = 19,
+    SolarPanel = 20,
+    Flywheel = 21,
+    ArmorBench = 22,
+    TrainYard = 23,
+    Easel = 24,
+    Build = 25,
+    Refinery = 26,
+    ElectricPress = 27,
+    CompostBin = 28,
+    Sluice = 29,
+    EggExtractor = 30,
+    PizzaOven = 31,
+}
+
+impl From<WorkbenchType> for u8 {
+    fn from(value: WorkbenchType) -> Self {
+        value as u8
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkbenchData {
+    #[serde(flatten)]
+    parent: InteractionObject,
+    available_electricity: u64,
+    craft_progress_count: NonNaNFinite<f32>,
+    fire_spread_timer: NonNaNFinite<f32>,
+    fuel_fraction: NonNaNFinite<f32>,
+    has_fuel: bool,
+    hurry_cost: u64,
+    hurry_seconds: NonNaNFinite<f32>,
+    hurry_timer: NonNaNFinite<f32>,
+    hurrying: bool,
+    last_world_time: NonNaNFinite<f32>,
+    level: u8,
+    save_time: NonNaNFinite<f64>,
+    #[serde(rename = "ownerID")]
+    owner_id: String,
+    selected_index: u8,
+    workbench_type: WorkbenchType,
+    x_scroll: NonNaNFinite<f32>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum Extra {
+    Basket([StackedItem; Self::NUM_SLOT_BASKET]),
+    Chest(ChestData),
+    Workbench(WorkbenchData),
+}
+
+impl Extra {
+    pub const NUM_SLOT_BASKET: usize = 4;
+}
+
+impl<'de> Deserialize<'de> for Extra {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let dict = plist::Dictionary::deserialize(deserializer)?;
+        if let Some(value) = dict.get("s") {
+            Ok(Self::Basket(plist::from_value(value).map_err(|e| {
+                D::Error::custom(format!("plist error: {}", e))
+            })?))
+        } else if let Some(value @ plist::Value::Dictionary(d)) = dict.get("d")
+            && d.contains_key("chestType")
+        {
+            Ok(Self::Chest(plist::from_value(value).map_err(|e| {
+                D::Error::custom(format!("plist error: {}", e))
+            })?))
+        } else if let Some(value @ plist::Value::Dictionary(d)) = dict.get("d")
+            && d.contains_key("workbenchType")
+        {
+            Ok(Self::Workbench(plist::from_value(value).map_err(|e| {
+                D::Error::custom(format!("plist error: {}", e))
+            })?))
+        } else {
+            dbg!(dict);
+            Err(D::Error::custom("No known key in extra"))
+        }
+    }
+}
+
+impl Serialize for Extra {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut dict = plist::Dictionary::new();
+        match self {
+            Self::Basket(items) => {
+                dict.insert(
+                    "s".to_string(),
+                    plist::to_value(items).map_err(|e| S::Error::custom(e.to_string()))?,
+                );
+            }
+            Self::Chest(chest) => {
+                dict.insert(
+                    "d".to_string(),
+                    plist::to_value(chest).map_err(|e| S::Error::custom(e.to_string()))?,
+                );
+            }
+            Self::Workbench(workbench) => {
+                dict.insert(
+                    "d".to_string(),
+                    plist::to_value(workbench).map_err(|e| S::Error::custom(e.to_string()))?,
+                );
+            }
+        }
+        dict.serialize(serializer)
+    }
+}
+
+struct AsDisplay<'a, T>(&'a T);
+
+impl<'a, T: Display> std::fmt::Debug for AsDisplay<'a, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(self.0, f)
+    }
+}
+
+struct ListDisplay<'a, T>(&'a [T]);
+impl<'a, T: Display> Display for ListDisplay<'a, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_list()
+            .entries(self.0.iter().map(AsDisplay))
+            .finish()
+    }
+}
+
+impl Display for Extra {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Extra::Basket(items) => f.debug_list().entries(items.iter().map(AsDisplay)).finish(),
+            Extra::Chest(chest) => f
+                .debug_struct("ChestData")
+                .field("type", &chest.chest_type)
+                .field("items", &AsDisplay(&ListDisplay(&chest.save_item_slots)))
+                .finish(),
+            Extra::Workbench(workbench) => std::fmt::Debug::fmt(workbench, f),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct Item {
+    type_id: u16,
+    data_a: u16,
+    data_b: u16,
+    selected_sub_item_index: u8,
+    padding: u8,
+    extra: Option<Extra>,
+}
+
+impl<'de> Deserialize<'de> for Item {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let data: Vec<u8> = plist::Data::deserialize(deserializer)?.into();
+        let bytes = data.as_slice();
+        if bytes.len() < 8 {
+            return Err(D::Error::custom(
+                "Item data too short: expected at least 8 bytes",
+            ));
+        }
+        // SAFETY: from_le_bytes expects [u8; 2], we provide slice exactly that long
+        let type_id = u16::from_le_bytes(bytes[0..2].try_into().unwrap());
+        let data_a = u16::from_le_bytes(bytes[2..4].try_into().unwrap());
+        let data_b = u16::from_le_bytes(bytes[4..6].try_into().unwrap());
+        let selected_sub_item_index = bytes[6];
+        let padding = bytes[7];
+
+        // Pop first 8 bytes and avoid malloc
+        let mut compressed_extra = data;
+        compressed_extra.drain(0..8);
+
+        let extra = if compressed_extra.is_empty() {
+            None
+        } else {
+            let extra_bytes = decompress_gzip(&compressed_extra).map_err(|e| {
+                D::Error::custom(format!("Failed to decompress item extra as gzip: {:?}", e))
+            })?;
+            Some(
+                plist::from_reader_xml(extra_bytes.as_slice())
+                    .map_err(|e| D::Error::custom(format!("plist error: {}", e)))?,
+            )
+        };
+
+        Ok(Self {
+            type_id,
+            data_a,
+            data_b,
+            selected_sub_item_index,
+            padding,
+            extra,
+        })
+    }
+}
+
+impl Serialize for Item {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut buffer = Vec::with_capacity(8);
+
+        buffer.extend_from_slice(&self.type_id.to_le_bytes());
+        buffer.extend_from_slice(&self.data_a.to_le_bytes());
+        buffer.extend_from_slice(&self.data_b.to_le_bytes());
+        buffer.push(self.selected_sub_item_index);
+        buffer.push(self.padding);
+        if let Some(extra) = self.extra.as_ref() {
+            let mut serialized_extra = Vec::new();
+            plist::to_writer_xml(&mut serialized_extra, extra).map_err(|e| {
+                S::Error::custom(format!("Failed to serialize item extra data: {}", e))
+            })?;
+            compress_gzip_to(&serialized_extra, &mut buffer).map_err(|e| {
+                S::Error::custom(format!("Failed to compress item extra data: {}", e))
+            })?;
+        }
+        // Wrap in plist::Data so it renders as <data> in the XML
+        plist::Data::new(buffer).serialize(serializer)
+    }
+}
+
+#[derive(Debug, Clone, Copy, TryFromPrimitive)]
+#[repr(u8)]
+pub enum PigmentColor {
+    Transparent = 0,
+    MarbleWhite = 1,
+    CarbonBlack = 2,
+    RedOchre = 3,
+    IndianYellow = 4,
+    UltraMarineBlue = 5,
+    EmeraldGreen = 6,
+    TyrianPurple = 7,
+    CopperBlue = 8,
+}
+
+fn item_type_to_str(item_type: BhResult<ItemType>) -> String {
+    item_type
+        .map(|item_type| {
+            let item_type_str: &'static str = item_type.into();
+            item_type_str.to_string()
+        })
+        .unwrap_or_else(|e| e.to_string())
+}
+
+impl Item {
+    pub const MAX_COLORS: usize = 3;
+
+    pub fn item_type_raw(&self) -> u16 {
+        self.type_id
+    }
+
+    pub fn item_type_raw_mut(&mut self) -> &mut u16 {
+        &mut self.type_id
+    }
+
+    pub fn item_type(&self) -> BhResult<ItemType> {
+        ItemType::try_from(self.item_type_raw()).map_err(|e| BhError::InvalidItemTypeId(e.number))
+    }
+
+    pub fn set_item_type(&mut self, item_type: ItemType) {
+        *self.item_type_raw_mut() = item_type as u16;
+    }
+
+    pub fn damage(&self) -> u16 {
+        self.data_a
+    }
+
+    pub fn damage_mut(&mut self) -> &mut u16 {
+        &mut self.data_a
+    }
+
+    pub fn color_raw(&self) -> u16 {
+        self.data_b
+    }
+
+    pub fn color_raw_mut(&mut self) -> &mut u16 {
+        &mut self.data_b
+    }
+
+    pub fn color(&self) -> BhResult<[PigmentColor; Self::MAX_COLORS]> {
+        let mut color_bits = self.data_b;
+        let mut colors = [PigmentColor::Transparent; _];
+        for color_mut in colors.iter_mut() {
+            *color_mut = PigmentColor::try_from((color_bits & 0b1111) as u8)
+                .map_err(|e| BhError::InvalidColorId(e.number))?;
+            color_bits >>= 4;
+        }
+        Ok(colors)
+    }
+
+    pub fn set_color(&mut self, colors: [PigmentColor; Self::MAX_COLORS]) {
+        let mut color_bits = 0;
+        for color in colors {
+            color_bits |= color as u16;
+            color_bits <<= 4;
+        }
+        *self.color_raw_mut() = color_bits;
+    }
+
+    pub fn extra(&self) -> &Option<Extra> {
+        &self.extra
+    }
+}
+
+impl Display for Item {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let type_name = item_type_to_str(self.item_type());
+        if let Some(extra) = self.extra.as_ref() {
+            f.debug_tuple(&type_name).field(&AsDisplay(extra)).finish()
+        } else {
+            f.write_str(&type_name)
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct StackedItem(Vec<Item>); // TODO consider switch to smallvec
+
+impl Deref for StackedItem {
+    type Target = Vec<Item>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for StackedItem {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl Display for StackedItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(item) = self.first() {
+            let all_same_type = self.iter().all(|other| item.type_id == other.type_id);
+            let any_extra = self.iter().any(|item| item.extra().is_some());
+            let is_stacked = self.len() > 1;
+            let type_name = item_type_to_str(item.item_type());
+            match (all_same_type, any_extra, is_stacked) {
+                (true, false, _) => {
+                    write!(f, "{} {}", self.len(), type_name)
+                }
+                (_, _, false) => item.fmt(f),
+                _ => f.debug_list().entries(self.iter().map(AsDisplay)).finish(),
+            }
+        } else {
+            f.write_str("Empty")
+        }
+    }
+}
+
+// An inventory of a blockhead
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct Inventory([StackedItem; Self::NUM_SLOTS]);
+
+impl Inventory {
+    pub const NUM_SLOTS: usize = 8;
+}
+
+impl Deref for Inventory {
+    type Target = [StackedItem; Self::NUM_SLOTS];
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for Inventory {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl Display for Inventory {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_list().entries(self.iter().map(AsDisplay)).finish()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Inventory;
+
+    #[test]
+    fn inventory_round_trip_test() {
+        let inventory_data = b"
+<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
+<plist version=\"1.0\">
+<array>
+        <array>
+                <data>
+                AQAAAAAAAAw=
+                </data>
+        </array>
+        <array>
+                <data>
+                DAAAAAAAAgwfiwgAAAAAAAAH7dyxbtNQFAbguX0K4z25sCHkpApNQZUiSNV0
+                gM2KrWCRJpZtYfL22KmaFAGpGBiQPi/3v77fOb7rWZxcfL9fR9/yqi62m1H8
+                avgyjvLNcpsVm9Uovlu8G7yOL8bnyYvpx8vFp/lVVK6Luonmd29n15dRPAhh
+                UpbrPITpYhrNZ9e3i6jrEcLVhziKvzRN+SaEtm2Haa+Gy+19D+swr7ZlXjW7
+                Wdds0BUMsyaLu888dP/pOt3brFg24/Oz5Gu+G9dJ6Jdul1ZV2ocn6SzJ0ibd
+                p9nqZvLwtKP9STgc/Q5NIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiC
+                IAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiC
+                IAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAj6S5SEtKrS3T4e0pPK
+                z6vHwvbP7Y/oxB0gCIIgCIIgCIL+X/Ts7NTuq25/nZ2eq3x/8zivnZi6jujE
+                7SEIgiAIgiAIgiAIgiAIgiAIgiAIgiAIgiAIgiAIgiAIgiAIgiAIgiAIgiAI
+                giAIgiAIgiAI+ufo+GOhQ+oOi2XTr+W6qLvwA2esHopJ5wAA
+                </data>
+        </array>
+        <array>
+                <data>
+                DAAAAAAAAgwfiwgAAAAAAAAH7ZZLk6JIFEbXXb/CcWtUJYKITljVwdMSBAFB
+                gR2SKCgvIXn++gZ7pucRHRPR2wlzw5fccy65uUGuvjZxNKr8vAjT5H08fcPG
+                Iz/xUhgml/exaQivi/HXj5fVb9yONWyVH2VRWKCRajLbDTsavwJAZ1nkA8AZ
+                3EjdbvbGqO8BAK+MR+MAoex3AOq6fnMH6s1L4wEsgJqnmZ+jdts3e+2FN4jg
+                uP/M9+7/OE7/FoYe+nj5srr57UexAsOj37l57g7hb+nLCrrIfaSjxtH8he5X
+                /f6ogD9LK/DfplP3Ekvrv27ytUZ/X/U5rC9/ZPqTcgL9RBY1L/vnGwYYn17s
+                XChcNpGGDR4UMGzKSAd112SLgo1OGwbiLaEgcsKIChuHsCkTQztYOVedKxtC
+                yuUHD1QnUSNn2XIWtgIDjQM8r++pJLEyzG5md3DOAelIadIhbjITiF0dA2bw
+                YlNqo08+OorUfEHG4fXC1Kx302iBSiWbB1WdHgrNo53Gv6eIrI3r7OGZohsx
+                IZJCgvEvWs0LjMJPvNSKZwRPh0Rc7HNW2RZgf4P2rDPCLmEuj3Nim1ykHGap
+                Sx06mY3e+ZuFxQiYbC8LZcemta47eMt1FsNZuJdt9kE5ePixtGVNm58vDXkR
+                bluNzwJVz21B/pQxe4IK13SUe5DkEJsluYav8dYavClER/dA295ZQFG3nKRx
+                oNaZCgNBxrekLVMmZkf1MfTmYCpjpMA0+Hrw7mwYc/BkcOb8wnIct3adPbmX
+                7LMFbNEvXJWfVLCM5/Jt6TAl0BNJXQyeVKiLyfFOaEuhadd8t1RwoSTm8VWb
+                YF1yXkOTcohkg0RZxQgRNXw8dQcv+hQDv6TQbnPDExP5+G3nddJBcZAx7Q4w
+                kQ6xnCQlSGStKVFYqkEbDx45pXZ7xwBuu7VIh6LOXSiibBHnVRH5Z6ut1Paq
+                EV45OVWG1xEE6uuDZxPxqdrpJj1LGuNyrWrZykoLcPBwNMRalETd511I6Zqe
+                NvrVK8ylnAxeeTXx672+Yt2GWt8agQisjNKJ+zxUTpynzlyO2su8FiKXMqsY
+                KW2QTAaPiatMXxZ3vp+oX5sk+8fw/HsGfwrRT+gJPaEn9ISe0P8ZWvwc+ut3
+                +iP1xceteQUed+qPl29sHDTy6gsAAA==
+                </data>
+        </array>
+        <array>
+                <data>
+                DAAAAAAAAAwfiwgAYA9lXgL/7dlBT4MwFAfw8/gUtXd4ejOmsGxjJkuIw8gO
+                89ZBo0QGpDTWfXsLmqkXx8nD/HPh0ffrn97eoWL6tq/Yq9Jd2dQhvwouOVN1
+                3hRl/RTyTXbrX/Np5ImLeL3ItumStVXZGZZu5slqwbhPNGvbShHFWczSZPWQ
+                MZdBtLzjjD8b094QWWsD2asgb/Y97CjVTau0OSQuzHcbgsIU3P3mI/3Hcdxq
+                UeYm8ibiRR2iTlD/cl9Sa9kX36qJKKSRQ7W7n30+Nhw6dGwBAQEBAQH9AyTo
+                90m5HhMPBAQEBAR0tujUpNzaEfFAQEBAQEBni05NyscxgxgICAgICOjv0Nfo
+                OlauOdwwChruHyPvHUCTe1QWHQAA
+                </data>
+        </array>
+        <array>
+                <data>
+                DAAAAAAAAAwfiwgAAAAAAAAH7d3JjqNWFAbgdfdTON5aXRiXx8hVLcxswGAb
+                PO3MjBnNaNfTx1R3p5Moqt5FivSzuQf4/stdcAS7O/96i6NO7eRFkCYvXfKp
+                3+04iZXaQeK9dA2d+zLtfn39PP+NUWn9qLGdLAqKsqMZC1mkO90vBEFlWeQQ
+                BKMzHU0Wt3rnMQdBsKtup+uXZfY7QTRN83Ru1ZOVxi0sCC1PMycv7/Jjsi+P
+                wJNd2t3HY77N/rflPK7agVW+fv40D537azEn2uFxds7zc1v8pfo0t8/l+b3i
+                vTX17WjcoPG+15Rw2enmpUwbViCdOpBX6rNAu+ey2MV9qs3R66TcBFI6jlZR
+                6AnWyjzlKvnWq8OhxzdXf8pvEqsyldhRb4TtzvwoM9tcKGbNLF5OLnFpNgvJ
+                YfPTuHDcW8XEzWGo8sTgMBSKI5GO2EjihHNQmW6by0bausgK0d2oNBXKjMP7
+                XH8aFqXXCOur8jyYyId9WtW0Sg7Uxk0k2vXbXHy7pwa9HVFSqBl9bb+iIvUa
+                aWbExHfirgkbTt2OJeY2EghKNPxZRBNxmxvf1jO/ZvfsMD1w7NFgA3K5rrf+
+                hpmMfD46euubJYwOpnLhN44Ur5Klwb6v05AcZTeIthbVtxYDfee8SRG93ygL
+                JY6UU0gRYi/xRV+UyGbbb3aprBFtTlAr8dpcqczSuUmhZ/ZpYnu2WjoscTOv
+                Nrnzylnmk5kyXlyCzarM5Xve5qzj826gLupzdEsMf0Tn9YbJfDPlt1src7Le
+                ePM2jZcKR7JvsX6KRyGnyW1uMqzdky8H3nCR3+0xeZLE2JQm3vKicdua8EL/
+                lLiBYFiziqnL1WySJLM2V5b1dZZcGXrWN8rKdaL8YJJv8vCS8hZDV4VSaMou
+                ZenK6q/UZLC3RHbV5taWl0VNzw56zJWcTPhLcp+OS5aMxt6xCquiiarUmpq5
+                nVzV4qzXTjXYt7kBwVYXjl8fSFtc3u8cH7OkvN8qhJJ4z5Kgyfltnz337ELV
+                7scB75TC4X2d0krvF9k0CiNtnAySft8VblfbDIbr9Ow2HL+/7Ht6Yzxe9ZeX
+                944gfrTEnPi4Y5QfPUI1/0j+K6KAgICAgICAgICA/gOE31ggICAgICAgICAg
+                ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg
+                ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg
+                ICAgICAgICAgICAgICAgICAgICAgICCg/yn61Yb12pr9Hvxgw/qf6IM1AAEB
+                AQEB/Qr9/Cr9WT1uBlbZjlkUFI/iD75cbuYdlAAA
+                </data>
+        </array>
+        <array>
+                <data>
+                DAAAAAAAAAwfiwgAYA9lXgL/nVBNC8IwDD27X1F736I3kW6jbgrC0InzoLey
+                Fh3uo3TF6r+3myh6ETGXvOTlvYSQ8FqV6CJUWzS1j8feCCNR5w0v6qOPd9nC
+                neAwcMgwXkfZPp0jWRatRululiwjhF0AKmUpAOIsRmmy3GbIegDMVxjhk9Zy
+                CmCM8Vg35eVN1Q22kKpGCqVviTVzrcDjmmO75uH+cY7t8iLXgTMgZ3ELWgJd
+                shVTinXgDQ0IZ5r16GCojdmRUuP3DDwpAj8pN/8qqflb+XXnC1myfwiB/l2B
+                cwc3T8VwxQEAAA==
+                </data>
+        </array>
+        <array>
+                <data>
+                DAAAAAAAAwwfiwgAYA9lXgL/nZBRC4IwFIWf81esveutt4hpmBYEUkL2UG/D
+                jZJMxxyt/n1Xo6iXCAdjZzv3O3dcNrtdSnKVuinqyqdjb0SJrPJaFNXRp7ts
+                6U7oLHDYMN5E2T5dEFUWjSHpbp6sIkJdgFCpUgLEWUzSZLXNCGYALNaU0JMx
+                agpgrfV4W+Xl9aUtbCDVtZLa3BMMcxHwhBEU2zzTv76Dr6LITeAM2Fneg4ZB
+                e+CNa81b8aEGTHDDO3WwIa4It/U7B14Wg3/IeX/S9iXD4y/yrdDsBsKgG1fg
+                PABFr9BBxQEAAA==
+                </data>
+        </array>
+        <array>
+                <data>
+                DAAAAAAAAAwfiwgAYA9lXgL/7dlBT4MwFAfw8/gUtXd4ejOmsOCYyRLiSGQH
+                d0PaTCKDpjTivr0FzdSL42jmnwuPvl//9PYOFfO3fc1elemqtgn5VXDJmWrK
+                VlbNLuSb/M6/5vPIExfJepE/Zkum66qzLNvcpqsF4z5RrHWtiJI8YVm6esiZ
+                yyBa3nPGn63VN0R93wfFoIKy3Q+wo8y0Whl7SF2Y7zYE0krufvOR/uM4blVW
+                pY28mXhRh6gTNLzcV2FMMRTfqpmQhS3GSvbx59OHY4eOLSAgICAgoH+ABP0+
+                KZ92E+KBgICAgIDOFp2alOt4QjwQEBAQENDZolOTcjslHggICAgI6I+hr/l2
+                rFxzvIYUNF5SRt47sNC68TsdAAA=
+                </data>
+        </array>
+</array>
+</plist>";
+        let inventory: Inventory = plist::from_reader_xml(inventory_data.as_slice())
+            .expect("should be able to deserialize");
+        let mut round_trip_inventory_data = Vec::new();
+        plist::to_writer_xml(&mut round_trip_inventory_data, &inventory).expect("should serialize");
+        let round_trip_inventory: Inventory =
+            plist::from_reader_xml(round_trip_inventory_data.as_slice())
+                .expect("should be able to deserialize");
+        assert_eq!(inventory, round_trip_inventory);
+    }
 }
