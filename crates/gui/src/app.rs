@@ -11,6 +11,7 @@ use eframe::{egui, egui_wgpu, emath::Rect, wgpu};
 use glam::Vec3Swizzles;
 #[cfg(not(target_arch = "wasm32"))]
 use std::path::PathBuf;
+use std::collections::HashSet;
 #[cfg(target_arch = "wasm32")]
 use std::sync::mpsc::{Receiver, Sender, channel};
 use the_blockheads_tools_lib::{
@@ -151,6 +152,8 @@ pub struct EditorApp {
 }
 
 impl EditorApp {
+    const CHUNK_DIM_X: f32 = 32.0;
+
     pub fn new(cc: &eframe::CreationContext) -> Self {
         let state = cc
             .wgpu_render_state
@@ -211,6 +214,8 @@ impl EditorApp {
         *self.camera.world_offset_mut() = glam::Vec3::new(spawn_x as f32, spawn_y as f32, 5.0);
 
         let new_world_width_macro = world_db.main.world_v2.world_width_macro as usize;
+        let world_width_blocks = new_world_width_macro as f32 * Self::CHUNK_DIM_X;
+        self.camera.set_world_width_blocks(world_width_blocks);
 
         // TODO: if width_macro doesn't match the old one, create new buffer and update voxel renderer bind group
         voxel_util::set_chunks(
@@ -388,6 +393,34 @@ impl EditorApp {
         }
     }
 
+    fn world_width_blocks(&self) -> f32 {
+        self.camera.world_width_blocks()
+    }
+
+    fn wrap_x_f32(x: f32, width: f32) -> f32 {
+        if width <= 0.0 {
+            return x;
+        }
+        let mut wrapped = x % width;
+        if wrapped < 0.0 {
+            wrapped += width;
+        }
+        wrapped
+    }
+
+    fn wrap_chunk_index(x: i32, width: i32) -> i32 {
+        if width <= 0 {
+            return x;
+        }
+        x.rem_euclid(width)
+    }
+
+    fn wrap_camera_x(&mut self) {
+        let width = self.world_width_blocks();
+        let x = self.camera.world_offset().x;
+        self.camera.world_offset_mut().x = Self::wrap_x_f32(x, width);
+    }
+
     fn update_camera_pos(&mut self, ui: &mut egui::Ui, response: &egui::Response) {
         let viewport_size = (
             self.world_viewport_rect.width(),
@@ -414,22 +447,34 @@ impl EditorApp {
                     viewport_size,
                     scroll_y,
                 );
+
+                web_sys::console::log_1(&format!("Zoom after clamp: {}", self.camera.world_offset().z).into());
+
+                // --- clamp zoom (distance) so user can't zoom out beyond allowed range ---
+                // Use Camera constants if available; these were referenced in the UI already.
+                let z = self.camera.world_offset().z;
+                self.camera.world_offset_mut().z =
+                    z.clamp(Camera::MAX_BLOCK_Z, Camera::MAX_Z);
             }
         }
+
+        self.wrap_camera_x();
     }
 
     fn update_gpu_block_coords(&mut self, response: &egui::Response) {
+        let world_width = self.world_width_blocks();
         if response.clicked_by(egui::PointerButton::Primary)
             && let Some(pos) = response.interact_pointer_pos()
         {
-            let [x, y] = self
+            let mut world_pos = self
                 .camera
                 .mouse_at(
                     (pos - self.world_viewport_rect.min).into(),
                     self.world_viewport_rect.size().into(),
                 )
-                .floor()
-                .to_array();
+                .floor();
+            world_pos.x = Self::wrap_x_f32(world_pos.x, world_width);
+            let [x, y] = world_pos.to_array();
             self.selected_block_coord
                 .toggle(BlockCoord::new(x as u32, y as u16).ok());
         }
@@ -437,14 +482,15 @@ impl EditorApp {
         if response.hovered()
             && let Some(pos) = response.hover_pos()
         {
-            let [x, y] = self
+            let mut world_pos = self
                 .camera
                 .mouse_at(
                     (pos - self.world_viewport_rect.min).into(),
                     self.world_viewport_rect.size().into(),
                 )
-                .floor()
-                .to_array();
+                .floor();
+            world_pos.x = Self::wrap_x_f32(world_pos.x, world_width);
+            let [x, y] = world_pos.to_array();
             self.hover_on_block_coord
                 .update(BlockCoord::new(x as u32, y as u16).ok());
         }
@@ -463,24 +509,30 @@ impl EditorApp {
 
         let [min_coords, max_coords] = self.camera.visible_world_region_2d(rect.size().into());
         let center = self.camera.world_offset().xy();
-        const MAX_DIST: f32 = 48.0;
+        const MAX_DIST: f32 = 24.0;
+        let world_width_blocks = self.world_width_blocks();
+        let world_width_chunks = (world_width_blocks / Self::CHUNK_DIM_X) as i32;
 
-        let min_x = min_coords.x.max(center.x - MAX_DIST).max(0.0);
+        let min_x = min_coords.x.max(center.x - MAX_DIST);
         let min_y = min_coords.y.max(center.y - MAX_DIST).max(0.0);
         let max_x = max_coords.x.min(center.x + MAX_DIST);
         let max_y = max_coords.y.min(center.y + MAX_DIST).min(1024.0);
 
-        let chunk_min_x = (min_x / 32.0).floor() as u32;
-        let chunk_min_y = (min_y / 32.0).floor() as u8;
-        let chunk_max_x = (max_x / 32.0).ceil() as u32;
-        let chunk_max_y = (max_y / 32.0).ceil() as u8;
-        let mut dw_chunks = Vec::with_capacity(
-            chunk_max_x.saturating_sub(chunk_min_x) as usize
-                * chunk_max_y.saturating_sub(chunk_min_y) as usize,
-        );
+        let chunk_min_x = (min_x / Self::CHUNK_DIM_X).floor() as i32;
+        let chunk_min_y = (min_y / Self::CHUNK_DIM_X).floor() as u8;
+        let chunk_max_x = (max_x / Self::CHUNK_DIM_X).ceil() as i32;
+        let chunk_max_y = (max_y / Self::CHUNK_DIM_X).ceil() as u8;
+        let x_span = (chunk_max_x - chunk_min_x).max(0) as usize;
+        let y_span = (chunk_max_y as i32 - chunk_min_y as i32).max(0) as usize;
+        let mut dw_chunks = Vec::with_capacity(x_span * y_span);
+        let mut seen_chunks = HashSet::new();
         for x in chunk_min_x..chunk_max_x {
+            let wrapped_x = Self::wrap_chunk_index(x, world_width_chunks) as u32;
             for y in chunk_min_y..chunk_max_y {
-                if let Some(chunk_buf) = self.dw_buf.get_chunk(ChunkCoord::new(x, y).unwrap()) {
+                let coord = ChunkCoord::new(wrapped_x, y).unwrap();
+                if seen_chunks.insert(coord)
+                    && let Some(chunk_buf) = self.dw_buf.get_chunk(coord)
+                {
                     dw_chunks.push(chunk_buf.clone()); // chunk_buf is cheap to clone
                 }
             }

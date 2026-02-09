@@ -3,6 +3,7 @@ struct CameraUniform {
     inv_view_proj: mat4x4<f32>,
     camera_pos: vec4<f32>, // xyz
     world_offset: vec4<f32>,
+    world_dims: vec4<f32>,
 };
 
 @group(0) @binding(0) var<uniform> camera: CameraUniform;
@@ -28,6 +29,7 @@ const VOXEL_TILES_PER_ROW: u32 = 32u;
 const VOXEL_TILE_SIZE_UV: f32 = VOXEL_TILE_DIM_PX / VOXEL_ATLAS_DIM_PX;
 
 
+
 struct DynObjVertexInput {
     @location(0) position: vec2<f32>,
 };
@@ -48,7 +50,13 @@ fn vs_dynamic_object_icon(model: DynObjVertexInput, instance: DynObjInstanceInpu
     var out: DynObjVSOutput;
     
     let world_pos = vec3<f32>(instance.instance_pos + model.position, 2.0);
-    let pos_in_view = world_pos - camera.world_offset.xyz;
+    let delta_x = world_pos.x - camera.world_offset.x;
+    let wrapped_delta_x = delta_x - floor(delta_x / camera.world_dims.x + 0.5) * camera.world_dims.x;
+    let pos_in_view = vec3<f32>(
+        wrapped_delta_x,
+        world_pos.y - camera.world_offset.y,
+        world_pos.z - camera.world_offset.z
+    );
     out.clip_position = camera.view_proj * vec4<f32>(pos_in_view, 1.0);
     
     // Pass model position to fragment shader for UV calculation

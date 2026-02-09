@@ -19,4 +19,5 @@ zune-png = "0.4.10"
 rfd = "0.15.3"
 rayon = "1.11.0"
 wasm-bindgen-futures = { workspace = true, optional = true }
+web-sys = { version = "0.3", features = ["console"] }
 

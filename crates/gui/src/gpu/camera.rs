@@ -10,6 +10,7 @@ pub struct Camera {
     z_far: f32,  // Far clipping plane
     world_offset: Vec3,
     aspect: f32,
+    world_width_blocks: f32,
 }
 
 impl Default for Camera {
@@ -20,6 +21,7 @@ impl Default for Camera {
             z_near: 0.01,
             z_far: 10000.0,
             aspect: 1.0,
+            world_width_blocks: Self::DEFAULT_WORLD_WIDTH_BLOCKS,
         }
     }
 }
@@ -31,11 +33,15 @@ pub struct CameraUniform {
     inv_view_proj: [[f32; 4]; 4], // Combined view and projection matrix
     camera_pos: [f32; 4],         // Camera's world position (vec3 + padding)
     world_offset: [f32; 4],       // World offset
+    world_dims: [f32; 4],         // World dimensions (x,y,z + padding)
 }
 
 impl Camera {
     pub const MAX_BLOCK_Z: f32 = 3.0;
-    pub const MAX_Z: f32 = 1e8;
+    pub const MAX_Z: f32 = 2000.0;
+    const DEFAULT_WORLD_WIDTH_BLOCKS: f32 = 512.0 * 32.0;
+    const WORLD_HEIGHT_BLOCKS: f32 = 32.0 * 32.0;
+    const WORLD_DEPTH_BLOCKS: f32 = 3.0;
 
     fn eye(&self) -> Vec3 {
         Vec3::Z
@@ -59,6 +65,16 @@ impl Camera {
         self.aspect = new_aspect;
     }
 
+    pub fn set_world_width_blocks(&mut self, new_width: f32) {
+        if new_width > 0.0 {
+            self.world_width_blocks = new_width;
+        }
+    }
+
+    pub fn world_width_blocks(&self) -> f32 {
+        self.world_width_blocks
+    }
+
     pub fn world_offset(&self) -> &Vec3 {
         &self.world_offset
     }
@@ -76,6 +92,12 @@ impl Camera {
                 self.world_offset.x,
                 self.world_offset.y,
                 self.world_offset.z,
+                0.0,
+            ],
+            world_dims: [
+                self.world_width_blocks,
+                Self::WORLD_HEIGHT_BLOCKS,
+                Self::WORLD_DEPTH_BLOCKS,
                 0.0,
             ],
         }

@@ -38,6 +38,7 @@ struct CameraUniform {
     inv_view_proj: mat4x4<f32>,
     camera_pos: vec4<f32>, // xyz
     world_offset: vec4<f32>,
+    world_dims: vec4<f32>,
 };
 
 @group(0) @binding(0)
@@ -62,16 +63,16 @@ var<uniform> selected_block: vec4<u32>;
 var<uniform> hover_on_block: vec4<u32>;
 
 fn get_voxel_type(global_voxel_coords: vec3<i32>) -> u32 {
-    if global_voxel_coords.x < 0 || global_voxel_coords.x >= i32(WORLD_DIM_X) ||
-       global_voxel_coords.y < 0 || global_voxel_coords.y >= i32(WORLD_DIM_Y) ||
-       global_voxel_coords.z < 0 || global_voxel_coords.z >= i32(WORLD_DIM_Z) {
+    if global_voxel_coords.y < 0 || global_voxel_coords.y >= i32(camera.world_dims.y) ||
+       global_voxel_coords.z < 0 || global_voxel_coords.z >= i32(camera.world_dims.z) {
         return AIR_TYPE; // everything outside of the world is air
     }
 
-    let chunk_coord_x = u32(global_voxel_coords.x) / CHUNK_DIM_X;
+    let wrapped_x = wrap_x(global_voxel_coords.x);
+    let chunk_coord_x = u32(wrapped_x) / CHUNK_DIM_X;
     let chunk_coord_y = u32(global_voxel_coords.y) / CHUNK_DIM_Y;
 
-    let local_voxel_coord_x = u32(global_voxel_coords.x) % CHUNK_DIM_X;
+    let local_voxel_coord_x = u32(wrapped_x) % CHUNK_DIM_X;
     let local_voxel_coord_y = u32(global_voxel_coords.y) % CHUNK_DIM_Y;
     let local_voxel_coord_z = u32(global_voxel_coords.z);
 
@@ -89,6 +90,12 @@ fn get_voxel_type(global_voxel_coords: vec3<i32>) -> u32 {
     } else {
         return data & 0xFFFFu;
     }
+}
+
+fn wrap_x(x: i32) -> i32 {
+    let m = i32(camera.world_dims.x);
+    let r = x % m;
+    return select(r + m, r, r >= 0);
 }
 
 fn sample_texture_by_face(voxel_type: u32, hit_face_id: u32, uv_on_face: vec2<f32>) -> vec4<f32> {
@@ -195,8 +202,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let ray_origin_world = ray_origin_local + camera.world_offset.xyz;
     let ray_dir_world = ray_dir_local;
 
-    let world_min_bound = vec3<f32>(0.0, 0.0, 0.0);
-    let world_max_bound = vec3<f32>(f32(WORLD_DIM_X), f32(WORLD_DIM_Y), f32(WORLD_DIM_Z)) * VOXEL_SIZE;
+    let world_min_bound = vec3<f32>(-1e9, 0.0, 0.0);
+    let world_max_bound = vec3<f32>(1e9, camera.world_dims.y, camera.world_dims.z) * VOXEL_SIZE;
 
     let inv_dir = 1.0 / ray_dir_world;
     let t_bottom = (world_min_bound - ray_origin_world) * inv_dir;
@@ -217,7 +224,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
     var current_ray_pos = ray_origin_world + ray_dir_world * t_min_intersect;
     var current_voxel_coords = vec3<i32>(floor(current_ray_pos / VOXEL_SIZE));
-    current_voxel_coords = clamp(current_voxel_coords, vec3<i32>(0), vec3<i32>(i32(WORLD_DIM_X)-1, i32(WORLD_DIM_Y)-1, i32(WORLD_DIM_Z)-1));
+    current_voxel_coords.y = clamp(current_voxel_coords.y, 0, i32(camera.world_dims.y) - 1);
+    current_voxel_coords.z = clamp(current_voxel_coords.z, 0, i32(camera.world_dims.z) - 1);
     
     var step_dir = sign(ray_dir_world);
     if (ray_dir_world.x == 0.0) { step_dir.x = 0.0; }
@@ -248,8 +256,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             break;
         }
 
-        ever_hit_selected_block |= selected_block.x == 1 && all(vec3<u32>(current_voxel_coords).xy == selected_block.yz);
-        ever_hit_hover_on_block |= hover_on_block.x == 1 && all(vec3<u32>(current_voxel_coords).xy == hover_on_block.yz);
+        let wrapped_x = wrap_x(current_voxel_coords.x);
+        ever_hit_selected_block |= selected_block.x == 1 && wrapped_x == i32(selected_block.y) && current_voxel_coords.y == i32(selected_block.z);
+        ever_hit_hover_on_block |= hover_on_block.x == 1 && wrapped_x == i32(hover_on_block.y) && current_voxel_coords.y == i32(hover_on_block.z);
 
         let current_voxel_type = get_voxel_type(current_voxel_coords);
         if (current_voxel_type != prev_voxel_type) {
@@ -286,7 +295,13 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     // After the loop, if the ray exited the world from a transparent block, render its final exit surface.
     if (t_hit >= t_max_intersect && prev_voxel_type != AIR_TYPE && accumulated_color.a != 1.0) {
         let hit_point = ray_origin_world + ray_dir_world * t_max_intersect;
-        let clamped_hit_point = clamp(hit_point, vec3<f32>(0.0), vec3<f32>(f32(WORLD_DIM_X), f32(WORLD_DIM_Y), f32(WORLD_DIM_Z)));
+        let world_dim_x = camera.world_dims.x;
+        let wrapped_x = hit_point.x - floor(hit_point.x / world_dim_x) * world_dim_x;
+        let clamped_hit_point = vec3<f32>(
+            wrapped_x,
+            clamp(hit_point.y, 0.0, camera.world_dims.y),
+            clamp(hit_point.z, 0.0, camera.world_dims.z)
+        );
         render_and_blend(prev_voxel_type, clamped_hit_point, normal_of_entry_face, &accumulated_color);
     }
 

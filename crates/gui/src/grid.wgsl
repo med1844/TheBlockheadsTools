@@ -3,17 +3,14 @@ struct CameraUniform {
     inv_view_proj: mat4x4<f32>,
     camera_pos: vec4<f32>, // xyz
     world_offset: vec4<f32>,
+    world_dims: vec4<f32>,
 };
 
 @group(0) @binding(0) var<uniform> camera: CameraUniform;
 
-// --- World Constants (must match voxel.wgsl) ---
-const WORLD_CHUNKS_X: u32 = 512u;
-const WORLD_CHUNKS_Y: u32 = 32u;
+// --- World Constants ---
 const CHUNK_DIM_X: u32 = 32u;
 const CHUNK_DIM_Y: u32 = 32u;
-const WORLD_DIM_X_F32: f32 = f32(CHUNK_DIM_X * WORLD_CHUNKS_X); // 16384.0
-const WORLD_DIM_Y_F32: f32 = f32(CHUNK_DIM_Y * WORLD_CHUNKS_Y); // 1024.0
 
 // --- Grid Constants ---
 const GRID_Z: f32 = 3.0;
@@ -72,19 +69,21 @@ fn fs_grid(in: VertexOutput) -> @location(0) vec4<f32> {
     let world_pos = ray_origin_world + ray_dir_world * t;
 
     // --- 3. Check World Boundaries ---
-    if (world_pos.x < 0.0 || world_pos.x > WORLD_DIM_X_F32 || 
-        world_pos.y < 0.0 || world_pos.y > WORLD_DIM_Y_F32) {
+    if (world_pos.y < 0.0 || world_pos.y > camera.world_dims.y) {
         discard;
     }
+
+    let wrapped_x = world_pos.x - floor(world_pos.x / camera.world_dims.x) * camera.world_dims.x;
+    let wrapped_world_pos = vec2<f32>(wrapped_x, world_pos.y);
 
     // --- 4. Calculate Anti-Aliased Grid Lines ---
     
     // Get the width of one pixel in world coordinates
-    let line_width_vec = fwidth(world_pos.xy);
+    let line_width_vec = fwidth(wrapped_world_pos);
     let line_width = (line_width_vec.x + line_width_vec.y) * 0.5 * 1.0; // 1.0 pixel wide
 
     // `d` = distance from the "previous" grid line
-    let d = world_pos.xy % CHUNK_SIZE;
+    let d = wrapped_world_pos % CHUNK_SIZE;
     // `dist` = distance to the *nearest* grid line
     let dist = min(d, CHUNK_SIZE - d);
     

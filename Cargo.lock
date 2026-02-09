@@ -3216,6 +3216,7 @@ dependencies = [
  "rfd",
  "the-blockheads-tools-lib",
  "wasm-bindgen-futures",
+ "web-sys",
  "wgpu",
  "zune-png",
 ]
