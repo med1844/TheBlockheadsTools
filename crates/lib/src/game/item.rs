@@ -444,15 +444,15 @@ pub enum ItemType {
     LuminousPlaster = 1105,
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InteractionObject {
     #[serde(flatten)]
-    parent: DynamicObject,
-    interaction_object_type: u64,
-    is_in_use: bool,
-    flipped: bool,
-    paint_color: u16,
+    pub parent: DynamicObject,
+    pub interaction_object_type: u64,
+    pub is_in_use: bool,
+    pub flipped: bool,
+    pub paint_color: u16,
 }
 
 #[derive(
@@ -477,13 +477,13 @@ impl From<ChestType> for u8 {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChestData {
     #[serde(flatten)]
-    parent: InteractionObject,
-    chest_type: ChestType,
-    save_item_slots: [StackedItem; Self::NUM_SLOTS],
+    pub parent: InteractionObject,
+    pub chest_type: ChestType,
+    pub save_item_slots: [StackedItem; Self::NUM_SLOTS],
     #[serde(rename = "ownerID")]
     pub owner_id: String,
 }
@@ -539,31 +539,31 @@ impl From<WorkbenchType> for u8 {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkbenchData {
     #[serde(flatten)]
-    parent: InteractionObject,
-    available_electricity: u64,
-    craft_progress_count: NonNaNFinite<f32>,
-    fire_spread_timer: NonNaNFinite<f32>,
-    fuel_fraction: NonNaNFinite<f32>,
-    has_fuel: bool,
-    hurry_cost: u64,
-    hurry_seconds: NonNaNFinite<f32>,
-    hurry_timer: NonNaNFinite<f32>,
-    hurrying: bool,
-    last_world_time: NonNaNFinite<f32>,
-    level: u8,
-    save_time: NonNaNFinite<f32>,
+    pub parent: InteractionObject,
+    pub available_electricity: u64,
+    pub craft_progress_count: NonNaNFinite<f32>,
+    pub fire_spread_timer: NonNaNFinite<f32>,
+    pub fuel_fraction: NonNaNFinite<f32>,
+    pub has_fuel: bool,
+    pub hurry_cost: u64,
+    pub hurry_seconds: NonNaNFinite<f32>,
+    pub hurry_timer: NonNaNFinite<f32>,
+    pub hurrying: bool,
+    pub last_world_time: NonNaNFinite<f32>,
+    pub level: u8,
+    pub save_time: NonNaNFinite<f32>,
     #[serde(rename = "ownerID")]
-    owner_id: String,
-    selected_index: u8,
-    workbench_type: WorkbenchType,
-    x_scroll: NonNaNFinite<f32>,
+    pub owner_id: String,
+    pub selected_index: u8,
+    pub workbench_type: WorkbenchType,
+    pub x_scroll: NonNaNFinite<f32>,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Extra {
     Basket([StackedItem; Self::NUM_SLOT_BASKET]),
     Chest(Box<ChestData>),
@@ -664,14 +664,14 @@ impl Display for Extra {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Item {
-    type_id: u16,
-    data_a: u16,
-    data_b: u16,
-    selected_sub_item_index: u8,
-    padding: u8,
-    extra: Option<Extra>,
+    pub type_id: u16,
+    pub data_a: u16,
+    pub data_b: u16,
+    pub selected_sub_item_index: u8,
+    pub padding: u8,
+    pub extra: Option<Extra>,
 }
 
 impl<'de> Deserialize<'de> for Item {
@@ -804,8 +804,16 @@ impl Item {
         &mut self.data_b
     }
 
-    pub fn color(&self) -> BhResult<[PigmentColor; Self::MAX_COLORS]> {
-        let mut color_bits = self.data_b;
+    pub fn encode_colors(colors: [PigmentColor; Self::MAX_COLORS]) -> u16 {
+        let mut color_bits = 0;
+        for color in colors.into_iter().rev() {
+            color_bits <<= 4;
+            color_bits |= color as u16;
+        }
+        color_bits
+    }
+
+    pub fn decode_colors(mut color_bits: u16) -> BhResult<[PigmentColor; Self::MAX_COLORS]> {
         let mut colors = [PigmentColor::Transparent; _];
         for color_mut in colors.iter_mut() {
             *color_mut = PigmentColor::try_from((color_bits & 0b1111) as u8)
@@ -815,17 +823,27 @@ impl Item {
         Ok(colors)
     }
 
+    pub fn color(&self) -> BhResult<[PigmentColor; Self::MAX_COLORS]> {
+        Self::decode_colors(self.data_b)
+    }
+
     pub fn set_color(&mut self, colors: [PigmentColor; Self::MAX_COLORS]) {
-        let mut color_bits = 0;
-        for color in colors.into_iter().rev() {
-            color_bits <<= 4;
-            color_bits |= color as u16;
-        }
-        *self.color_raw_mut() = color_bits;
+        *self.color_raw_mut() = Self::encode_colors(colors);
     }
 
     pub fn extra(&self) -> &Option<Extra> {
         &self.extra
+    }
+
+    pub fn new(item_type: ItemType) -> Self {
+        Self {
+            type_id: item_type as u16,
+            data_a: 0,
+            data_b: 0,
+            selected_sub_item_index: 0,
+            padding: 0,
+            extra: None,
+        }
     }
 }
 
@@ -840,9 +858,15 @@ impl Display for Item {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct StackedItem(Vec<Item>); // TODO consider switch to smallvec
+pub struct StackedItem(pub Vec<Item>); // TODO consider switch to smallvec
+
+impl StackedItem {
+    pub fn new(items: Vec<Item>) -> Self {
+        Self(items)
+    }
+}
 
 impl Deref for StackedItem {
     type Target = Vec<Item>;
@@ -878,9 +902,9 @@ impl Display for StackedItem {
 }
 
 // An inventory of a blockhead
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct Inventory([StackedItem; Self::NUM_SLOTS]);
+pub struct Inventory(pub [StackedItem; Self::NUM_SLOTS]);
 
 impl Inventory {
     pub const NUM_SLOTS: usize = 8;

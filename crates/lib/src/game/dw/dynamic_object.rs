@@ -64,7 +64,7 @@ impl<T> Default for DynamicObjectList<T> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 #[serde(transparent)]
 pub struct UniqueID(u64);
 inherit!(UniqueID -> u64);
@@ -79,7 +79,7 @@ impl UniqueID {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DynamicObject {
     #[serde(rename = "floatPos")]
     pub float_pos: [NonNaNFinite<f32>; 2],
@@ -90,7 +90,7 @@ pub struct DynamicObject {
 }
 
 // Corresponds to Plant
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Plant {
     #[serde(flatten)]
@@ -110,7 +110,7 @@ pub struct Plant {
 
 inherit!(Plant -> DynamicObject, obj);
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ArtificialLight {
     pub max_red: u32,
@@ -125,7 +125,7 @@ pub struct ArtificialLight {
     pub light_direction: LightDirection,
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NormalPlant {
     #[serde(flatten)]
@@ -137,19 +137,19 @@ pub struct NormalPlant {
 
 inherit!(NormalPlant -> Plant, plant);
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CornPlant(pub NormalPlant);
 inherit!(CornPlant -> NormalPlant);
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CarrotPlant(pub NormalPlant);
 inherit!(CarrotPlant -> NormalPlant);
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TomatoPlant(pub NormalPlant);
 inherit!(TomatoPlant -> NormalPlant);
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum LightDirection {
     All = 0,
@@ -160,7 +160,7 @@ pub enum LightDirection {
 // NOTE: final_goal_square_x/y, load_requires_recalculation are optional and needs serde(default)
 // which doesn't work together with serde(flatten), which is needed for DynamicObject.
 // Either manually flatten DynamicObject, or remove these fields. For now we go latter.
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Blockhead {
     #[serde(flatten)]
