@@ -113,7 +113,7 @@ impl<T: Serialize> ToXmlPlist for DynamicObjectList<T> {
 }
 
 /// Contains all different types of dynamic objects that one chunk might have.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq)]
 pub struct ChunkDynamicObjects {
     pub apple_tree: Vec<u8>,
     pub maple_tree: Vec<u8>,
@@ -134,7 +134,7 @@ pub struct ChunkDynamicObjects {
     pub glow_block: Vec<u8>,
     pub ladder: Vec<u8>,
     pub door: Vec<u8>,
-    pub artificiallight: Vec<u8>,
+    pub artificial_light: Vec<u8>,
     pub bed: Vec<u8>,
     pub dropbear: Vec<u8>,
     pub gather_block: Vec<u8>,
@@ -165,13 +165,13 @@ pub struct ChunkDynamicObjects {
     pub vine_plant: Vec<u8>,
     pub tulip_plant: Vec<u8>,
     pub wheat_plant: Vec<u8>,
-    pub tomato_plants: DynamicObjectList<TomatoPlant>,
+    pub tomato_plant: DynamicObjectList<TomatoPlant>,
     pub yak: Vec<u8>,
 }
 
 impl ChunkDynamicObjects {
     pub fn num_objects(&self) -> usize {
-        self.tomato_plants.len()
+        self.tomato_plant.len() + self.corn_plant.len() + self.carrot_plant.len()
     }
 }
 
@@ -181,6 +181,10 @@ pub struct DynamicWorld(HashMap<ChunkCoord, ChunkDynamicObjects>);
 impl DynamicWorld {
     pub fn chunk_at<I: Into<ChunkCoord>>(&self, coord: I) -> Option<&ChunkDynamicObjects> {
         self.0.get(&coord.into())
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&ChunkCoord, &ChunkDynamicObjects)> {
+        self.0.iter()
     }
 
     pub fn from_db(db: &Database<Str, Bytes>, rtxn: &RoTxn) -> BhResult<Self> {
@@ -212,7 +216,7 @@ impl DynamicWorld {
                 DynamicObjectType::CoffeeTree => entry.coffee_tree = v.to_vec(),
                 DynamicObjectType::FlaxPlant => entry.flax_plant = v.to_vec(),
                 DynamicObjectType::SunflowerPlant => entry.sunflower_plant = v.to_vec(),
-                DynamicObjectType::CornPlant => entry.tomato_plants = plist::from_bytes(v)?,
+                DynamicObjectType::CornPlant => entry.corn_plant = plist::from_bytes(v)?,
                 DynamicObjectType::Dodo => entry.dodo = v.to_vec(),
                 DynamicObjectType::Item => entry.item = v.to_vec(),
                 DynamicObjectType::Fire => entry.fire = v.to_vec(),
@@ -220,7 +224,7 @@ impl DynamicWorld {
                 DynamicObjectType::GlowBlock => entry.glow_block = v.to_vec(),
                 DynamicObjectType::Ladder => entry.ladder = v.to_vec(),
                 DynamicObjectType::Door => entry.door = v.to_vec(),
-                DynamicObjectType::ArtificialLight => entry.artificiallight = v.to_vec(),
+                DynamicObjectType::ArtificialLight => entry.artificial_light = v.to_vec(),
                 DynamicObjectType::Bed => entry.bed = v.to_vec(),
                 DynamicObjectType::Dropbear => entry.dropbear = v.to_vec(),
                 DynamicObjectType::GatherBlock => entry.gather_block = v.to_vec(),
@@ -251,8 +255,8 @@ impl DynamicWorld {
                 DynamicObjectType::VinePlant => entry.vine_plant = v.to_vec(),
                 DynamicObjectType::TulipPlant => entry.tulip_plant = v.to_vec(),
                 DynamicObjectType::WheatPlant => entry.wheat_plant = v.to_vec(),
-                DynamicObjectType::TomatoPlant => entry.tomato_plants = plist::from_bytes(v)?,
-                DynamicObjectType::Yak => entry.yak = Vec::new(),
+                DynamicObjectType::TomatoPlant => entry.tomato_plant = plist::from_bytes(v)?,
+                DynamicObjectType::Yak => entry.yak = v.to_vec(),
             }
         }
         Ok(Self(map))
@@ -299,7 +303,7 @@ impl DynamicWorld {
             put(db, wtxn, &coord, GlowBlock, &obj.glow_block)?;
             put(db, wtxn, &coord, Ladder, &obj.ladder)?;
             put(db, wtxn, &coord, Door, &obj.door)?;
-            put(db, wtxn, &coord, ArtificialLight, &obj.artificiallight)?;
+            put(db, wtxn, &coord, ArtificialLight, &obj.artificial_light)?;
             put(db, wtxn, &coord, Bed, &obj.bed)?;
             put(db, wtxn, &coord, Dropbear, &obj.dropbear)?;
             put(db, wtxn, &coord, GatherBlock, &obj.gather_block)?;
@@ -330,9 +334,348 @@ impl DynamicWorld {
             put(db, wtxn, &coord, VinePlant, &obj.vine_plant)?;
             put(db, wtxn, &coord, TulipPlant, &obj.tulip_plant)?;
             put(db, wtxn, &coord, WheatPlant, &obj.wheat_plant)?;
-            put(db, wtxn, &coord, TomatoPlant, &obj.tomato_plants)?;
-            put(db, wtxn, &coord, Yak, &obj.tomato_plants)?;
+            put(db, wtxn, &coord, TomatoPlant, &obj.tomato_plant)?;
+            put(db, wtxn, &coord, Yak, &obj.yak)?;
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ChunkDynamicObjects, DynamicObjectType, DynamicWorld};
+    use crate::game::coord::ChunkCoord;
+    use lmdb_rs::arch::DynArch;
+    use lmdb_rs::env::{Env, EnvWrite};
+    use std::collections::HashMap;
+
+    #[test]
+    fn test_dynamic_object_type_parsing() {
+        assert_eq!(
+            DynamicObjectType::try_from_str("1").unwrap(),
+            DynamicObjectType::AppleTree
+        );
+        assert_eq!(
+            DynamicObjectType::try_from_str("12").unwrap(),
+            DynamicObjectType::CornPlant
+        );
+        assert_eq!(
+            DynamicObjectType::try_from_str("45").unwrap(),
+            DynamicObjectType::Workbench
+        );
+        assert_eq!(
+            DynamicObjectType::try_from_str("46").unwrap(),
+            DynamicObjectType::Chest
+        );
+        assert_eq!(
+            DynamicObjectType::try_from_str("63").unwrap(),
+            DynamicObjectType::Yak
+        );
+
+        assert!(DynamicObjectType::try_from_str("999").is_err());
+        assert!(DynamicObjectType::try_from_str("abc").is_err());
+    }
+
+    #[test]
+    fn test_dynamic_world_round_trip() {
+        let tomato_plist_source: &[u8] = b"
+<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
+<plist version=\"1.0\">
+<dict>
+    <key>dynamicObjects</key>
+    <array>
+        <dict>
+            <key>floatPos</key>
+            <array>
+                <real>4431.5</real>
+                <real>522</real>
+            </array>
+            <key>pos_x</key>
+            <integer>4431</integer>
+            <key>pos_y</key>
+            <integer>522</integer>
+            <key>uniqueID</key>
+            <integer>106576</integer>
+            <key>saveTime</key>
+            <real>5581.80003093183</real>
+            <key>seasonOffset</key>
+            <integer>-1</integer>
+            <key>gatherProgress</key>
+            <integer>0</integer>
+            <key>hasFloweredThisSeason</key>
+            <false/>
+            <key>flowering</key>
+            <false/>
+            <key>frozen</key>
+            <false/>
+            <key>age</key>
+            <real>6353.9091796875</real>
+            <key>maxAge</key>
+            <real>16644.7109375</real>
+            <key>maxAgeGene</key>
+            <integer>200</integer>
+            <key>growthRate</key>
+            <real>0.9686275124549866</real>
+            <key>growthRateGene</key>
+            <integer>196</integer>
+            <key>availableFood</key>
+            <real>1046.7919921875</real>
+        </dict>
+    </array>
+</dict>
+</plist>";
+        let corn_plist_source: &[u8] = b"
+<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
+<plist version=\"1.0\">
+<dict>
+    <key>dynamicObjects</key>
+    <array>
+        <dict>
+            <key>age</key>
+            <real>6684.742</real>
+            <key>availableFood</key>
+            <real>1436.561</real>
+            <key>floatPos</key>
+            <array>
+                <real>11562.5</real>
+                <real>659</real>
+            </array>
+            <key>flowering</key>
+            <false/>
+            <key>frozen</key>
+            <false/>
+            <key>gatherProgress</key>
+            <integer>0</integer>
+            <key>growthRate</key>
+            <real>0.9333333</real>
+            <key>growthRateGene</key>
+            <integer>187</integer>
+            <key>hasFloweredThisSeason</key>
+            <false/>
+            <key>maxAge</key>
+            <real>15882.35</real>
+            <key>maxAgeGene</key>
+            <integer>185</integer>
+            <key>pos_x</key>
+            <integer>11562</integer>
+            <key>pos_y</key>
+            <integer>659</integer>
+            <key>saveTime</key>
+            <real>5493.800029620528</real>
+            <key>seasonOffset</key>
+            <integer>6</integer>
+            <key>uniqueID</key>
+            <integer>129771</integer>
+        </dict>
+    </array>
+</dict>
+</plist>";
+        let carrot_plist_source: &[u8] = b"
+<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
+<plist version=\"1.0\">
+<dict>
+    <key>dynamicObjects</key>
+    <array>
+        <dict>
+            <key>age</key>
+            <real>16878.66</real>
+            <key>availableFood</key>
+            <real>88.2</real>
+            <key>floatPos</key>
+            <array>
+                <real>11002.5</real>
+                <real>517</real>
+            </array>
+            <key>flowering</key>
+            <false/>
+            <key>frozen</key>
+            <false/>
+            <key>gatherProgress</key>
+            <integer>0</integer>
+            <key>growthRate</key>
+            <real>0</real>
+            <key>growthRateGene</key>
+            <integer>207</integer>
+            <key>hasFloweredThisSeason</key>
+            <false/>
+            <key>maxAge</key>
+            <real>16797.18</real>
+            <key>maxAgeGene</key>
+            <integer>203</integer>
+            <key>pos_x</key>
+            <integer>11002</integer>
+            <key>pos_y</key>
+            <integer>517</integer>
+            <key>saveTime</key>
+            <real>5890.200031712651</real>
+            <key>seasonOffset</key>
+            <integer>-7</integer>
+            <key>uniqueID</key>
+            <integer>4804</integer>
+        </dict>
+    </array>
+</dict>
+</plist>";
+
+        let mut monster = ChunkDynamicObjects::default();
+
+        if !tomato_plist_source.is_empty() {
+            monster.tomato_plant = plist::from_bytes(tomato_plist_source).unwrap();
+        }
+        if !corn_plist_source.is_empty() {
+            monster.corn_plant = plist::from_bytes(corn_plist_source).unwrap();
+        }
+        if !carrot_plist_source.is_empty() {
+            monster.carrot_plant = plist::from_bytes(carrot_plist_source).unwrap();
+        }
+
+        monster.apple_tree = vec![1, 0xAA, 0xBB];
+        monster.maple_tree = vec![2, 0xAA, 0xBB];
+        monster.mango_tree = vec![3, 0xAA, 0xBB];
+        monster.pine_tree = vec![4, 0xAA, 0xBB];
+        monster.cactus_tree = vec![5, 0xAA, 0xBB];
+        monster.coconut_tree = vec![6, 0xAA, 0xBB];
+        monster.orange_tree = vec![7, 0xAA, 0xBB];
+        monster.cherry_tree = vec![8, 0xAA, 0xBB];
+        monster.coffee_tree = vec![9, 0xAA, 0xBB];
+        monster.flax_plant = vec![10, 0xAA, 0xBB];
+        monster.sunflower_plant = vec![11, 0xAA, 0xBB];
+        monster.dodo = vec![13, 0xAA, 0xBB];
+        monster.item = vec![14, 0xAA, 0xBB];
+        monster.fire = vec![16, 0xAA, 0xBB];
+        monster.torch = vec![17, 0xAA, 0xBB];
+        monster.glow_block = vec![18, 0xAA, 0xBB];
+        monster.ladder = vec![19, 0xAA, 0xBB];
+        monster.door = vec![20, 0xAA, 0xBB];
+        monster.artificial_light = vec![21, 0xAA, 0xBB];
+        monster.bed = vec![23, 0xAA, 0xBB];
+        monster.dropbear = vec![25, 0xAA, 0xBB];
+        monster.gather_block = vec![26, 0xAA, 0xBB];
+        monster.donkey = vec![28, 0xAA, 0xBB];
+        monster.egg = vec![30, 0xAA, 0xBB];
+        monster.window = vec![31, 0xAA, 0xBB];
+        monster.boat = vec![32, 0xAA, 0xBB];
+        monster.chilli_plant = vec![33, 0xAA, 0xBB];
+        monster.kelp_plant = vec![34, 0xAA, 0xBB];
+        monster.clown_fish = vec![35, 0xAA, 0xBB];
+        monster.shark = vec![36, 0xAA, 0xBB];
+        monster.lime_tree = vec![37, 0xAA, 0xBB];
+        monster.wire = vec![38, 0xAA, 0xBB];
+        monster.cave_troll = vec![39, 0xAA, 0xBB];
+        monster.rail = vec![40, 0xAA, 0xBB];
+        monster.workbench = vec![45, 0xAA, 0xBB];
+        monster.chest = vec![46, 0xAA, 0xBB];
+        monster.sign = vec![47, 0xAA, 0xBB];
+        monster.trading_post = vec![48, 0xAA, 0xBB];
+        monster.trade_portal = vec![50, 0xAA, 0xBB];
+        monster.scorpion = vec![51, 0xAA, 0xBB];
+        monster.column = vec![53, 0xAA, 0xBB];
+        monster.stairs = vec![54, 0xAA, 0xBB];
+        monster.elevator_motor = vec![55, 0xAA, 0xBB];
+        monster.elevator_shaft = vec![56, 0xAA, 0xBB];
+        monster.gem_tree = vec![57, 0xAA, 0xBB];
+        monster.vine_plant = vec![58, 0xAA, 0xBB];
+        monster.tulip_plant = vec![59, 0xAA, 0xBB];
+        monster.wheat_plant = vec![61, 0xAA, 0xBB];
+        monster.yak = vec![63, 0xAA, 0xBB];
+
+        let coord = ChunkCoord::new(10, 20).unwrap();
+        let mut map = HashMap::new();
+        map.insert(coord, monster);
+        let dw = DynamicWorld(map);
+
+        // write to buffer
+        let mut buffer = Vec::new();
+        {
+            let mut env_write = EnvWrite::new(&mut buffer, DynArch::Arch64);
+            let mut wtxn = env_write.write_txn().unwrap();
+            let db = wtxn.create_database(Some("dw")).unwrap();
+            dw.to_db(&db, &mut wtxn).unwrap();
+            wtxn.commit().unwrap();
+        }
+
+        // read from buffer
+        {
+            let env = Env::new(&buffer).unwrap();
+            let rtxn = env.read_txn().unwrap();
+            let db = env
+                .open_database::<lmdb_rs::codec::types::Str, lmdb_rs::codec::types::Bytes>(
+                    &rtxn,
+                    Some("dw"),
+                )
+                .unwrap()
+                .unwrap();
+
+            let coord_str = coord.to_string();
+            let check_key = |id: DynamicObjectType| {
+                let key = format!("{}/{}", coord_str, id as u16);
+                assert!(
+                    db.get(&rtxn, &key).unwrap().is_some(),
+                    "Key {} missing",
+                    key
+                );
+            };
+
+            check_key(DynamicObjectType::AppleTree);
+            check_key(DynamicObjectType::MapleTree);
+            check_key(DynamicObjectType::MangoTree);
+            check_key(DynamicObjectType::PineTree);
+            check_key(DynamicObjectType::CactusTree);
+            check_key(DynamicObjectType::CoconutTree);
+            check_key(DynamicObjectType::OrangeTree);
+            check_key(DynamicObjectType::CherryTree);
+            check_key(DynamicObjectType::CoffeeTree);
+            check_key(DynamicObjectType::FlaxPlant);
+            check_key(DynamicObjectType::SunflowerPlant);
+            check_key(DynamicObjectType::CornPlant);
+            check_key(DynamicObjectType::Dodo);
+            check_key(DynamicObjectType::Item);
+            check_key(DynamicObjectType::Fire);
+            check_key(DynamicObjectType::Torch);
+            check_key(DynamicObjectType::GlowBlock);
+            check_key(DynamicObjectType::Ladder);
+            check_key(DynamicObjectType::Door);
+            check_key(DynamicObjectType::ArtificialLight);
+            check_key(DynamicObjectType::Bed);
+            check_key(DynamicObjectType::Dropbear);
+            check_key(DynamicObjectType::GatherBlock);
+            check_key(DynamicObjectType::CarrotPlant);
+            check_key(DynamicObjectType::Donkey);
+            check_key(DynamicObjectType::Egg);
+            check_key(DynamicObjectType::Window);
+            check_key(DynamicObjectType::Boat);
+            check_key(DynamicObjectType::ChilliPlant);
+            check_key(DynamicObjectType::KelpPlant);
+            check_key(DynamicObjectType::ClownFish);
+            check_key(DynamicObjectType::Shark);
+            check_key(DynamicObjectType::LimeTree);
+            check_key(DynamicObjectType::Wire);
+            check_key(DynamicObjectType::CaveTroll);
+            check_key(DynamicObjectType::Rail);
+            check_key(DynamicObjectType::Workbench);
+            check_key(DynamicObjectType::Chest);
+            check_key(DynamicObjectType::Sign);
+            check_key(DynamicObjectType::TradingPost);
+            check_key(DynamicObjectType::TradePortal);
+            check_key(DynamicObjectType::Scorpion);
+            check_key(DynamicObjectType::Column);
+            check_key(DynamicObjectType::Stairs);
+            check_key(DynamicObjectType::ElevatorMotor);
+            check_key(DynamicObjectType::ElevatorShaft);
+            check_key(DynamicObjectType::GemTree);
+            check_key(DynamicObjectType::VinePlant);
+            check_key(DynamicObjectType::TulipPlant);
+            check_key(DynamicObjectType::WheatPlant);
+            check_key(DynamicObjectType::TomatoPlant);
+            check_key(DynamicObjectType::Yak);
+
+            let round_tripped_dw = DynamicWorld::from_db(&db, &rtxn).unwrap();
+            let round_tripped_dw_chunk = round_tripped_dw.chunk_at(coord).unwrap();
+
+            assert_eq!(round_tripped_dw_chunk, dw.chunk_at(coord).unwrap());
+        }
     }
 }

@@ -193,3 +193,76 @@ impl BlockCoord {
         (self.into(), self.into())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{BlockCoord, ChunkBlockCoord, ChunkCoord, ChunkOffset};
+
+    #[test]
+    fn test_chunk_block_coord_limits() {
+        assert!(ChunkBlockCoord::new(0, 0).is_ok());
+        assert!(ChunkBlockCoord::new(31, 31).is_ok());
+        assert!(ChunkBlockCoord::new(32, 0).is_err());
+        assert!(ChunkBlockCoord::new(0, 32).is_err());
+    }
+
+    #[test]
+    fn test_chunk_coord_limits() {
+        assert!(ChunkCoord::new(0, 0).is_ok());
+        assert!(ChunkCoord::new(u32::MAX, 31).is_ok());
+        assert!(ChunkCoord::new(0, 32).is_err());
+    }
+
+    #[test]
+    fn test_block_coord_limits() {
+        assert!(BlockCoord::new(0, 0).is_ok());
+        assert!(BlockCoord::new(u32::MAX, 1023).is_ok());
+        assert!(BlockCoord::new(0, 1024).is_err());
+    }
+
+    #[test]
+    fn test_chunk_block_coord_offset() {
+        let coord = ChunkBlockCoord::new(0, 0).unwrap();
+        assert_eq!(coord.to_offset(), 0);
+
+        let coord = ChunkBlockCoord::new(1, 0).unwrap();
+        assert_eq!(coord.to_offset(), 64);
+
+        let coord = ChunkBlockCoord::new(0, 1).unwrap();
+        assert_eq!(coord.to_offset(), 2048);
+
+        let coord = ChunkBlockCoord::new(31, 31).unwrap();
+        let expected = ((31 * 32) + 31) * 64;
+        assert_eq!(coord.to_offset(), expected);
+    }
+
+    #[test]
+    fn test_coord_round_trip() {
+        let test_cases = vec![
+            (0, 0),
+            (31, 31),
+            (32, 0),
+            (32, 32),
+            (100, 100),
+            (1024, 1023),
+        ];
+
+        for (x, y) in test_cases {
+            if let Ok(block_coord) = BlockCoord::new(x, y) {
+                let (chunk_coord, chunk_block_coord) = block_coord.decompose();
+                let params_recomposed = BlockCoord::from_decomposed(chunk_coord, chunk_block_coord);
+                assert_eq!(block_coord, params_recomposed, "Round trip failed for ({}, {})", x, y);
+            }
+        }
+    }
+
+    #[test]
+    fn test_chunk_coord_parse() {
+        assert_eq!(ChunkCoord::try_from_str("10_20").unwrap(), ChunkCoord::new(10, 20).unwrap());
+        assert!(ChunkCoord::try_from_str("10_32").is_err());
+        assert!(ChunkCoord::try_from_str("abc_20").is_err());
+        assert!(ChunkCoord::try_from_str("10_abc").is_err());
+        assert!(ChunkCoord::try_from_str("10_20_30").is_err());
+        assert!(ChunkCoord::try_from_str("10").is_err());
+    }
+}

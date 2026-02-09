@@ -87,7 +87,7 @@ impl DwChunkBuf {
 
         add(chunk.corn_plant.iter(), &mut icons);
         add(chunk.carrot_plant.iter(), &mut icons);
-        add(chunk.tomato_plants.iter(), &mut icons);
+        add(chunk.tomato_plant.iter(), &mut icons);
 
         let instance_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Dynamic Object Icon Instance Buffer"),

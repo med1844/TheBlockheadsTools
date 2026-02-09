@@ -196,3 +196,87 @@ impl Chunks {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{Chunk, ChunkCoord, ChunkIndexIter, Chunks, CompressedChunk};
+    use crate::game::block::{Block, BlockMut};
+    use crate::game::coord::BlockCoord;
+    use flate2::Compression;
+    use flate2::write::GzEncoder;
+    use std::io::Write;
+
+    #[test]
+    fn test_chunk_size() {
+        assert_eq!(Chunk::NUM_BYTES, 32 * 32 * 64 + 5);
+        let chunk = Chunk::new_empty();
+        assert_eq!(chunk.inner().len(), Chunk::NUM_BYTES);
+    }
+
+    #[test]
+    fn test_chunk_index_iter() {
+        let mut iter = ChunkIndexIter::default();
+        assert_eq!(iter.next(), Some(ChunkCoord::new(0, 0).unwrap()));
+        for _ in 0..31 {
+            iter.next();
+        }
+        assert_eq!(iter.next(), Some(ChunkCoord::new(1, 0).unwrap()));
+    }
+
+    #[test]
+    fn test_chunks_to_index() {
+        assert_eq!(Chunks::to_index(ChunkCoord::new(0, 0).unwrap()), 0);
+        assert_eq!(Chunks::to_index(ChunkCoord::new(0, 31).unwrap()), 31);
+        assert_eq!(Chunks::to_index(ChunkCoord::new(1, 0).unwrap()), 32);
+        assert_eq!(
+            Chunks::to_index(ChunkCoord::new(10, 5).unwrap()),
+            10 * 32 + 5
+        );
+    }
+
+    #[test]
+    fn test_compressed_chunk_decompression() {
+        let chunk = Chunk::new_empty();
+        let mut raw_bytes = chunk.inner().to_vec();
+        raw_bytes[100] = 0xAA;
+        raw_bytes[chunk.inner().len() - 1] = 0xBB;
+
+        let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+        encoder.write_all(&raw_bytes).unwrap();
+        let compressed_bytes = encoder.finish().unwrap();
+
+        let compressed = CompressedChunk::new(compressed_bytes);
+        let decompressed = compressed.decompress().unwrap();
+        assert_eq!(decompressed.inner(), raw_bytes.as_slice());
+
+        let mut buffer = Vec::new();
+        let _ = compressed.decompress_view(&mut buffer).unwrap();
+        assert_eq!(buffer, raw_bytes);
+    }
+
+    #[test]
+    fn test_chunks_block_at() {
+        let mut chunks = Chunks(vec![None; 32 * 32]);
+        let coord = ChunkCoord::new(1, 1).unwrap();
+
+        let mut chunk = Chunk::new_empty();
+        let block_coord = BlockCoord::new(32, 32).unwrap(); // (1, 1) in chunks, (0, 0) in block
+        let (_, local_coord) = block_coord.decompose();
+
+        {
+            let mut slice = chunk.as_mut_slice();
+            let mut block = slice.block_at_mut(local_coord);
+            block.set_fg(0xF0);
+        }
+
+        let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+        encoder.write_all(chunk.inner()).unwrap();
+        let compressed_bytes = encoder.finish().unwrap();
+
+        chunks.set_chunk_at(coord, CompressedChunk::new(compressed_bytes));
+
+        let mut buffer = Vec::new();
+        let block = chunks.block_at(block_coord, &mut buffer).unwrap().unwrap();
+        assert_eq!(block.fg_raw(), 0xF0);
+    }
+}

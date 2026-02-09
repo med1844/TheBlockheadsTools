@@ -746,7 +746,7 @@ impl Serialize for Item {
     }
 }
 
-#[derive(Debug, Clone, Copy, TryFromPrimitive)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, TryFromPrimitive)]
 #[repr(u8)]
 pub enum PigmentColor {
     Transparent = 0,
@@ -817,9 +817,9 @@ impl Item {
 
     pub fn set_color(&mut self, colors: [PigmentColor; Self::MAX_COLORS]) {
         let mut color_bits = 0;
-        for color in colors {
-            color_bits |= color as u16;
+        for color in colors.into_iter().rev() {
             color_bits <<= 4;
+            color_bits |= color as u16;
         }
         *self.color_raw_mut() = color_bits;
     }
@@ -907,7 +907,197 @@ impl Display for Inventory {
 
 #[cfg(test)]
 mod tests {
-    use super::Inventory;
+    use super::{
+        ChestData, ChestType, Extra, Inventory, Item, ItemType, PigmentColor, StackedItem,
+        WorkbenchData, WorkbenchType,
+    };
+
+    #[test]
+    fn test_color_round_trip() {
+        let mut item = Item {
+            type_id: ItemType::Flint as u16,
+            data_a: 0,
+            data_b: 0,
+            selected_sub_item_index: 0,
+            padding: 0,
+            extra: None,
+        };
+
+        let colors = [
+            PigmentColor::RedOchre,
+            PigmentColor::EmeraldGreen,
+            PigmentColor::UltraMarineBlue,
+        ];
+
+        item.set_color(colors);
+        let recovered = item.color().unwrap();
+        assert_eq!(recovered, colors);
+    }
+
+    #[test]
+    fn test_item_serialization_basic() {
+        let items = vec![
+            Item {
+                type_id: ItemType::Flint as u16,
+                data_a: 10,
+                data_b: 20,
+                selected_sub_item_index: 1,
+                padding: 0,
+                extra: None,
+            },
+            Item {
+                type_id: ItemType::SteelPickaxe as u16,
+                data_a: 100,
+                data_b: 0,
+                selected_sub_item_index: 0,
+                padding: 0,
+                extra: None,
+            },
+        ];
+
+        for item in items {
+            let serialized = plist::to_value(&item).unwrap();
+            let deserialized: Item = plist::from_value(&serialized).unwrap();
+            assert_eq!(item, deserialized);
+        }
+    }
+
+    #[test]
+    fn test_invalid_item_id() {
+        let item = Item {
+            type_id: 9999,
+            data_a: 0,
+            data_b: 0,
+            selected_sub_item_index: 0,
+            padding: 0,
+            extra: None,
+        };
+        assert!(item.item_type().is_err());
+    }
+
+    #[test]
+    fn test_extra_basket_isolation() {
+        let item_in_basket = Item {
+            type_id: ItemType::Apple as u16,
+            data_a: 0,
+            data_b: 0,
+            selected_sub_item_index: 0,
+            padding: 0,
+            extra: None,
+        };
+        let mut basket_items = [const { StackedItem(vec![]) }; 4];
+        basket_items[0] = StackedItem(vec![item_in_basket]);
+
+        let item = Item {
+            type_id: ItemType::Basket as u16,
+            data_a: 0,
+            data_b: 0,
+            selected_sub_item_index: 0,
+            padding: 0,
+            extra: Some(Extra::Basket(basket_items)),
+        };
+
+        let serialized = plist::to_value(&item).unwrap();
+        let deserialized: Item = plist::from_value(&serialized).unwrap();
+        assert_eq!(item, deserialized);
+    }
+
+    #[test]
+    fn test_extra_chest_isolation() {
+        let chest_data = ChestData {
+            parent: crate::game::item::InteractionObject {
+                parent: crate::game::dw::dynamic_object::DynamicObject {
+                    float_pos: [0.0f32.try_into().unwrap(), 0.0f32.try_into().unwrap()],
+                    pos_x: 10,
+                    pos_y: 20,
+                    unique_id: crate::game::dw::dynamic_object::UniqueID::new(123),
+                },
+                interaction_object_type: 46,
+                is_in_use: false,
+                flipped: false,
+                paint_color: 0,
+            },
+            chest_type: ChestType::Standard,
+            save_item_slots: [const { StackedItem(vec![]) }; 16],
+            owner_id: "test_owner".to_string(),
+        };
+
+        let item = Item {
+            type_id: ItemType::Chest as u16,
+            data_a: 0,
+            data_b: 0,
+            selected_sub_item_index: 0,
+            padding: 0,
+            extra: Some(Extra::Chest(Box::new(chest_data))),
+        };
+
+        let serialized = plist::to_value(&item).unwrap();
+        let deserialized: Item = plist::from_value(&serialized).unwrap();
+        assert_eq!(item, deserialized);
+    }
+
+    #[test]
+    fn test_extra_workbench_isolation() {
+        let wb_data = WorkbenchData {
+            parent: crate::game::item::InteractionObject {
+                parent: crate::game::dw::dynamic_object::DynamicObject {
+                    float_pos: [0.0f32.try_into().unwrap(), 0.0f32.try_into().unwrap()],
+                    pos_x: 5,
+                    pos_y: 5,
+                    unique_id: crate::game::dw::dynamic_object::UniqueID::new(456),
+                },
+                interaction_object_type: 45,
+                is_in_use: false,
+                flipped: false,
+                paint_color: 0,
+            },
+            available_electricity: 0,
+            craft_progress_count: 0.0f32.try_into().unwrap(),
+            fire_spread_timer: 0.0f32.try_into().unwrap(),
+            fuel_fraction: 0.0f32.try_into().unwrap(),
+            has_fuel: false,
+            hurry_cost: 0,
+            hurry_seconds: 0.0f32.try_into().unwrap(),
+            hurry_timer: 0.0f32.try_into().unwrap(),
+            hurrying: false,
+            last_world_time: 0.0f32.try_into().unwrap(),
+            level: 1,
+            save_time: 100.0f32.try_into().unwrap(),
+            owner_id: "wb_owner".to_string(),
+            selected_index: 0,
+            workbench_type: WorkbenchType::Workbench,
+            x_scroll: 0.0f32.try_into().unwrap(),
+        };
+
+        let item = Item {
+            type_id: ItemType::WorkBench as u16,
+            data_a: 0,
+            data_b: 0,
+            selected_sub_item_index: 0,
+            padding: 0,
+            extra: Some(Extra::Workbench(Box::new(wb_data))),
+        };
+
+        let serialized = plist::to_value(&item).unwrap();
+        let deserialized: Item = plist::from_value(&serialized).unwrap();
+        assert_eq!(item, deserialized);
+    }
+
+    #[test]
+    fn test_stacked_item_serialization() {
+        let item = Item {
+            type_id: ItemType::Flint as u16,
+            data_a: 0,
+            data_b: 0,
+            selected_sub_item_index: 0,
+            padding: 0,
+            extra: None,
+        };
+        let stacked = StackedItem(vec![item]);
+        let serialized = plist::to_value(&stacked).unwrap();
+        let deserialized: StackedItem = plist::from_value(&serialized).unwrap();
+        assert_eq!(stacked, deserialized);
+    }
 
     #[test]
     fn inventory_round_trip_test() {

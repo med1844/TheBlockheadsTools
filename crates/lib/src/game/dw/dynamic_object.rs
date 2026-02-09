@@ -131,6 +131,7 @@ pub struct NormalPlant {
     #[serde(flatten)]
     pub plant: Plant,
     pub available_food: f32,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub light: Option<ArtificialLight>,
 }
 
@@ -138,7 +139,6 @@ inherit!(NormalPlant -> Plant, plant);
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct CornPlant(pub NormalPlant);
-
 inherit!(CornPlant -> NormalPlant);
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
