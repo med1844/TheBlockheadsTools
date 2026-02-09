@@ -21,7 +21,10 @@ pub fn into_py_err(err: lib::BhError) -> PyErr {
         | lib::BhError::ParseError(_)
         | lib::BhError::InvalidBlockIdError(_)
         | lib::BhError::InvalidBlockContentIdError(_)
-        | lib::BhError::InvalidDynamicOjectId(_) => PyValueError::new_err(error_message),
+        | lib::BhError::InvalidDynamicOjectId(_)
+        | lib::BhError::InvalidItemTypeId(_)
+        | lib::BhError::InvalidColorId(_)
+        | lib::BhError::InvalidChunkSize(_) => PyValueError::new_err(error_message),
     }
 }
 
@@ -152,12 +155,10 @@ pub use coord::{BlockCoordPy, ChunkBlockCoordPy, ChunkCoordPy};
 
 mod block {
     use crate::{into_py_err, lib, InvalidAccessorError, SharedWorldDb};
-    use lib::game::{
-        block::{BlockType, BlockView},
-        coord::BlockCoord,
-    };
+    use lib::game::{block::BlockType, coord::BlockCoord};
     use num_enum::TryFromPrimitive;
     use pyo3::prelude::*;
+    use the_blockheads_tools_lib::game::block::Block;
 
     #[pyclass(eq, eq_int, name = "BlockType")]
     #[derive(PartialEq, TryFromPrimitive)]
@@ -260,10 +261,13 @@ mod block {
     impl BlockPy {
         fn fg(&self) -> PyResult<BlockTypePy> {
             let mut world_db = self.world_db.write().unwrap();
-            let block = world_db.chunks.block_at(self.block_coord);
+            let mut chunk_buffer = Vec::new();
+            let block = world_db
+                .chunks
+                .block_at(self.block_coord, &mut chunk_buffer);
             match block {
                 Some(block) => {
-                    let fg_type = block?.fg().map_err(into_py_err)?;
+                    let fg_type = block.map_err(into_py_err)?.fg().map_err(into_py_err)?;
                     Ok(fg_type.into())
                 }
                 None => Err(InvalidAccessorError::new_err(format!(
@@ -281,8 +285,8 @@ mod chunk {
     use std::{borrow::Cow, collections::HashSet};
 
     use crate::{
-        lib, BlockCoordPy, BlockPy, ChunkBlockCoordPy, ChunkCoordPy, InvalidAccessorError,
-        SharedWorldDb,
+        into_py_err, lib, BlockCoordPy, BlockPy, ChunkBlockCoordPy, ChunkCoordPy,
+        InvalidAccessorError, SharedWorldDb,
     };
     use lib::game::coord::{BlockCoord, ChunkCoord};
     use pyo3::prelude::*;
@@ -296,10 +300,12 @@ mod chunk {
     #[pymethods]
     impl ChunkPy {
         fn as_bytes(&'_ self) -> PyResult<Cow<'_, [u8]>> {
-            let mut world_db = self.world_db.write().unwrap();
+            let world_db = self.world_db.read().unwrap();
             let chunk = world_db.chunks.chunk_at(self.coord);
             match chunk {
-                Some(chunk) => Ok(Cow::Owned(chunk.decompress()?.inner().to_vec())),
+                Some(chunk) => Ok(Cow::Owned(
+                    chunk.decompress().map_err(into_py_err)?.inner().to_vec(),
+                )),
                 None => Err(InvalidAccessorError::new_err(format!(
                     "The chunk at {} doesn't exist.",
                     self.coord.to_string()
@@ -379,7 +385,7 @@ pub use chunk::{ChunkPy, ChunksPy};
 mod world_db {
     use super::{Arc, RwLock};
     use crate::{into_py_err, lib, ChunksPy, SharedWorldDb};
-    use lib::game::{db::world_db::WorldDb, dw::dynamic_object::Blockhead};
+    use lib::game::db::world_db::WorldDb;
     use pyo3::prelude::*;
     use std::{
         borrow::Cow,
