@@ -248,7 +248,7 @@ impl<'chunk> BlockViewMut<'chunk> {
 
 impl<'chunk> Block for BlockViewMut<'chunk> {
     fn as_bytes(&self) -> &[u8; 64] {
-        &self.0
+        self.0
     }
 }
 

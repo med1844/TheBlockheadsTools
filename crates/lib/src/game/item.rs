@@ -555,7 +555,7 @@ pub struct WorkbenchData {
     hurrying: bool,
     last_world_time: NonNaNFinite<f32>,
     level: u8,
-    save_time: NonNaNFinite<f64>,
+    save_time: NonNaNFinite<f32>,
     #[serde(rename = "ownerID")]
     owner_id: String,
     selected_index: u8,
@@ -566,8 +566,8 @@ pub struct WorkbenchData {
 #[derive(Debug, PartialEq, Eq)]
 pub enum Extra {
     Basket([StackedItem; Self::NUM_SLOT_BASKET]),
-    Chest(ChestData),
-    Workbench(WorkbenchData),
+    Chest(Box<ChestData>),
+    Workbench(Box<WorkbenchData>),
 }
 
 impl Extra {

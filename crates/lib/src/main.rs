@@ -4,13 +4,6 @@ use the_blockheads_tools_lib::{
     game::{chunk::Chunk, db::world_db::WorldDb},
 };
 
-fn dump_to_stdout(bytes: &[u8]) -> std::io::Result<()> {
-    use std::io::Write;
-    std::io::stdout().write_all(bytes)?;
-    std::io::stdout().flush()?; // Make sure all bytes are written immediately
-    Ok(())
-}
-
 fn main() -> BhResult<()> {
     dbg!(mem::size_of::<Chunk>());
     dbg!(mem::size_of::<Vec<u8>>());
