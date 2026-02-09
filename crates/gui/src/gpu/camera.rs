@@ -38,7 +38,7 @@ pub struct CameraUniform {
 
 impl Camera {
     pub const MAX_BLOCK_Z: f32 = 3.0;
-    pub const MAX_Z: f32 = 2000.0;
+    pub const MAX_Z: f32 = 1e8;
     const DEFAULT_WORLD_WIDTH_BLOCKS: f32 = 512.0 * 32.0;
     const WORLD_HEIGHT_BLOCKS: f32 = 32.0 * 32.0;
     const WORLD_DEPTH_BLOCKS: f32 = 3.0;
