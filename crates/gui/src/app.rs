@@ -448,8 +448,6 @@ impl EditorApp {
                     scroll_y,
                 );
 
-                web_sys::console::log_1(&format!("Zoom after clamp: {}", self.camera.world_offset().z).into());
-
                 // --- clamp zoom (distance) so user can't zoom out beyond allowed range ---
                 // Use Camera constants if available; these were referenced in the UI already.
                 let z = self.camera.world_offset().z;
