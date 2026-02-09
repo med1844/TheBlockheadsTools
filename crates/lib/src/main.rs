@@ -1,8 +1,7 @@
 use std::mem;
 use the_blockheads_tools_lib::{
     BhResult,
-    game::{chunk::Chunk, db::world_db::WorldDb, dw::dynamic_object::UniqueID},
-    util::gzip::Gzip,
+    game::{chunk::Chunk, db::world_db::WorldDb},
 };
 
 fn dump_to_stdout(bytes: &[u8]) -> std::io::Result<()> {
@@ -14,8 +13,6 @@ fn dump_to_stdout(bytes: &[u8]) -> std::io::Result<()> {
 
 fn main() -> BhResult<()> {
     dbg!(mem::size_of::<Chunk>());
-    dbg!(mem::size_of::<Gzip<Chunk>>());
-    dbg!(mem::size_of::<Option<Gzip<Chunk>>>());
     dbg!(mem::size_of::<Vec<u8>>());
 
     let args: Vec<String> = std::env::args().collect();

@@ -297,9 +297,9 @@ mod chunk {
     impl ChunkPy {
         fn as_bytes(&'_ self) -> PyResult<Cow<'_, [u8]>> {
             let mut world_db = self.world_db.write().unwrap();
-            let chunk = world_db.chunks.chunk_at_mut(self.coord);
+            let chunk = world_db.chunks.chunk_at(self.coord);
             match chunk {
-                Some(chunk) => Ok(Cow::Owned(chunk.as_uncompressed()?.inner().to_owned())),
+                Some(chunk) => Ok(Cow::Owned(chunk.decompress()?.inner().to_vec())),
                 None => Err(InvalidAccessorError::new_err(format!(
                     "The chunk at {} doesn't exist.",
                     self.coord.to_string()

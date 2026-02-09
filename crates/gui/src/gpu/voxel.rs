@@ -308,7 +308,7 @@ impl VoxelType {
 }
 
 impl VoxelType {
-    fn fg_from_block_inner<'b>(block: Block<'b>) -> BhResult<Self> {
+    fn fg_from_block_inner<'b>(block: BlockView<'b>) -> BhResult<Self> {
         Ok(Self(match (block.fg()?, block.content()?) {
             (BlockType::Air, _) => 2,
             (BlockType::Snow, _) => 5,
@@ -331,11 +331,11 @@ impl VoxelType {
         }))
     }
 
-    pub fn fg_from_block<'b>(block: Block<'b>) -> Self {
+    pub fn fg_from_block<'b>(block: BlockView<'b>) -> Self {
         Self::fg_from_block_inner(block).unwrap_or(Self::UNKNOWN)
     }
 
-    fn mg_from_block_inner<'b>(block: Block<'b>) -> BhResult<Self> {
+    fn mg_from_block_inner<'b>(block: BlockView<'b>) -> BhResult<Self> {
         Ok(Self(match block.content()? {
             BlockContent::None => 2,
             BlockContent::AppleTreeLeaf => 92,
@@ -394,15 +394,15 @@ impl VoxelType {
         }))
     }
 
-    pub fn mg_from_block<'b>(block: Block<'b>) -> Self {
+    pub fn mg_from_block<'b>(block: BlockView<'b>) -> Self {
         Self::mg_from_block_inner(block).unwrap_or(Self::UNKNOWN)
     }
 
-    fn bg_from_block_inner<'b>(block: Block<'b>) -> BhResult<Self> {
+    fn bg_from_block_inner<'b>(block: BlockView<'b>) -> BhResult<Self> {
         Ok(Self(block.bg()? as u16))
     }
 
-    pub fn bg_from_block<'b>(block: Block<'b>) -> Self {
+    pub fn bg_from_block<'b>(block: BlockView<'b>) -> Self {
         Self::bg_from_block_inner(block).unwrap_or(Self::UNKNOWN)
     }
 }
@@ -411,14 +411,12 @@ pub mod voxel_util {
 
     use super::VoxelType;
     use eframe::wgpu::{self, util::DeviceExt};
-    use std::ops::Deref;
     use the_blockheads_tools_lib::{
         BhResult,
         game::{
-            chunk::{Chunk, ChunkView, Chunks},
+            chunk::{Chunk, ChunkSlice, Chunks},
             coord::{ChunkBlockCoord, ChunkCoord},
         },
-        util::gzip::{Gzip, decompress_gzip_to},
     };
 
     const NUM_BLOCK_PER_CHUNK: usize = Chunk::NUM_BLOCK_PER_ROW * Chunk::NUM_BLOCK_PER_COL * 3; // 3 layers
@@ -437,7 +435,7 @@ pub mod voxel_util {
         vec![VoxelType::AIR; NUM_BLOCK_PER_CHUNK * Chunks::NUM_CHUNK_PER_COL * world_width_macro]
     }
 
-    fn fill_chunk_voxel<C: ChunkView>(chunk: &C, chunk_voxel: &mut [VoxelType]) -> BhResult<()> {
+    fn fill_chunk_voxel(chunk: ChunkSlice<'_>, chunk_voxel: &mut [VoxelType]) -> BhResult<()> {
         for y in 0..Chunk::NUM_BLOCK_PER_COL {
             for x in 0..Chunk::NUM_BLOCK_PER_ROW {
                 let block = chunk.block_at(ChunkBlockCoord::new(x as u8, y as u8)?);
@@ -472,23 +470,10 @@ pub mod voxel_util {
             .iter()
             .zip(world_voxel.chunks_exact_mut(NUM_BLOCK_PER_CHUNK))
             .for_each(|(chunk, chunk_voxel)| {
-                if let Some(chunk) = chunk {
-                    let chunk_bytes = match chunk {
-                        Gzip::Compressed(bytes) => {
-                            decompress_output.clear();
-                            decompress_gzip_to(bytes, &mut decompress_output)
-                                .ok()
-                                .and_then(|_| {
-                                    let chunk_bytes: Option<&[u8; Chunk::NUM_BYTES]> =
-                                        decompress_output.as_slice().try_into().ok();
-                                    chunk_bytes
-                                })
-                        }
-                        Gzip::Uncompressed(chunk) => Some(chunk.deref()),
-                    };
-                    if let Some(chunk_bytes) = chunk_bytes {
-                        let _ = fill_chunk_voxel(&chunk_bytes, chunk_voxel);
-                    }
+                if let Some(chunk) = chunk
+                    && let Ok(chunk_slice) = chunk.decompress_view(&mut decompress_output)
+                {
+                    let _ = fill_chunk_voxel(chunk_slice, chunk_voxel);
                 }
             });
         world_voxel
@@ -512,7 +497,7 @@ pub mod voxel_util {
         chunk: &Chunk,
     ) -> BhResult<()> {
         let mut blocks = [VoxelType(0); NUM_BLOCK_PER_CHUNK];
-        fill_chunk_voxel(chunk, &mut blocks)?;
+        fill_chunk_voxel(chunk.as_slice(), &mut blocks)?;
 
         let chunk_coord: ChunkCoord = coord.into();
         let offset = (chunk_coord.x() * 32 + chunk_coord.y() as u32) * NUM_BLOCK_PER_CHUNK as u32;

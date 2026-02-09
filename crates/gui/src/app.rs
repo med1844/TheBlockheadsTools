@@ -17,7 +17,7 @@ use the_blockheads_tools_lib::{
     BhError, BhResult,
     game::{
         block::{Block, BlockView},
-        chunk::ChunkView,
+        chunk::Chunk,
         coord::{BlockCoord, ChunkCoord},
         db::world_db::WorldDb,
     },
@@ -142,6 +142,7 @@ pub struct EditorApp {
 
     selected_block_coord: GpuBlockCoord,
     hover_on_block_coord: GpuBlockCoord,
+    selected_chunk: Option<Chunk>,
 
     file_reader: FileReader,
     load_err: Option<BhError>,
@@ -187,6 +188,7 @@ impl EditorApp {
 
             selected_block_coord,
             hover_on_block_coord,
+            selected_chunk: None,
 
             file_reader: FileReader::new(),
             load_err: None,
@@ -315,7 +317,7 @@ impl EditorApp {
         }
     }
 
-    fn render_selected_block_info(ui: &mut egui::Ui, block: Block<'_>) {
+    fn render_selected_block_info(ui: &mut egui::Ui, block: BlockView<'_>) {
         let add_row = |ui: &mut egui::Ui, key: &str, value: &str| {
             ui.label(key);
             ui.label(egui::RichText::new(value).family(egui::FontFamily::Monospace));
@@ -366,12 +368,10 @@ impl EditorApp {
                 .range(Camera::MAX_BLOCK_Z..=Camera::MAX_Z)
                 .prefix("Distance: "),
         );
-        if let Some(world_db) = self.world_db.as_mut()
+        if let Some(selected_chunk) = self.selected_chunk.as_ref()
             && let Some(selected_block_coord) = self.selected_block_coord.coord()
-            && let Some(chunk) = world_db.chunks.chunk_at_mut(selected_block_coord)
-            && let Ok(chunk) = chunk.as_uncompressed()
         {
-            let block = chunk.block_at(selected_block_coord);
+            let block = selected_chunk.as_slice().block_at(selected_block_coord);
             ui.separator();
             ui.heading(format!(
                 "Block {}, {}",
@@ -432,6 +432,15 @@ impl EditorApp {
                 .to_array();
             self.selected_block_coord
                 .toggle(BlockCoord::new(x as u32, y as u16).ok());
+            if let Some(coord) = self.selected_block_coord.coord()
+                && let Some(world_db) = self.world_db.as_ref()
+                && let Some(compressed_chunk) = world_db.chunks.chunk_at(coord)
+                && let Ok(chunk) = compressed_chunk.decompress()
+            {
+                self.selected_chunk = Some(chunk);
+            } else {
+                self.selected_chunk = None;
+            }
         }
 
         if response.hovered()

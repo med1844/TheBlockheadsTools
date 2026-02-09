@@ -1,7 +1,7 @@
 use crate::{
     BhError, BhResult,
     game::dw::dynamic_object::DynamicObject,
-    util::gzip::{compress_gzip_to, decompress_gzip},
+    util::gzip::{compress_into, decompress},
 };
 use num_enum::{FromPrimitive, TryFromPrimitive};
 use serde::{Deserialize, Serialize, de::Error as DeError, ser::Error as SerError};
@@ -700,7 +700,7 @@ impl<'de> Deserialize<'de> for Item {
         let extra = if compressed_extra.is_empty() {
             None
         } else {
-            let extra_bytes = decompress_gzip(&compressed_extra).map_err(|e| {
+            let extra_bytes = decompress(&compressed_extra).map_err(|e| {
                 D::Error::custom(format!("Failed to decompress item extra as gzip: {:?}", e))
             })?;
             Some(
@@ -737,7 +737,7 @@ impl Serialize for Item {
             plist::to_writer_xml(&mut serialized_extra, extra).map_err(|e| {
                 S::Error::custom(format!("Failed to serialize item extra data: {}", e))
             })?;
-            compress_gzip_to(&serialized_extra, &mut buffer).map_err(|e| {
+            compress_into(&serialized_extra, &mut buffer).map_err(|e| {
                 S::Error::custom(format!("Failed to compress item extra data: {}", e))
             })?;
         }

@@ -1,24 +1,55 @@
 use super::{
-    block::{Block, BlockMut},
+    block::{BlockView, BlockViewMut},
     coord::{BlockCoord, ChunkCoord, ChunkOffset},
 };
 use crate::util::{
     error::BhResult,
-    gzip::{FromGzip, Gzip},
+    gzip::{decompress_exact_into, decompress_into},
 };
-use flate2::read::GzDecoder;
 use lmdb_rs::{
     codec::types::{Bytes, Str},
     database::Database,
     txn::{RoTxn, RwTxn},
 };
-use std::{
-    io::{Read, Write},
-    ops::{Deref, DerefMut},
-};
+use std::io::Write;
+
+type ChunkBytes = [u8; Chunk::NUM_BYTES];
+
+#[derive(Debug, Clone, Copy)]
+pub struct ChunkSlice<'a>(&'a ChunkBytes);
+
+impl<'a> ChunkSlice<'a> {
+    pub fn block_at<O: ChunkOffset>(&self, coord: O) -> BlockView<'a> {
+        let offset = coord.to_offset();
+        let slice =
+            <&[u8; 64]>::try_from(&self.0.as_slice()[offset..offset + Chunk::NUM_BYTES_PER_BLOCK])
+                .expect(
+                    "Return value of `ChunkBlockCoord.to_offset()` is guaranteed \
+                to be smaller than chunk bytes len - 32",
+                );
+        BlockView::new(slice)
+    }
+}
+
+#[derive(Debug)]
+pub struct ChunkSliceMut<'a>(&'a mut ChunkBytes);
+
+impl<'a> ChunkSliceMut<'a> {
+    pub fn block_at_mut<O: ChunkOffset>(&'_ mut self, coord: O) -> BlockViewMut<'_> {
+        let offset = coord.to_offset();
+        let slice = <&mut [u8; 64]>::try_from(
+            &mut self.0.as_mut_slice()[offset..offset + Chunk::NUM_BYTES_PER_BLOCK],
+        )
+        .expect(
+            "Return value of `ChunkBlockCoord.to_offset()` is guaranteed \
+                to be smaller than chunk bytes len - 32",
+        );
+        BlockViewMut::new(slice)
+    }
+}
 
 #[derive(Debug, Clone)]
-pub struct Chunk(Box<[u8; Self::NUM_BYTES]>); // 5 unknown bytes
+pub struct Chunk(Box<ChunkBytes>); // 5 unknown bytes
 
 impl Chunk {
     pub const NUM_BLOCK_PER_ROW: usize = 32;
@@ -31,76 +62,50 @@ impl Chunk {
         Self(Box::new([0; Self::NUM_BYTES]))
     }
 
+    pub fn as_slice(&'_ self) -> ChunkSlice<'_> {
+        ChunkSlice(&self.0)
+    }
+
+    pub fn as_mut_slice(&'_ mut self) -> ChunkSliceMut<'_> {
+        ChunkSliceMut(&mut self.0)
+    }
+
     pub fn inner(&self) -> &[u8] {
-        self.0.as_ref()
+        self.0.as_slice()
     }
 
-    pub fn inner_mut(&mut self) -> &mut [u8] {
-        self.0.as_mut()
-    }
-}
-
-impl AsRef<[u8]> for Chunk {
-    fn as_ref(&self) -> &[u8] {
-        self.inner()
+    fn inner_mut(&mut self) -> &mut [u8] {
+        self.0.as_mut_slice()
     }
 }
 
-impl Deref for Chunk {
-    type Target = [u8; Self::NUM_BYTES];
+#[derive(Debug, Clone)]
+pub struct CompressedChunk(Vec<u8>);
 
-    fn deref(&self) -> &Self::Target {
+impl CompressedChunk {
+    pub fn new(bytes: Vec<u8>) -> Self {
+        Self(bytes)
+    }
+
+    pub fn decompress_view<'a>(&self, buffer: &'a mut Vec<u8>) -> BhResult<ChunkSlice<'a>> {
+        buffer.clear();
+        decompress_into(&self.0, buffer)?;
+        Ok(ChunkSlice(buffer.as_slice().try_into()?))
+    }
+
+    pub fn decompress(&self) -> BhResult<Chunk> {
+        let mut chunk = Chunk::new_empty();
+        decompress_exact_into(&self.0, chunk.inner_mut())?;
+        Ok(chunk)
+    }
+
+    pub fn as_bytes(&self) -> &[u8] {
         &self.0
     }
-}
 
-impl DerefMut for Chunk {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-pub trait ChunkView {
-    fn block_at<O: ChunkOffset>(&'_ self, coord: O) -> Block<'_>;
-}
-
-impl<T: Deref<Target = [u8; Chunk::NUM_BYTES]>> ChunkView for T {
-    fn block_at<O: ChunkOffset>(&'_ self, coord: O) -> Block<'_> {
-        let offset = coord.to_offset();
-        let slice =
-            <&[u8; 64]>::try_from(&self.deref()[offset..offset + Chunk::NUM_BYTES_PER_BLOCK])
-                .expect(
-                    "Return value of `ChunkBlockCoord.to_offset()` is guaranteed \
-                to be smaller than chunk bytes len - 32",
-                );
-        Block::new(slice)
-    }
-}
-
-pub trait ChunkViewMut {
-    fn block_at_mut<O: ChunkOffset>(&'_ mut self, coord: O) -> BlockMut<'_>;
-}
-
-impl<T: DerefMut<Target = [u8; Chunk::NUM_BYTES]>> ChunkViewMut for T {
-    fn block_at_mut<O: ChunkOffset>(&'_ mut self, coord: O) -> BlockMut<'_> {
-        let offset = coord.to_offset();
-        let slice = <&mut [u8; 64]>::try_from(
-            &mut self.deref_mut()[offset..offset + Chunk::NUM_BYTES_PER_BLOCK],
-        )
-        .expect(
-            "Return value of `ChunkBlockCoord.to_offset()` is guaranteed \
-                to be smaller than chunk bytes len - 32",
-        );
-        BlockMut::new(slice)
-    }
-}
-
-impl FromGzip for Chunk {
-    fn from_compressed_gzip(bytes: &[u8]) -> Result<Self, std::io::Error> {
-        let mut decoder = GzDecoder::new(bytes);
-        let mut chunk = Self::new_empty();
-        decoder.read_exact(chunk.inner_mut())?;
-        Ok(chunk)
+    // decompress, modify, then re-compress
+    pub fn apply<'a, O, F: FnOnce(ChunkSliceMut<'a>) -> O>(&mut self, _: F) -> O {
+        todo!()
     }
 }
 
@@ -123,7 +128,7 @@ impl Iterator for ChunkIndexIter {
 }
 
 #[derive(Debug)]
-pub struct Chunks(Vec<Option<Gzip<Chunk>>>);
+pub struct Chunks(Vec<Option<CompressedChunk>>);
 
 impl Chunks {
     pub const NUM_CHUNK_PER_COL: usize = 32;
@@ -132,12 +137,8 @@ impl Chunks {
         coord.x() as usize * Self::NUM_CHUNK_PER_COL + coord.y() as usize
     }
 
-    pub fn inner(&self) -> &Vec<Option<Gzip<Chunk>>> {
+    pub fn inner(&self) -> &Vec<Option<CompressedChunk>> {
         &self.0
-    }
-
-    pub fn inner_mut(&mut self) -> &mut Vec<Option<Gzip<Chunk>>> {
-        &mut self.0
     }
 
     pub fn from_db(db: &Database<Str, Bytes>, rtxn: &RoTxn, world_width: u32) -> BhResult<Self> {
@@ -146,7 +147,7 @@ impl Chunks {
             if let Ok((k, v)) = pair
                 && let Ok(coord) = ChunkCoord::try_from_str(k)
             {
-                chunks[Self::to_index(coord)] = Some(Gzip::Compressed(v.to_owned()));
+                chunks[Self::to_index(coord)] = Some(CompressedChunk(v.to_vec()));
             }
         }
         Ok(Self(chunks))
@@ -155,8 +156,7 @@ impl Chunks {
     pub fn to_db<W: Write>(&self, db: &Database<Str, Bytes>, wtxn: &mut RwTxn<W>) -> BhResult<()> {
         for (coord, chunk) in ChunkIndexIter::default().zip(self.0.iter()) {
             if let Some(chunk) = chunk {
-                let data = chunk.to_compressed()?;
-                db.put(wtxn, coord.to_string().as_str(), &data)?;
+                db.put(wtxn, coord.to_string().as_str(), chunk.as_bytes())?;
             }
         }
         Ok(())
@@ -172,43 +172,27 @@ impl Chunks {
         self.0.get(Self::to_index(key)).is_some()
     }
 
-    pub fn chunk_at<I: Into<ChunkCoord>>(&self, coord: I) -> Option<&Gzip<Chunk>> {
+    pub fn chunk_at<I: Into<ChunkCoord>>(&self, coord: I) -> Option<&CompressedChunk> {
         self.0
             .get(Self::to_index(coord.into()))
             .and_then(|out| out.as_ref())
     }
 
-    pub fn chunk_at_mut<I: Into<ChunkCoord>>(&mut self, coord: I) -> Option<&mut Gzip<Chunk>> {
-        self.0
-            .get_mut(Self::to_index(coord.into()))
-            .and_then(|out| out.as_mut())
-    }
-
-    pub fn set_chunk_at<I: Into<ChunkCoord>>(&mut self, coord: I, chunk: Gzip<Chunk>) {
+    pub fn set_chunk_at<I: Into<ChunkCoord>>(&mut self, coord: I, chunk: CompressedChunk) {
         self.0[Self::to_index(coord.into())] = Some(chunk);
     }
 
-    pub fn block_at<I: Into<BlockCoord>>(
-        &'_ mut self,
+    pub fn block_at<'a, I: Into<BlockCoord>>(
+        &mut self,
         coord: I,
-    ) -> Option<std::io::Result<Block<'_>>> {
+        chunk_buffer: &'a mut Vec<u8>,
+    ) -> Option<BhResult<BlockView<'a>>> {
         let block_coord = coord.into();
         let (chunk_coord, chunk_block_coord) = block_coord.decompose();
-        self.chunk_at_mut(chunk_coord).map(|v| {
-            v.as_uncompressed_mut()
-                .map(|chunk| chunk.block_at(chunk_block_coord))
-        })
-    }
-
-    pub fn block_at_mut<I: Into<BlockCoord>>(
-        &'_ mut self,
-        coord: I,
-    ) -> Option<std::io::Result<BlockMut<'_>>> {
-        let block_coord = coord.into();
-        let (chunk_coord, chunk_block_coord) = block_coord.decompose();
-        self.chunk_at_mut(chunk_coord).map(|v| {
-            v.as_uncompressed_mut()
-                .map(|chunk| chunk.block_at_mut(chunk_block_coord))
+        self.chunk_at(chunk_coord).map(|chunk| {
+            chunk
+                .decompress_view(chunk_buffer)
+                .map(|chunk_slice| chunk_slice.block_at(chunk_block_coord))
         })
     }
 }

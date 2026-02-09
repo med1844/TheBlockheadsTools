@@ -20,6 +20,8 @@ pub enum BhError {
     InvalidItemTypeId(u16),
     #[error("Invalid color ID: {0}")]
     InvalidColorId(u8),
+    #[error("Invalid chunk size: {0}")]
+    InvalidChunkSize(#[from] std::array::TryFromSliceError),
     #[error("Missing key: {0}")]
     MissingKey(&'static str),
     #[error("Lmdb error: {0}")]
