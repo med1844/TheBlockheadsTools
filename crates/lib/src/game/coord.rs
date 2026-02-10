@@ -251,14 +251,21 @@ mod tests {
             if let Ok(block_coord) = BlockCoord::new(x, y) {
                 let (chunk_coord, chunk_block_coord) = block_coord.decompose();
                 let params_recomposed = BlockCoord::from_decomposed(chunk_coord, chunk_block_coord);
-                assert_eq!(block_coord, params_recomposed, "Round trip failed for ({}, {})", x, y);
+                assert_eq!(
+                    block_coord, params_recomposed,
+                    "Round trip failed for ({}, {})",
+                    x, y
+                );
             }
         }
     }
 
     #[test]
     fn test_chunk_coord_parse() {
-        assert_eq!(ChunkCoord::try_from_str("10_20").unwrap(), ChunkCoord::new(10, 20).unwrap());
+        assert_eq!(
+            ChunkCoord::try_from_str("10_20").unwrap(),
+            ChunkCoord::new(10, 20).unwrap()
+        );
         assert!(ChunkCoord::try_from_str("10_32").is_err());
         assert!(ChunkCoord::try_from_str("abc_20").is_err());
         assert!(ChunkCoord::try_from_str("10_abc").is_err());

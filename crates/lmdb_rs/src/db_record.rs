@@ -1,5 +1,5 @@
-use crate::arch::{DynArch, Arch, Arch32, Arch64};
-use crate::error::{Result, Error};
+use crate::arch::{Arch, Arch32, Arch64, DynArch};
+use crate::error::{Error, Result};
 use std::convert::TryInto;
 
 /// Represents a named database record stored inside the Main DB.
@@ -17,7 +17,6 @@ pub struct DbRecord {
 }
 
 impl DbRecord {
-
     pub fn from_bytes(data: &[u8], arch: DynArch) -> Result<Self> {
         match arch {
             DynArch::Arch32 => Self::parse::<Arch32>(data),
@@ -29,32 +28,41 @@ impl DbRecord {
         // Validation: 4 (pad) + 2 (flags) + 2 (depth) + 4 * PGNO + 1 * SIZE
         let required = 8 + A::PGNO_SIZE * 4 + A::SIZE_T_SIZE;
         if data.len() < required {
-            return Err(Error::UnexpectedEof { expected: required, available: data.len() });
+            return Err(Error::UnexpectedEof {
+                expected: required,
+                available: data.len(),
+            });
         }
 
         let pad = u32::from_le_bytes(data[0..4].try_into().unwrap());
         let flags = u16::from_le_bytes(data[4..6].try_into().unwrap());
         let depth = u16::from_le_bytes(data[6..8].try_into().unwrap());
-        
+
         let mut offset = 8;
-        
+
         let branch_pages = A::read_pgno(&data[offset..])?;
         offset += A::PGNO_SIZE;
-        
+
         let leaf_pages = A::read_pgno(&data[offset..])?;
         offset += A::PGNO_SIZE;
-        
+
         let overflow_pages = A::read_pgno(&data[offset..])?;
         offset += A::PGNO_SIZE;
-        
+
         let entries = A::read_size(&data[offset..])?;
         offset += A::SIZE_T_SIZE;
-        
+
         let root_page = A::read_pgno(&data[offset..])?;
-        // offset += A::PGNO_SIZE; 
-        
+        // offset += A::PGNO_SIZE;
+
         Ok(DbRecord {
-            flags, depth, branch_pages, leaf_pages, overflow_pages, entries, root_page,
+            flags,
+            depth,
+            branch_pages,
+            leaf_pages,
+            overflow_pages,
+            entries,
+            root_page,
             size: data.len(),
             pad,
         })

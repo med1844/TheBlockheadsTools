@@ -1,7 +1,7 @@
 use crate::constants::{P_BRANCH, P_LEAF, P_LEAF2, P_META, P_OVERFLOW};
 use crate::error::Result;
-use std::fmt::Debug;
-use std::convert::TryInto; // Ensure TryInto is used or remove if not necessary
+use std::convert::TryInto;
+use std::fmt::Debug; // Ensure TryInto is used or remove if not necessary
 
 /// Zero-copy page header (16 bytes, arch-independent header portion)
 #[derive(Clone)]
@@ -162,59 +162,57 @@ impl<'a> PageHeader<'a> {
     pub fn page_number(&self, arch: crate::arch::DynArch) -> Result<u64> {
         match arch {
             crate::arch::DynArch::Arch32 => {
-                 let val = u32::from_le_bytes(self.data[0..4].try_into().unwrap());
-                 Ok(val as u64)
-            },
+                let val = u32::from_le_bytes(self.data[0..4].try_into().unwrap());
+                Ok(val as u64)
+            }
             crate::arch::DynArch::Arch64 => {
-                 let val = u64::from_le_bytes(self.data[0..8].try_into().unwrap());
-                 Ok(val)
+                let val = u64::from_le_bytes(self.data[0..8].try_into().unwrap());
+                Ok(val)
             }
         }
     }
 
     pub fn flags(&self, arch: crate::arch::DynArch) -> u16 {
         match arch {
-            crate::arch::DynArch::Arch32 => {
-                u16::from_le_bytes(self.data[6..8].try_into().unwrap())
-            },
+            crate::arch::DynArch::Arch32 => u16::from_le_bytes(self.data[6..8].try_into().unwrap()),
             crate::arch::DynArch::Arch64 => {
                 u16::from_le_bytes(self.data[10..12].try_into().unwrap())
             }
         }
     }
-    
+
     // Helper to guess arch from flags
     pub fn guess_arch(&self) -> Option<crate::arch::DynArch> {
         let flags32 = u16::from_le_bytes(self.data[6..8].try_into().unwrap());
         let flags64 = u16::from_le_bytes(self.data[10..12].try_into().unwrap());
-        
+
         let valid32 = is_valid_flags(flags32);
         let valid64 = is_valid_flags(flags64);
-        
+
         match (valid32, valid64) {
-             (true, false) => Some(crate::arch::DynArch::Arch32),
-             (false, true) => Some(crate::arch::DynArch::Arch64),
-             (true, true) => {
-                 // Ambiguous. 
-                 // If page number is small (0), both might look valid if 0 is considered invalid.
-                 // P_META is 0x08.
-                 None
-             },
-             (false, false) => None
+            (true, false) => Some(crate::arch::DynArch::Arch32),
+            (false, true) => Some(crate::arch::DynArch::Arch64),
+            (true, true) => {
+                // Ambiguous.
+                // If page number is small (0), both might look valid if 0 is considered invalid.
+                // P_META is 0x08.
+                None
+            }
+            (false, false) => None,
         }
     }
 
     pub fn is_meta(&self, arch: crate::arch::DynArch) -> bool {
         (self.flags(arch) & P_META) != 0
     }
-    
+
     pub fn lower(&self, arch: crate::arch::DynArch) -> u16 {
         match arch {
             crate::arch::DynArch::Arch32 => {
-                 u16::from_le_bytes(self.data[8..10].try_into().unwrap())
-            },
+                u16::from_le_bytes(self.data[8..10].try_into().unwrap())
+            }
             crate::arch::DynArch::Arch64 => {
-                 u16::from_le_bytes(self.data[12..14].try_into().unwrap())
+                u16::from_le_bytes(self.data[12..14].try_into().unwrap())
             }
         }
     }
@@ -222,10 +220,10 @@ impl<'a> PageHeader<'a> {
     pub fn upper(&self, arch: crate::arch::DynArch) -> u16 {
         match arch {
             crate::arch::DynArch::Arch32 => {
-                 u16::from_le_bytes(self.data[10..12].try_into().unwrap())
-            },
+                u16::from_le_bytes(self.data[10..12].try_into().unwrap())
+            }
             crate::arch::DynArch::Arch64 => {
-                 u16::from_le_bytes(self.data[14..16].try_into().unwrap())
+                u16::from_le_bytes(self.data[14..16].try_into().unwrap())
             }
         }
     }
@@ -240,9 +238,9 @@ impl<'a> PageHeader<'a> {
     pub fn num_keys(&self, arch: crate::arch::DynArch) -> usize {
         let lower = self.lower(arch) as usize;
         let header_sz = Self::header_size(arch);
-        
+
         if lower < header_sz {
-            return 0; 
+            return 0;
         }
         (lower - header_sz) / 2
     }
@@ -251,7 +249,7 @@ impl<'a> PageHeader<'a> {
 fn is_valid_flags(flags: u16) -> bool {
     // Must have at least one type bit set?
     // Types: BRANCH(1), LEAF(2), OVERFLOW(4), META(8)
-    // One of these MUST be set for a valid page? 
+    // One of these MUST be set for a valid page?
     // mdb.c checks msg_flags against P_BRANCH|P_LEAF|P_LEAF2|P_OVERFLOW|P_META
     let type_mask = P_BRANCH | P_LEAF | P_LEAF2 | P_OVERFLOW | P_META;
     (flags & type_mask) != 0
@@ -275,7 +273,7 @@ mod tests {
         data[0] = 1;
         // flags at 6 = P_LEAF (2)
         data[6] = 2;
-        
+
         let h = PageHeader::new(&data);
         assert_eq!(h.flags(DynArch::Arch32), 2);
         assert_eq!(h.page_number(DynArch::Arch32).unwrap(), 1);
@@ -289,7 +287,7 @@ mod tests {
         data[0] = 1;
         // flags at 10 = P_LEAF (2)
         data[10] = 2;
-        
+
         let h = PageHeader::new(&data);
         assert_eq!(h.flags(DynArch::Arch64), 2);
         assert_eq!(h.page_number(DynArch::Arch64).unwrap(), 1);

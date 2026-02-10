@@ -1,12 +1,12 @@
-use crate::env::Env;
-use crate::error::Result;
-use crate::database::Database;
-use crate::codec::BytesDecode;
-use crate::cursor::Cursor;
 use crate::arch::{Arch, DynArch};
 use crate::build::database::DatabaseBuilder;
 use crate::build::meta::MetaPageBuilder;
+use crate::codec::BytesDecode;
+use crate::cursor::Cursor;
+use crate::database::Database;
 use crate::db_record::DbRecord;
+use crate::env::Env;
+use crate::error::Result;
 use crate::write::{ByteArena, SliceId};
 use std::collections::HashMap;
 use std::io::Write;
@@ -44,12 +44,17 @@ impl<'a> RoTxn<'a> {
             // Find named DB in Main DB
             // We need a cursor on Main DB
             let main_root = self.env.main_db_root();
-            let mut cursor = Cursor::new(self.env.raw_data(), self.env.arch(), main_root, self.env.page_size());
-            
+            let mut cursor = Cursor::new(
+                self.env.raw_data(),
+                self.env.arch(),
+                main_root,
+                self.env.page_size(),
+            );
+
             if let Some(record) = cursor.find_db(db_name)? {
                 record
             } else {
-                 return Ok(None);
+                return Ok(None);
             }
         } else {
             self.env.main_db()
@@ -58,8 +63,6 @@ impl<'a> RoTxn<'a> {
         Ok(Some(Database::new(record)))
     }
 }
-
-
 
 // Type aliases for semantic clarity
 type DbName = String;
@@ -130,7 +133,7 @@ impl<'e, W: Write> RwTxn<'e, W> {
         for (name, entries) in self.buffers {
             let mut indices = entries;
             let arena = &self.arena;
-            
+
             // Sort by key content
             indices.sort_by(|a, b| {
                 let ka = arena.get(a.0);

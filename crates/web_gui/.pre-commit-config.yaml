@@ -1,0 +1,23 @@
+repos:
+  - repo: local
+    hooks:
+      - id: cargo-fmt
+        name: cargo fmt
+        entry: cargo fmt
+        language: system
+        types: [rust]
+        pass_filenames: false
+
+      - id: cargo-check
+        name: cargo check
+        entry: cargo check --target wasm32-unknown-unknown
+        language: system
+        types: [rust]
+        pass_filenames: false
+
+      - id: clippy
+        name: clippy
+        entry: cargo clippy --target wasm32-unknown-unknown -- -D warnings
+        language: system
+        types: [rust]
+        pass_filenames: false

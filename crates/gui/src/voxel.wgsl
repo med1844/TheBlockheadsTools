@@ -148,7 +148,7 @@ fn render_and_blend(
         let ambient_light = 0.2;
         let diffuse_factor = max(dot(face_normal_f32, light_direction), 0.0);
         let final_light_factor = ambient_light + (1.0 - ambient_light) * diffuse_factor;
-    
+
         let lit_rgb = surface_color.rgb * final_light_factor;
 
         let min_depth_factor = 0.85;
@@ -218,7 +218,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     var current_ray_pos = ray_origin_world + ray_dir_world * t_min_intersect;
     var current_voxel_coords = vec3<i32>(floor(current_ray_pos / VOXEL_SIZE));
     current_voxel_coords = clamp(current_voxel_coords, vec3<i32>(0), vec3<i32>(i32(WORLD_DIM_X)-1, i32(WORLD_DIM_Y)-1, i32(WORLD_DIM_Z)-1));
-    
+
     var step_dir = sign(ray_dir_world);
     if (ray_dir_world.x == 0.0) { step_dir.x = 0.0; }
     if (ray_dir_world.y == 0.0) { step_dir.y = 0.0; }
@@ -262,7 +262,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
                 t_first_hit = t_hit;
             }
         }
-        
+
         prev_voxel_type = current_voxel_type;
 
         if (t_max_axis.x < t_max_axis.y && t_max_axis.x < t_max_axis.z) {
@@ -297,12 +297,12 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         // This is the standard "over" alpha blending operation.
         // Final RGB = Highlight RGB + Scene RGB * (1 - Highlight Alpha)
         let final_rgb = mix(accumulated_color.rgb, highlight_color.rgb, highlight_color.a);
-        
+
         // The final alpha is also a combination of the highlight and scene alphas.
         let final_a = highlight_color.a + accumulated_color.a * (1.0 - highlight_color.a);
 
         accumulated_color = vec4<f32>(final_rgb, final_a);
-    }    
+    }
 
     if (ever_hit_hover_on_block) {
         let highlight_color = vec4<f32>(0.0, 0.0, 1.0, 0.1);
@@ -311,7 +311,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         // This is the standard "over" alpha blending operation.
         // Final RGB = Highlight RGB + Scene RGB * (1 - Highlight Alpha)
         let final_rgb = mix(accumulated_color.rgb, highlight_color.rgb, highlight_color.a);
-        
+
         // The final alpha is also a combination of the highlight and scene alphas.
         let final_a = highlight_color.a + accumulated_color.a * (1.0 - highlight_color.a);
 

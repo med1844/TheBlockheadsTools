@@ -39,19 +39,34 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Error::InvalidMagic { expected, found } => {
-                write!(f, "Invalid magic number: expected {:#x}, found {:#x}", expected, found)
+                write!(
+                    f,
+                    "Invalid magic number: expected {:#x}, found {:#x}",
+                    expected, found
+                )
             }
             Error::UnsupportedVersion { version } => {
                 write!(f, "Unsupported data version: {}", version)
             }
-            Error::UnexpectedEof { expected, available } => {
-                write!(f, "Unexpected EOF: expected {} bytes, available {}", expected, available)
+            Error::UnexpectedEof {
+                expected,
+                available,
+            } => {
+                write!(
+                    f,
+                    "Unexpected EOF: expected {} bytes, available {}",
+                    expected, available
+                )
             }
             Error::InvalidPageNumber { pgno, max } => {
                 write!(f, "Invalid page number {}: max is {}", pgno, max)
             }
             Error::InvalidPageType { expected, found } => {
-                write!(f, "Invalid page type: expected {:#x}, found {:#x}", expected, found)
+                write!(
+                    f,
+                    "Invalid page type: expected {:#x}, found {:#x}",
+                    expected, found
+                )
             }
             Error::KeyNotFound => write!(f, "Key not found"),
             Error::DatabaseNotFound { name } => {
@@ -61,11 +76,19 @@ impl fmt::Display for Error {
             Error::InvalidPageSize { size } => write!(f, "Invalid page size: {}", size),
             Error::CorruptedTree { message } => write!(f, "Corrupted tree: {}", message),
             Error::ArchMismatch { expected, found } => {
-                write!(f, "Architecture mismatch: expected {:?}, found {:?}", expected, found)
+                write!(
+                    f,
+                    "Architecture mismatch: expected {:?}, found {:?}",
+                    expected, found
+                )
             }
             Error::Codec(msg) => write!(f, "Codec error: {}", msg),
             Error::BufferTooSmall { needed, available } => {
-                write!(f, "Buffer too small: needed {}, available {}", needed, available)
+                write!(
+                    f,
+                    "Buffer too small: needed {}, available {}",
+                    needed, available
+                )
             }
 
             Error::PageFull => write!(f, "Page full"),

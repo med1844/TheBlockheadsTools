@@ -37,7 +37,10 @@ impl Arch for Arch32 {
 
     fn read_pgno(bytes: &[u8]) -> Result<u64> {
         if bytes.len() < 4 {
-            return Err(Error::UnexpectedEof { expected: 4, available: bytes.len() });
+            return Err(Error::UnexpectedEof {
+                expected: 4,
+                available: bytes.len(),
+            });
         }
         let val = u32::from_le_bytes(bytes[0..4].try_into().unwrap());
         Ok(val as u64)
@@ -45,7 +48,10 @@ impl Arch for Arch32 {
 
     fn read_size(bytes: &[u8]) -> Result<u64> {
         if bytes.len() < 4 {
-            return Err(Error::UnexpectedEof { expected: 4, available: bytes.len() });
+            return Err(Error::UnexpectedEof {
+                expected: 4,
+                available: bytes.len(),
+            });
         }
         let val = u32::from_le_bytes(bytes[0..4].try_into().unwrap());
         Ok(val as u64)
@@ -79,7 +85,10 @@ impl Arch for Arch64 {
 
     fn read_pgno(bytes: &[u8]) -> Result<u64> {
         if bytes.len() < 8 {
-            return Err(Error::UnexpectedEof { expected: 8, available: bytes.len() });
+            return Err(Error::UnexpectedEof {
+                expected: 8,
+                available: bytes.len(),
+            });
         }
         let val = u64::from_le_bytes(bytes[0..8].try_into().unwrap());
         Ok(val)
@@ -87,7 +96,10 @@ impl Arch for Arch64 {
 
     fn read_size(bytes: &[u8]) -> Result<u64> {
         if bytes.len() < 8 {
-            return Err(Error::UnexpectedEof { expected: 8, available: bytes.len() });
+            return Err(Error::UnexpectedEof {
+                expected: 8,
+                available: bytes.len(),
+            });
         }
         let val = u64::from_le_bytes(bytes[0..8].try_into().unwrap());
         Ok(val)
@@ -154,6 +166,9 @@ mod tests {
     #[test]
     fn test_arch32_short_read() {
         let bytes = [0x00; 3];
-        assert!(matches!(Arch32::read_pgno(&bytes), Err(Error::UnexpectedEof { .. })));
+        assert!(matches!(
+            Arch32::read_pgno(&bytes),
+            Err(Error::UnexpectedEof { .. })
+        ));
     }
 }

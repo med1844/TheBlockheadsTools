@@ -1,5 +1,3 @@
-
-
 /// Simple arena for storing bytes contiguously.
 pub(crate) struct ByteArena {
     buffer: Vec<u8>,

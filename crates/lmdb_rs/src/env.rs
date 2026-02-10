@@ -1,11 +1,11 @@
 use crate::arch::DynArch;
+use crate::codec::BytesDecode;
+use crate::database::Database;
+use crate::db_record::DbRecord;
 use crate::error::Result;
 use crate::page::meta::MetaPage;
 use crate::txn::RoTxn;
 use crate::txn::RwTxn;
-use crate::database::Database;
-use crate::db_record::DbRecord;
-use crate::codec::BytesDecode;
 use std::io::Write;
 
 /// Database environment (read-only, from bytes).
@@ -28,14 +28,15 @@ impl<'a> Env<'a> {
 
         // 2. Try to read Meta 1
         // We slice the data starting at meta1_offset to effectively pass "offset" to parse
-        if data.len() >= meta1_offset + 4096 
-             && let Ok((meta1, arch1)) = MetaPage::parse(&data[meta1_offset..]) {
-                 // 3. Compare TxnID
-                 if meta1.txn_id() > active_meta.txn_id() {
-                     active_meta = meta1;
-                     active_arch = arch1;
-                 }
-             }
+        if data.len() >= meta1_offset + 4096
+            && let Ok((meta1, arch1)) = MetaPage::parse(&data[meta1_offset..])
+        {
+            // 3. Compare TxnID
+            if meta1.txn_id() > active_meta.txn_id() {
+                active_meta = meta1;
+                active_arch = arch1;
+            }
+        }
 
         Ok(Self {
             arch: active_arch,
@@ -59,7 +60,7 @@ impl<'a> Env<'a> {
     pub fn raw_data(&self) -> &'a [u8] {
         self.data
     }
-    
+
     /// Get the Main DB root page.
     pub fn main_db_root(&self) -> u64 {
         self.meta.main_db().root_page

@@ -70,18 +70,18 @@ Packet {
             },
             SendReliableCommand {
                 data_length: 246,
-                data: 
+                data:
                 23 26 3c 3f 78 6d 6c 20 76 65 72 73 69 6f 6e 3d | #&<?xml version=
                 22 31 2e 30 22 20 65 6e 63 6f 64 69 6e 67 3d 22 | "1.0" encoding="
                 55 54 46 2d 38 22 3f 3e 0a 3c 21 44 4f 43 54 59 | UTF-8"?>.<!DOCTY
-                50 45 20 70 6c 69 73 74 20 50 55 42 4c 49 43 20 | PE plist PUBLIC 
+                50 45 20 70 6c 69 73 74 20 50 55 42 4c 49 43 20 | PE plist PUBLIC
                 22 2d 2f 2f 41 70 70 6c 65 2f 2f 44 54 44 20 50 | "-//Apple//DTD P
                 4c 49 53 54 20 31 2e 30 2f 2f 45 4e 22 20 22 68 | LIST 1.0//EN" "h
                 74 74 70 3a 2f 2f 77 77 77 2e 61 70 70 6c 65 2e | ttp://www.apple.
                 63 6f 6d 2f 44 54 44 73 2f 50 72 6f 70 65 72 74 | com/DTDs/Propert
                 79 4c 69 73 74 2d 31 2e 30 2e 64 74 64 22 3e 0a | yList-1.0.dtd">.
                 3c 70 6c 69 73 74 20 76 65 72 73 69 6f 6e 3d 22 | <plist version="
-                31 2e 30 22 3e 0a 3c 64 69 63 74 3e 0a 20 20 20 | 1.0">.<dict>.   
+                31 2e 30 22 3e 0a 3c 64 69 63 74 3e 0a 20 20 20 | 1.0">.<dict>.
                 20 3c 6b 65 79 3e 77 6f 72 6c 64 49 44 3c 2f 6b |  <key>worldID</k
                 65 79 3e 0a 20 20 20 20 3c 73 74 72 69 6e 67 3e | ey>.    <string>
                 33 64 37 5f 6d 6f 64 69 66 69 65 64 3c 2f 73 74 | 3d7_modified</st
@@ -127,7 +127,7 @@ Packet {
             },
             SendReliableCommand {
                 data_length: 417,
-                data: 
+                data:
                 01 1f 8b 08 00 00 00 00 00 00 03 75 93 5d 4f 83 | ...........u.]O.
                 30 14 86 ef f7 2b 2a f7 a3 14 74 1d 06 31 2a 33 | 0....+*...t..1*3
                 21 d9 07 71 a8 f1 ca 34 f4 6c 6b 04 4a 4a b3 8f | !..q...4.lk.JJ..
@@ -223,7 +223,7 @@ Packet {
             },
             SendReliableCommand {
                 data_length: 591,
-                data: 
+                data:
                 1f 3c 3f 78 6d 6c 20 76 65 72 73 69 6f 6e 3d 22 | .<?xml version="
                 31 2e 30 22 20 65 6e 63 6f 64 69 6e 67 3d 22 55 | 1.0" encoding="U
                 54 46 2d 38 22 3f 3e 0a 3c 21 44 4f 43 54 59 50 | TF-8"?>.<!DOCTYP
@@ -290,7 +290,7 @@ Packet {
             },
             SendReliableCommand {
                 data_length: 9,
-                data: 
+                data:
                 03 4f 21 00 00 01 00 00 00                      | .O!......       ,
             },
         ),

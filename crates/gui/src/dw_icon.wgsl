@@ -46,11 +46,11 @@ struct DynObjVSOutput {
 @vertex
 fn vs_dynamic_object_icon(model: DynObjVertexInput, instance: DynObjInstanceInput) -> DynObjVSOutput {
     var out: DynObjVSOutput;
-    
+
     let world_pos = vec3<f32>(instance.instance_pos + model.position, 2.0);
     let pos_in_view = world_pos - camera.world_offset.xyz;
     out.clip_position = camera.view_proj * vec4<f32>(pos_in_view, 1.0);
-    
+
     // Pass model position to fragment shader for UV calculation
     // Remap from [-0.5, 0.5] to [0, 1]
     out.uv = model.position + 0.5;
@@ -117,15 +117,15 @@ fn render_block_icon(uv: vec2<f32>, block_type_id: u32) -> vec4<f32> {
         face_normal = select(vec3<f32>(0.0, 0.0, -1.0), vec3<f32>(0.0, 0.0, 1.0), hit_pos.z > 0.0); // Set normal
     }
     face_uv.y = 1.0 - face_uv.y;
-    
+
     // Now sample the tilemap using the determined face
     let atlas_lookup_idx = (block_type_id * 6u) + hit_face_id;
     let tile_index = voxel_uv_atlas[atlas_lookup_idx];
-    
+
     let tile_x = f32(tile_index % VOXEL_TILES_PER_ROW);
     let tile_y = f32(tile_index / VOXEL_TILES_PER_ROW);
     let uv_min_tile = vec2<f32>(tile_x * VOXEL_TILE_SIZE_UV, tile_y * VOXEL_TILE_SIZE_UV);
-    
+
     let final_atlas_uv = uv_min_tile + face_uv * VOXEL_TILE_SIZE_UV;
     var surface_color = textureSampleLevel(tilemap_texture, tilemap_sampler, final_atlas_uv, 0.0);
 
@@ -156,7 +156,7 @@ fn fs_dynamic_object_icon(in: DynObjVSOutput) -> @location(0) vec4<f32> {
         let tile_x = f32(tile_index % ITEMS_TILES_PER_ROW);
         let tile_y = f32(tile_index / ITEMS_TILES_PER_ROW);
         let uv_min_tile = vec2<f32>(tile_x * ITEMS_TILE_SIZE_UV.x, tile_y * ITEMS_TILE_SIZE_UV.y);
-        
+
         let final_atlas_uv = uv_min_tile + in.uv * ITEMS_TILE_SIZE_UV;
         final_color = textureSampleLevel(items_texture, items_sampler, final_atlas_uv, 0.0);
     }
@@ -174,7 +174,7 @@ fn fs_dynamic_object_icon(in: DynObjVSOutput) -> @location(0) vec4<f32> {
         // You might want a more sophisticated blend mode depending on desired effect
         final_color = mix(final_color, outline_color, outline_color.a);
     }
-    
+
     let gamma = 2.2;
     let corrected_color = pow(final_color.rgb, vec3<f32>(1.0 / gamma));
     return vec4<f32>(corrected_color, final_color.a);

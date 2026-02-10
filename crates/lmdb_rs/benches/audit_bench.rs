@@ -1,13 +1,13 @@
 use divan::Bencher;
+use lmdb_rs::arch::Arch64;
+use lmdb_rs::codec::types::{Bytes, Str};
+use lmdb_rs::{Env, EnvWrite};
 use std::env;
 use std::fs;
 use std::path::PathBuf;
-use lmdb_rs::{Env, EnvWrite};
-use lmdb_rs::codec::types::{Bytes, Str};
-use lmdb_rs::arch::Arch64;
 // Arch trait might be needed for as_dyn_arch, but Arch64 struct usually implements it.
 // We need to import the trait to call as_dyn_arch if it is a trait method.
-use lmdb_rs::arch::Arch; 
+use lmdb_rs::arch::Arch;
 
 #[global_allocator]
 static ALLOC: divan::AllocProfiler = divan::AllocProfiler::system();
@@ -20,8 +20,7 @@ fn main() {
 }
 
 fn load_data() -> Vec<u8> {
-    let path_str = env::var("LMDB_BENCH_PATH")
-        .expect("LMDB_BENCH_PATH must be set");
+    let path_str = env::var("LMDB_BENCH_PATH").expect("LMDB_BENCH_PATH must be set");
     let path = PathBuf::from(path_str);
     fs::read(&path).expect("Failed to read DB file")
 }
@@ -38,7 +37,7 @@ fn bench_env_open(bencher: Bencher) {
 fn bench_read_txn(bencher: Bencher) {
     let data = load_data();
     let env = Env::new(&data).unwrap();
-    
+
     bencher.bench_local(|| {
         divan::black_box(env.read_txn().unwrap());
     });
@@ -53,12 +52,15 @@ fn bench_iter_main_db(bencher: Bencher) {
         let txn = env.read_txn().unwrap();
         // Main DB is usually nameless (None) or "main"? Example says None implies main db/root?
         // lmdb_copy: env.open_database::<Str, Bytes>(&txn, None)
-        let main_db = env.open_database::<Str, Bytes>(&txn, None).unwrap().expect("Root DB not found");
-        
+        let main_db = env
+            .open_database::<Str, Bytes>(&txn, None)
+            .unwrap()
+            .expect("Root DB not found");
+
         let mut count = 0;
         for item in main_db.iter(&txn).unwrap() {
-             let _ = divan::black_box(item);
-             count += 1;
+            let _ = divan::black_box(item);
+            count += 1;
         }
         divan::black_box(count);
     });
@@ -71,9 +73,12 @@ fn bench_read_all_entries(bencher: Bencher) {
 
     bencher.bench_local(|| {
         let txn = env.read_txn().unwrap();
-        
+
         // 1. Find DB names
-        let main_db = env.open_database::<Str, Bytes>(&txn, None).unwrap().expect("Root DB not found");
+        let main_db = env
+            .open_database::<Str, Bytes>(&txn, None)
+            .unwrap()
+            .expect("Root DB not found");
         let mut db_names = Vec::new();
         for item in main_db.iter(&txn).unwrap() {
             let (key, _) = item.unwrap();
@@ -82,7 +87,9 @@ fn bench_read_all_entries(bencher: Bencher) {
 
         // 2. Iterate all Sub DBs
         for name in &db_names {
-            let db = env.open_database::<Bytes, Bytes>(&txn, Some(name)).unwrap()
+            let db = env
+                .open_database::<Bytes, Bytes>(&txn, Some(name))
+                .unwrap()
                 .expect("Sub-DB missing");
             for item in db.iter(&txn).unwrap() {
                 let _ = divan::black_box(item.unwrap());
@@ -95,23 +102,29 @@ fn bench_read_all_entries(bencher: Bencher) {
 fn bench_write_full_copy(bencher: Bencher) {
     let data = load_data();
     let env = Env::new(&data).unwrap();
-    
+
     // Pre-read logic to have data ready for write benchmark
-    // We don't want to measure read time in the write bench if we can avoid it, 
-    // BUT usually benchmarks run the whole loop. 
+    // We don't want to measure read time in the write bench if we can avoid it,
+    // BUT usually benchmarks run the whole loop.
     // Ideally we prepare the data "outside" the bench loop.
-    
+
     let mut collected_dbs: Vec<(String, Vec<(Vec<u8>, Vec<u8>)>)> = Vec::new();
     {
         let txn = env.read_txn().unwrap();
-        let main_db = env.open_database::<Str, Bytes>(&txn, None).unwrap().expect("Root DB not found");
+        let main_db = env
+            .open_database::<Str, Bytes>(&txn, None)
+            .unwrap()
+            .expect("Root DB not found");
         let mut db_names = Vec::new();
         for item in main_db.iter(&txn).unwrap() {
             let (key, _) = item.unwrap();
             db_names.push(key.to_string());
         }
         for name in &db_names {
-            let db = env.open_database::<Bytes, Bytes>(&txn, Some(name)).unwrap().expect("Sub-DB missing");
+            let db = env
+                .open_database::<Bytes, Bytes>(&txn, Some(name))
+                .unwrap()
+                .expect("Sub-DB missing");
             let mut entries = Vec::new();
             for item in db.iter(&txn).unwrap() {
                 let (k, v) = item.unwrap();
@@ -120,7 +133,7 @@ fn bench_write_full_copy(bencher: Bencher) {
             collected_dbs.push((name.clone(), entries));
         }
     }
-    
+
     // Now benchmark the WRITE process
     bencher.bench_local(|| {
         let mut writer = Vec::new(); // Memory writer

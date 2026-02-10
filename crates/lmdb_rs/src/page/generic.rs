@@ -22,15 +22,18 @@ impl<'a> Page<'a> {
     pub fn new(data: &'a [u8], arch: DynArch) -> Result<Self> {
         // Peek header
         if data.len() < 16 {
-             // Basic size check (min header is 12 or 16)
-              return Err(Error::UnexpectedEof { expected: 16, available: data.len() });
+            // Basic size check (min header is 12 or 16)
+            return Err(Error::UnexpectedEof {
+                expected: 16,
+                available: data.len(),
+            });
         }
-        
+
         let header = PageHeader::new(data);
         let flags = header.flags(arch);
-        
+
         if (flags & P_META) != 0 {
-            let meta = MetaPage::new(data)?; 
+            let meta = MetaPage::new(data)?;
             Ok(Page::Meta(meta))
         } else if (flags & P_BRANCH) != 0 {
             Ok(Page::Branch(BranchPage::new(data, arch)?))
@@ -42,7 +45,7 @@ impl<'a> Page<'a> {
             Ok(Page::Other(header))
         }
     }
-    
+
     pub fn page_number(&self, arch: DynArch) -> Option<u64> {
         match self {
             Page::Meta(p) => Some(p.header().page_number(arch).unwrap_or(0)),
@@ -52,23 +55,23 @@ impl<'a> Page<'a> {
             Page::Other(h) => h.page_number(arch).ok(),
         }
     }
-    
+
     pub fn overflow_pages(&self, arch: DynArch) -> Option<u32> {
         match self {
-             Page::Overflow(h) => {
-                 match arch {
-                     DynArch::Arch32 => {
-                         // pgno(4) + pad(2) + flags(2) = 8. pb_pages at 8. (u32)
-                         Arch32::read_size(&h.data()[8..]).ok().map(|x| x as u32)
-                     },
-                     DynArch::Arch64 => {
-                         // pgno(8) + pad(2) + flags(2) = 12. pb_pages at 12. (u32, even on 64-bit)
-                         // Note: We use Arch32::read_size because pb_pages is always u32.
-                         Arch32::read_size(&h.data()[12..]).ok().map(|x| x as u32)
-                     }
-                 }
-             },
-             _ => None,
+            Page::Overflow(h) => {
+                match arch {
+                    DynArch::Arch32 => {
+                        // pgno(4) + pad(2) + flags(2) = 8. pb_pages at 8. (u32)
+                        Arch32::read_size(&h.data()[8..]).ok().map(|x| x as u32)
+                    }
+                    DynArch::Arch64 => {
+                        // pgno(8) + pad(2) + flags(2) = 12. pb_pages at 12. (u32, even on 64-bit)
+                        // Note: We use Arch32::read_size because pb_pages is always u32.
+                        Arch32::read_size(&h.data()[12..]).ok().map(|x| x as u32)
+                    }
+                }
+            }
+            _ => None,
         }
     }
     pub fn flags(&self, arch: DynArch) -> u16 {

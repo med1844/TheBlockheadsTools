@@ -1,5 +1,5 @@
 use crate::arch::Arch;
-use crate::build::btree::{BTreeBuilder};
+use crate::build::btree::BTreeBuilder;
 use crate::db_record::DbRecord;
 use std::marker::PhantomData;
 
@@ -36,14 +36,20 @@ impl<A: Arch> DatabaseBuilder<A> {
 
     /// Add a named database with its entries.
     /// entries: Iterator of (key, val). keys must be sorted.
-    pub fn add_sorted_database<'a, I>(&mut self, name: &str, entries: I) -> Result<(), crate::error::Error> 
-    where I: Iterator<Item = (&'a [u8], &'a [u8])>
+    pub fn add_sorted_database<'a, I>(
+        &mut self,
+        name: &str,
+        entries: I,
+    ) -> Result<(), crate::error::Error>
+    where
+        I: Iterator<Item = (&'a [u8], &'a [u8])>,
     {
         // Build immediately
         let builder = BTreeBuilder::<A>::new(self.page_size, self.next_page);
         let result = builder.build(entries)?;
-        
-        self.built_dbs.push((name.to_string(), result.pages, result.db_record));
+
+        self.built_dbs
+            .push((name.to_string(), result.pages, result.db_record));
         self.next_page = result.next_page;
         Ok(())
     }
@@ -56,7 +62,7 @@ impl<A: Arch> DatabaseBuilder<A> {
         // Let's sort to be safe if reusing this for legacy.
         let mut sorted = entries;
         sorted.sort_by(|a, b| a.0.cmp(&b.0));
-        let iter = sorted.iter().map(|(k,v)| (k.as_slice(), v.as_slice()));
+        let iter = sorted.iter().map(|(k, v)| (k.as_slice(), v.as_slice()));
         let _ = self.add_sorted_database(name, iter);
     }
 
@@ -65,7 +71,10 @@ impl<A: Arch> DatabaseBuilder<A> {
         // We do NOT sort `built_dbs` directly because that would scramble the physical page order.
         let mut indices: Vec<usize> = (0..self.built_dbs.len()).collect();
         indices.sort_by(|&i, &j| {
-            self.built_dbs[i].0.as_bytes().cmp(self.built_dbs[j].0.as_bytes())
+            self.built_dbs[i]
+                .0
+                .as_bytes()
+                .cmp(self.built_dbs[j].0.as_bytes())
         });
 
         let mut main_db_entries: Vec<(Vec<u8>, Vec<u8>)> = Vec::new();
@@ -76,31 +85,35 @@ impl<A: Arch> DatabaseBuilder<A> {
         }
 
         let mut all_pages = Vec::new();
-        
+
         // 2. Aggregate Pages in original allocation order
         for (_, pages, _) in self.built_dbs {
-             all_pages.extend(pages);
+            all_pages.extend(pages);
         }
-        
+
         // 3. Build Main DB
         let builder = BTreeBuilder::<A>::new(self.page_size, self.next_page);
-        let result = builder.build(main_db_entries.iter().map(|(k,v)| (k.as_slice(), v.as_slice())))?;
-        
+        let result = builder.build(
+            main_db_entries
+                .iter()
+                .map(|(k, v)| (k.as_slice(), v.as_slice())),
+        )?;
+
         all_pages.extend(result.pages);
         let final_next_page = result.next_page;
-        
+
         Ok(BuildResult {
             pages: all_pages,
             main_db: result.db_record,
             last_page: final_next_page - 1,
         })
     }
-    
+
     fn serialize_db_record(record: &DbRecord) -> Vec<u8> {
         // Serialize DbRecord to bytes matching C struct layout (MDB_db).
         // The layout depends on the Architecture (32-bit vs 64-bit).
         // Matches `src/db_record.rs` parsing logic.
-        
+
         let mut buf = Vec::new();
         // pad(4)
         buf.extend_from_slice(&record.pad.to_le_bytes());
@@ -108,10 +121,10 @@ impl<A: Arch> DatabaseBuilder<A> {
         buf.extend_from_slice(&record.flags.to_le_bytes());
         // depth(2)
         buf.extend_from_slice(&record.depth.to_le_bytes());
-        
+
         // branch
         let mut tmp = [0u8; 8];
-        A::write_pgno(record.branch_pages, &mut tmp); 
+        A::write_pgno(record.branch_pages, &mut tmp);
         buf.extend_from_slice(&tmp[0..A::PGNO_SIZE]);
 
         A::write_pgno(record.leaf_pages, &mut tmp);
@@ -119,13 +132,13 @@ impl<A: Arch> DatabaseBuilder<A> {
 
         A::write_pgno(record.overflow_pages, &mut tmp);
         buf.extend_from_slice(&tmp[0..A::PGNO_SIZE]);
-        
+
         A::write_size(record.entries, &mut tmp);
         buf.extend_from_slice(&tmp[0..A::SIZE_T_SIZE]);
 
         A::write_pgno(record.root_page, &mut tmp);
         buf.extend_from_slice(&tmp[0..A::PGNO_SIZE]);
-        
+
         buf
     }
 }
@@ -133,19 +146,18 @@ impl<A: Arch> DatabaseBuilder<A> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::arch::{Arch64};
+    use crate::arch::Arch64;
 
-    
     #[test]
     fn test_database_builder_struct() {
         let mut builder = DatabaseBuilder::<Arch64>::new(4096);
         builder.add_database("db1", vec![(b"k".to_vec(), b"v".to_vec())]);
-        
+
         let res = builder.build().expect("Build failed");
-        
+
         // Main DB should contain "db1"
         assert!(res.main_db.entries >= 1);
-        
+
         // Pages should exist
         assert!(!res.pages.is_empty());
     }

@@ -25,7 +25,7 @@ def test_inventories():
         inv = db.main.get_blockhead_inventory(first_id)
         assert inv is not None
         assert len(inv.slots) == 8
-      
+
         # Test setting (roundtrip)
         db.main.set_blockhead_inventory(first_id, inv)
         inv2 = db.main.get_blockhead_inventory(first_id)

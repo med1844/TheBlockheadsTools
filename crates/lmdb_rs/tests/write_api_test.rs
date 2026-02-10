@@ -1,6 +1,6 @@
-use lmdb_rs::env::{Env, EnvWrite};
 use lmdb_rs::arch::DynArch;
-use lmdb_rs::codec::types::{Str, Bytes};
+use lmdb_rs::codec::types::{Bytes, Str};
+use lmdb_rs::env::{Env, EnvWrite};
 use std::io::Cursor;
 
 #[test]
@@ -26,18 +26,22 @@ fn test_write_and_read_api() -> Result<(), Box<dyn std::error::Error>> {
     let rtxn = env_read.read_txn()?;
 
     // Verify Main DB
-    let db_main_read = env_read.open_database::<Str, Bytes>(&rtxn, Some("main"))?
+    let db_main_read = env_read
+        .open_database::<Str, Bytes>(&rtxn, Some("main"))?
         .expect("Main DB should exist");
-    
+
     assert_eq!(db_main_read.get(&rtxn, "key1")?, Some(b"value1".as_slice()));
     assert_eq!(db_main_read.get(&rtxn, "key2")?, Some(b"value2".as_slice()));
 
-
     // Verify Blocks DB
-    let db_blocks_read = env_read.open_database::<Str, Bytes>(&rtxn, Some("blocks"))?
+    let db_blocks_read = env_read
+        .open_database::<Str, Bytes>(&rtxn, Some("blocks"))?
         .expect("Blocks DB should exist");
-    
-    assert_eq!(db_blocks_read.get(&rtxn, "block1")?, Some(b"data1".as_slice()));
+
+    assert_eq!(
+        db_blocks_read.get(&rtxn, "block1")?,
+        Some(b"data1".as_slice())
+    );
 
     Ok(())
 }

@@ -56,7 +56,7 @@ fn fs_grid(in: VertexOutput) -> @location(0) vec4<f32> {
 
     // --- 2. Ray-Plane Intersection ---
     // Find intersection with plane world.z = GRID_Z
-    
+
     // Discard if ray is parallel to the plane
     if (abs(ray_dir_world.z) < 1e-6) {
         discard;
@@ -72,13 +72,13 @@ fn fs_grid(in: VertexOutput) -> @location(0) vec4<f32> {
     let world_pos = ray_origin_world + ray_dir_world * t;
 
     // --- 3. Check World Boundaries ---
-    if (world_pos.x < 0.0 || world_pos.x > WORLD_DIM_X_F32 || 
+    if (world_pos.x < 0.0 || world_pos.x > WORLD_DIM_X_F32 ||
         world_pos.y < 0.0 || world_pos.y > WORLD_DIM_Y_F32) {
         discard;
     }
 
     // --- 4. Calculate Anti-Aliased Grid Lines ---
-    
+
     // Get the width of one pixel in world coordinates
     let line_width_vec = fwidth(world_pos.xy);
     let line_width = (line_width_vec.x + line_width_vec.y) * 0.5 * 1.0; // 1.0 pixel wide
@@ -87,7 +87,7 @@ fn fs_grid(in: VertexOutput) -> @location(0) vec4<f32> {
     let d = world_pos.xy % CHUNK_SIZE;
     // `dist` = distance to the *nearest* grid line
     let dist = min(d, CHUNK_SIZE - d);
-    
+
     // `grid_line` will be 0.0 on the line, and increase as we move away
     let grid_line = dist / line_width;
 

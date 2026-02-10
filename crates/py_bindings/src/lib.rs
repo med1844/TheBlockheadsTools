@@ -1630,12 +1630,22 @@ pub mod item {
 
         fn __repr__(&self, py: Python<'_>) -> String {
             let extra_repr = match &self.extra {
-                Some(e) => {
-                     match e {
-                        ItemExtraPy::Basket(b) => b.bind(py).repr().map(|s| s.to_string()).unwrap_or_else(|_| "<repr error>".to_string()),
-                        ItemExtraPy::Chest(c) => c.bind(py).repr().map(|s| s.to_string()).unwrap_or_else(|_| "<repr error>".to_string()),
-                        ItemExtraPy::Workbench(w) => w.bind(py).repr().map(|s| s.to_string()).unwrap_or_else(|_| "<repr error>".to_string()),
-                     }
+                Some(e) => match e {
+                    ItemExtraPy::Basket(b) => b
+                        .bind(py)
+                        .repr()
+                        .map(|s| s.to_string())
+                        .unwrap_or_else(|_| "<repr error>".to_string()),
+                    ItemExtraPy::Chest(c) => c
+                        .bind(py)
+                        .repr()
+                        .map(|s| s.to_string())
+                        .unwrap_or_else(|_| "<repr error>".to_string()),
+                    ItemExtraPy::Workbench(w) => w
+                        .bind(py)
+                        .repr()
+                        .map(|s| s.to_string())
+                        .unwrap_or_else(|_| "<repr error>".to_string()),
                 },
                 None => "None".to_string(),
             };
@@ -1846,7 +1856,7 @@ pub use item::{
 };
 
 mod world_db {
-    use super::{into_py_err, lib, ChunksPy, SharedWorldDb, item::InventoryPy};
+    use super::{into_py_err, item::InventoryPy, lib, ChunksPy, SharedWorldDb};
     use lib::game::db::world_db::WorldDb;
     use pyo3::prelude::*;
     use std::{
@@ -2355,7 +2365,11 @@ mod world_db {
                 .collect()
         }
 
-        fn get_blockhead_inventory(&self, py: Python<'_>, id: u64) -> PyResult<Option<Py<InventoryPy>>> {
+        fn get_blockhead_inventory(
+            &self,
+            py: Python<'_>,
+            id: u64,
+        ) -> PyResult<Option<Py<InventoryPy>>> {
             let world_db = self.inner.read().unwrap();
             if let Some(inv) = world_db
                 .main

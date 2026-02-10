@@ -1,5 +1,5 @@
-use std::borrow::Cow;
 use crate::error::Result;
+use std::borrow::Cow;
 
 /// A trait that allows to encode a type into bytes.
 /// A trait that allows to encode a type into bytes.
