@@ -276,25 +276,25 @@ impl EditorApp {
                             }
                         })
                     }
-                    if ui.button("Export").clicked() {
-                        if let Some(world_db) = self.world_db.as_ref() {
-                            let mut out_bytes = Vec::new();
-                            match world_db.write_to(&mut out_bytes) {
-                                Ok(()) => {
-                                    let task = rfd::AsyncFileDialog::new()
-                                        .set_file_name("data.mdb")
-                                        .save_file();
-                                    let ctx = ui.ctx().clone();
-                                    wasm_bindgen_futures::spawn_local(async move {
-                                        if let Some(file) = task.await {
-                                            let _ = file.write(&out_bytes).await;
-                                            ctx.request_repaint();
-                                        }
-                                    })
-                                }
-                                Err(e) => {
-                                    self.save_err = Some(e);
-                                }
+                    if ui.button("Export").clicked()
+                        && let Some(world_db) = self.world_db.as_ref()
+                    {
+                        let mut out_bytes = Vec::new();
+                        match world_db.write_to(&mut out_bytes) {
+                            Ok(()) => {
+                                let task = rfd::AsyncFileDialog::new()
+                                    .set_file_name("data.mdb")
+                                    .save_file();
+                                let ctx = ui.ctx().clone();
+                                wasm_bindgen_futures::spawn_local(async move {
+                                    if let Some(file) = task.await {
+                                        let _ = file.write(&out_bytes).await;
+                                        ctx.request_repaint();
+                                    }
+                                })
+                            }
+                            Err(e) => {
+                                self.save_err = Some(e);
                             }
                         }
                     }

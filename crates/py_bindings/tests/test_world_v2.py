@@ -33,16 +33,16 @@ def test_world_v2_write():
     world_db = WorldDb.open(WORLD_DB_PATH)
     world_v2 = world_db.main.world_v2
     with pytest.raises(TypeError):
-        world_v2.host_port = 12345
+        world_v2.host_port = 12345  # ty: ignore[invalid-assignment]
     world_v2.host_port = "51515"
     assert world_v2.host_port == "51515"
 
     with pytest.raises(TypeError):
-        world_v2.translation = "15151"
+        world_v2.translation = "15151"  # ty: ignore[invalid-assignment]
     world_v2.translation = (520, 520)
     assert world_v2.translation == (520.0, 520.0)
 
     with pytest.raises(TypeError):
-        world_v2.translation = "15151"
+        world_v2.translation = "15151"  # ty: ignore[invalid-assignment]
     world_v2.circum_navigate_booleans_data = b"12345"
     assert world_v2.circum_navigate_booleans_data == b"12345"

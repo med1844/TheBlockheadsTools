@@ -10,9 +10,9 @@ def test_chunk_coord():
     assert coord.y == 10
 
     with pytest.raises(AttributeError):
-        coord.x = 5
+        coord.x = 5  # ty: ignore[invalid-assignment]
     with pytest.raises(AttributeError):
-        coord.y = 5
+        coord.y = 5  # ty: ignore[invalid-assignment]
     with pytest.raises(ValueError):
         ChunkCoord(123, 45)
     with pytest.raises(OverflowError):
@@ -30,9 +30,9 @@ def test_chunk_block_coord():
     assert coord.y == 10
 
     with pytest.raises(AttributeError):
-        coord.x = 5
+        coord.x = 5  # ty: ignore[invalid-assignment]
     with pytest.raises(AttributeError):
-        coord.y = 5
+        coord.y = 5  # ty: ignore[invalid-assignment]
     with pytest.raises(ValueError):
         ChunkBlockCoord(32, 5)
     with pytest.raises(ValueError):
@@ -48,9 +48,9 @@ def test_block_coord():
     assert coord.y == 678
 
     with pytest.raises(AttributeError):
-        coord.x = 5
+        coord.x = 5  # ty: ignore[invalid-assignment]
     with pytest.raises(AttributeError):
-        coord.y = 5
+        coord.y = 5  # ty: ignore[invalid-assignment]
     with pytest.raises(ValueError):
         BlockCoord(123, 1024)
     with pytest.raises(OverflowError):

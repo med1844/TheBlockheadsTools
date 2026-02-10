@@ -245,9 +245,9 @@ mod block {
         }
     }
 
-    impl Into<BlockType> for BlockTypePy {
-        fn into(self) -> BlockType {
-            BlockType::try_from(self as u8).expect("Enums are out of sync!")
+    impl From<BlockTypePy> for BlockType {
+        fn from(val: BlockTypePy) -> Self {
+            BlockType::try_from(val as u8).expect("Enums are out of sync!")
         }
     }
 
@@ -272,7 +272,7 @@ mod block {
                 }
                 None => Err(InvalidAccessorError::new_err(format!(
                     "The block at {} doesn't exist.",
-                    self.block_coord.to_string()
+                    self.block_coord
                 ))),
             }
         }
@@ -308,7 +308,7 @@ mod chunk {
                 )),
                 None => Err(InvalidAccessorError::new_err(format!(
                     "The chunk at {} doesn't exist.",
-                    self.coord.to_string()
+                    self.coord
                 ))),
             }
         }
@@ -346,7 +346,6 @@ mod chunk {
                 world_db
                     .chunks
                     .keys()
-                    .into_iter()
                     .map(|value| ChunkCoordPy { inner: value }),
             )
         }
@@ -834,9 +833,9 @@ pub mod item {
         }
     }
 
-    impl Into<ItemType> for ItemTypePy {
-        fn into(self) -> ItemType {
-            ItemType::try_from(self as u16).expect("Enums are out of sync!")
+    impl From<ItemTypePy> for ItemType {
+        fn from(val: ItemTypePy) -> Self {
+            ItemType::try_from(val as u16).expect("Enums are out of sync!")
         }
     }
 
@@ -859,9 +858,9 @@ pub mod item {
         }
     }
 
-    impl Into<ChestType> for ChestTypePy {
-        fn into(self) -> ChestType {
-            ChestType::try_from(self as u8).expect("Enums are out of sync!")
+    impl From<ChestTypePy> for ChestType {
+        fn from(val: ChestTypePy) -> Self {
+            ChestType::from(val as u8)
         }
     }
 
@@ -909,9 +908,9 @@ pub mod item {
         }
     }
 
-    impl Into<WorkbenchType> for WorkbenchTypePy {
-        fn into(self) -> WorkbenchType {
-            WorkbenchType::try_from(self as u8).expect("Enums are out of sync!")
+    impl From<WorkbenchTypePy> for WorkbenchType {
+        fn from(val: WorkbenchTypePy) -> Self {
+            WorkbenchType::from(val as u8)
         }
     }
 
@@ -936,9 +935,9 @@ pub mod item {
         }
     }
 
-    impl Into<PigmentColor> for PigmentColorPy {
-        fn into(self) -> PigmentColor {
-            PigmentColor::try_from(self as u8).expect("Enums are out of sync!")
+    impl From<PigmentColorPy> for PigmentColor {
+        fn from(val: PigmentColorPy) -> Self {
+            PigmentColor::try_from(val as u8).expect("Enums are out of sync!")
         }
     }
 

@@ -22,28 +22,28 @@ def test_dynamic_world_v2_write():
     with pytest.raises(OverflowError):
         dynamic_world_v2.active_blockhead_index = -1  # u64 internally
     with pytest.raises(TypeError):
-        dynamic_world_v2.active_blockhead_index = "123"
+        dynamic_world_v2.active_blockhead_index = "123"  # ty: ignore[invalid-assignment]
 
     dynamic_world_v2.dynamic_object_id_count = 12345
     assert dynamic_world_v2.dynamic_object_id_count == 12345
     with pytest.raises(OverflowError):
         dynamic_world_v2.dynamic_object_id_count = -1  # u64 internally
     with pytest.raises(TypeError):
-        dynamic_world_v2.dynamic_object_id_count = "123"
+        dynamic_world_v2.dynamic_object_id_count = "123"  # ty: ignore[invalid-assignment]
 
     dynamic_world_v2.save_version = 0
     assert dynamic_world_v2.save_version == 0
     with pytest.raises(OverflowError):
         dynamic_world_v2.save_version = -1  # u8 internally
     with pytest.raises(TypeError):
-        dynamic_world_v2.save_version = "123"
+        dynamic_world_v2.save_version = "123"  # ty: ignore[invalid-assignment]
 
     dynamic_world_v2.saved_glow_indices = b""
     assert dynamic_world_v2.saved_glow_indices == b""
     with pytest.raises(TypeError):
-        dynamic_world_v2.saved_glow_indices = "123"
+        dynamic_world_v2.saved_glow_indices = "123"  # ty: ignore[invalid-assignment]
 
     dynamic_world_v2.workbench_has_been_crafted = True
     assert dynamic_world_v2.workbench_has_been_crafted == True
     with pytest.raises(TypeError):
-        dynamic_world_v2.saved_glow_indices = "123"
+        dynamic_world_v2.saved_glow_indices = "123"  # ty: ignore[invalid-assignment]

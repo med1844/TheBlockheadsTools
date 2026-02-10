@@ -1,5 +1,6 @@
 from the_blockheads_tools_py import (
-    Item, ItemType, PigmentColor, StackedItem, BasketExtra, ChestExtra, ChestType
+    Item, ItemType, PigmentColor, StackedItem, BasketExtra, ChestExtra, ChestType,
+    WorkbenchExtra, WorkbenchType
 )
 import pytest
 
@@ -225,13 +226,12 @@ def test_chest_roundtrip():
     container = Item(ItemType.PortalChest, extra=chest)
 
     # We can test that the properties we set are stable in python.
+    assert type(container.extra) is ChestExtra
     assert container.extra.unique_id == 0xDEADBEEFCAFEBABE
     assert container.extra[7][0].item_type == ItemType.Diamond
     assert container.extra[7][0].damage == 5
 
 def test_workbench_basic():
-    from the_blockheads_tools_py import WorkbenchExtra, WorkbenchType
-
     wb = WorkbenchExtra()
     assert wb.workbench_type == WorkbenchType.Workbench
     assert wb.level == 1
@@ -243,8 +243,6 @@ def test_workbench_basic():
     assert wb.owner_id == "crafter"
 
 def test_workbench_properties():
-    from the_blockheads_tools_py import WorkbenchExtra
-
     wb = WorkbenchExtra()
 
     # Test mutability
@@ -264,8 +262,6 @@ def test_workbench_properties():
     assert wb.unique_id == 999999
 
 def test_workbench_integration():
-    from the_blockheads_tools_py import WorkbenchExtra, WorkbenchType
-
     wb = WorkbenchExtra(WorkbenchType.Easel)
     item = Item(ItemType.Easel, extra=wb)
 

@@ -8,9 +8,9 @@ def test_world_db_main():
     # blockheads is now a list of BlockheadPy
     assert isinstance(main.blockheads, list)
     with pytest.raises(AttributeError):
-        main.blockheads = b"12345"
+        main.blockheads = b"12345"  # ty: ignore[invalid-assignment]
     with pytest.raises(AttributeError):
-        main.dynamic_world_v2 = b"12345"
+        main.dynamic_world_v2 = b"12345"  # ty: ignore[invalid-assignment]
     if main.blockheads:
         assert isinstance(main.blockheads[0].name, str)
 
@@ -29,4 +29,6 @@ def test_inventories():
         # Test setting (roundtrip)
         db.main.set_blockhead_inventory(first_id, inv)
         inv2 = db.main.get_blockhead_inventory(first_id)
+        assert inv2 is not None
         assert len(inv2.slots) == 8
+        assert inv2 is inv

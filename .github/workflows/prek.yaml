@@ -10,4 +10,6 @@ jobs:
         uses: astral-sh/setup-uv@v7
       - name: Set up Python
         run: uv python install
+      - name: Setup wasm32
+        run: rustup target add wasm32-unknown-unknown
       - uses: j178/prek-action@v1
