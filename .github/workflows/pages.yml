@@ -1,5 +1,5 @@
 # forked from https://github.com/DavidAntliff/egui-eframe-demo/blob/main/.github/workflows/pages.yml
-name: Github Pages
+name: Deploy Editor and Docs
 
 on:
   push:
@@ -29,7 +29,7 @@ jobs:
         with:
           # Optional version of trunk to install(eg. 'v0.21.14', 'latest')
           version: 'latest'
-      - name: Build with Trunk
+      - name: Build Editor with Trunk
         # Environment $public_url resolves to the github project page.
         # If using a user/organization page, remove the `${{ github.event.repository.name }}` part.
         # using --public-url something will allow trunk to modify all the href paths like from favicon.ico to repo_name/favicon.ico .
@@ -39,11 +39,25 @@ jobs:
         working-directory: crates/web_gui
         run: trunk build --release --public-url $public_url
         env:
-          public_url: "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
+          public_url: "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/editor/"
+      # setup uv for mkdocs
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+      - name: Set up Python
+        run: uv python install
+      - name: Build MkDocs
+        working-directory: docs
+        run: uv run mkdocs build --strict
+      - name: Prepare deployment folder
+        run: |
+          mkdir staging
+          mkdir -p staging/editor
+          cp -r crates/web_gui/dist/* staging/editor/
+          cp -r docs/site/docs staging/
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: crates/web_gui/dist
+          path: staging
 
   deploy:
     environment:

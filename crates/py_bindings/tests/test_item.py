@@ -278,7 +278,7 @@ def test_slot_sequence_protocol():
     slot = Slot()
     assert len(slot) == 0
     item = Item(ItemType.Apple)
-    
+
     slot.append(item)
     assert len(slot) == 1
     assert slot[0].item_type == ItemType.Apple
@@ -288,7 +288,7 @@ def test_slot_sequence_protocol():
     slot[0] = newItem
     assert slot[0] is newItem
     assert slot[0].item_type == ItemType.Mango
-    
+
     del slot[0]
     assert len(slot) == 0
 

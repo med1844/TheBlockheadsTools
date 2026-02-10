@@ -8,11 +8,12 @@ save_structure*
 .ruff_cache
 *.png
 !crates/gui/resources/*.png
-!imgs/*.png
+!docs/src/assets/*.png
 server
 test.py
 lock.mdb
 __pycache__
+site/
 
 # Added by cargo
 

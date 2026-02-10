@@ -7,7 +7,7 @@ use lib::game::{
     },
 };
 use num_enum::TryFromPrimitive;
-use pyo3::exceptions::{PyIndexError, PyTypeError, PyValueError};
+use pyo3::exceptions::{PyIndexError, PyValueError};
 use pyo3::prelude::*;
 
 #[pyclass(eq, eq_int, name = "ItemType")]
@@ -1391,14 +1391,20 @@ impl SlotPy {
     }
 
     fn insert(&mut self, index: isize, item: Py<ItemPy>) {
-         let len = self.items.len() as isize;
-         let idx = if index < 0 {
-             let i = index + len;
-             if i < 0 { 0 } else { i }
-         } else {
-             if index > len { len } else { index }
-         };
-         self.items.insert(idx as usize, item);
+        let len = self.items.len() as isize;
+        let idx = if index < 0 {
+            let i = index + len;
+            if i < 0 {
+                0
+            } else {
+                i
+            }
+        } else if index > len {
+            len
+        } else {
+            index
+        };
+        self.items.insert(idx as usize, item);
     }
 
     #[pyo3(signature = (index=None))]
@@ -1407,7 +1413,7 @@ impl SlotPy {
         let len = self.items.len() as isize;
         let idx = if idx < 0 { idx + len } else { idx };
         if idx < 0 || idx >= len {
-             return Err(PyIndexError::new_err("pop index out of range"));
+            return Err(PyIndexError::new_err("pop index out of range"));
         }
         Ok(self.items.remove(idx as usize))
     }
@@ -1417,10 +1423,10 @@ impl SlotPy {
     }
 
     fn __iter__(slf: PyRef<'_, Self>) -> PyResult<SlotIterator> {
-         Ok(SlotIterator {
-             slot: slf.into(),
-             index: 0,
-         })
+        Ok(SlotIterator {
+            slot: slf.into(),
+            index: 0,
+        })
     }
 
     fn __repr__(&self, py: Python<'_>) -> String {
