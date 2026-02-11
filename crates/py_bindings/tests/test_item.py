@@ -1,5 +1,5 @@
 from the_blockheads_tools_py import (
-    Item, ItemType, PigmentColor, StackedItem, BasketExtra, ChestExtra, ChestType,
+    Item, ItemType, PigmentColor, Slot, BasketExtra, ChestExtra, ChestType,
     WorkbenchExtra, WorkbenchType
 )
 import pytest
@@ -65,55 +65,55 @@ def test_item_edge_cases():
     with pytest.raises(ValueError, match="Invalid color ID: 15"):
         _ = item.colors
 
-def test_stacked_item():
+def test_slot():
     items = [Item(ItemType.Apple), Item(ItemType.Apple)]
-    stacked = StackedItem(items)
-    assert len(stacked) == 2
+    slot = Slot(items)
+    assert len(slot) == 2
 
     # Reference identity check
-    item1 = stacked[0]
-    item2 = stacked[0]
+    item1 = slot[0]
+    item2 = slot[0]
     assert item1 is item2
 
     # In-place mutation check
-    stacked[0].item_type = ItemType.Mango
-    assert stacked[0].item_type == ItemType.Mango
+    slot[0].item_type = ItemType.Mango
+    assert slot[0].item_type == ItemType.Mango
     assert item1.item_type == ItemType.Mango
 
     # Test __setitem__
     new_item = Item(ItemType.Flint)
-    stacked[1] = new_item
-    assert stacked[1] is new_item
+    slot[1] = new_item
+    assert slot[1] is new_item
 
     # Test public field
-    stacked.items = [Item(ItemType.Flint)]
-    assert len(stacked) == 1
-    assert stacked[0].item_type == ItemType.Flint
+    slot.items = [Item(ItemType.Flint)]
+    assert len(slot) == 1
+    assert slot[0].item_type == ItemType.Flint
 
     with pytest.raises(IndexError):
-        _ = stacked[1]
+        _ = slot[1]
     with pytest.raises(IndexError):
-        stacked[1] = Item(ItemType.Apple)
+        slot[1] = Item(ItemType.Apple)
 
     # Test negative indexing
-    stacked.items = [Item(ItemType.Apple), Item(ItemType.Mango)]
-    assert stacked[-1].item_type == ItemType.Mango
-    last_item = stacked[-1]
-    assert last_item is stacked[1]
+    slot.items = [Item(ItemType.Apple), Item(ItemType.Mango)]
+    assert slot[-1].item_type == ItemType.Mango
+    last_item = slot[-1]
+    assert last_item is slot[1]
 
 def test_basket_extra():
     # Test creation
     basket = BasketExtra()
     assert len(basket) == 4
-    assert isinstance(basket[0], StackedItem)
+    assert isinstance(basket[0], Slot)
     assert len(basket[0]) == 0
 
     # Test identity and nested mutation
     item = Item(ItemType.Apple)
-    stacked = StackedItem([item])
-    basket[0] = stacked
+    slot = Slot([item])
+    basket[0] = slot
 
-    assert basket[0] is stacked
+    assert basket[0] is slot
     assert basket[0][0] is item
 
     # Modify nested item
@@ -164,11 +164,11 @@ def test_chest_extra_basic():
 def test_chest_identity_and_mutation():
     chest = ChestExtra()
     item = Item(ItemType.Apple)
-    stacked = StackedItem([item])
+    slot = Slot([item])
 
     # Set slot 0
-    chest[0] = stacked
-    assert chest[0] is stacked
+    chest[0] = slot
+    assert chest[0] is slot
     assert chest[0][0] is item
 
     # Nested mutation via reference
@@ -176,10 +176,10 @@ def test_chest_identity_and_mutation():
     assert chest[0][0].damage == 10
 
     # Test __setitem__ replaced identity
-    new_stacked = StackedItem([Item(ItemType.Mango)])
-    chest[0] = new_stacked
-    assert chest[0] is new_stacked
-    assert chest[0] is not stacked
+    new_slot = Slot([Item(ItemType.Mango)])
+    chest[0] = new_slot
+    assert chest[0] is new_slot
+    assert chest[0] is not slot
 
 def test_chest_dispatch():
     chest = ChestExtra(ChestType.Gold)
@@ -201,11 +201,11 @@ def test_chest_validation():
     chest = ChestExtra()
     assert len(chest.items) == 16
 
-    new_items = [StackedItem() for _ in range(16)]
+    new_items = [Slot() for _ in range(16)]
     chest.items = new_items
     assert len(chest.items) == 16
 
-    chest.items = [StackedItem()] * 5
+    chest.items = [Slot()] * 5
     assert len(chest.items) == 5
 
 def test_chest_roundtrip():
@@ -220,7 +220,7 @@ def test_chest_roundtrip():
 
     item_in_chest = Item(ItemType.Diamond)
     item_in_chest.damage = 5
-    chest[7] = StackedItem([item_in_chest])
+    chest[7] = Slot([item_in_chest])
 
     # Wrap in Item
     container = Item(ItemType.PortalChest, extra=chest)

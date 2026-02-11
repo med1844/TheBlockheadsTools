@@ -387,7 +387,7 @@ pub mod item {
         dw::dynamic_object::{DynamicObject, UniqueID},
         item::{
             ChestData, ChestType, Extra, InteractionObject, Inventory, Item, ItemType,
-            PigmentColor, StackedItem, WorkbenchData, WorkbenchType,
+            PigmentColor, Slot, WorkbenchData, WorkbenchType,
         },
     };
     use num_enum::TryFromPrimitive;
@@ -944,7 +944,7 @@ pub mod item {
     #[pyclass(name = "BasketExtra")]
     pub struct BasketExtraPy {
         #[pyo3(get, set)]
-        pub items: Vec<Py<StackedItemPy>>,
+        pub items: Vec<Py<SlotPy>>,
     }
 
     impl std::fmt::Debug for BasketExtraPy {
@@ -959,7 +959,7 @@ pub mod item {
     impl BasketExtraPy {
         #[new]
         #[pyo3(signature = (items=None))]
-        fn new(items: Option<Vec<Py<StackedItemPy>>>) -> PyResult<Self> {
+        fn new(items: Option<Vec<Py<SlotPy>>>) -> PyResult<Self> {
             match items {
                 Some(items) => {
                     if items.len() != Extra::NUM_SLOT_BASKET {
@@ -973,7 +973,7 @@ pub mod item {
                 None => Python::attach(|py| {
                     let mut items = Vec::with_capacity(Extra::NUM_SLOT_BASKET);
                     for _ in 0..Extra::NUM_SLOT_BASKET {
-                        items.push(Py::new(py, StackedItemPy::default())?);
+                        items.push(Py::new(py, SlotPy::default())?);
                     }
                     Ok(Self { items })
                 }),
@@ -984,7 +984,7 @@ pub mod item {
             self.items.len()
         }
 
-        fn __getitem__(&self, py: Python<'_>, mut index: isize) -> PyResult<Py<StackedItemPy>> {
+        fn __getitem__(&self, py: Python<'_>, mut index: isize) -> PyResult<Py<SlotPy>> {
             if index < 0 {
                 index += self.items.len() as isize;
             }
@@ -996,7 +996,7 @@ pub mod item {
             Ok(self.items[index as usize].clone_ref(py))
         }
 
-        fn __setitem__(&mut self, mut index: isize, value: Py<StackedItemPy>) -> PyResult<()> {
+        fn __setitem__(&mut self, mut index: isize, value: Py<SlotPy>) -> PyResult<()> {
             if index < 0 {
                 index += self.items.len() as isize;
             }
@@ -1029,7 +1029,7 @@ pub mod item {
         #[pyo3(get, set)]
         pub chest_type: ChestTypePy,
         #[pyo3(get, set)]
-        pub items: Vec<Py<StackedItemPy>>,
+        pub items: Vec<Py<SlotPy>>,
         #[pyo3(get, set)]
         pub owner_id: String,
         #[pyo3(get, set)]
@@ -1062,7 +1062,7 @@ pub mod item {
         pub fn inflate(py: Python<'_>, chest: ChestData) -> PyResult<Py<Self>> {
             let mut items = Vec::with_capacity(ChestData::NUM_SLOTS);
             for slot in chest.save_item_slots {
-                items.push(StackedItemPy::inflate(py, slot)?);
+                items.push(SlotPy::inflate(py, slot)?);
             }
             Py::new(
                 py,
@@ -1085,7 +1085,7 @@ pub mod item {
         }
 
         pub fn deflate(&self, py: Python<'_>) -> ChestData {
-            let mut save_item_slots = [const { StackedItem(vec![]) }; ChestData::NUM_SLOTS];
+            let mut save_item_slots = [const { Slot(vec![]) }; ChestData::NUM_SLOTS];
             for (i, si_py) in self.items.iter().enumerate() {
                 if i < ChestData::NUM_SLOTS {
                     save_item_slots[i] = si_py.bind(py).borrow().deflate(py);
@@ -1140,7 +1140,7 @@ pub mod item {
         fn new(py: Python<'_>, chest_type: ChestTypePy, owner_id: String) -> PyResult<Py<Self>> {
             let mut items = Vec::with_capacity(ChestData::NUM_SLOTS);
             for _ in 0..ChestData::NUM_SLOTS {
-                items.push(Py::new(py, StackedItemPy::default())?);
+                items.push(Py::new(py, SlotPy::default())?);
             }
             Py::new(
                 py,
@@ -1163,7 +1163,7 @@ pub mod item {
             self.items.len()
         }
 
-        fn __getitem__(&self, index: isize, py: Python<'_>) -> PyResult<Py<StackedItemPy>> {
+        fn __getitem__(&self, index: isize, py: Python<'_>) -> PyResult<Py<SlotPy>> {
             let len = self.items.len() as isize;
             let idx = if index < 0 { index + len } else { index };
             if idx < 0 || idx >= len {
@@ -1174,7 +1174,7 @@ pub mod item {
             Ok(self.items[idx as usize].clone_ref(py))
         }
 
-        fn __setitem__(&mut self, index: isize, item: Py<StackedItemPy>) -> PyResult<()> {
+        fn __setitem__(&mut self, index: isize, item: Py<SlotPy>) -> PyResult<()> {
             let len = self.items.len() as isize;
             let idx = if index < 0 { index + len } else { index };
             if idx < 0 || idx >= len {
@@ -1457,7 +1457,7 @@ pub mod item {
                 Extra::Basket(items) => {
                     let py_items = items
                         .into_iter()
-                        .map(|si| StackedItemPy::inflate(py, si))
+                        .map(|si| SlotPy::inflate(py, si))
                         .collect::<PyResult<Vec<_>>>()?;
                     Ok(Self::Basket(Py::new(
                         py,
@@ -1475,7 +1475,7 @@ pub mod item {
             match self {
                 Self::Basket(basket_py) => {
                     let basket = basket_py.bind(py).borrow();
-                    let mut items = [const { StackedItem(vec![]) }; Extra::NUM_SLOT_BASKET];
+                    let mut items = [const { Slot(vec![]) }; Extra::NUM_SLOT_BASKET];
                     for (i, si) in basket.items.iter().enumerate() {
                         items[i] = si.bind(py).borrow().deflate(py);
                     }
@@ -1664,20 +1664,20 @@ pub mod item {
     #[derive(Debug)]
     pub struct InventoryPy {
         #[pyo3(get, set)]
-        pub slots: Vec<Py<StackedItemPy>>,
+        pub slots: Vec<Py<SlotPy>>,
     }
 
     impl InventoryPy {
         pub fn inflate(py: Python<'_>, inventory: Inventory) -> PyResult<Py<Self>> {
             let mut slots = Vec::with_capacity(Inventory::NUM_SLOTS);
             for slot in inventory.0 {
-                slots.push(StackedItemPy::inflate(py, slot)?);
+                slots.push(SlotPy::inflate(py, slot)?);
             }
             Py::new(py, Self { slots })
         }
 
         pub fn deflate(&self, py: Python<'_>) -> Inventory {
-            let mut slots = [const { StackedItem(vec![]) }; Inventory::NUM_SLOTS];
+            let mut slots = [const { Slot(vec![]) }; Inventory::NUM_SLOTS];
             for (i, slot_py) in self.slots.iter().enumerate() {
                 if i < Inventory::NUM_SLOTS {
                     slots[i] = slot_py.bind(py).borrow().deflate(py);
@@ -1701,7 +1701,7 @@ pub mod item {
     impl InventoryPy {
         #[new]
         #[pyo3(signature = (slots=None))]
-        fn new(py: Python<'_>, slots: Option<Vec<Py<StackedItemPy>>>) -> PyResult<Py<Self>> {
+        fn new(py: Python<'_>, slots: Option<Vec<Py<SlotPy>>>) -> PyResult<Py<Self>> {
             let slots = match slots {
                 Some(s) => {
                     if s.len() != Inventory::NUM_SLOTS {
@@ -1715,7 +1715,7 @@ pub mod item {
                 None => {
                     let mut s = Vec::with_capacity(Inventory::NUM_SLOTS);
                     for _ in 0..Inventory::NUM_SLOTS {
-                        s.push(Py::new(py, StackedItemPy::default())?);
+                        s.push(Py::new(py, SlotPy::default())?);
                     }
                     s
                 }
@@ -1727,7 +1727,7 @@ pub mod item {
             self.slots.len()
         }
 
-        fn __getitem__(&self, index: isize, py: Python<'_>) -> PyResult<Py<StackedItemPy>> {
+        fn __getitem__(&self, index: isize, py: Python<'_>) -> PyResult<Py<SlotPy>> {
             let len = self.slots.len() as isize;
             let idx = if index < 0 { index + len } else { index };
             if idx < 0 || idx >= len {
@@ -1738,7 +1738,7 @@ pub mod item {
             Ok(self.slots[idx as usize].clone_ref(py))
         }
 
-        fn __setitem__(&mut self, index: isize, item: Py<StackedItemPy>) -> PyResult<()> {
+        fn __setitem__(&mut self, index: isize, item: Py<SlotPy>) -> PyResult<()> {
             let len = self.slots.len() as isize;
             let idx = if index < 0 { index + len } else { index };
             if idx < 0 || idx >= len {
@@ -1765,32 +1765,30 @@ pub mod item {
         }
     }
 
-    #[pyclass(name = "StackedItem")]
+    #[pyclass(name = "Slot")]
     #[derive(Default)]
-    pub struct StackedItemPy {
+    pub struct SlotPy {
         #[pyo3(get, set)]
         pub items: Vec<Py<ItemPy>>,
     }
 
-    impl std::fmt::Debug for StackedItemPy {
+    impl std::fmt::Debug for SlotPy {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            f.debug_struct("StackedItemPy")
-                .field("items", &"<items>")
-                .finish()
+            f.debug_struct("SlotPy").field("items", &"<items>").finish()
         }
     }
 
-    impl StackedItemPy {
-        pub fn inflate(py: Python<'_>, stacked: StackedItem) -> PyResult<Py<Self>> {
-            let mut items = Vec::with_capacity(stacked.0.len());
-            for item in stacked.0 {
+    impl SlotPy {
+        pub fn inflate(py: Python<'_>, slot: Slot) -> PyResult<Py<Self>> {
+            let mut items = Vec::with_capacity(slot.0.len());
+            for item in slot.0 {
                 items.push(ItemPy::inflate(py, item)?);
             }
             Py::new(py, Self { items })
         }
 
-        pub fn deflate(&self, py: Python<'_>) -> StackedItem {
-            StackedItem(
+        pub fn deflate(&self, py: Python<'_>) -> Slot {
+            Slot(
                 self.items
                     .iter()
                     .map(|item_py| item_py.bind(py).borrow().deflate(py))
@@ -1800,7 +1798,7 @@ pub mod item {
     }
 
     #[pymethods]
-    impl StackedItemPy {
+    impl SlotPy {
         #[new]
         #[pyo3(signature = (items=None))]
         fn new(items: Option<Vec<Py<ItemPy>>>) -> Self {
@@ -1844,14 +1842,14 @@ pub mod item {
                 .iter()
                 .map(|item| format!("{:?}", item.bind(py).borrow()))
                 .collect();
-            format!("StackedItem(items=[{}])", items_repr.join(", "))
+            format!("Slot(items=[{}])", items_repr.join(", "))
         }
     }
 }
 
 pub use item::{
     BasketExtraPy, ChestExtraPy, ChestTypePy, InventoryPy, ItemPy, ItemTypePy, PigmentColorPy,
-    StackedItemPy, WorkbenchExtraPy, WorkbenchTypePy,
+    SlotPy, WorkbenchExtraPy, WorkbenchTypePy,
 };
 
 mod world_db {
@@ -2468,7 +2466,7 @@ fn the_blockheads_tools_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PigmentColorPy>()?;
 
     m.add_class::<ItemPy>()?;
-    m.add_class::<StackedItemPy>()?;
+    m.add_class::<SlotPy>()?;
     m.add_class::<BasketExtraPy>()?;
     m.add_class::<InventoryPy>()?;
     m.add_class::<ChestExtraPy>()?;

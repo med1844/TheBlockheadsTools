@@ -1,4 +1,4 @@
-from the_blockheads_tools_py import Inventory, StackedItem, Item, ItemType
+from the_blockheads_tools_py import Inventory, Slot, Item, ItemType
 import pytest
 
 def test_inventory_creation():
@@ -7,10 +7,10 @@ def test_inventory_creation():
     assert len(inv) == 8
     for i in range(8):
         assert len(inv[i]) == 0
-        assert isinstance(inv[i], StackedItem)
+        assert isinstance(inv[i], Slot)
 
     # Creation with slots
-    slots = [StackedItem([Item(ItemType.Flint)]) for _ in range(8)]
+    slots = [Slot([Item(ItemType.Flint)]) for _ in range(8)]
     inv = Inventory(slots)
     assert len(inv) == 8
     assert len(inv[0]) == 1
@@ -21,26 +21,26 @@ def test_inventory_creation_errors():
         Inventory([])
 
     with pytest.raises(ValueError, match="Inventory must have exactly 8 slots"):
-        Inventory([StackedItem()] * 7)
+        Inventory([Slot()] * 7)
 
 def test_inventory_access():
     inv = Inventory()
     item = Item(ItemType.Apple)
-    stacked = StackedItem([item])
+    slot = Slot([item])
 
-    inv[0] = stacked
-    assert inv[0] is stacked
+    inv[0] = slot
+    assert inv[0] is slot
     assert inv[0][0] is item
 
     # Negative indexing
-    inv[-1] = stacked
-    assert inv[7] is stacked
+    inv[-1] = slot
+    assert inv[7] is slot
 
     # Out of bounds
     with pytest.raises(IndexError):
         _ = inv[8]
     with pytest.raises(IndexError):
-        inv[-9] = stacked
+        inv[-9] = slot
 
 def test_inventory_identity():
     inv = Inventory()
@@ -58,4 +58,4 @@ def test_inventory_repr():
     inv = Inventory()
     r = repr(inv)
     assert "Inventory(slots=[" in r
-    assert "StackedItem(items=[])" in r
+    assert "Slot(items=[])" in r

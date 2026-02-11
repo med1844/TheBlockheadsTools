@@ -483,7 +483,7 @@ pub struct ChestData {
     #[serde(flatten)]
     pub parent: InteractionObject,
     pub chest_type: ChestType,
-    pub save_item_slots: [StackedItem; Self::NUM_SLOTS],
+    pub save_item_slots: [Slot; Self::NUM_SLOTS],
     #[serde(rename = "ownerID")]
     pub owner_id: String,
 }
@@ -565,7 +565,7 @@ pub struct WorkbenchData {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Extra {
-    Basket([StackedItem; Self::NUM_SLOT_BASKET]),
+    Basket([Slot; Self::NUM_SLOT_BASKET]),
     Chest(Box<ChestData>),
     Workbench(Box<WorkbenchData>),
 }
@@ -860,28 +860,28 @@ impl Display for Item {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct StackedItem(pub Vec<Item>); // TODO consider switch to smallvec
+pub struct Slot(pub Vec<Item>); // TODO consider switch to smallvec
 
-impl StackedItem {
+impl Slot {
     pub fn new(items: Vec<Item>) -> Self {
         Self(items)
     }
 }
 
-impl Deref for StackedItem {
+impl Deref for Slot {
     type Target = Vec<Item>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl DerefMut for StackedItem {
+impl DerefMut for Slot {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
-impl Display for StackedItem {
+impl Display for Slot {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(item) = self.first() {
             let all_same_type = self.iter().all(|other| item.type_id == other.type_id);
@@ -904,14 +904,14 @@ impl Display for StackedItem {
 // An inventory of a blockhead
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct Inventory(pub [StackedItem; Self::NUM_SLOTS]);
+pub struct Inventory(pub [Slot; Self::NUM_SLOTS]);
 
 impl Inventory {
     pub const NUM_SLOTS: usize = 8;
 }
 
 impl Deref for Inventory {
-    type Target = [StackedItem; Self::NUM_SLOTS];
+    type Target = [Slot; Self::NUM_SLOTS];
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -932,8 +932,8 @@ impl Display for Inventory {
 #[cfg(test)]
 mod tests {
     use super::{
-        ChestData, ChestType, Extra, Inventory, Item, ItemType, PigmentColor, StackedItem,
-        WorkbenchData, WorkbenchType,
+        ChestData, ChestType, Extra, Inventory, Item, ItemType, PigmentColor, Slot, WorkbenchData,
+        WorkbenchType,
     };
 
     #[test]
@@ -1009,8 +1009,8 @@ mod tests {
             padding: 0,
             extra: None,
         };
-        let mut basket_items = [const { StackedItem(vec![]) }; 4];
-        basket_items[0] = StackedItem(vec![item_in_basket]);
+        let mut basket_items = [const { Slot(vec![]) }; 4];
+        basket_items[0] = Slot(vec![item_in_basket]);
 
         let item = Item {
             type_id: ItemType::Basket as u16,
@@ -1042,7 +1042,7 @@ mod tests {
                 paint_color: 0,
             },
             chest_type: ChestType::Standard,
-            save_item_slots: [const { StackedItem(vec![]) }; 16],
+            save_item_slots: [const { Slot(vec![]) }; 16],
             owner_id: "test_owner".to_string(),
         };
 
@@ -1108,7 +1108,7 @@ mod tests {
     }
 
     #[test]
-    fn test_stacked_item_serialization() {
+    fn test_slot_serialization() {
         let item = Item {
             type_id: ItemType::Flint as u16,
             data_a: 0,
@@ -1117,10 +1117,10 @@ mod tests {
             padding: 0,
             extra: None,
         };
-        let stacked = StackedItem(vec![item]);
-        let serialized = plist::to_value(&stacked).unwrap();
-        let deserialized: StackedItem = plist::from_value(&serialized).unwrap();
-        assert_eq!(stacked, deserialized);
+        let slot = Slot(vec![item]);
+        let serialized = plist::to_value(&slot).unwrap();
+        let deserialized: Slot = plist::from_value(&serialized).unwrap();
+        assert_eq!(slot, deserialized);
     }
 
     #[test]
