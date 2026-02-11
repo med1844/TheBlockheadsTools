@@ -7,7 +7,7 @@ use lib::game::{
     },
 };
 use num_enum::TryFromPrimitive;
-use pyo3::exceptions::PyValueError;
+use pyo3::exceptions::{PyIndexError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 
 #[pyclass(eq, eq_int, name = "ItemType")]
@@ -1273,6 +1273,166 @@ impl ItemPy {
     }
 }
 
+#[pyclass(name = "Slot")]
+#[derive(Default)]
+pub struct SlotPy {
+    #[pyo3(get, set)]
+    pub items: Vec<Py<ItemPy>>,
+}
+
+impl std::fmt::Debug for SlotPy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SlotPy").field("items", &"<items>").finish()
+    }
+}
+
+impl SlotPy {
+    pub fn inflate(py: Python<'_>, slot: Slot) -> PyResult<Py<Self>> {
+        let mut items = Vec::with_capacity(slot.0.len());
+        for item in slot.0 {
+            items.push(ItemPy::inflate(py, item)?);
+        }
+        Py::new(py, Self { items })
+    }
+
+    pub fn deflate(&self, py: Python<'_>) -> Slot {
+        Slot(
+            self.items
+                .iter()
+                .map(|item_py| item_py.bind(py).borrow().deflate(py))
+                .collect(),
+        )
+    }
+}
+
+#[pyclass]
+pub struct SlotIterator {
+    slot: Py<SlotPy>,
+    index: usize,
+}
+
+#[pymethods]
+impl SlotIterator {
+    fn __iter__(slf: PyRef<'_, Self>) -> PyRef<'_, Self> {
+        slf
+    }
+
+    fn __next__(mut slf: PyRefMut<'_, Self>, py: Python<'_>) -> Option<Py<ItemPy>> {
+        let slot_obj = slf.slot.clone_ref(py);
+        let slot = slot_obj.borrow(py);
+        if slf.index < slot.items.len() {
+            let item = slot.items[slf.index].clone_ref(py);
+            slf.index += 1;
+            Some(item)
+        } else {
+            None
+        }
+    }
+}
+
+#[pymethods]
+impl SlotPy {
+    #[new]
+    #[pyo3(signature = (items=None))]
+    fn new(items: Option<Vec<Py<ItemPy>>>) -> Self {
+        Self {
+            items: items.unwrap_or_default(),
+        }
+    }
+
+    fn __len__(&self) -> usize {
+        self.items.len()
+    }
+
+    fn __getitem__(&self, py: Python<'_>, mut index: isize) -> PyResult<Py<ItemPy>> {
+        if index < 0 {
+            index += self.items.len() as isize;
+        }
+        if index < 0 || index >= self.items.len() as isize {
+            return Err(pyo3::exceptions::PyIndexError::new_err(
+                "index out of range",
+            ));
+        }
+        Ok(self.items[index as usize].clone_ref(py))
+    }
+
+    fn __setitem__(&mut self, mut index: isize, value: Py<ItemPy>) -> PyResult<()> {
+        if index < 0 {
+            index += self.items.len() as isize;
+        }
+        if index < 0 || index >= self.items.len() as isize {
+            return Err(pyo3::exceptions::PyIndexError::new_err(
+                "index out of range",
+            ));
+        }
+        self.items[index as usize] = value;
+        Ok(())
+    }
+
+    fn __delitem__(&mut self, mut index: isize) -> PyResult<()> {
+        if index < 0 {
+            index += self.items.len() as isize;
+        }
+        if index < 0 || index >= self.items.len() as isize {
+            return Err(pyo3::exceptions::PyIndexError::new_err(
+                "index out of range",
+            ));
+        }
+        self.items.remove(index as usize);
+        Ok(())
+    }
+
+    fn append(&mut self, item: Py<ItemPy>) {
+        self.items.push(item);
+    }
+
+    fn extend(&mut self, items: Vec<Py<ItemPy>>) {
+        self.items.extend(items);
+    }
+
+    fn insert(&mut self, index: isize, item: Py<ItemPy>) {
+         let len = self.items.len() as isize;
+         let idx = if index < 0 {
+             let i = index + len;
+             if i < 0 { 0 } else { i }
+         } else {
+             if index > len { len } else { index }
+         };
+         self.items.insert(idx as usize, item);
+    }
+
+    #[pyo3(signature = (index=None))]
+    fn pop(&mut self, index: Option<isize>) -> PyResult<Py<ItemPy>> {
+        let idx = index.unwrap_or(-1);
+        let len = self.items.len() as isize;
+        let idx = if idx < 0 { idx + len } else { idx };
+        if idx < 0 || idx >= len {
+             return Err(PyIndexError::new_err("pop index out of range"));
+        }
+        Ok(self.items.remove(idx as usize))
+    }
+
+    fn clear(&mut self) {
+        self.items.clear();
+    }
+
+    fn __iter__(slf: PyRef<'_, Self>) -> PyResult<SlotIterator> {
+         Ok(SlotIterator {
+             slot: slf.into(),
+             index: 0,
+         })
+    }
+
+    fn __repr__(&self, py: Python<'_>) -> String {
+        let items_repr: Vec<String> = self
+            .items
+            .iter()
+            .map(|item| format!("{:?}", item.bind(py).borrow()))
+            .collect();
+        format!("Slot(items=[{}])", items_repr.join(", "))
+    }
+}
+
 #[pyclass(name = "Inventory")]
 #[derive(Debug)]
 pub struct InventoryPy {
@@ -1375,86 +1535,5 @@ impl InventoryPy {
             })
             .collect();
         format!("Inventory(slots=[{}])", slots_repr.join(", "))
-    }
-}
-
-#[pyclass(name = "Slot")]
-#[derive(Default)]
-pub struct SlotPy {
-    #[pyo3(get, set)]
-    pub items: Vec<Py<ItemPy>>,
-}
-
-impl std::fmt::Debug for SlotPy {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("SlotPy").field("items", &"<items>").finish()
-    }
-}
-
-impl SlotPy {
-    pub fn inflate(py: Python<'_>, slot: Slot) -> PyResult<Py<Self>> {
-        let mut items = Vec::with_capacity(slot.0.len());
-        for item in slot.0 {
-            items.push(ItemPy::inflate(py, item)?);
-        }
-        Py::new(py, Self { items })
-    }
-
-    pub fn deflate(&self, py: Python<'_>) -> Slot {
-        Slot(
-            self.items
-                .iter()
-                .map(|item_py| item_py.bind(py).borrow().deflate(py))
-                .collect(),
-        )
-    }
-}
-
-#[pymethods]
-impl SlotPy {
-    #[new]
-    #[pyo3(signature = (items=None))]
-    fn new(items: Option<Vec<Py<ItemPy>>>) -> Self {
-        Self {
-            items: items.unwrap_or_default(),
-        }
-    }
-
-    fn __len__(&self) -> usize {
-        self.items.len()
-    }
-
-    fn __getitem__(&self, py: Python<'_>, mut index: isize) -> PyResult<Py<ItemPy>> {
-        if index < 0 {
-            index += self.items.len() as isize;
-        }
-        if index < 0 || index >= self.items.len() as isize {
-            return Err(pyo3::exceptions::PyIndexError::new_err(
-                "index out of range",
-            ));
-        }
-        Ok(self.items[index as usize].clone_ref(py))
-    }
-
-    fn __setitem__(&mut self, mut index: isize, value: Py<ItemPy>) -> PyResult<()> {
-        if index < 0 {
-            index += self.items.len() as isize;
-        }
-        if index < 0 || index >= self.items.len() as isize {
-            return Err(pyo3::exceptions::PyIndexError::new_err(
-                "index out of range",
-            ));
-        }
-        self.items[index as usize] = value;
-        Ok(())
-    }
-
-    fn __repr__(&self, py: Python<'_>) -> String {
-        let items_repr: Vec<String> = self
-            .items
-            .iter()
-            .map(|item| format!("{:?}", item.bind(py).borrow()))
-            .collect();
-        format!("Slot(items=[{}])", items_repr.join(", "))
     }
 }

@@ -273,3 +273,74 @@ def test_workbench_integration():
             assert wt == WorkbenchType.Easel
         case _:
             pytest.fail("Should have matched WorkbenchExtra")
+
+def test_slot_sequence_protocol():
+    slot = Slot()
+    assert len(slot) == 0
+    item = Item(ItemType.Apple)
+    
+    slot.append(item)
+    assert len(slot) == 1
+    assert slot[0].item_type == ItemType.Apple
+    assert slot[0] is item
+
+    newItem = Item(ItemType.Mango)
+    slot[0] = newItem
+    assert slot[0] is newItem
+    assert slot[0].item_type == ItemType.Mango
+    
+    del slot[0]
+    assert len(slot) == 0
+
+    with pytest.raises(TypeError):
+        _ = slot[0:1]
+    with pytest.raises(TypeError):
+        slot[0:1] = [item]
+    with pytest.raises(TypeError):
+        del slot[0:1]
+
+def test_slot_mutators():
+    slot = Slot()
+    i1 = Item(ItemType.Apple)
+    i2 = Item(ItemType.Mango)
+    i3 = Item(ItemType.Flint)
+
+    slot.append(i1)
+    assert len(slot) == 1
+    assert slot[-1] is i1
+
+    slot.extend([i2, i3])
+    assert len(slot) == 3
+    assert slot[1] is i2
+    assert slot[2] is i3
+
+    i4 = Item(ItemType.Stick)
+    slot.insert(1, i4) # [Apple, Stick, Mango, Flint]
+    assert len(slot) == 4
+    assert slot[0] is i1
+    assert slot[1] is i4
+    assert slot[2] is i2
+    assert slot[3] is i3
+
+    popped = slot.pop(1)
+    assert popped is i4
+    assert len(slot) == 3
+    assert slot[1] is i2
+
+    popped_last = slot.pop()
+    assert popped_last is i3
+    assert len(slot) == 2
+
+    slot.clear()
+    assert len(slot) == 0
+
+def test_slot_iterator():
+    slot = Slot()
+    items = [Item(ItemType.Apple), Item(ItemType.Mango)]
+    slot.extend(items)
+
+    iterated = list(slot)
+    assert len(iterated) == 2
+    assert iterated[0] is items[0]
+    assert iterated[1] is items[1]
+
