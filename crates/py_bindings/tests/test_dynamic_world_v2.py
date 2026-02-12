@@ -4,7 +4,7 @@ from constants import WORLD_DB_PATH
 
 
 def test_dynamic_world_v2_read():
-    world_db = WorldDb.open(WORLD_DB_PATH)
+    world_db = WorldDb.open_path(WORLD_DB_PATH)
     dynamic_world_v2 = world_db.main.dynamic_world_v2
     assert dynamic_world_v2.active_blockhead_index == 0
     assert dynamic_world_v2.dynamic_object_id_count == 515
@@ -14,7 +14,7 @@ def test_dynamic_world_v2_read():
 
 
 def test_dynamic_world_v2_write():
-    world_db = WorldDb.open(WORLD_DB_PATH)
+    world_db = WorldDb.open_path(WORLD_DB_PATH)
     dynamic_world_v2 = world_db.main.dynamic_world_v2
 
     dynamic_world_v2.active_blockhead_index = 100

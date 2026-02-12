@@ -550,20 +550,38 @@ pub struct WorldDbPy {
 #[pymethods]
 impl WorldDbPy {
     #[staticmethod]
-    fn open(path: &str) -> PyResult<Self> {
+    fn open_path(path: std::path::PathBuf) -> PyResult<Self> {
         let world_db = WorldDb::from_path(path).map_err(into_py_err)?;
         Ok(Self {
             inner: Arc::new(RwLock::new(world_db)),
         })
     }
 
-    fn save(&self, path: &str) -> PyResult<()> {
+    fn save_path(&self, path: std::path::PathBuf) -> PyResult<()> {
         self.inner
             .read()
             .unwrap()
             .to_path(path)
             .map_err(into_py_err)?;
         Ok(())
+    }
+
+    #[staticmethod]
+    fn open_bytes(data: Vec<u8>) -> PyResult<Self> {
+        let world_db = WorldDb::from_bytes(&data).map_err(into_py_err)?;
+        Ok(Self {
+            inner: Arc::new(RwLock::new(world_db)),
+        })
+    }
+
+    fn save_bytes(&'_ self) -> PyResult<Cow<'_, [u8]>> {
+        let mut data = Vec::new();
+        self.inner
+            .read()
+            .unwrap()
+            .write_to(&mut data)
+            .map_err(into_py_err)?;
+        Ok(Cow::Owned(data))
     }
 
     #[getter]

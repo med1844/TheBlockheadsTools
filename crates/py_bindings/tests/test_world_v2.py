@@ -4,7 +4,7 @@ from constants import WORLD_DB_PATH
 
 
 def test_world_v2_read():
-    world_db = WorldDb.open(WORLD_DB_PATH)
+    world_db = WorldDb.open_path(WORLD_DB_PATH)
     world_v2 = world_db.main.world_v2
 
     assert world_v2.expert_mode == False
@@ -30,7 +30,7 @@ def test_world_v2_read():
 
 
 def test_world_v2_write():
-    world_db = WorldDb.open(WORLD_DB_PATH)
+    world_db = WorldDb.open_path(WORLD_DB_PATH)
     world_v2 = world_db.main.world_v2
     with pytest.raises(TypeError):
         world_v2.host_port = 12345  # ty: ignore[invalid-assignment]

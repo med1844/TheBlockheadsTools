@@ -4,7 +4,7 @@ from constants import WORLD_DB_PATH
 
 
 def test_world_db_main():
-    main = WorldDb.open(WORLD_DB_PATH).main
+    main = WorldDb.open_path(WORLD_DB_PATH).main
     # blockheads is now a list of BlockheadPy
     assert isinstance(main.blockheads, list)
     with pytest.raises(AttributeError):
@@ -15,7 +15,7 @@ def test_world_db_main():
         assert isinstance(main.blockheads[0].name, str)
 
 def test_inventories():
-    db = WorldDb.open(WORLD_DB_PATH)
+    db = WorldDb.open_path(WORLD_DB_PATH)
     inv_keys = db.main.blockhead_inventory_keys
     assert isinstance(inv_keys, set)
 

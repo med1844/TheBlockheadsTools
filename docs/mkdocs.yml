@@ -1,12 +1,60 @@
 site_name: TheBlockheadsTools Docs
 theme:
   name: material
+  features:
+    - navigation.path
+    - navigation.instant
+    - navigation.instant.prefetch
+    - navigation.instant.progress
+    - navigation.sections
+    - navigation.indexes
+    - navigation.tracking
+    - content.code.annotate
+    - toc.follow
+    - navigation.footer
+    - navigation.top
+    - content.code.copy
+    - content.tabs.link
+  palette:
+    # https://squidfunk.github.io/mkdocs-material/setup/changing-the-colors/#automatic-light-dark-mode
+    # Palette toggle for automatic mode
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+
+    # Palette toggle for light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default 
+      primary: blue
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to dark mode
+
+    # Palette toggle for dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: blue
+      toggle:
+        icon: material/weather-night
+        name: Switch to system preference
 site_url: https://med1844.github.io/TheBlockheadsTools/docs/
 site_dir: site/docs
 docs_dir: src
 nav:
   - Introduction: index.md
   - Getting started:
+    - First steps: getting-started/first-steps.md
     - Examples: getting-started/examples.md
   - Guides:
     - Setup Emulator: guides/setup-emulator.md
+markdown_extensions:
+  - pymdownx.snippets:
+      base_path: ["../crates/py_bindings/examples/"]
+      check_paths: true
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+      use_pygments: true
+      pygments_lang_class: true
+  - pymdownx.inlinehilite

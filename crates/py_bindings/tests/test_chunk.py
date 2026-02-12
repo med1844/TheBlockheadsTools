@@ -12,7 +12,7 @@ from constants import WORLD_DB_PATH
 
 
 def test_chunks():
-    world_db = WorldDb.open(WORLD_DB_PATH)
+    world_db = WorldDb.open_path(WORLD_DB_PATH)
     chunks = world_db.chunks
     assert isinstance(chunks, Chunks)
 
