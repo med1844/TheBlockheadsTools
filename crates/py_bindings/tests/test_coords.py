@@ -46,6 +46,11 @@ def test_block_coord():
     assert str(coord) == "BlockCoord(12345, 678)"
     assert coord.x == 12345
     assert coord.y == 678
+    chunk_coord, chunk_block_coord = coord.decompose()
+    assert chunk_coord.x == 385
+    assert chunk_coord.y == 21
+    assert chunk_block_coord.x == 25
+    assert chunk_block_coord.y == 6
 
     with pytest.raises(AttributeError):
         coord.x = 5  # ty: ignore[invalid-assignment]

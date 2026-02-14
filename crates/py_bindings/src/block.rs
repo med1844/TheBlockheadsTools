@@ -1,11 +1,13 @@
-use super::{into_py_err, lib, InvalidAccessorError, SharedWorldDb};
-use lib::game::{block::BlockType, coord::BlockCoord};
+use super::{chunk::ChunkPy, into_py_err, lib};
+use lib::game::{
+    block::{Block, BlockContentType, BlockMut, BlockType, BlockView, BlockViewMut},
+    coord::ChunkBlockCoord,
+};
 use num_enum::TryFromPrimitive;
 use pyo3::prelude::*;
-use the_blockheads_tools_lib::game::block::Block;
 
 #[pyclass(eq, eq_int, name = "BlockType")]
-#[derive(PartialEq, TryFromPrimitive)]
+#[derive(Clone, Copy, PartialEq, TryFromPrimitive)]
 #[repr(u8)]
 pub enum BlockTypePy {
     Stone = 1,
@@ -83,6 +85,16 @@ pub enum BlockTypePy {
     LuminousPlaster = 77,
 }
 
+#[pymethods]
+impl BlockTypePy {
+    #[new]
+    fn new(value: u8) -> PyResult<Self> {
+        Self::try_from(value).map_err(|_| {
+            pyo3::exceptions::PyValueError::new_err(format!("Invalid BlockType value: {}", value))
+        })
+    }
+}
+
 impl From<BlockType> for BlockTypePy {
     fn from(value: BlockType) -> Self {
         Self::try_from(value as u8).expect("Enums are out of sync!")
@@ -91,33 +103,214 @@ impl From<BlockType> for BlockTypePy {
 
 impl From<BlockTypePy> for BlockType {
     fn from(val: BlockTypePy) -> Self {
-        BlockType::try_from(val as u8).expect("Enums are out of sync!")
+        Self::try_from(val as u8).expect("Enums are out of sync!")
+    }
+}
+
+impl From<BlockTypePy> for u8 {
+    fn from(value: BlockTypePy) -> Self {
+        value as u8
+    }
+}
+
+#[pyclass(eq, eq_int, name = "BlockContentType")]
+#[derive(Clone, Copy, PartialEq, TryFromPrimitive)]
+#[repr(u8)]
+pub enum BlockContentTypePy {
+    Nothing = 0,
+    Flint = 1,
+    Clay = 2,
+    AppleTreeLeaf = 3,
+    AppleTreeTrunk = 4,
+    AppleTreeTrunkLeaf = 5,
+    PineTreeLeaf = 6,
+    PineTreeTrunk = 7,
+    PineTreeTrunkLeaf = 8,
+    MapleTreeLeaf = 9,
+    MapleTreeTrunk = 10,
+    MapleTreeTrunkLeaf = 11,
+    MangoTreeLeaf = 12,
+    MangoTreeTrunk = 13,
+    MangoTreeTrunkLeaf = 14,
+    CoconutTreeLeaf = 15,
+    CoconutTreeTrunk = 16,
+    OrangeTreeLeaf = 18,
+    OrangeTreeTrunk = 19,
+    OrangeTreeTrunkLeaf = 20,
+    CherryTreeLeaf = 21,
+    CherryTreeTrunk = 22,
+    CherryTreeTrunkLeaf = 23,
+    CoffeeTreeLeaf = 24,
+    CoffeeTreeTrunk = 25,
+    CoffeeTreeTrunkLeaf = 26,
+    DeadPineTreeTrunk = 29,
+    DeadPineTreeLeaf = 34,
+    DeadOrangeTreeLeaf = 37,
+    DeadOrangeTreeTrunk = 38,
+    DeadCherryTreeLeaf = 39,
+    DeadCherryTreeTrunk = 40,
+    Cactus = 43,
+    DeadCactus = 44,
+    Workbench = 46,
+    WorkbenchSprite = 47,
+    CopperOre = 61,
+    TinOre = 62,
+    IronOre = 63,
+    Oil = 64,
+    Coal = 65,
+    GoldNuggets = 77,
+    LimeTreeLeaf = 89,
+    LimeTreeTrunk = 90,
+    LimeTreeTrunkLeaf = 91,
+    DeadLimeTreeLeaf = 92,
+    DeadLimeTreeTrunk = 93,
+    GoldChest = 94,
+    PlatinumOre = 106,
+    TitaniumOre = 107,
+    AmethystTreeTrunk = 109,
+    AmethystTreeLeaf = 110,
+    AmethystTreeTrunkLeaf = 111,
+    SapphireTreeTrunk = 112,
+    SapphireTreeLeaf = 113,
+    SapphireTreeTrunkLeaf = 114,
+    EmeraldTreeTrunk = 115,
+    EmeraldTreeLeaf = 116,
+    EmeraldTreeTrunkLeaf = 117,
+    RubyTreeTrunk = 118,
+    RubyTreeLeaf = 119,
+    RubyTreeTrunkLeaf = 120,
+    DiamondTreeTrunk = 121,
+    DiamondTreeLeaf = 122,
+    DiamondTreeTrunkLeaf = 123,
+}
+
+#[pymethods]
+impl BlockContentTypePy {
+    #[new]
+    fn new(value: u8) -> PyResult<Self> {
+        Self::try_from(value).map_err(|_| {
+            pyo3::exceptions::PyValueError::new_err(format!("Invalid BlockType value: {}", value))
+        })
+    }
+}
+
+impl From<BlockContentType> for BlockContentTypePy {
+    fn from(value: BlockContentType) -> Self {
+        Self::try_from(value as u8).expect("Enums are out of sync!")
+    }
+}
+
+impl From<BlockContentTypePy> for BlockContentType {
+    fn from(val: BlockContentTypePy) -> Self {
+        Self::try_from(val as u8).expect("Enums are out of sync!")
+    }
+}
+
+impl From<BlockContentTypePy> for u8 {
+    fn from(value: BlockContentTypePy) -> Self {
+        value as u8
     }
 }
 
 #[pyclass(name = "Block")]
 pub struct BlockPy {
-    pub(crate) world_db: SharedWorldDb,
-    pub(crate) block_coord: BlockCoord,
+    pub(crate) chunk: Py<ChunkPy>,
+    pub(crate) coord: ChunkBlockCoord,
+}
+
+impl BlockPy {
+    fn read<O, F: Fn(BlockView) -> O>(&self, py: Python<'_>, f: F) -> O {
+        let chunk_py = self.chunk.borrow(py);
+        let chunk = chunk_py.inner();
+        f(chunk.view().block_at(self.coord))
+    }
+
+    fn write<O, F: FnOnce(BlockViewMut) -> O>(&self, py: Python<'_>, f: F) -> O {
+        let mut chunk_py = self.chunk.borrow_mut(py);
+        let chunk = chunk_py.inner_mut();
+        f(chunk.view_mut().block_at_mut(self.coord))
+    }
 }
 
 #[pymethods]
 impl BlockPy {
-    fn fg(&self) -> PyResult<BlockTypePy> {
-        let mut world_db = self.world_db.write().unwrap();
-        let mut chunk_buffer = Vec::new();
-        let block = world_db
-            .chunks
-            .block_at(self.block_coord, &mut chunk_buffer);
-        match block {
-            Some(block) => {
-                let fg_type = block.map_err(into_py_err)?.fg().map_err(into_py_err)?;
-                Ok(fg_type.into())
-            }
-            None => Err(InvalidAccessorError::new_err(format!(
-                "The block at {} doesn't exist.",
-                self.block_coord
-            ))),
-        }
+    fn fg_raw(&self, py: Python<'_>) -> u8 {
+        self.read(py, |block_view| block_view.fg_raw())
+    }
+
+    fn bg_raw(&self, py: Python<'_>) -> u8 {
+        self.read(py, |block_view| block_view.bg_raw())
+    }
+
+    fn content_raw(&self, py: Python<'_>) -> u8 {
+        self.read(py, |block_view| block_view.content_raw())
+    }
+
+    fn fg(&self, py: Python<'_>) -> PyResult<BlockTypePy> {
+        self.read(py, |block_view| {
+            block_view.fg().map(Into::into).map_err(into_py_err)
+        })
+    }
+
+    fn set_fg(&self, py: Python<'_>, block_type: &BlockTypePy) {
+        self.write(py, |mut block_view_mut| block_view_mut.set_fg(*block_type))
+    }
+
+    fn bg(&self, py: Python<'_>) -> PyResult<BlockTypePy> {
+        self.read(py, |block_view| {
+            block_view.bg().map(Into::into).map_err(into_py_err)
+        })
+    }
+
+    fn set_bg(&self, py: Python<'_>, block_type: &BlockTypePy) {
+        self.write(py, |mut block_view_mut| block_view_mut.set_bg(*block_type))
+    }
+
+    fn content(&self, py: Python<'_>) -> PyResult<BlockContentTypePy> {
+        self.read(py, |block_view| {
+            block_view.content().map(Into::into).map_err(into_py_err)
+        })
+    }
+
+    fn set_content(&self, py: Python<'_>, block_content_type: &BlockContentTypePy) {
+        self.write(py, |mut block_view_mut| {
+            block_view_mut.set_content(*block_content_type)
+        })
+    }
+
+    fn height(&self, py: Python<'_>) -> u8 {
+        self.read(py, |block_view| block_view.height())
+    }
+
+    fn set_height(&self, py: Python<'_>, height: u8) {
+        self.write(py, |mut block_view_mut| block_view_mut.set_height(height))
+    }
+
+    fn damage(&self, py: Python<'_>) -> u8 {
+        self.read(py, |block_view| block_view.damage())
+    }
+
+    fn set_damage(&self, py: Python<'_>, damage: u8) {
+        self.write(py, |mut block_view_mut| block_view_mut.set_damage(damage))
+    }
+
+    fn visibility(&self, py: Python<'_>) -> u8 {
+        self.read(py, |block_view| block_view.visibility())
+    }
+
+    fn set_visibility(&self, py: Python<'_>, visibility: u8) {
+        self.write(py, |mut block_view_mut| {
+            block_view_mut.set_visibility(visibility)
+        })
+    }
+
+    fn brightness(&self, py: Python<'_>) -> u8 {
+        self.read(py, |block_view| block_view.brightness())
+    }
+
+    fn set_brightness(&self, py: Python<'_>, brightness: u8) {
+        self.write(py, |mut block_view_mut| {
+            block_view_mut.set_brightness(brightness)
+        })
     }
 }

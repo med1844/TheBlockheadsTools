@@ -14,7 +14,7 @@ use std::path::PathBuf;
 #[cfg(target_arch = "wasm32")]
 use std::sync::mpsc::{Receiver, Sender, channel};
 use the_blockheads_tools_lib::{
-    BhError, BhResult,
+    BhError, BhResult, DynArch,
     game::{
         block::{Block, BlockView},
         chunk::Chunk,
@@ -255,8 +255,9 @@ impl EditorApp {
                         // TODO if world_db is empty we should return as error
                         if let Some(world_db) = self.world_db.as_ref()
                             && let Some(save_path) = rfd::FileDialog::new().pick_folder()
-                            && let Err(e) = world_db.to_path(save_path)
+                            && let Err(e) = world_db.to_path(save_path, DynArch::Arch64)
                         {
+                            // TODO allow user select arch
                             self.save_err = Some(e);
                         }
                     }
@@ -280,7 +281,7 @@ impl EditorApp {
                         && let Some(world_db) = self.world_db.as_ref()
                     {
                         let mut out_bytes = Vec::new();
-                        match world_db.write_to(&mut out_bytes) {
+                        match world_db.write_to(&mut out_bytes, DynArch::Arch64) {
                             Ok(()) => {
                                 let task = rfd::AsyncFileDialog::new()
                                     .set_file_name("data.mdb")
@@ -371,7 +372,7 @@ impl EditorApp {
         if let Some(selected_chunk) = self.selected_chunk.as_ref()
             && let Some(selected_block_coord) = self.selected_block_coord.coord()
         {
-            let block = selected_chunk.as_slice().block_at(selected_block_coord);
+            let block = selected_chunk.view().block_at(selected_block_coord);
             ui.separator();
             ui.heading(format!(
                 "Block {}, {}",

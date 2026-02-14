@@ -57,12 +57,11 @@ fn the_blockheads_tools_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<coord::ChunkCoordPy>()?;
 
     m.add_class::<block::BlockTypePy>()?;
+    m.add_class::<block::BlockContentTypePy>()?;
     m.add_class::<block::BlockPy>()?;
 
     m.add_class::<chunk::ChunkPy>()?;
     m.add_class::<chunk::ChunksPy>()?;
-
-    m.add_class::<world_db::WorldDbPy>()?;
 
     m.add_class::<item::ItemTypePy>()?;
     m.add_class::<item::ChestTypePy>()?;
@@ -79,6 +78,9 @@ fn the_blockheads_tools_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<world_db::WorldV2Py>()?;
     m.add_class::<world_db::DynamicWorldV2Py>()?;
     m.add_class::<world_db::BlockheadPy>()?;
+
+    m.add_class::<world_db::ArchPy>()?;
+    m.add_class::<world_db::WorldDbPy>()?;
 
     Ok(())
 }

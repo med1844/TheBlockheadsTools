@@ -9,6 +9,7 @@ save_structure*
 *.png
 !crates/gui/resources/*.png
 !docs/src/assets/*.png
+crates/py_bindings/examples/output
 server
 test.py
 lock.mdb

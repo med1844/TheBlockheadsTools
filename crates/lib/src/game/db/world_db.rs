@@ -41,8 +41,8 @@ impl WorldDb {
         Ok(Self { chunks, dw, main })
     }
 
-    pub fn write_to<W: Write>(&self, writer: W) -> BhResult<()> {
-        let mut env = EnvWrite::new(writer, DynArch::Arch64);
+    pub fn write_to<W: Write>(&self, writer: W, arch: DynArch) -> BhResult<()> {
+        let mut env = EnvWrite::new(writer, arch);
 
         let mut wtxn = env.write_txn()?;
 
@@ -66,8 +66,8 @@ impl WorldDb {
         Self::from_bytes(&data)
     }
 
-    pub fn to_path<P: AsRef<Path>>(&self, path: P) -> BhResult<()> {
+    pub fn to_path<P: AsRef<Path>>(&self, path: P, arch: DynArch) -> BhResult<()> {
         let file = File::create_new(path.as_ref().join("data.mdb"))?;
-        self.write_to(file)
+        self.write_to(file, arch)
     }
 }

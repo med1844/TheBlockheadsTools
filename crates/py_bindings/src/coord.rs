@@ -96,6 +96,16 @@ impl BlockCoordPy {
         self.inner.y()
     }
 
+    fn decompose(&self) -> (ChunkCoordPy, ChunkBlockCoordPy) {
+        let (chunk_coord, chunk_block_coord) = self.inner.decompose();
+        (
+            ChunkCoordPy { inner: chunk_coord },
+            ChunkBlockCoordPy {
+                inner: chunk_block_coord,
+            },
+        )
+    }
+
     fn __str__(&self) -> String {
         self.inner.to_string()
     }

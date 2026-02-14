@@ -451,7 +451,7 @@ impl From<ItemType> for ItemTypePy {
 
 impl From<ItemTypePy> for ItemType {
     fn from(val: ItemTypePy) -> Self {
-        ItemType::try_from(val as u16).expect("Enums are out of sync!")
+        Self::try_from(val as u16).expect("Enums are out of sync!")
     }
 }
 
@@ -476,7 +476,7 @@ impl From<ChestType> for ChestTypePy {
 
 impl From<ChestTypePy> for ChestType {
     fn from(val: ChestTypePy) -> Self {
-        ChestType::from(val as u8)
+        Self::from(val as u8)
     }
 }
 
@@ -526,7 +526,7 @@ impl From<WorkbenchType> for WorkbenchTypePy {
 
 impl From<WorkbenchTypePy> for WorkbenchType {
     fn from(val: WorkbenchTypePy) -> Self {
-        WorkbenchType::from(val as u8)
+        Self::from(val as u8)
     }
 }
 
@@ -553,7 +553,7 @@ impl From<PigmentColor> for PigmentColorPy {
 
 impl From<PigmentColorPy> for PigmentColor {
     fn from(val: PigmentColorPy) -> Self {
-        PigmentColor::try_from(val as u8).expect("Enums are out of sync!")
+        Self::try_from(val as u8).expect("Enums are out of sync!")
     }
 }
 

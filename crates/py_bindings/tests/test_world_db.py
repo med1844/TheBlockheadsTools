@@ -1,4 +1,4 @@
-from the_blockheads_tools_py import WorldDb
+from the_blockheads_tools_py import WorldDb, Arch
 from constants import WORLD_DB_PATH
 from pathlib import Path
 
@@ -30,7 +30,7 @@ def test_world_db_bytes():
     world_db.chunks
 
     # and we can save it to bytes
-    saved_data = world_db.save_bytes()
+    saved_data = world_db.save_bytes(Arch.Arch64)
 
     # and the saved data should be valid
     world_db2 = WorldDb.open_bytes(saved_data)

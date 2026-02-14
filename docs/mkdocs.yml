@@ -25,7 +25,7 @@ theme:
 
     # Palette toggle for light mode
     - media: "(prefers-color-scheme: light)"
-      scheme: default 
+      scheme: default
       primary: blue
       toggle:
         icon: material/weather-sunny
@@ -49,9 +49,11 @@ nav:
   - Guides:
     - Setup Emulator: guides/setup-emulator.md
 markdown_extensions:
+  - admonition
   - pymdownx.snippets:
       base_path: ["../crates/py_bindings/examples/"]
       check_paths: true
+      dedent_subsections: true
   - pymdownx.superfences
   - pymdownx.highlight:
       anchor_linenums: true

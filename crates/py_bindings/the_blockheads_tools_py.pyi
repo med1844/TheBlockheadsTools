@@ -1,5 +1,6 @@
 from enum import Enum
 from typing import Optional, Self, Iterator
+from pathlib import Path
 
 
 class PigmentColor(Enum):
@@ -645,6 +646,7 @@ class BlockCoord:
     def x(self) -> int: ...
     @property
     def y(self) -> int: ...
+    def decompose(self) -> tuple[ChunkCoord, ChunkBlockCoord]: ...
     def __str__(self) -> str: ...
     def __repr__(self) -> str: ...
     def __hash__(self) -> int: ...
@@ -728,24 +730,106 @@ class BlockType(Enum):
     def __int__(self) -> int: ...
 
 
+class BlockContentType(Enum):
+    Nothing = 0
+    Flint = 1
+    Clay = 2
+    AppleTreeLeaf = 3
+    AppleTreeTrunk = 4
+    AppleTreeTrunkLeaf = 5
+    PineTreeLeaf = 6
+    PineTreeTrunk = 7
+    PineTreeTrunkLeaf = 8
+    MapleTreeLeaf = 9
+    MapleTreeTrunk = 10
+    MapleTreeTrunkLeaf = 11
+    MangoTreeLeaf = 12
+    MangoTreeTrunk = 13
+    MangoTreeTrunkLeaf = 14
+    CoconutTreeLeaf = 15
+    CoconutTreeTrunk = 16
+    OrangeTreeLeaf = 18
+    OrangeTreeTrunk = 19
+    OrangeTreeTrunkLeaf = 20
+    CherryTreeLeaf = 21
+    CherryTreeTrunk = 22
+    CherryTreeTrunkLeaf = 23
+    CoffeeTreeLeaf = 24
+    CoffeeTreeTrunk = 25
+    CoffeeTreeTrunkLeaf = 26
+    DeadPineTreeTrunk = 29
+    DeadPineTreeLeaf = 34
+    DeadOrangeTreeLeaf = 37
+    DeadOrangeTreeTrunk = 38
+    DeadCherryTreeLeaf = 39
+    DeadCherryTreeTrunk = 40
+    Cactus = 43
+    DeadCactus = 44
+    Workbench = 46
+    WorkbenchSprite = 47
+    CopperOre = 61
+    TinOre = 62
+    IronOre = 63
+    Oil = 64
+    Coal = 65
+    GoldNuggets = 77
+    LimeTreeLeaf = 89
+    LimeTreeTrunk = 90
+    LimeTreeTrunkLeaf = 91
+    DeadLimeTreeLeaf = 92
+    DeadLimeTreeTrunk = 93
+    GoldChest = 94
+    PlatinumOre = 106
+    TitaniumOre = 107
+    AmethystTreeTrunk = 109
+    AmethystTreeLeaf = 110
+    AmethystTreeTrunkLeaf = 111
+    SapphireTreeTrunk = 112
+    SapphireTreeLeaf = 113
+    SapphireTreeTrunkLeaf = 114
+    EmeraldTreeTrunk = 115
+    EmeraldTreeLeaf = 116
+    EmeraldTreeTrunkLeaf = 117
+    RubyTreeTrunk = 118
+    RubyTreeLeaf = 119
+    RubyTreeTrunkLeaf = 120
+    DiamondTreeTrunk = 121
+    DiamondTreeLeaf = 122
+    DiamondTreeTrunkLeaf = 123
+
+    def __int__(self) -> int: ...
+
+
 class Block:
     def fg(self) -> BlockType: ...
+    def set_fg(self, block_type: BlockType): ...
+    def bg(self) -> BlockType: ...
+    def set_bg(self, block_type: BlockType): ...
+    def content(self) -> BlockContentType: ...
+    def set_content(self, block_content_type: BlockContentType): ...
+    def height(self) -> int: ...
+    def set_height(self, height: int): ...
+    def damage(self) -> int: ...
+    def set_damage(self, damage: int): ...
+    def visibility(self) -> int: ...
+    def set_visibility(self, visibility: int): ...
+    def brightness(self) -> int: ...
+    def set_brightness(self, brightness: int): ...
 
 
 class Chunk:
+    WIDTH: int = 32
+    HEIGHT: int = 32
+
     def as_bytes(self) -> bytes: ...
     def block_at(self, coord: ChunkBlockCoord) -> Block: ...
 
 
 class Chunks:
     def __contains__(self, coord: ChunkCoord) -> bool: ...
-
-    def keys(self) -> set[ChunkCoord]:
-        """We create a set each time this function is called. Kinda expensive."""
-        ...
-
+    def keys(self) -> set[ChunkCoord]: ...
     def chunk_at(self, coord: BlockCoord | ChunkCoord) -> Optional[Chunk]: ...
-    def block_at(self, coord: BlockCoord) -> Optional[Block]: ...
+    def set_chunk_at(self, coord: BlockCoord | ChunkCoord, chunk: Chunk): ...
 
 
 class WorldV2:
@@ -934,15 +1018,20 @@ class WorldDbMain:
     def set_blockhead_inventory(self, id: int, inventory: Optional[Inventory]) -> None: ...
 
 
-from pathlib import Path
+class Arch(Enum):
+    Arch32 = 0
+    Arch64 = 1
+
+    def __int__(self) -> int: ...
+
 
 class WorldDb:
     @classmethod
     def open_path(cls, path: str | Path) -> Self: ...
-    def save_path(self, path: str | Path): ...
+    def save_path(self, path: str | Path, arch: Arch): ...
     @classmethod
     def open_bytes(cls, data: bytes | bytearray) -> Self: ...
-    def save_bytes(self) -> bytes: ...
+    def save_bytes(self, arch: Arch) -> bytes: ...
 
     @property
     def chunks(self) -> Chunks: ...

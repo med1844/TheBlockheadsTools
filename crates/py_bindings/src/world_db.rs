@@ -1,5 +1,6 @@
 use super::{chunk::ChunksPy, into_py_err, item::InventoryPy, lib, SharedWorldDb};
-use lib::game::db::world_db::WorldDb;
+use lib::{game::db::world_db::WorldDb, DynArch};
+use num_enum::TryFromPrimitive;
 use pyo3::prelude::*;
 use std::{
     borrow::Cow,
@@ -538,6 +539,42 @@ impl WorldDbMainPy {
     }
 }
 
+#[pyclass(eq, eq_int, name = "Arch")]
+#[derive(Clone, Copy, PartialEq, TryFromPrimitive)]
+#[repr(u8)]
+pub enum ArchPy {
+    Arch32 = 0,
+    Arch64 = 1,
+}
+
+impl From<DynArch> for ArchPy {
+    fn from(value: DynArch) -> Self {
+        match value {
+            DynArch::Arch32 => Self::Arch32,
+            DynArch::Arch64 => Self::Arch64,
+        }
+    }
+}
+
+impl From<ArchPy> for DynArch {
+    fn from(val: ArchPy) -> Self {
+        match val {
+            ArchPy::Arch32 => Self::Arch32,
+            ArchPy::Arch64 => Self::Arch64,
+        }
+    }
+}
+
+#[pymethods]
+impl ArchPy {
+    #[new]
+    fn new(value: u8) -> PyResult<Self> {
+        Self::try_from(value).map_err(|_| {
+            pyo3::exceptions::PyValueError::new_err(format!("Invalid Arch value: {}", value))
+        })
+    }
+}
+
 #[pyclass(name = "WorldDb")]
 pub struct WorldDbPy {
     // Python doesn't care about lifetimes. Thus we model the save file in the pythonic way.
@@ -557,11 +594,11 @@ impl WorldDbPy {
         })
     }
 
-    fn save_path(&self, path: std::path::PathBuf) -> PyResult<()> {
+    fn save_path(&self, path: std::path::PathBuf, arch: ArchPy) -> PyResult<()> {
         self.inner
             .read()
             .unwrap()
-            .to_path(path)
+            .to_path(path, arch.into())
             .map_err(into_py_err)?;
         Ok(())
     }
@@ -574,12 +611,12 @@ impl WorldDbPy {
         })
     }
 
-    fn save_bytes(&'_ self) -> PyResult<Cow<'_, [u8]>> {
+    fn save_bytes(&'_ self, arch: ArchPy) -> PyResult<Cow<'_, [u8]>> {
         let mut data = Vec::new();
         self.inner
             .read()
             .unwrap()
-            .write_to(&mut data)
+            .write_to(&mut data, arch.into())
             .map_err(into_py_err)?;
         Ok(Cow::Owned(data))
     }

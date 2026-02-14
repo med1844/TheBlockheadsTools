@@ -106,8 +106,8 @@ impl From<BlockType> for u8 {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, IntoStaticStr, Display, TryFromPrimitive)]
 #[repr(u8)]
-pub enum BlockContent {
-    None = 0,
+pub enum BlockContentType {
+    Nothing = 0,
     Flint = 1,
     Clay = 2,
     AppleTreeLeaf = 3,
@@ -174,11 +174,19 @@ pub enum BlockContent {
     DiamondTreeTrunkLeaf = 123,
 }
 
-impl BlockContent {
+impl BlockContentType {
     pub fn as_str(&self) -> &'static str {
         self.into()
     }
 }
+
+const FG: usize = 0;
+const BG: usize = 1;
+const CONTENT: usize = 3;
+const HEIGHT: usize = 4;
+const DAMAGE: usize = 5;
+const VISIBILITY: usize = 6;
+const BRIGHTNESS: usize = 7;
 
 pub trait Block {
     // required
@@ -186,13 +194,13 @@ pub trait Block {
 
     // provided
     fn fg_raw(&self) -> u8 {
-        self.as_bytes()[0]
+        self.as_bytes()[FG]
     }
     fn bg_raw(&self) -> u8 {
-        self.as_bytes()[1]
+        self.as_bytes()[BG]
     }
     fn content_raw(&self) -> u8 {
-        self.as_bytes()[3]
+        self.as_bytes()[CONTENT]
     }
 
     fn fg(&self) -> BhResult<BlockType> {
@@ -201,9 +209,21 @@ pub trait Block {
     fn bg(&self) -> BhResult<BlockType> {
         BlockType::try_from(self.bg_raw()).map_err(|e| BhError::InvalidBlockIdError(e.number))
     }
-    fn content(&self) -> BhResult<BlockContent> {
-        BlockContent::try_from(self.content_raw())
+    fn content(&self) -> BhResult<BlockContentType> {
+        BlockContentType::try_from(self.content_raw())
             .map_err(|e| BhError::InvalidBlockContentIdError(e.number))
+    }
+    fn height(&self) -> u8 {
+        self.as_bytes()[HEIGHT]
+    }
+    fn damage(&self) -> u8 {
+        self.as_bytes()[DAMAGE]
+    }
+    fn visibility(&self) -> u8 {
+        self.as_bytes()[VISIBILITY]
+    }
+    fn brightness(&self) -> u8 {
+        self.as_bytes()[BRIGHTNESS]
     }
 }
 
@@ -213,13 +233,25 @@ pub trait BlockMut {
 
     // provided
     fn set_fg<I: Into<u8>>(&mut self, value: I) {
-        self.as_mut_bytes()[0] = value.into();
+        self.as_mut_bytes()[FG] = value.into();
     }
     fn set_bg<I: Into<u8>>(&mut self, value: I) {
-        self.as_mut_bytes()[1] = value.into();
+        self.as_mut_bytes()[BG] = value.into();
     }
     fn set_content<I: Into<u8>>(&mut self, value: I) {
-        self.as_mut_bytes()[3] = value.into();
+        self.as_mut_bytes()[CONTENT] = value.into();
+    }
+    fn set_height(&mut self, value: u8) {
+        self.as_mut_bytes()[HEIGHT] = value;
+    }
+    fn set_damage(&mut self, value: u8) {
+        self.as_mut_bytes()[DAMAGE] = value;
+    }
+    fn set_visibility(&mut self, value: u8) {
+        self.as_mut_bytes()[VISIBILITY] = value;
+    }
+    fn set_brightness(&mut self, value: u8) {
+        self.as_mut_bytes()[BRIGHTNESS] = value;
     }
 }
 

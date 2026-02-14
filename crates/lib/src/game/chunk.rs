@@ -1,10 +1,10 @@
 use super::{
+    super::util::{
+        error::BhResult,
+        gzip::{compress_into, decompress_exact_into, decompress_into},
+    },
     block::{BlockView, BlockViewMut},
     coord::{BlockCoord, ChunkCoord, ChunkOffset},
-};
-use crate::util::{
-    error::BhResult,
-    gzip::{decompress_exact_into, decompress_into},
 };
 use lmdb_rs::{
     codec::types::{Bytes, Str},
@@ -16,9 +16,9 @@ use std::io::Write;
 type ChunkBytes = [u8; Chunk::NUM_BYTES];
 
 #[derive(Debug, Clone, Copy)]
-pub struct ChunkSlice<'a>(&'a ChunkBytes);
+pub struct ChunkView<'a>(&'a ChunkBytes);
 
-impl<'a> ChunkSlice<'a> {
+impl<'a> ChunkView<'a> {
     pub fn block_at<O: ChunkOffset>(&self, coord: O) -> BlockView<'a> {
         let offset = coord.to_offset();
         let slice =
@@ -32,9 +32,9 @@ impl<'a> ChunkSlice<'a> {
 }
 
 #[derive(Debug)]
-pub struct ChunkSliceMut<'a>(&'a mut ChunkBytes);
+pub struct ChunkViewMut<'a>(&'a mut ChunkBytes);
 
-impl<'a> ChunkSliceMut<'a> {
+impl<'a> ChunkViewMut<'a> {
     pub fn block_at_mut<O: ChunkOffset>(&'_ mut self, coord: O) -> BlockViewMut<'_> {
         let offset = coord.to_offset();
         let slice = <&mut [u8; 64]>::try_from(
@@ -62,20 +62,26 @@ impl Chunk {
         Self(Box::new([0; Self::NUM_BYTES]))
     }
 
-    pub fn as_slice(&'_ self) -> ChunkSlice<'_> {
-        ChunkSlice(&self.0)
+    pub fn view(&'_ self) -> ChunkView<'_> {
+        ChunkView(&self.0)
     }
 
-    pub fn as_mut_slice(&'_ mut self) -> ChunkSliceMut<'_> {
-        ChunkSliceMut(&mut self.0)
+    pub fn view_mut(&'_ mut self) -> ChunkViewMut<'_> {
+        ChunkViewMut(&mut self.0)
     }
 
-    pub fn inner(&self) -> &[u8] {
+    pub fn as_bytes(&self) -> &[u8] {
         self.0.as_slice()
     }
 
-    fn inner_mut(&mut self) -> &mut [u8] {
+    fn as_bytes_mut(&mut self) -> &mut [u8] {
         self.0.as_mut_slice()
+    }
+
+    pub fn compress(&self) -> BhResult<CompressedChunk> {
+        let mut compressed_bytes = Vec::new();
+        compress_into(self.as_bytes(), &mut compressed_bytes)?;
+        Ok(CompressedChunk::new(compressed_bytes))
     }
 }
 
@@ -87,15 +93,15 @@ impl CompressedChunk {
         Self(bytes)
     }
 
-    pub fn decompress_view<'a>(&self, buffer: &'a mut Vec<u8>) -> BhResult<ChunkSlice<'a>> {
+    pub fn decompress_view<'a>(&self, buffer: &'a mut Vec<u8>) -> BhResult<ChunkView<'a>> {
         buffer.clear();
         decompress_into(&self.0, buffer)?;
-        Ok(ChunkSlice(buffer.as_slice().try_into()?))
+        Ok(ChunkView(buffer.as_slice().try_into()?))
     }
 
     pub fn decompress(&self) -> BhResult<Chunk> {
         let mut chunk = Chunk::new_empty();
-        decompress_exact_into(&self.0, chunk.inner_mut())?;
+        decompress_exact_into(&self.0, chunk.as_bytes_mut())?;
         Ok(chunk)
     }
 
@@ -104,7 +110,7 @@ impl CompressedChunk {
     }
 
     // decompress, modify, then re-compress
-    pub fn apply<'a, O, F: FnOnce(ChunkSliceMut<'a>) -> O>(&mut self, _: F) -> O {
+    pub fn apply<'a, O, F: FnOnce(ChunkViewMut<'a>) -> O>(&mut self, _: F) -> O {
         todo!()
     }
 }
@@ -210,7 +216,7 @@ mod tests {
     fn test_chunk_size() {
         assert_eq!(Chunk::NUM_BYTES, 32 * 32 * 64 + 5);
         let chunk = Chunk::new_empty();
-        assert_eq!(chunk.inner().len(), Chunk::NUM_BYTES);
+        assert_eq!(chunk.as_bytes().len(), Chunk::NUM_BYTES);
     }
 
     #[test]
@@ -237,9 +243,9 @@ mod tests {
     #[test]
     fn test_compressed_chunk_decompression() {
         let chunk = Chunk::new_empty();
-        let mut raw_bytes = chunk.inner().to_vec();
+        let mut raw_bytes = chunk.as_bytes().to_vec();
         raw_bytes[100] = 0xAA;
-        raw_bytes[chunk.inner().len() - 1] = 0xBB;
+        raw_bytes[chunk.as_bytes().len() - 1] = 0xBB;
 
         let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
         encoder.write_all(&raw_bytes).unwrap();
@@ -247,7 +253,7 @@ mod tests {
 
         let compressed = CompressedChunk::new(compressed_bytes);
         let decompressed = compressed.decompress().unwrap();
-        assert_eq!(decompressed.inner(), raw_bytes.as_slice());
+        assert_eq!(decompressed.as_bytes(), raw_bytes.as_slice());
 
         let mut buffer = Vec::new();
         let _ = compressed.decompress_view(&mut buffer).unwrap();
@@ -264,13 +270,13 @@ mod tests {
         let (_, local_coord) = block_coord.decompose();
 
         {
-            let mut slice = chunk.as_mut_slice();
+            let mut slice = chunk.view_mut();
             let mut block = slice.block_at_mut(local_coord);
             block.set_fg(0xF0);
         }
 
         let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
-        encoder.write_all(chunk.inner()).unwrap();
+        encoder.write_all(chunk.as_bytes()).unwrap();
         let compressed_bytes = encoder.finish().unwrap();
 
         chunks.set_chunk_at(coord, CompressedChunk::new(compressed_bytes));

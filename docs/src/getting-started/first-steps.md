@@ -1,8 +1,8 @@
 # First steps
 
-This page covers basic usages.
+This page covers basic usages: how to load & save world, how to edit chunks & blocks, how to edit inventories.
 
-## Read the world
+## Read and save the world
 
 ```python
 --8<-- "world_db_io.py:open_save"
@@ -31,8 +31,25 @@ Say you have made some changes to the world and you are happy about it. You can 
 --8<-- "world_db_io.py:write_save"
 ```
 
-## Edit blocks
+## Read chunks and blocks
 
 ```python
+--8<-- "chunk_block.py:read_chunk"
+```
 
+You should see something similar to this:
+
+```
+num chunks: 328
+Foreground block type: BlockType.SpawnPortalBase
+Background block type: BlockType.Stone
+```
+
+## Edit chunks and blocks
+
+!!! note
+    `Chunk` instances are copies of the db data. You must use `set_chunk_at` to apply your changes back to the `WorldDb`.
+
+```python
+--8<-- "chunk_block.py:write_chunk"
 ```

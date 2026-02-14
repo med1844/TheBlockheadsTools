@@ -1,38 +1,50 @@
 use super::{
     block::BlockPy,
     coord::{BlockCoordPy, ChunkBlockCoordPy, ChunkCoordPy},
-    into_py_err, lib, InvalidAccessorError, SharedWorldDb,
+    into_py_err, lib, SharedWorldDb,
 };
-use lib::game::coord::{BlockCoord, ChunkCoord};
+use lib::game::{chunk::Chunk, coord::ChunkCoord};
 use pyo3::prelude::*;
 use std::{borrow::Cow, collections::HashSet};
 
 #[pyclass(name = "Chunk")]
 pub struct ChunkPy {
-    world_db: SharedWorldDb,
-    coord: ChunkCoord,
+    inner: Chunk,
+}
+
+impl ChunkPy {
+    pub(crate) fn inner(&self) -> &Chunk {
+        &self.inner
+    }
+
+    pub(crate) fn inner_mut(&mut self) -> &mut Chunk {
+        &mut self.inner
+    }
 }
 
 #[pymethods]
 impl ChunkPy {
-    fn as_bytes(&'_ self) -> PyResult<Cow<'_, [u8]>> {
-        let world_db = self.world_db.read().unwrap();
-        let chunk = world_db.chunks.chunk_at(self.coord);
-        match chunk {
-            Some(chunk) => Ok(Cow::Owned(
-                chunk.decompress().map_err(into_py_err)?.inner().to_vec(),
-            )),
-            None => Err(InvalidAccessorError::new_err(format!(
-                "The chunk at {} doesn't exist.",
-                self.coord
-            ))),
+    #[classattr]
+    const WIDTH: i32 = 32;
+
+    #[classattr]
+    const HEIGHT: i32 = 32;
+
+    #[new]
+    fn new() -> Self {
+        Self {
+            inner: Chunk::new_empty(),
         }
     }
 
-    fn block_at(&self, coord: ChunkBlockCoordPy) -> BlockPy {
+    fn as_bytes(&'_ self) -> PyResult<Cow<'_, [u8]>> {
+        Ok(Cow::Borrowed(self.inner.as_bytes()))
+    }
+
+    fn block_at(slf: Py<Self>, coord: ChunkBlockCoordPy, py: Python<'_>) -> BlockPy {
         BlockPy {
-            world_db: self.world_db.clone(),
-            block_coord: BlockCoord::from_decomposed(self.coord, coord.inner),
+            chunk: slf.clone_ref(py),
+            coord: coord.inner,
         }
     }
 }
@@ -41,6 +53,18 @@ impl ChunkPy {
 enum IntoChunkCoord {
     BlockCoord(BlockCoordPy),
     ChunkCoord(ChunkCoordPy),
+}
+
+impl From<IntoChunkCoord> for ChunkCoord {
+    fn from(val: IntoChunkCoord) -> Self {
+        match val {
+            IntoChunkCoord::BlockCoord(block_coord_py) => {
+                let (chunk_coord, _) = block_coord_py.inner.decompose();
+                chunk_coord
+            }
+            IntoChunkCoord::ChunkCoord(chunk_coord_py) => chunk_coord_py.inner,
+        }
+    }
 }
 
 #[pyclass(name = "Chunks")]
@@ -66,30 +90,26 @@ impl ChunksPy {
         )
     }
 
-    fn chunk_at(&self, coord: IntoChunkCoord) -> Option<ChunkPy> {
-        let chunk_coord = match coord {
-            IntoChunkCoord::BlockCoord(block_coord_py) => {
-                let (chunk_coord, _) = block_coord_py.inner.decompose();
-                chunk_coord
-            }
-            IntoChunkCoord::ChunkCoord(chunk_coord_py) => chunk_coord_py.inner,
-        };
-        let world_db = self.world_db.read().unwrap();
-        world_db.chunks.contains_key(chunk_coord).then(|| ChunkPy {
-            world_db: self.world_db.clone(),
-            coord: chunk_coord,
-        })
-    }
-
-    fn block_at(&self, coord: BlockCoordPy) -> Option<BlockPy> {
-        let (chunk_coord, _) = coord.inner.decompose();
+    fn chunk_at(&self, coord: IntoChunkCoord) -> PyResult<Option<ChunkPy>> {
         let world_db = self.world_db.read().unwrap();
         world_db
             .chunks
-            .contains_key(chunk_coord)
-            .then_some(BlockPy {
-                world_db: self.world_db.clone(),
-                block_coord: coord.inner,
+            .chunk_at(coord)
+            .map(|compressed_chunk| {
+                compressed_chunk
+                    .decompress()
+                    .map(|chunk| ChunkPy { inner: chunk })
             })
+            .transpose()
+            .map_err(into_py_err)
+    }
+
+    fn set_chunk_at(&self, coord: IntoChunkCoord, chunk: &ChunkPy) -> PyResult<()> {
+        self.world_db
+            .write()
+            .unwrap()
+            .chunks
+            .set_chunk_at(coord, chunk.inner.compress().map_err(into_py_err)?);
+        Ok(())
     }
 }

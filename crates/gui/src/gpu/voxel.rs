@@ -1,7 +1,7 @@
 use crate::image_type::ImageType;
 use the_blockheads_tools_lib::{
     BhResult,
-    game::block::{Block, BlockContent, BlockType, BlockView},
+    game::block::{Block, BlockContentType, BlockType, BlockView},
 };
 
 type BlockIdType = u16;
@@ -312,21 +312,21 @@ impl VoxelType {
         Ok(Self(match (block.fg()?, block.content()?) {
             (BlockType::Air, _) => 2,
             (BlockType::Snow, _) => 5,
-            (block_type, BlockContent::None) => block_type as u16,
-            (BlockType::Dirt, BlockContent::Clay) => 78,
-            (BlockType::Dirt, BlockContent::Flint) => 79,
-            (BlockType::GrassDirt, BlockContent::Clay) => 80,
-            (BlockType::GrassDirt, BlockContent::Flint) => 81,
-            (BlockType::SnowDirt, BlockContent::Clay) => 82,
-            (BlockType::SnowDirt, BlockContent::Flint) => 83,
-            (BlockType::Stone, BlockContent::CopperOre) => 84,
-            (BlockType::Stone, BlockContent::TinOre) => 85,
-            (BlockType::Stone, BlockContent::IronOre) => 86,
-            (BlockType::Stone, BlockContent::Coal) => 87,
-            (BlockType::Stone, BlockContent::GoldNuggets) => 88,
-            (BlockType::Stone, BlockContent::PlatinumOre) => 89,
-            (BlockType::Stone, BlockContent::TitaniumOre) => 90,
-            (BlockType::Limestone, BlockContent::Oil) => 91,
+            (block_type, BlockContentType::Nothing) => block_type as u16,
+            (BlockType::Dirt, BlockContentType::Clay) => 78,
+            (BlockType::Dirt, BlockContentType::Flint) => 79,
+            (BlockType::GrassDirt, BlockContentType::Clay) => 80,
+            (BlockType::GrassDirt, BlockContentType::Flint) => 81,
+            (BlockType::SnowDirt, BlockContentType::Clay) => 82,
+            (BlockType::SnowDirt, BlockContentType::Flint) => 83,
+            (BlockType::Stone, BlockContentType::CopperOre) => 84,
+            (BlockType::Stone, BlockContentType::TinOre) => 85,
+            (BlockType::Stone, BlockContentType::IronOre) => 86,
+            (BlockType::Stone, BlockContentType::Coal) => 87,
+            (BlockType::Stone, BlockContentType::GoldNuggets) => 88,
+            (BlockType::Stone, BlockContentType::PlatinumOre) => 89,
+            (BlockType::Stone, BlockContentType::TitaniumOre) => 90,
+            (BlockType::Limestone, BlockContentType::Oil) => 91,
             _ => 0,
         }))
     }
@@ -337,59 +337,59 @@ impl VoxelType {
 
     fn mg_from_block_inner<'b>(block: BlockView<'b>) -> BhResult<Self> {
         Ok(Self(match block.content()? {
-            BlockContent::None => 2,
-            BlockContent::AppleTreeLeaf => 92,
-            BlockContent::AppleTreeTrunk => 93,
-            BlockContent::AppleTreeTrunkLeaf => 94,
-            BlockContent::PineTreeLeaf => 95,
-            BlockContent::PineTreeTrunk => 96,
-            BlockContent::PineTreeTrunkLeaf => 97,
-            BlockContent::MapleTreeLeaf => 98,
-            BlockContent::MapleTreeTrunk => 99,
-            BlockContent::MapleTreeTrunkLeaf => 100,
-            BlockContent::MangoTreeLeaf => 101,
-            BlockContent::MangoTreeTrunk => 102,
-            BlockContent::MangoTreeTrunkLeaf => 103,
-            BlockContent::CoconutTreeLeaf => 104,
-            BlockContent::CoconutTreeTrunk => 105,
-            BlockContent::OrangeTreeLeaf => 106,
-            BlockContent::OrangeTreeTrunk => 107,
-            BlockContent::OrangeTreeTrunkLeaf => 108,
-            BlockContent::CherryTreeLeaf => 109,
-            BlockContent::CherryTreeTrunk => 110,
-            BlockContent::CherryTreeTrunkLeaf => 111,
-            BlockContent::CoffeeTreeLeaf => 112,
-            BlockContent::CoffeeTreeTrunk => 113,
-            BlockContent::CoffeeTreeTrunkLeaf => 114,
-            BlockContent::Cactus => 115,
-            BlockContent::DeadCactus => 116,
-            BlockContent::LimeTreeLeaf => 117,
-            BlockContent::LimeTreeTrunk => 118,
-            BlockContent::LimeTreeTrunkLeaf => 119,
-            BlockContent::AmethystTreeTrunk => 120,
-            BlockContent::AmethystTreeLeaf => 121,
-            BlockContent::AmethystTreeTrunkLeaf => 122,
-            BlockContent::SapphireTreeTrunk => 123,
-            BlockContent::SapphireTreeLeaf => 124,
-            BlockContent::SapphireTreeTrunkLeaf => 125,
-            BlockContent::EmeraldTreeTrunk => 126,
-            BlockContent::EmeraldTreeLeaf => 127,
-            BlockContent::EmeraldTreeTrunkLeaf => 128,
-            BlockContent::RubyTreeTrunk => 129,
-            BlockContent::RubyTreeLeaf => 130,
-            BlockContent::RubyTreeTrunkLeaf => 131,
-            BlockContent::DiamondTreeTrunk => 132,
-            BlockContent::DiamondTreeLeaf => 133,
-            BlockContent::DiamondTreeTrunkLeaf => 134,
-            BlockContent::DeadPineTreeLeaf
-            | BlockContent::DeadOrangeTreeLeaf
-            | BlockContent::DeadCherryTreeLeaf
-            | BlockContent::DeadLimeTreeLeaf => 135,
-            BlockContent::DeadPineTreeTrunk
-            | BlockContent::DeadOrangeTreeTrunk
-            | BlockContent::DeadCherryTreeTrunk
-            | BlockContent::DeadLimeTreeTrunk => 136,
-            BlockContent::GoldChest => 137,
+            BlockContentType::Nothing => 2,
+            BlockContentType::AppleTreeLeaf => 92,
+            BlockContentType::AppleTreeTrunk => 93,
+            BlockContentType::AppleTreeTrunkLeaf => 94,
+            BlockContentType::PineTreeLeaf => 95,
+            BlockContentType::PineTreeTrunk => 96,
+            BlockContentType::PineTreeTrunkLeaf => 97,
+            BlockContentType::MapleTreeLeaf => 98,
+            BlockContentType::MapleTreeTrunk => 99,
+            BlockContentType::MapleTreeTrunkLeaf => 100,
+            BlockContentType::MangoTreeLeaf => 101,
+            BlockContentType::MangoTreeTrunk => 102,
+            BlockContentType::MangoTreeTrunkLeaf => 103,
+            BlockContentType::CoconutTreeLeaf => 104,
+            BlockContentType::CoconutTreeTrunk => 105,
+            BlockContentType::OrangeTreeLeaf => 106,
+            BlockContentType::OrangeTreeTrunk => 107,
+            BlockContentType::OrangeTreeTrunkLeaf => 108,
+            BlockContentType::CherryTreeLeaf => 109,
+            BlockContentType::CherryTreeTrunk => 110,
+            BlockContentType::CherryTreeTrunkLeaf => 111,
+            BlockContentType::CoffeeTreeLeaf => 112,
+            BlockContentType::CoffeeTreeTrunk => 113,
+            BlockContentType::CoffeeTreeTrunkLeaf => 114,
+            BlockContentType::Cactus => 115,
+            BlockContentType::DeadCactus => 116,
+            BlockContentType::LimeTreeLeaf => 117,
+            BlockContentType::LimeTreeTrunk => 118,
+            BlockContentType::LimeTreeTrunkLeaf => 119,
+            BlockContentType::AmethystTreeTrunk => 120,
+            BlockContentType::AmethystTreeLeaf => 121,
+            BlockContentType::AmethystTreeTrunkLeaf => 122,
+            BlockContentType::SapphireTreeTrunk => 123,
+            BlockContentType::SapphireTreeLeaf => 124,
+            BlockContentType::SapphireTreeTrunkLeaf => 125,
+            BlockContentType::EmeraldTreeTrunk => 126,
+            BlockContentType::EmeraldTreeLeaf => 127,
+            BlockContentType::EmeraldTreeTrunkLeaf => 128,
+            BlockContentType::RubyTreeTrunk => 129,
+            BlockContentType::RubyTreeLeaf => 130,
+            BlockContentType::RubyTreeTrunkLeaf => 131,
+            BlockContentType::DiamondTreeTrunk => 132,
+            BlockContentType::DiamondTreeLeaf => 133,
+            BlockContentType::DiamondTreeTrunkLeaf => 134,
+            BlockContentType::DeadPineTreeLeaf
+            | BlockContentType::DeadOrangeTreeLeaf
+            | BlockContentType::DeadCherryTreeLeaf
+            | BlockContentType::DeadLimeTreeLeaf => 135,
+            BlockContentType::DeadPineTreeTrunk
+            | BlockContentType::DeadOrangeTreeTrunk
+            | BlockContentType::DeadCherryTreeTrunk
+            | BlockContentType::DeadLimeTreeTrunk => 136,
+            BlockContentType::GoldChest => 137,
             _ => 0,
         }))
     }
@@ -414,7 +414,7 @@ pub mod voxel_util {
     use the_blockheads_tools_lib::{
         BhResult,
         game::{
-            chunk::{Chunk, ChunkSlice, Chunks},
+            chunk::{Chunk, ChunkView, Chunks},
             coord::{ChunkBlockCoord, ChunkCoord},
         },
     };
@@ -435,7 +435,7 @@ pub mod voxel_util {
         vec![VoxelType::AIR; NUM_BLOCK_PER_CHUNK * Chunks::NUM_CHUNK_PER_COL * world_width_macro]
     }
 
-    fn fill_chunk_voxel(chunk: ChunkSlice<'_>, chunk_voxel: &mut [VoxelType]) -> BhResult<()> {
+    fn fill_chunk_voxel(chunk: ChunkView<'_>, chunk_voxel: &mut [VoxelType]) -> BhResult<()> {
         for y in 0..Chunk::NUM_BLOCK_PER_COL {
             for x in 0..Chunk::NUM_BLOCK_PER_ROW {
                 let block = chunk.block_at(ChunkBlockCoord::new(x as u8, y as u8)?);
@@ -497,7 +497,7 @@ pub mod voxel_util {
         chunk: &Chunk,
     ) -> BhResult<()> {
         let mut blocks = [VoxelType(0); NUM_BLOCK_PER_CHUNK];
-        fill_chunk_voxel(chunk.as_slice(), &mut blocks)?;
+        fill_chunk_voxel(chunk.view(), &mut blocks)?;
 
         let chunk_coord: ChunkCoord = coord.into();
         let offset = (chunk_coord.x() * 32 + chunk_coord.y() as u32) * NUM_BLOCK_PER_CHUNK as u32;
