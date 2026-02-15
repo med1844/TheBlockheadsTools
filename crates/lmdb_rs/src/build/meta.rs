@@ -1,5 +1,5 @@
 use crate::arch::Arch;
-use crate::constants::{MDB_MAGIC, P_META};
+use crate::constants::{DEFAULT_MAPSIZE, MDB_MAGIC, P_META};
 use crate::db_record::DbRecord;
 use std::marker::PhantomData;
 
@@ -68,9 +68,9 @@ impl<A: Arch> MetaPageBuilder<A> {
         buffer[meta_offset + 4..meta_offset + 8].copy_from_slice(&1u32.to_le_bytes());
 
         // Address (ptr) - 0 for new file
-        // Mapsize (size_t)
-
-        let mapsize = (last_page + 1) * (self.page_size as u64);
+        // Mapsize: use C LMDB's default (100MB) rather than exact file size.
+        // The game's LMDB reader may validate or use this value.
+        let mapsize = DEFAULT_MAPSIZE;
 
         let db0_offset;
         let db1_offset;

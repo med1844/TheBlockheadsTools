@@ -91,8 +91,8 @@ impl<A: Arch> DatabaseBuilder<A> {
             all_pages.extend(pages);
         }
 
-        // 3. Build Main DB
-        let builder = BTreeBuilder::<A>::new(self.page_size, self.next_page);
+        // 3. Build Main DB (entries are sub-database records, need F_SUBDATA flag)
+        let builder = BTreeBuilder::<A>::new(self.page_size, self.next_page).with_subdata();
         let result = builder.build(
             main_db_entries
                 .iter()

@@ -11,6 +11,8 @@ pub struct BTreeBuilder<A: Arch> {
     pages: Vec<Vec<u8>>,
     /// Next available page number
     next_page: u64,
+    /// If true, leaf entries get F_SUBDATA flag (used for Main DB entries)
+    subdata: bool,
     _arch: PhantomData<A>,
 
     // Stats for DbRecord
@@ -35,6 +37,7 @@ impl<A: Arch> BTreeBuilder<A> {
             page_size,
             pages: Vec::new(),
             next_page: start_page,
+            subdata: false,
             _arch: PhantomData,
             stat_leaf_pages: 0,
             stat_branch_pages: 0,
@@ -42,6 +45,13 @@ impl<A: Arch> BTreeBuilder<A> {
             stat_entries: 0,
             stat_depth: 0,
         }
+    }
+
+    /// Set subdata mode: leaf entries will have F_SUBDATA flag.
+    /// Must be called before `build()`.
+    pub fn with_subdata(mut self) -> Self {
+        self.subdata = true;
+        self
     }
 
     /// Add sorted entries and build tree
@@ -88,7 +98,12 @@ impl<A: Arch> BTreeBuilder<A> {
                 if current_leaf_min_key.is_none() {
                     current_leaf_min_key = Some(key);
                 }
-                if current_leaf.push(key, val) {
+                let ok = if self.subdata {
+                    current_leaf.push_subdata(key, val)
+                } else {
+                    current_leaf.push(key, val)
+                };
+                if ok {
                     pushed = true;
                 }
             }
@@ -134,7 +149,11 @@ impl<A: Arch> BTreeBuilder<A> {
                         false
                     }
                 } else {
-                    current_leaf.push(key, val)
+                    if self.subdata {
+                        current_leaf.push_subdata(key, val)
+                    } else {
+                        current_leaf.push(key, val)
+                    }
                 };
 
                 if !retry_success {

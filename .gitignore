@@ -10,6 +10,7 @@ save_structure*
 !crates/gui/resources/*.png
 !docs/src/assets/*.png
 crates/py_bindings/examples/output
+crates/py_bindings/examples/main.log
 server
 test.py
 lock.mdb

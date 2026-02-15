@@ -63,6 +63,15 @@ impl WorldDbMain {
         let mut world_v2_bytes = Vec::new();
         plist::to_writer_binary(&mut world_v2_bytes, &self.world_v2)?;
         db.put(wtxn, "worldv2", world_v2_bytes.as_slice())?;
+        for (unique_id, inventory) in self.blockhead_inventories.iter() {
+            let mut inventory_bytes = Vec::new();
+            plist::to_writer_xml(&mut inventory_bytes, inventory)?;
+            db.put(
+                wtxn,
+                format!("blockhead_{}_inventory", unique_id.inner()).as_str(),
+                inventory_bytes.as_slice(),
+            )?;
+        }
         Ok(())
     }
 }

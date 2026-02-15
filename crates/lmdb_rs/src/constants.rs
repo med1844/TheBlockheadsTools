@@ -1,6 +1,10 @@
 pub const MDB_MAGIC: u32 = 0xBEEFC0DE;
 pub const MDB_DATA_VERSION: u32 = 1;
 
+/// Default map size matching C LMDB's default (100MB).
+/// This is stored in the meta page as the maximum environment size.
+pub const DEFAULT_MAPSIZE: u64 = 100 * 1024 * 1024;
+
 // Page flags
 pub const P_BRANCH: u16 = 0x01;
 pub const P_LEAF: u16 = 0x02;
@@ -13,6 +17,9 @@ pub const P_SUBP: u16 = 0x40;
 pub const F_BIGDATA: u16 = 0x01;
 pub const F_SUBDATA: u16 = 0x02;
 pub const F_DUPDATA: u16 = 0x04;
+
+// Database flags
+pub const MDB_INTEGERKEY: u16 = 0x08;
 
 // Sizes
 

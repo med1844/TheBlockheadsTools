@@ -45,6 +45,17 @@ impl<'a, A: Arch> LeafPageBuilder<'a, A> {
         self.push_internal(key, EntryContent::Ref(value), value.len(), 0)
     }
 
+    /// Add sub-database entry with F_SUBDATA flag.
+    /// Used for entries in the Main DB whose values are serialized DbRecords.
+    pub fn push_subdata(&mut self, key: &'a [u8], value: &'a [u8]) -> bool {
+        self.push_internal(
+            key,
+            EntryContent::Ref(value),
+            value.len(),
+            crate::constants::F_SUBDATA,
+        )
+    }
+
     /// Add overflow entry (F_BIGDATA).
     /// `full_size` is the logical size of the value.
     /// `overflow_pgno` is the page number where data starts.

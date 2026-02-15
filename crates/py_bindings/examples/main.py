@@ -6,7 +6,7 @@ import pathlib
 import shutil
 
 world_db = WorldDb.open_path("../tests/resources/9c3/world_db")
-# world_db_io(world_db)
+world_db_io(world_db)
 chunk_block(world_db)
 
 folder_path = pathlib.Path("./output")

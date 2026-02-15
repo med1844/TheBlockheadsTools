@@ -47,7 +47,8 @@ nav:
     - First steps: getting-started/first-steps.md
     - Examples: getting-started/examples.md
   - Guides:
-    - Setup Emulator: guides/setup-emulator.md
+    - Setup emulator: guides/setup-emulator.md
+    - Fix rotation: guides/support-landscape.md
 markdown_extensions:
   - admonition
   - pymdownx.snippets:

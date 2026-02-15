@@ -17,10 +17,7 @@ This page covers basic usages: how to load & save world, how to edit chunks & bl
 Run it, you should see something similar to this:
 
 ```
-world name: TEST
-seed: 1711316399
-world width: 512
-start portal: (10740.0, 520.0)
+--8<-- "main.log:world_info_output"
 ```
 
 ## Save the world
@@ -31,6 +28,8 @@ Say you have made some changes to the world and you are happy about it. You can 
 --8<-- "world_db_io.py:write_save"
 ```
 
+![world name changed at save file selection menu](../assets/world_db_io__write_save.png)
+
 ## Read chunks and blocks
 
 ```python
@@ -40,9 +39,7 @@ Say you have made some changes to the world and you are happy about it. You can 
 You should see something similar to this:
 
 ```
-num chunks: 328
-Foreground block type: BlockType.SpawnPortalBase
-Background block type: BlockType.Stone
+--8<-- "main.log:read_chunk_output"
 ```
 
 ## Edit chunks and blocks
@@ -53,3 +50,5 @@ Background block type: BlockType.Stone
 ```python
 --8<-- "chunk_block.py:write_chunk"
 ```
+
+![time crystal placed above the spawn portal base](../assets/chunk_block__write_chunk.png)

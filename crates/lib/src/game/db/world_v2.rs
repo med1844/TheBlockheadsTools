@@ -18,6 +18,8 @@ pub struct WorldV2 {
     pub migration_complete_v1_7: bool,
     pub no_rain_timer: f64,
     pub portal_level: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub preview_image_data: Option<plist::Data>,
     pub random_seed: u64,
     pub remote_game: bool,
     pub run_at_launch: bool,
