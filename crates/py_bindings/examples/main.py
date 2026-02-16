@@ -1,6 +1,6 @@
 from world_db_io import world_db_io
 from chunk_block import chunk_block
-from constants import WORLD_DB_PATH
+from inventory import inventory
 from the_blockheads_tools_py import WorldDb, Arch
 import pathlib
 import shutil
@@ -8,6 +8,7 @@ import shutil
 world_db = WorldDb.open_path("../tests/resources/9c3/world_db")
 world_db_io(world_db)
 chunk_block(world_db)
+inventory(world_db)
 
 folder_path = pathlib.Path("./output")
 if folder_path.exists() and folder_path.is_dir():

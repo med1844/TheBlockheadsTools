@@ -2,7 +2,9 @@
 
 This page covers basic usages: how to load & save world, how to edit chunks & blocks, how to edit inventories.
 
-## Read and save the world
+## World management
+
+### Read the world
 
 ```python
 --8<-- "world_db_io.py:open_save"
@@ -20,7 +22,7 @@ Run it, you should see something similar to this:
 --8<-- "main.log:world_info_output"
 ```
 
-## Save the world
+### Save the world
 
 Say you have made some changes to the world and you are happy about it. You can save it with `WorldDb.save_path` or `WorldDb.save_bytes`.
 
@@ -30,7 +32,9 @@ Say you have made some changes to the world and you are happy about it. You can 
 
 ![world name changed at save file selection menu](../assets/world_db_io__write_save.png)
 
-## Read chunks and blocks
+## Chunk & block manipulation
+
+### Read chunks and blocks
 
 ```python
 --8<-- "chunk_block.py:read_chunk"
@@ -42,7 +46,9 @@ You should see something similar to this:
 --8<-- "main.log:read_chunk_output"
 ```
 
-## Edit chunks and blocks
+### Edit chunks and blocks
+
+#### Basic
 
 !!! note
     `Chunk` instances are copies of the db data. You must use `set_chunk_at` to apply your changes back to the `WorldDb`.
@@ -50,5 +56,65 @@ You should see something similar to this:
 ```python
 --8<-- "chunk_block.py:write_chunk"
 ```
-
 ![time crystal placed above the spawn portal base](../assets/chunk_block__write_chunk.png)
+
+#### Foreground, background, content
+
+Todo
+
+#### Height of water and snow
+
+
+## Inventory manipulation
+
+### Read blockhead's inventory
+
+```python
+--8<-- "inventory.py:read_blockhead"
+```
+
+Output:
+
+```
+--8<-- "main.log:read_blockhead_output"
+```
+
+### Edit inventory
+
+#### Basic
+
+You can set item type and number of items:
+
+```python
+--8<-- "inventory.py:edit_inventory_basic"
+```
+
+!!! note
+    Similar to `Chunk`, `Inventory` instances are copies of the db data. You must write it back to apply your changes.
+
+![1234 diamonds in inventory](../assets/inventory__edit_inventory_basic.png)
+
+#### Containers
+
+Blockheads can carry containers, such as basket and chests, in their inventories.
+
+```python
+--8<-- "inventory.py:edit_inventory_container"
+```
+
+![edited inventory featuring a checkered chest of "Double Time" items and a basket of stacked deprecated blocks.](../assets/inventory__edit_inventory_container.png)
+
+#### Tool damage, dye
+
+```python
+--8<-- "inventory.py:edit_inventory_damage_dye"
+```
+
+![overflowing titanium pickaxe damage and custom-dyed golden bed & paint](../assets/inventory__edit_inventory_damage_dye.png)
+
+If you want the damage indication bar to look normal, consider limit the damage value below 16384.
+
+#### Workbench
+
+Todo
+

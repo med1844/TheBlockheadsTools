@@ -1,5 +1,3 @@
-WORLD_DB_PATH = "../tests/resources/3d7/world_db"
-
 class Snippet:
     def __init__(self, name: str):
         self.name = name

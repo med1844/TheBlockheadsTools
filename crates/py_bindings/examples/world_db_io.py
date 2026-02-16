@@ -1,4 +1,4 @@
-from constants import Snippet
+from util import Snippet
 
 
 # --8<-- [start:open_save]

@@ -45,6 +45,9 @@ jobs:
         uses: astral-sh/setup-uv@v7
       - name: Set up Python
         run: uv python install
+      - name: Run examples
+        working-directory: crates/py_bindings/examples
+        run: uv run main.py > main.log
       - name: Build MkDocs
         working-directory: docs
         run: uv run mkdocs build --strict

@@ -2,8 +2,9 @@ use super::{into_py_err, lib};
 use lib::game::{
     dw::dynamic_object::{DynamicObject, UniqueID},
     item::{
-        ChestData, ChestType, Extra, InteractionObject, Inventory, Item, ItemType, PigmentColor,
-        Slot, WorkbenchData, WorkbenchType,
+        fmt_item_display, fmt_slot_display, ChestData, ChestType, Extra, InteractionObject,
+        Inventory, Item, ItemType, ItemView, PigmentColor, Slot, SlotView, WorkbenchData,
+        WorkbenchType,
     },
 };
 use num_enum::TryFromPrimitive;
@@ -559,8 +560,7 @@ impl From<PigmentColorPy> for PigmentColor {
 
 #[pyclass(name = "BasketExtra")]
 pub struct BasketExtraPy {
-    #[pyo3(get, set)]
-    pub items: Vec<Py<SlotPy>>,
+    items: Vec<Py<SlotPy>>,
 }
 
 impl std::fmt::Debug for BasketExtraPy {
@@ -638,14 +638,26 @@ impl BasketExtraPy {
             .collect();
         format!("BasketExtra(items=[{}])", items_repr.join(", "))
     }
+
+    fn __str__(&self, py: Python<'_>) -> String {
+        let items_str: Vec<String> = self
+            .items
+            .iter()
+            .map(|item| {
+                item.bind(py)
+                    .str()
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|_| "<str error>".to_string())
+            })
+            .collect();
+        format!("[{}]", items_str.join(", "))
+    }
 }
 
 #[pyclass(name = "ChestExtra")]
 pub struct ChestExtraPy {
     #[pyo3(get, set)]
     pub chest_type: ChestTypePy,
-    #[pyo3(get, set)]
-    pub items: Vec<Py<SlotPy>>,
     #[pyo3(get, set)]
     pub owner_id: String,
     #[pyo3(get, set)]
@@ -662,6 +674,7 @@ pub struct ChestExtraPy {
     pub float_pos: [f32; 2],
     #[pyo3(get, set)]
     pub unique_id: u64,
+    items: Vec<Py<SlotPy>>,
 }
 
 impl std::fmt::Debug for ChestExtraPy {
@@ -752,17 +765,35 @@ impl ChestExtraPy {
 #[pymethods]
 impl ChestExtraPy {
     #[new]
-    #[pyo3(signature = (chest_type=ChestTypePy::Standard, owner_id="server".to_string()))]
-    fn new(py: Python<'_>, chest_type: ChestTypePy, owner_id: String) -> PyResult<Py<Self>> {
-        let mut items = Vec::with_capacity(ChestData::NUM_SLOTS);
-        for _ in 0..ChestData::NUM_SLOTS {
-            items.push(Py::new(py, SlotPy::default())?);
-        }
+    #[pyo3(signature = (items=None, chest_type=ChestTypePy::Standard, owner_id="server".to_string()))]
+    fn new(
+        py: Python<'_>,
+        items: Option<Vec<Py<SlotPy>>>,
+        chest_type: ChestTypePy,
+        owner_id: String,
+    ) -> PyResult<Py<Self>> {
+        let items = match items {
+            Some(items) => {
+                if items.len() != ChestData::NUM_SLOTS {
+                    return Err(PyValueError::new_err(format!(
+                        "ChestExtra must have exactly {} slots",
+                        ChestData::NUM_SLOTS
+                    )));
+                }
+                items
+            }
+            None => {
+                let mut items = Vec::with_capacity(ChestData::NUM_SLOTS);
+                for _ in 0..ChestData::NUM_SLOTS {
+                    items.push(Py::new(py, SlotPy::default())?);
+                }
+                items
+            }
+        };
         Py::new(
             py,
             Self {
                 chest_type,
-                items,
                 owner_id,
                 is_in_use: false,
                 flipped: false,
@@ -771,6 +802,7 @@ impl ChestExtraPy {
                 pos_y: 0,
                 float_pos: [0.0, 0.0],
                 unique_id: 0,
+                items,
             },
         )
     }
@@ -818,6 +850,24 @@ impl ChestExtraPy {
             self.chest_type,
             self.owner_id,
             items_repr.join(", ")
+        )
+    }
+
+    fn __str__(&self, py: Python<'_>) -> String {
+        let items_str: Vec<String> = self
+            .items
+            .iter()
+            .map(|item| {
+                item.bind(py)
+                    .str()
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|_| "<str error>".to_string())
+            })
+            .collect();
+        format!(
+            "ChestData {{ type: {:?}, items: [{}] }}",
+            self.chest_type,
+            items_str.join(", ")
         )
     }
 }
@@ -1026,6 +1076,10 @@ impl WorkbenchExtraPy {
             self.workbench_type, self.level, self.owner_id, self.pos_x, self.pos_y
         )
     }
+
+    fn __str__(&self) -> String {
+        format!("{:?}", self)
+    }
 }
 
 #[derive(FromPyObject, IntoPyObject)]
@@ -1104,6 +1158,88 @@ impl ItemExtraPy {
                 Extra::Workbench(Box::new(bench.deflate()))
             }
         }
+    }
+}
+
+struct ItemPyView<'a> {
+    item: &'a ItemPy,
+    py: Python<'a>,
+}
+
+impl<'a> ItemView for ItemPyView<'a> {
+    fn type_id(&self) -> u16 {
+        self.item.type_id
+    }
+
+    fn has_extra(&self) -> bool {
+        self.item.extra.is_some()
+    }
+
+    fn fmt_extra(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(extra) = &self.item.extra {
+            let extra_str = match extra {
+                ItemExtraPy::Basket(b) => b
+                    .bind(self.py)
+                    .str()
+                    .map(|s| s.to_string())
+                    .unwrap_or_default(),
+                ItemExtraPy::Chest(c) => c
+                    .bind(self.py)
+                    .str()
+                    .map(|s| s.to_string())
+                    .unwrap_or_default(),
+                ItemExtraPy::Workbench(w) => w
+                    .bind(self.py)
+                    .str()
+                    .map(|s| s.to_string())
+                    .unwrap_or_default(),
+            };
+            f.write_str(&extra_str)
+        } else {
+            Ok(())
+        }
+    }
+}
+
+struct SlotPyView<'a> {
+    slot: &'a SlotPy,
+    py: Python<'a>,
+}
+
+impl<'a> SlotView for SlotPyView<'a> {
+    fn len(&self) -> usize {
+        self.slot.items.len()
+    }
+    fn item_type_id(&self, index: usize) -> u16 {
+        self.slot.items[index].bind(self.py).borrow().type_id
+    }
+    fn item_has_extra(&self, index: usize) -> bool {
+        self.slot.items[index]
+            .bind(self.py)
+            .borrow()
+            .extra
+            .is_some()
+    }
+    fn fmt_item(&self, index: usize, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let item = self.slot.items[index].bind(self.py).borrow();
+        fmt_item_display(
+            &ItemPyView {
+                item: &*item,
+                py: self.py,
+            },
+            f,
+        )
+    }
+}
+
+struct DisplayWrapper<'a, T: ?Sized>(
+    &'a T,
+    fn(&T, &mut std::fmt::Formatter<'_>) -> std::fmt::Result,
+);
+
+impl<'a, T: ?Sized> std::fmt::Display for DisplayWrapper<'a, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        (self.1)(self.0, f)
     }
 }
 
@@ -1219,8 +1355,10 @@ impl ItemPy {
 
     #[setter]
     fn set_colors(&mut self, colors: Vec<PigmentColorPy>) -> PyResult<()> {
-        if colors.len() != 3 {
-            return Err(PyValueError::new_err("colors must have exactly 3 elements"));
+        if colors.len() > 3 {
+            return Err(PyValueError::new_err(
+                "colors must not have more than 3 elements",
+            ));
         }
         let mut array = [PigmentColor::Transparent; 3];
         for (i, color) in colors.into_iter().enumerate() {
@@ -1270,6 +1408,10 @@ impl ItemPy {
             self.padding,
             extra_repr
         )
+    }
+
+    fn __str__(&self, py: Python<'_>) -> String {
+        DisplayWrapper(&ItemPyView { item: self, py }, fmt_item_display).to_string()
     }
 }
 
@@ -1437,13 +1579,16 @@ impl SlotPy {
             .collect();
         format!("Slot(items=[{}])", items_repr.join(", "))
     }
+
+    fn __str__(&self, py: Python<'_>) -> String {
+        DisplayWrapper(&SlotPyView { slot: self, py }, fmt_slot_display).to_string()
+    }
 }
 
 #[pyclass(name = "Inventory")]
 #[derive(Debug)]
 pub struct InventoryPy {
-    #[pyo3(get, set)]
-    pub slots: Vec<Py<SlotPy>>,
+    slots: Vec<Py<SlotPy>>,
 }
 
 impl InventoryPy {
@@ -1541,5 +1686,19 @@ impl InventoryPy {
             })
             .collect();
         format!("Inventory(slots=[{}])", slots_repr.join(", "))
+    }
+
+    fn __str__(&self, py: Python<'_>) -> String {
+        let slots_str: Vec<String> = self
+            .slots
+            .iter()
+            .map(|slot| {
+                slot.bind(py)
+                    .str()
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|_| "<str error>".to_string())
+            })
+            .collect();
+        format!("[{}]", slots_str.join(", "))
     }
 }

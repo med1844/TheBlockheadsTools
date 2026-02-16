@@ -49,7 +49,7 @@ class ItemType(Enum):
     Clay = 28
     DodoMeat = 29
     DodoFeather = 30
-    CopperOre = 31,
+    CopperOre = 31
     IronOre = 32
     StoneAxe = 33
     StonePickaxe = 34
@@ -165,7 +165,7 @@ class ItemType(Enum):
     Kelp = 144
     AmethystChandelier = 145
     SapphireChandelier = 146
-    EmeraldChandelier = 147,
+    EmeraldChandelier = 147
     RubyChandelier = 148
     DiamondChandelier = 149
     SteelLantern = 150
@@ -252,7 +252,7 @@ class ItemType(Enum):
     MarbleStairs = 231
     SandstoneStairs = 232
     RedMarbleStairs = 233
-    LapisLazuliStairs = 234,
+    LapisLazuliStairs = 234
     BasaltStairs = 235
     CopperColumn = 236
     TinColumn = 237
@@ -499,7 +499,6 @@ class WorkbenchType(Enum):
 
 
 class BasketExtra:
-    items: list[Slot]
     def __init__(self, items: Optional[list[Slot]] = None) -> None: ...
     def __len__(self) -> int: ...
     def __getitem__(self, index: int) -> Slot: ...
@@ -509,7 +508,6 @@ class BasketExtra:
 
 class ChestExtra:
     chest_type: ChestType
-    items: list[Slot]
     owner_id: str
     is_in_use: bool
     flipped: bool
@@ -519,7 +517,12 @@ class ChestExtra:
     float_pos: list[float]
     unique_id: int
 
-    def __init__(self, chest_type: ChestType = ChestType.Standard, owner_id: str = "server") -> None: ...
+    def __init__(
+        self,
+        items: Optional[list[Slot]] = None,
+        chest_type: ChestType = ChestType.Standard,
+        owner_id: str = "server",
+    ) -> None: ...
     def __len__(self) -> int: ...
     def __getitem__(self, index: int) -> Slot: ...
     def __setitem__(self, index: int, value: Slot) -> None: ...
@@ -551,7 +554,12 @@ class WorkbenchExtra:
     selected_index: int
     x_scroll: float
 
-    def __init__(self, workbench_type: WorkbenchType = WorkbenchType.Workbench, level: int = 1, owner_id: str = "server") -> None: ...
+    def __init__(
+        self,
+        workbench_type: WorkbenchType = WorkbenchType.Workbench,
+        level: int = 1,
+        owner_id: str = "server",
+    ) -> None: ...
     def __repr__(self) -> str: ...
 
 
@@ -562,7 +570,11 @@ class Item:
     selected_sub_item_index: int
     padding: int
 
-    def __init__(self, item_type: ItemType, extra: Optional[BasketExtra | ChestExtra | WorkbenchExtra] = None) -> None: ...
+    def __init__(
+        self,
+        item_type: ItemType,
+        extra: Optional[BasketExtra | ChestExtra | WorkbenchExtra] = None,
+    ) -> None: ...
     @property
     def item_type(self) -> ItemType: ...
     @item_type.setter
@@ -578,7 +590,9 @@ class Item:
     @property
     def extra(self) -> Optional[BasketExtra | ChestExtra | WorkbenchExtra]: ...
     @extra.setter
-    def extra(self, value: Optional[BasketExtra | ChestExtra | WorkbenchExtra]) -> None: ...
+    def extra(
+        self, value: Optional[BasketExtra | ChestExtra | WorkbenchExtra]
+    ) -> None: ...
     def __repr__(self) -> str: ...
 
 
@@ -600,8 +614,6 @@ class Slot:
 
 
 class Inventory:
-    slots: list[Slot]
-
     def __init__(self, slots: Optional[list[Slot]] = None) -> None: ...
     def __len__(self) -> int: ...
     def __getitem__(self, index: int) -> Slot: ...
@@ -1015,7 +1027,9 @@ class WorldDbMain:
     @property
     def world_v2(self) -> WorldV2: ...
     def get_blockhead_inventory(self, id: int) -> Optional[Inventory]: ...
-    def set_blockhead_inventory(self, id: int, inventory: Optional[Inventory]) -> None: ...
+    def set_blockhead_inventory(
+        self, id: int, inventory: Optional[Inventory]
+    ) -> None: ...
 
 
 class Arch(Enum):

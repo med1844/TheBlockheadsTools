@@ -760,13 +760,91 @@ pub enum PigmentColor {
     CopperBlue = 8,
 }
 
-fn item_type_to_str(item_type: BhResult<ItemType>) -> String {
+pub fn item_type_to_str(item_type: BhResult<ItemType>) -> String {
     item_type
         .map(|item_type| {
             let item_type_str: &'static str = item_type.into();
             item_type_str.to_string()
         })
         .unwrap_or_else(|e| e.to_string())
+}
+
+pub trait ItemView {
+    fn type_id(&self) -> u16;
+    fn fmt_extra(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
+    fn has_extra(&self) -> bool;
+}
+
+pub fn fmt_item_display<T: ItemView + ?Sized>(
+    item: &T,
+    f: &mut std::fmt::Formatter<'_>,
+) -> std::fmt::Result {
+    let type_id = item.type_id();
+    let item_type = ItemType::try_from(type_id).map_err(|e| BhError::InvalidItemTypeId(e.number));
+    let type_name = item_type_to_str(item_type);
+    if item.has_extra() {
+        f.write_str(&type_name)?;
+        f.write_str("(")?;
+        item.fmt_extra(f)?;
+        f.write_str(")")
+    } else {
+        f.write_str(&type_name)
+    }
+}
+
+pub trait SlotView {
+    fn len(&self) -> usize;
+    fn item_type_id(&self, index: usize) -> u16;
+    fn item_has_extra(&self, index: usize) -> bool;
+    fn fmt_item(&self, index: usize, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+struct SlotItemDisplay<'a, S: SlotView + ?Sized> {
+    slot: &'a S,
+    index: usize,
+}
+
+impl<'a, S: SlotView + ?Sized> std::fmt::Debug for SlotItemDisplay<'a, S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.slot.fmt_item(self.index, f)
+    }
+}
+
+pub fn fmt_slot_display<S: SlotView + ?Sized>(
+    slot: &S,
+    f: &mut std::fmt::Formatter<'_>,
+) -> std::fmt::Result {
+    if !slot.is_empty() {
+        let count = slot.len();
+        let first_type = slot.item_type_id(0);
+
+        let all_same_type = (0..count).all(|i| slot.item_type_id(i) == first_type);
+        let any_extra = (0..count).any(|i| slot.item_has_extra(i));
+        let is_stacked = count > 1;
+
+        let item_type =
+            ItemType::try_from(first_type).map_err(|e| BhError::InvalidItemTypeId(e.number));
+        let type_name = item_type_to_str(item_type);
+
+        match (all_same_type, any_extra, is_stacked) {
+            (true, false, _) => {
+                write!(f, "{} {}", count, type_name)
+            }
+            (_, _, false) => slot.fmt_item(0, f),
+            _ => {
+                let mut list = f.debug_list();
+                for i in 0..count {
+                    list.entry(&SlotItemDisplay { slot, index: i });
+                }
+                list.finish()
+            }
+        }
+    } else {
+        f.write_str("Empty")
+    }
 }
 
 impl Item {
@@ -806,16 +884,17 @@ impl Item {
 
     pub fn encode_colors(colors: [PigmentColor; Self::MAX_COLORS]) -> u16 {
         let mut color_bits = 0;
-        for color in colors.into_iter().rev() {
+        for color in colors.into_iter() {
             color_bits <<= 4;
             color_bits |= color as u16;
         }
-        color_bits
+        color_bits << 4
     }
 
     pub fn decode_colors(mut color_bits: u16) -> BhResult<[PigmentColor; Self::MAX_COLORS]> {
         let mut colors = [PigmentColor::Transparent; _];
-        for color_mut in colors.iter_mut() {
+        color_bits >>= 4;
+        for color_mut in colors.iter_mut().rev() {
             *color_mut = PigmentColor::try_from((color_bits & 0b1111) as u8)
                 .map_err(|e| BhError::InvalidColorId(e.number))?;
             color_bits >>= 4;
@@ -847,14 +926,27 @@ impl Item {
     }
 }
 
+impl ItemView for Item {
+    fn type_id(&self) -> u16 {
+        self.type_id
+    }
+
+    fn has_extra(&self) -> bool {
+        self.extra.is_some()
+    }
+
+    fn fmt_extra(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(extra) = &self.extra {
+            Display::fmt(extra, f)
+        } else {
+            Ok(())
+        }
+    }
+}
+
 impl Display for Item {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let type_name = item_type_to_str(self.item_type());
-        if let Some(extra) = self.extra.as_ref() {
-            f.debug_tuple(&type_name).field(&AsDisplay(extra)).finish()
-        } else {
-            f.write_str(&type_name)
-        }
+        fmt_item_display(self, f)
     }
 }
 
@@ -881,23 +973,27 @@ impl DerefMut for Slot {
     }
 }
 
+impl SlotView for Slot {
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    fn item_type_id(&self, index: usize) -> u16 {
+        self.0[index].type_id
+    }
+
+    fn item_has_extra(&self, index: usize) -> bool {
+        self.0[index].extra.is_some()
+    }
+
+    fn fmt_item(&self, index: usize, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&self.0[index], f)
+    }
+}
+
 impl Display for Slot {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(item) = self.first() {
-            let all_same_type = self.iter().all(|other| item.type_id == other.type_id);
-            let any_extra = self.iter().any(|item| item.extra().is_some());
-            let is_stacked = self.len() > 1;
-            let type_name = item_type_to_str(item.item_type());
-            match (all_same_type, any_extra, is_stacked) {
-                (true, false, _) => {
-                    write!(f, "{} {}", self.len(), type_name)
-                }
-                (_, _, false) => item.fmt(f),
-                _ => f.debug_list().entries(self.iter().map(AsDisplay)).finish(),
-            }
-        } else {
-            f.write_str("Empty")
-        }
+        fmt_slot_display(self, f)
     }
 }
 

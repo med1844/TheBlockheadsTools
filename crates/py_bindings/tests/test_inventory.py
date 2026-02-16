@@ -53,9 +53,3 @@ def test_inventory_identity():
     slot0_ref1.items = [Item(ItemType.GoldIngot)]
     assert len(slot0_ref2) == 1
     assert slot0_ref2[0].item_type == ItemType.GoldIngot
-
-def test_inventory_repr():
-    inv = Inventory()
-    r = repr(inv)
-    assert "Inventory(slots=[" in r
-    assert "Slot(items=[])" in r

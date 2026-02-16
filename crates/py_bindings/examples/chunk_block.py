@@ -1,5 +1,5 @@
 from the_blockheads_tools_py import WorldDb
-from constants import WORLD_DB_PATH, Snippet
+from util import Snippet
 
 
 def chunk_block(world_db: WorldDb):
@@ -13,12 +13,15 @@ def chunk_block(world_db: WorldDb):
         chunks = world_db.chunks
         print("num chunks:", len(chunks.keys()))
 
+        # Get spawn point coords
         world_v2 = world_db.main.world_v2
         spawn_x = world_v2.start_portal_pos_x
         spawn_y = world_v2.start_portal_pos_y
 
+        # Break down the block coord to 1) chunk coord and 2) block coord in that chunk
         block_coord = BlockCoord(spawn_x, spawn_y)
         chunk_coord, chunk_block_coord = block_coord.decompose()
+        print("coords:", block_coord, chunk_coord, chunk_block_coord)
 
         # Get chunk
         spawn_chunk = chunks.chunk_at(chunk_coord)
