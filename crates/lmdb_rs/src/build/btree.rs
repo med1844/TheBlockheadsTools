@@ -148,12 +148,10 @@ impl<A: Arch> BTreeBuilder<A> {
                     } else {
                         false
                     }
+                } else if self.subdata {
+                    current_leaf.push_subdata(key, val)
                 } else {
-                    if self.subdata {
-                        current_leaf.push_subdata(key, val)
-                    } else {
-                        current_leaf.push(key, val)
-                    }
+                    current_leaf.push(key, val)
                 };
 
                 if !retry_success {

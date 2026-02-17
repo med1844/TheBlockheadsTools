@@ -221,9 +221,7 @@ mod tests {
         {
             let mut env = crate::env::EnvWrite::new(&mut buf, DynArch::Arch32);
             let mut wtxn = env.write_txn().unwrap();
-            let db = wtxn
-                .create_database::<Bytes, Bytes>(Some("test"))
-                .unwrap();
+            let db = wtxn.create_database::<Bytes, Bytes>(Some("test")).unwrap();
             db.put(&mut wtxn, &b"key1".as_slice(), &b"val1".as_slice())
                 .unwrap();
             db.put(&mut wtxn, &b"key2".as_slice(), &b"val2".as_slice())
@@ -232,7 +230,10 @@ mod tests {
         }
 
         let page_size = 4096usize;
-        assert!(buf.len() >= page_size * 2, "File must have at least 2 pages");
+        assert!(
+            buf.len() >= page_size * 2,
+            "File must have at least 2 pages"
+        );
 
         // -- Parse Meta 0 --
         let (meta0, arch0) = MetaPage::parse(&buf[0..page_size]).unwrap();
@@ -322,7 +323,8 @@ mod tests {
                     let node = leaf.get_node(i).unwrap();
                     assert!(
                         node.is_subdata(),
-                        "Main DB node {} must have F_SUBDATA flag", i
+                        "Main DB node {} must have F_SUBDATA flag",
+                        i
                     );
                 }
             }

@@ -48,13 +48,13 @@ Open `AndroidManifest.xml` with your favorite text editor, edit these lines from
   <meta-data android:name="apportable.opengles2" android:value="true"/>
   <!-- ... -->
   <meta-data android:name="com.google.android.gms.games.APP_ID" android:value="@string/app_id"/>
-  <activity 
+  <activity
       android:label="@string/app_name"
       android:launchMode="singleTask"
       android:name="com.apportable.activity.VerdeActivity"
 -     android:screenOrientation="portrait"
 +     android:screenOrientation="sensorLandscape"
-      android:windowSoftInputMode="adjustNothing" android:configChanges="mcc|mnc|locale|touchscreen|keyboard|keyboardHidden|navigation|orientation|screenLayout|uiMode|screenSize|smallestScreenSize|fontScale">  
+      android:windowSoftInputMode="adjustNothing" android:configChanges="mcc|mnc|locale|touchscreen|keyboard|keyboardHidden|navigation|orientation|screenLayout|uiMode|screenSize|smallestScreenSize|fontScale">
 ```
 
 ## Rebuild & sign APK

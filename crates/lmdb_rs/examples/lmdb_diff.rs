@@ -46,7 +46,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let old_db = match old_env.open_database::<Str, Bytes>(&old_txn, Some(name))? {
             Some(db) => db,
             None => {
-                println!("  [WARN] Database '{}' missing in OLD file. Skipping.", name);
+                println!(
+                    "  [WARN] Database '{}' missing in OLD file. Skipping.",
+                    name
+                );
                 continue;
             }
         };
@@ -55,7 +58,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let new_db = match new_env.open_database::<Str, Bytes>(&new_txn, Some(name))? {
             Some(db) => db,
             None => {
-                println!("  [CRITICAL] Database '{}' completely MISSING in NEW file!", name);
+                println!(
+                    "  [CRITICAL] Database '{}' completely MISSING in NEW file!",
+                    name
+                );
                 continue;
             }
         };
@@ -79,7 +85,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         changed_value_count += 1;
                         let diff = (new_val.len() as i64) - (old_val.len() as i64);
                         value_size_delta += diff;
-                        
+
                         // Verbose detail for significant changes (optional, maybe flag gated?)
                         // For now just aggregate
                     } else if old_val != new_val {
@@ -91,15 +97,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     // Key missing in New
                     missing_keys_count += 1;
                     missing_bytes += old_val.len();
-                    // println!("  [MISSING] Key: '{}' (Lost {} bytes)", key, old_val.len()); 
-                    // Too spammy if 500kb is lost in small chunks. 
+                    // println!("  [MISSING] Key: '{}' (Lost {} bytes)", key, old_val.len());
+                    // Too spammy if 500kb is lost in small chunks.
                     // Maybe print first few?
                     if missing_keys_count <= 10 {
-                         println!("  [MISSING] Key: '{}' (Lost {} bytes)", key, old_val.len());
+                        println!("  [MISSING] Key: '{}' (Lost {} bytes)", key, old_val.len());
                     }
                 }
                 Err(e) => {
-                     println!("  [ERROR] checking key '{}': {}", key, e);
+                    println!("  [ERROR] checking key '{}': {}", key, e);
                 }
             }
         }
@@ -107,10 +113,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("  Summary for '{}':", name);
         println!("    Total Keys in Old: {}", inspected_keys);
         println!("    Missing Keys:      {}", missing_keys_count);
-        println!("    Missing Bytes:     {} (from missing keys)", missing_bytes);
+        println!(
+            "    Missing Bytes:     {} (from missing keys)",
+            missing_bytes
+        );
         println!("    Changed Values:    {}", changed_value_count);
-        println!("    Size Delta:        {} bytes (from changed values)", value_size_delta);
-        
+        println!(
+            "    Size Delta:        {} bytes (from changed values)",
+            value_size_delta
+        );
+
         let net_change = (value_size_delta) - (missing_bytes as i64);
         println!("    NET CHANGE:        {} bytes", net_change);
     }

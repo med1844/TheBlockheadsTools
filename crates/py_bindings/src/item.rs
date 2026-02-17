@@ -1224,7 +1224,7 @@ impl<'a> SlotView for SlotPyView<'a> {
         let item = self.slot.items[index].bind(self.py).borrow();
         fmt_item_display(
             &ItemPyView {
-                item: &*item,
+                item: &item,
                 py: self.py,
             },
             f,

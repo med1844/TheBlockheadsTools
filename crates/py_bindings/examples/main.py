@@ -9,7 +9,7 @@ import sys
 world_db = WorldDb.open_path("../tests/resources/9c3/world_db")
 world_db_io(world_db)
 chunk_block(world_db)
-# inventory(world_db)
+inventory(world_db)
 
 if len(sys.argv) > 1:
     folder_path = pathlib.Path(sys.argv[1])

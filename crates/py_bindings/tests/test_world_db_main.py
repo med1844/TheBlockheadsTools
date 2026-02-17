@@ -14,6 +14,7 @@ def test_world_db_main():
     if main.blockheads:
         assert isinstance(main.blockheads[0].name, str)
 
+
 def test_inventories():
     db = WorldDb.open_path(WORLD_DB_PATH)
     inv_keys = db.main.blockhead_inventory_keys
@@ -24,11 +25,11 @@ def test_inventories():
         first_id = list(inv_keys)[0]
         inv = db.main.get_blockhead_inventory(first_id)
         assert inv is not None
-        assert len(inv.slots) == 8
+        assert len(inv) == 8
 
         # Test setting (roundtrip)
         db.main.set_blockhead_inventory(first_id, inv)
         inv2 = db.main.get_blockhead_inventory(first_id)
         assert inv2 is not None
-        assert len(inv2.slots) == 8
+        assert len(inv2) == 8
         assert inv2 is inv

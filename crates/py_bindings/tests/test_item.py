@@ -1,8 +1,16 @@
 from the_blockheads_tools_py import (
-    Item, ItemType, PigmentColor, Slot, BasketExtra, ChestExtra, ChestType,
-    WorkbenchExtra, WorkbenchType
+    Item,
+    ItemType,
+    PigmentColor,
+    Slot,
+    BasketExtra,
+    ChestExtra,
+    ChestType,
+    WorkbenchExtra,
+    WorkbenchType,
 )
 import pytest
+
 
 def test_item_basic():
     item = Item(ItemType.Flint)
@@ -16,6 +24,7 @@ def test_item_basic():
     item.damage = 100
     assert item.damage == 100
     assert item.data_a == 100
+
 
 def test_item_fields():
     item = Item(ItemType.Flint)
@@ -32,21 +41,27 @@ def test_item_fields():
     assert item.damage == 500
 
     # RedOchre = 3, EmeraldGreen = 6 (4 bits per color)
-    item.data_b = 3 | (6 << 4)
-    assert item.colors[0] == PigmentColor.RedOchre
-    assert item.colors[1] == PigmentColor.EmeraldGreen
+    item.data_b = (3 | (6 << 4)) << 8
+    assert item.colors[0] == PigmentColor.EmeraldGreen
+    assert item.colors[1] == PigmentColor.RedOchre
     assert item.colors[2] == PigmentColor.Transparent
+
 
 def test_item_colors():
     item = Item(ItemType.Paint)
     assert item.colors == [PigmentColor.Transparent] * 3
     assert item.data_b == 0
 
-    colors = [PigmentColor.RedOchre, PigmentColor.EmeraldGreen, PigmentColor.Transparent]
+    colors = [
+        PigmentColor.RedOchre,
+        PigmentColor.EmeraldGreen,
+        PigmentColor.Transparent,
+    ]
     item.colors = colors
     assert item.colors == colors
-    # 3 | (6 << 4) | (0 << 8) = 3 + 96 = 99
-    assert item.data_b == 99
+    # (3 << 12) | (6 << 8) | (0 << 4) | 0 = 13824
+    assert item.data_b == 13824
+
 
 def test_item_edge_cases():
     item = Item(ItemType.Flint)
@@ -55,8 +70,13 @@ def test_item_edge_cases():
     with pytest.raises(ValueError, match="Invalid item type id"):
         _ = item.item_type
 
-    with pytest.raises(ValueError, match="colors must have exactly 3 elements"):
-        item.colors = [PigmentColor.RedOchre]
+    with pytest.raises(ValueError, match="colors must not have more than 3 elements"):
+        item.colors = [
+            PigmentColor.RedOchre,
+            PigmentColor.CarbonBlack,
+            PigmentColor.CopperBlue,
+            PigmentColor.EmeraldGreen,
+        ]
 
     item.data_a = 0xFFFF
     assert item.damage == 65535
@@ -64,6 +84,7 @@ def test_item_edge_cases():
     item.data_b = 0x7FFF
     with pytest.raises(ValueError, match="Invalid color ID: 15"):
         _ = item.colors
+
 
 def test_slot():
     items = [Item(ItemType.Apple), Item(ItemType.Apple)]
@@ -101,6 +122,7 @@ def test_slot():
     last_item = slot[-1]
     assert last_item is slot[1]
 
+
 def test_basket_extra():
     # Test creation
     basket = BasketExtra()
@@ -126,10 +148,11 @@ def test_basket_extra():
 
     # Match dispatch test
     match container_item.extra:
-        case BasketExtra(items=items):
-            assert len(items) == 4
+        case BasketExtra() as basket:
+            assert len(basket) == 4
         case _:
             pytest.fail("Should have matched BasketExtra")
+
 
 def test_item_repr():
     item = Item(ItemType.Flint)
@@ -141,9 +164,10 @@ def test_item_repr():
     item_with_basket = Item(ItemType.Basket, extra=basket)
     assert "BasketExtra" in repr(item_with_basket)
 
+
 def test_chest_extra_basic():
     # Test initialization and defaults
-    chest = ChestExtra(ChestType.Safe, owner_id="player1")
+    chest = ChestExtra([Slot()] * 16, ChestType.Safe, owner_id="player1")
     assert chest.chest_type == ChestType.Safe
     assert chest.owner_id == "player1"
     assert len(chest) == 16
@@ -160,6 +184,7 @@ def test_chest_extra_basic():
     assert chest.pos_x == 1234
     assert chest.float_pos == [1.5, 2.5]
     assert chest.owner_id == "new_owner"
+
 
 def test_chest_identity_and_mutation():
     chest = ChestExtra()
@@ -181,8 +206,9 @@ def test_chest_identity_and_mutation():
     assert chest[0] is new_slot
     assert chest[0] is not slot
 
+
 def test_chest_dispatch():
-    chest = ChestExtra(ChestType.Gold)
+    chest = ChestExtra([Slot()] * 16, ChestType.Gold)
     item = Item(ItemType.Chest, extra=chest)
 
     assert isinstance(item.extra, ChestExtra)
@@ -197,20 +223,15 @@ def test_chest_dispatch():
         case _:
             pytest.fail("Should have matched ChestExtra")
 
+
 def test_chest_validation():
     chest = ChestExtra()
-    assert len(chest.items) == 16
+    assert len(chest) == 16
 
-    new_items = [Slot() for _ in range(16)]
-    chest.items = new_items
-    assert len(chest.items) == 16
-
-    chest.items = [Slot()] * 5
-    assert len(chest.items) == 5
 
 def test_chest_roundtrip():
     # Creating a complex chest setup
-    chest = ChestExtra(ChestType.Portal, owner_id="portal_master")
+    chest = ChestExtra([Slot()] * 16, ChestType.Portal, owner_id="portal_master")
     chest.flipped = True
     chest.paint_color = 123
     chest.pos_x = 987654
@@ -231,6 +252,7 @@ def test_chest_roundtrip():
     assert container.extra[7][0].item_type == ItemType.Diamond
     assert container.extra[7][0].damage == 5
 
+
 def test_workbench_basic():
     wb = WorkbenchExtra()
     assert wb.workbench_type == WorkbenchType.Workbench
@@ -241,6 +263,7 @@ def test_workbench_basic():
     assert wb.workbench_type == WorkbenchType.Craft
     assert wb.level == 2
     assert wb.owner_id == "crafter"
+
 
 def test_workbench_properties():
     wb = WorkbenchExtra()
@@ -261,6 +284,7 @@ def test_workbench_properties():
     wb.unique_id = 999999
     assert wb.unique_id == 999999
 
+
 def test_workbench_integration():
     wb = WorkbenchExtra(WorkbenchType.Easel)
     item = Item(ItemType.Easel, extra=wb)
@@ -273,6 +297,7 @@ def test_workbench_integration():
             assert wt == WorkbenchType.Easel
         case _:
             pytest.fail("Should have matched WorkbenchExtra")
+
 
 def test_slot_sequence_protocol():
     slot = Slot()
@@ -299,6 +324,7 @@ def test_slot_sequence_protocol():
     with pytest.raises(TypeError):
         del slot[0:1]
 
+
 def test_slot_mutators():
     slot = Slot()
     i1 = Item(ItemType.Apple)
@@ -315,7 +341,7 @@ def test_slot_mutators():
     assert slot[2] is i3
 
     i4 = Item(ItemType.Stick)
-    slot.insert(1, i4) # [Apple, Stick, Mango, Flint]
+    slot.insert(1, i4)  # [Apple, Stick, Mango, Flint]
     assert len(slot) == 4
     assert slot[0] is i1
     assert slot[1] is i4
@@ -334,6 +360,7 @@ def test_slot_mutators():
     slot.clear()
     assert len(slot) == 0
 
+
 def test_slot_iterator():
     slot = Slot()
     items = [Item(ItemType.Apple), Item(ItemType.Mango)]
@@ -343,4 +370,3 @@ def test_slot_iterator():
     assert len(iterated) == 2
     assert iterated[0] is items[0]
     assert iterated[1] is items[1]
-
