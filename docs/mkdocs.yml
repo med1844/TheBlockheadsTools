@@ -49,6 +49,7 @@ nav:
   - Guides:
     - Setup emulator: guides/setup-emulator.md
     - Fix rotation: guides/support-landscape.md
+    - Server development: guides/server-development.md
 markdown_extensions:
   - admonition
   - pymdownx.snippets:
