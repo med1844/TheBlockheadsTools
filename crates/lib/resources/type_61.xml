@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>dynamicObjects</key>
+    <array>
+	<dict>
+	    <key>age</key>
+	    <real>16093.92</real>
+	    <key>availableFood</key>
+	    <real>1752.746</real>
+	    <key>floatPos</key>
+	    <array>
+		<real>4217.5</real>
+		<real>561</real>
+	    </array>
+	    <key>flowering</key>
+	    <false/>
+	    <key>frozen</key>
+	    <false/>
+	    <key>gatherProgress</key>
+	    <integer>0</integer>
+	    <key>growthRate</key>
+	    <real>1.101961</real>
+	    <key>growthRateGene</key>
+	    <integer>230</integer>
+	    <key>hasFloweredThisSeason</key>
+	    <false/>
+	    <key>maxAge</key>
+	    <real>16158.21</real>
+	    <key>maxAgeGene</key>
+	    <integer>194</integer>
+	    <key>pos_x</key>
+	    <integer>4217</integer>
+	    <key>pos_y</key>
+	    <integer>561</integer>
+	    <key>saveTime</key>
+	    <real>5606.000031292439</real>
+	    <key>seasonOffset</key>
+	    <integer>-4</integer>
+	    <key>uniqueID</key>
+	    <integer>119258</integer>
+	</dict>
+    </array>
+</dict>
+</plist>

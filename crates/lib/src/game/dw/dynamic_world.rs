@@ -1,6 +1,9 @@
 use super::{
     super::coord::ChunkCoord,
-    dynamic_object::{CarrotPlant, CornPlant, DynamicObjectList, TomatoPlant},
+    dynamic_object::{
+        CarrotPlant, ChilliPlant, CornPlant, DynamicObjectList, FlaxPlant, KelpPlant,
+        SunflowerPlant, TomatoPlant, TulipPlant, VinePlant, WheatPlant,
+    },
 };
 use crate::{BhError, BhResult};
 use lmdb_rs::{
@@ -124,8 +127,8 @@ pub struct ChunkDynamicObjects {
     pub orange_tree: Vec<u8>,
     pub cherry_tree: Vec<u8>,
     pub coffee_tree: Vec<u8>,
-    pub flax_plant: Vec<u8>,
-    pub sunflower_plant: Vec<u8>,
+    pub flax_plant: DynamicObjectList<FlaxPlant>,
+    pub sunflower_plant: DynamicObjectList<SunflowerPlant>,
     pub corn_plant: DynamicObjectList<CornPlant>,
     pub dodo: Vec<u8>,
     pub item: Vec<u8>,
@@ -143,8 +146,8 @@ pub struct ChunkDynamicObjects {
     pub egg: Vec<u8>,
     pub window: Vec<u8>,
     pub boat: Vec<u8>,
-    pub chilli_plant: Vec<u8>,
-    pub kelp_plant: Vec<u8>,
+    pub chilli_plant: DynamicObjectList<ChilliPlant>,
+    pub kelp_plant: DynamicObjectList<KelpPlant>,
     pub clown_fish: Vec<u8>,
     pub shark: Vec<u8>,
     pub lime_tree: Vec<u8>,
@@ -162,16 +165,25 @@ pub struct ChunkDynamicObjects {
     pub elevator_motor: Vec<u8>,
     pub elevator_shaft: Vec<u8>,
     pub gem_tree: Vec<u8>,
-    pub vine_plant: Vec<u8>,
-    pub tulip_plant: Vec<u8>,
-    pub wheat_plant: Vec<u8>,
+    pub vine_plant: DynamicObjectList<VinePlant>,
+    pub tulip_plant: DynamicObjectList<TulipPlant>,
+    pub wheat_plant: DynamicObjectList<WheatPlant>,
     pub tomato_plant: DynamicObjectList<TomatoPlant>,
     pub yak: Vec<u8>,
 }
 
 impl ChunkDynamicObjects {
     pub fn num_objects(&self) -> usize {
-        self.tomato_plant.len() + self.corn_plant.len() + self.carrot_plant.len()
+        self.tomato_plant.len()
+            + self.corn_plant.len()
+            + self.carrot_plant.len()
+            + self.chilli_plant.len()
+            + self.sunflower_plant.len()
+            + self.flax_plant.len()
+            + self.kelp_plant.len()
+            + self.tulip_plant.len()
+            + self.vine_plant.len()
+            + self.wheat_plant.len()
     }
 }
 
@@ -214,8 +226,8 @@ impl DynamicWorld {
                 DynamicObjectType::OrangeTree => entry.orange_tree = v.to_vec(),
                 DynamicObjectType::CherryTree => entry.cherry_tree = v.to_vec(),
                 DynamicObjectType::CoffeeTree => entry.coffee_tree = v.to_vec(),
-                DynamicObjectType::FlaxPlant => entry.flax_plant = v.to_vec(),
-                DynamicObjectType::SunflowerPlant => entry.sunflower_plant = v.to_vec(),
+                DynamicObjectType::FlaxPlant => entry.flax_plant = plist::from_bytes(v)?,
+                DynamicObjectType::SunflowerPlant => entry.sunflower_plant = plist::from_bytes(v)?,
                 DynamicObjectType::CornPlant => entry.corn_plant = plist::from_bytes(v)?,
                 DynamicObjectType::Dodo => entry.dodo = v.to_vec(),
                 DynamicObjectType::Item => entry.item = v.to_vec(),
@@ -233,8 +245,8 @@ impl DynamicWorld {
                 DynamicObjectType::Egg => entry.egg = v.to_vec(),
                 DynamicObjectType::Window => entry.window = v.to_vec(),
                 DynamicObjectType::Boat => entry.boat = v.to_vec(),
-                DynamicObjectType::ChilliPlant => entry.chilli_plant = v.to_vec(),
-                DynamicObjectType::KelpPlant => entry.kelp_plant = v.to_vec(),
+                DynamicObjectType::ChilliPlant => entry.chilli_plant = plist::from_bytes(v)?,
+                DynamicObjectType::KelpPlant => entry.kelp_plant = plist::from_bytes(v)?,
                 DynamicObjectType::ClownFish => entry.clown_fish = v.to_vec(),
                 DynamicObjectType::Shark => entry.shark = v.to_vec(),
                 DynamicObjectType::LimeTree => entry.lime_tree = v.to_vec(),
@@ -252,9 +264,9 @@ impl DynamicWorld {
                 DynamicObjectType::ElevatorMotor => entry.elevator_motor = v.to_vec(),
                 DynamicObjectType::ElevatorShaft => entry.elevator_shaft = v.to_vec(),
                 DynamicObjectType::GemTree => entry.gem_tree = v.to_vec(),
-                DynamicObjectType::VinePlant => entry.vine_plant = v.to_vec(),
-                DynamicObjectType::TulipPlant => entry.tulip_plant = v.to_vec(),
-                DynamicObjectType::WheatPlant => entry.wheat_plant = v.to_vec(),
+                DynamicObjectType::VinePlant => entry.vine_plant = plist::from_bytes(v)?,
+                DynamicObjectType::TulipPlant => entry.tulip_plant = plist::from_bytes(v)?,
+                DynamicObjectType::WheatPlant => entry.wheat_plant = plist::from_bytes(v)?,
                 DynamicObjectType::TomatoPlant => entry.tomato_plant = plist::from_bytes(v)?,
                 DynamicObjectType::Yak => entry.yak = v.to_vec(),
             }
@@ -378,159 +390,26 @@ mod tests {
 
     #[test]
     fn test_dynamic_world_round_trip() {
-        let tomato_plist_source: &[u8] = b"
-<?xml version=\"1.0\" encoding=\"UTF-8\"?>
-<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
-<plist version=\"1.0\">
-<dict>
-    <key>dynamicObjects</key>
-    <array>
-        <dict>
-            <key>floatPos</key>
-            <array>
-                <real>4431.5</real>
-                <real>522</real>
-            </array>
-            <key>pos_x</key>
-            <integer>4431</integer>
-            <key>pos_y</key>
-            <integer>522</integer>
-            <key>uniqueID</key>
-            <integer>106576</integer>
-            <key>saveTime</key>
-            <real>5581.80003093183</real>
-            <key>seasonOffset</key>
-            <integer>-1</integer>
-            <key>gatherProgress</key>
-            <integer>0</integer>
-            <key>hasFloweredThisSeason</key>
-            <false/>
-            <key>flowering</key>
-            <false/>
-            <key>frozen</key>
-            <false/>
-            <key>age</key>
-            <real>6353.9091796875</real>
-            <key>maxAge</key>
-            <real>16644.7109375</real>
-            <key>maxAgeGene</key>
-            <integer>200</integer>
-            <key>growthRate</key>
-            <real>0.9686275124549866</real>
-            <key>growthRateGene</key>
-            <integer>196</integer>
-            <key>availableFood</key>
-            <real>1046.7919921875</real>
-        </dict>
-    </array>
-</dict>
-</plist>";
-        let corn_plist_source: &[u8] = b"
-<?xml version=\"1.0\" encoding=\"UTF-8\"?>
-<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
-<plist version=\"1.0\">
-<dict>
-    <key>dynamicObjects</key>
-    <array>
-        <dict>
-            <key>age</key>
-            <real>6684.742</real>
-            <key>availableFood</key>
-            <real>1436.561</real>
-            <key>floatPos</key>
-            <array>
-                <real>11562.5</real>
-                <real>659</real>
-            </array>
-            <key>flowering</key>
-            <false/>
-            <key>frozen</key>
-            <false/>
-            <key>gatherProgress</key>
-            <integer>0</integer>
-            <key>growthRate</key>
-            <real>0.9333333</real>
-            <key>growthRateGene</key>
-            <integer>187</integer>
-            <key>hasFloweredThisSeason</key>
-            <false/>
-            <key>maxAge</key>
-            <real>15882.35</real>
-            <key>maxAgeGene</key>
-            <integer>185</integer>
-            <key>pos_x</key>
-            <integer>11562</integer>
-            <key>pos_y</key>
-            <integer>659</integer>
-            <key>saveTime</key>
-            <real>5493.800029620528</real>
-            <key>seasonOffset</key>
-            <integer>6</integer>
-            <key>uniqueID</key>
-            <integer>129771</integer>
-        </dict>
-    </array>
-</dict>
-</plist>";
-        let carrot_plist_source: &[u8] = b"
-<?xml version=\"1.0\" encoding=\"UTF-8\"?>
-<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
-<plist version=\"1.0\">
-<dict>
-    <key>dynamicObjects</key>
-    <array>
-        <dict>
-            <key>age</key>
-            <real>16878.66</real>
-            <key>availableFood</key>
-            <real>88.2</real>
-            <key>floatPos</key>
-            <array>
-                <real>11002.5</real>
-                <real>517</real>
-            </array>
-            <key>flowering</key>
-            <false/>
-            <key>frozen</key>
-            <false/>
-            <key>gatherProgress</key>
-            <integer>0</integer>
-            <key>growthRate</key>
-            <real>0</real>
-            <key>growthRateGene</key>
-            <integer>207</integer>
-            <key>hasFloweredThisSeason</key>
-            <false/>
-            <key>maxAge</key>
-            <real>16797.18</real>
-            <key>maxAgeGene</key>
-            <integer>203</integer>
-            <key>pos_x</key>
-            <integer>11002</integer>
-            <key>pos_y</key>
-            <integer>517</integer>
-            <key>saveTime</key>
-            <real>5890.200031712651</real>
-            <key>seasonOffset</key>
-            <integer>-7</integer>
-            <key>uniqueID</key>
-            <integer>4804</integer>
-        </dict>
-    </array>
-</dict>
-</plist>";
+        fn read_test_xml<T: serde::de::DeserializeOwned>(
+            obj_type: DynamicObjectType,
+        ) -> super::DynamicObjectList<T> {
+            let path = format!("resources/type_{}.xml", obj_type as u16);
+            let bytes = std::fs::read(&path).unwrap_or_else(|_| panic!("Failed to read {}", path));
+            plist::from_bytes(&bytes).unwrap()
+        }
 
         let mut monster = ChunkDynamicObjects::default();
 
-        if !tomato_plist_source.is_empty() {
-            monster.tomato_plant = plist::from_bytes(tomato_plist_source).unwrap();
-        }
-        if !corn_plist_source.is_empty() {
-            monster.corn_plant = plist::from_bytes(corn_plist_source).unwrap();
-        }
-        if !carrot_plist_source.is_empty() {
-            monster.carrot_plant = plist::from_bytes(carrot_plist_source).unwrap();
-        }
+        monster.tomato_plant = read_test_xml(DynamicObjectType::TomatoPlant);
+        monster.corn_plant = read_test_xml(DynamicObjectType::CornPlant);
+        monster.carrot_plant = read_test_xml(DynamicObjectType::CarrotPlant);
+        monster.chilli_plant = read_test_xml(DynamicObjectType::ChilliPlant);
+        monster.sunflower_plant = read_test_xml(DynamicObjectType::SunflowerPlant);
+        monster.flax_plant = read_test_xml(DynamicObjectType::FlaxPlant);
+        monster.kelp_plant = read_test_xml(DynamicObjectType::KelpPlant);
+        monster.tulip_plant = read_test_xml(DynamicObjectType::TulipPlant);
+        monster.vine_plant = read_test_xml(DynamicObjectType::VinePlant);
+        monster.wheat_plant = read_test_xml(DynamicObjectType::WheatPlant);
 
         monster.apple_tree = vec![1, 0xAA, 0xBB];
         monster.maple_tree = vec![2, 0xAA, 0xBB];
@@ -541,8 +420,6 @@ mod tests {
         monster.orange_tree = vec![7, 0xAA, 0xBB];
         monster.cherry_tree = vec![8, 0xAA, 0xBB];
         monster.coffee_tree = vec![9, 0xAA, 0xBB];
-        monster.flax_plant = vec![10, 0xAA, 0xBB];
-        monster.sunflower_plant = vec![11, 0xAA, 0xBB];
         monster.dodo = vec![13, 0xAA, 0xBB];
         monster.item = vec![14, 0xAA, 0xBB];
         monster.fire = vec![16, 0xAA, 0xBB];
@@ -558,8 +435,6 @@ mod tests {
         monster.egg = vec![30, 0xAA, 0xBB];
         monster.window = vec![31, 0xAA, 0xBB];
         monster.boat = vec![32, 0xAA, 0xBB];
-        monster.chilli_plant = vec![33, 0xAA, 0xBB];
-        monster.kelp_plant = vec![34, 0xAA, 0xBB];
         monster.clown_fish = vec![35, 0xAA, 0xBB];
         monster.shark = vec![36, 0xAA, 0xBB];
         monster.lime_tree = vec![37, 0xAA, 0xBB];
@@ -577,9 +452,6 @@ mod tests {
         monster.elevator_motor = vec![55, 0xAA, 0xBB];
         monster.elevator_shaft = vec![56, 0xAA, 0xBB];
         monster.gem_tree = vec![57, 0xAA, 0xBB];
-        monster.vine_plant = vec![58, 0xAA, 0xBB];
-        monster.tulip_plant = vec![59, 0xAA, 0xBB];
-        monster.wheat_plant = vec![61, 0xAA, 0xBB];
         monster.yak = vec![63, 0xAA, 0xBB];
 
         let coord = ChunkCoord::new(10, 20).unwrap();

@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>dynamicObjects</key>
+    <array>
+	<dict>
+	    <key>age</key>
+	    <real>1999.771</real>
+	    <key>availableFood</key>
+	    <real>144.8237</real>
+	    <key>dead</key>
+	    <false/>
+	    <key>floatPos</key>
+	    <array>
+		<real>3806.5</real>
+		<real>539</real>
+	    </array>
+	    <key>growthCounter</key>
+	    <real>0.0961878</real>
+	    <key>growthRate</key>
+	    <real>0.2382353</real>
+	    <key>growthRateGene</key>
+	    <integer>192</integer>
+	    <key>height</key>
+	    <integer>2</integer>
+	    <key>maxAge</key>
+	    <real>26420.48</real>
+	    <key>maxHeight</key>
+	    <integer>7</integer>
+	    <key>maxHeightGene</key>
+	    <integer>216</integer>
+	    <key>maxHeightReached</key>
+	    <integer>2</integer>
+	    <key>pos_x</key>
+	    <integer>3806</integer>
+	    <key>pos_y</key>
+	    <integer>539</integer>
+	    <key>removeCheckCount</key>
+	    <real>0</real>
+	    <key>saveTime</key>
+	    <real>5581.80003093183</real>
+	    <key>splitDirection</key>
+	    <true/>
+	    <key>splitHeightA</key>
+	    <integer>3</integer>
+	    <key>splitHeightB</key>
+	    <integer>5</integer>
+	    <key>timeDied</key>
+	    <real>0</real>
+	    <key>treeFruit</key>
+	    <array>
+	    </array>
+	    <key>treeSeasonOffset</key>
+	    <integer>-24</integer>
+	    <key>uniqueID</key>
+	    <integer>106095</integer>
+	</dict>
+    </array>
+</dict>
+</plist>

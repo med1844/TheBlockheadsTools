@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>dynamicObjects</key>
+    <array>
+	<dict>
+	    <key>connectionType</key>
+	    <integer>-2</integer>
+	    <key>dataA</key>
+	    <integer>0</integer>
+	    <key>dataB</key>
+	    <integer>0</integer>
+	    <key>floatPos</key>
+	    <array>
+		<real>3311.5</real>
+		<real>786</real>
+	    </array>
+	    <key>itemType</key>
+	    <integer>86</integer>
+	    <key>lightDict</key>
+	    <dict>
+		<key>contributionGridOrigin.x</key>
+		<integer>3307</integer>
+		<key>contributionGridOrigin.y</key>
+		<integer>782</integer>
+		<key>floatPos</key>
+		<array>
+		    <real>3311.5</real>
+		    <real>786</real>
+		</array>
+		<key>lightDirection</key>
+		<integer>0</integer>
+		<key>maxBlue</key>
+		<integer>220</integer>
+		<key>maxGreen</key>
+		<integer>0</integer>
+		<key>maxHeat</key>
+		<integer>0</integer>
+		<key>maxRed</key>
+		<integer>0</integer>
+		<key>pos_x</key>
+		<integer>3311</integer>
+		<key>pos_y</key>
+		<integer>786</integer>
+		<key>radius</key>
+		<integer>4</integer>
+		<key>uniqueID</key>
+		<integer>138932</integer>
+	    </dict>
+	    <key>pos_x</key>
+	    <integer>3311</integer>
+	    <key>pos_y</key>
+	    <integer>786</integer>
+	    <key>uniqueID</key>
+	    <integer>138931</integer>
+	</dict>
+    </array>
+</dict>
+</plist>

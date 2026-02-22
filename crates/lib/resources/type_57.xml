@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>dynamicObjects</key>
+    <array>
+	<dict>
+	    <key>age</key>
+	    <real>200.1981</real>
+	    <key>dead</key>
+	    <false/>
+	    <key>floatPos</key>
+	    <array>
+		<real>3314.5</real>
+		<real>856</real>
+	    </array>
+	    <key>fruitYear</key>
+	    <integer>6</integer>
+	    <key>gemTreeType</key>
+	    <integer>12</integer>
+	    <key>height</key>
+	    <integer>11</integer>
+	    <key>pos_x</key>
+	    <integer>3314</integer>
+	    <key>pos_y</key>
+	    <integer>856</integer>
+	    <key>removeCheckCount</key>
+	    <real>0</real>
+	    <key>saveTime</key>
+	    <real>5432.200028702617</real>
+	    <key>timeDied</key>
+	    <real>0</real>
+	    <key>treeFruit</key>
+	    <array>
+		<dict>
+		    <key>hasCreatedFreeBlockThisSeason</key>
+		    <false/>
+		    <key>pos.x</key>
+		    <integer>3310</integer>
+		    <key>pos.y</key>
+		    <integer>865</integer>
+		</dict>
+	    </array>
+	    <key>treeSeasonOffset</key>
+	    <integer>-17</integer>
+	    <key>uniqueID</key>
+	    <integer>142403</integer>
+	</dict>
+    </array>
+</dict>
+</plist>

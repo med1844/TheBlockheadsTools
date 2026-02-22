@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>dynamicObjects</key>
+    <array>
+	<dict>
+	    <key>floatPos</key>
+	    <array>
+		<real>3284.5</real>
+		<real>77</real>
+	    </array>
+	    <key>lightDict</key>
+	    <dict>
+		<key>contributionGridOrigin.x</key>
+		<integer>3278</integer>
+		<key>contributionGridOrigin.y</key>
+		<integer>71</integer>
+		<key>floatPos</key>
+		<array>
+		    <real>3284.5</real>
+		    <real>77</real>
+		</array>
+		<key>lightDirection</key>
+		<integer>0</integer>
+		<key>maxBlue</key>
+		<integer>127</integer>
+		<key>maxGreen</key>
+		<integer>94</integer>
+		<key>maxHeat</key>
+		<integer>0</integer>
+		<key>maxRed</key>
+		<integer>76</integer>
+		<key>pos_x</key>
+		<integer>3284</integer>
+		<key>pos_y</key>
+		<integer>77</integer>
+		<key>radius</key>
+		<integer>6</integer>
+		<key>uniqueID</key>
+		<integer>26165</integer>
+	    </dict>
+	    <key>pos_x</key>
+	    <integer>3284</integer>
+	    <key>pos_y</key>
+	    <integer>77</integer>
+	    <key>tileType</key>
+	    <integer>16</integer>
+	    <key>uniqueID</key>
+	    <integer>26164</integer>
+	</dict>
+    </array>
+</dict>
+</plist>

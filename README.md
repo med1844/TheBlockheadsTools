@@ -27,6 +27,7 @@ Check out [docs](https://med1844.github.io/TheBlockheadsTools/docs/) for install
 
 - [ ] Understand all dynamic objects, container types, workbench types
 - [ ] Understand world generation algo & tree density algo
+- [ ] Refactor to use SNAFU
 - [ ] MVP of modifing blocks & saving
   MVP: ui exposing drop menu for block type
 - [ ] Ergonomic block editing

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>dynamicObjects</key>
+    <array>
+	<dict>
+	    <key>age</key>
+	    <real>2209.971</real>
+	    <key>breed</key>
+	    <integer>0</integer>
+	    <key>damage</key>
+	    <integer>0</integer>
+	    <key>floatPos</key>
+	    <array>
+		<real>3744.524</real>
+		<real>521</real>
+	    </array>
+	    <key>fullness</key>
+	    <real>1035.996</real>
+	    <key>hasBeenFedByBlockheadOrChest</key>
+	    <false/>
+	    <key>hasBred</key>
+	    <false/>
+	    <key>layCooldownTimer</key>
+	    <real>-65.45115</real>
+	    <key>layTimer</key>
+	    <real>0</real>
+	    <key>mateBreed</key>
+	    <integer>0</integer>
+	    <key>mateCooldownTimer</key>
+	    <real>-624.0197</real>
+	    <key>pos_x</key>
+	    <integer>3744</integer>
+	    <key>pos_y</key>
+	    <integer>521</integer>
+	    <key>saveTime</key>
+	    <real>5603.8</real>
+	    <key>tameCooldownTimer</key>
+	    <real>0</real>
+	    <key>uniqueID</key>
+	    <integer>106094</integer>
+	</dict>
+    </array>
+</dict>
+</plist>

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>dynamicObjects</key>
+    <array>
+	<dict>
+	    <key>bounceTimer</key>
+	    <real>1</real>
+	    <key>creationTime</key>
+	    <real>4546.200015500188</real>
+	    <key>dataA</key>
+	    <integer>0</integer>
+	    <key>dataB</key>
+	    <integer>0</integer>
+	    <key>fallSpeed</key>
+	    <real>-0.05</real>
+	    <key>floatPos</key>
+	    <array>
+		<real>0.5</real>
+		<real>528.5</real>
+	    </array>
+	    <key>floatPos[VX]</key>
+	    <real>0.5</real>
+	    <key>floatPos[VY]</key>
+	    <real>528.5</real>
+	    <key>hovers</key>
+	    <true/>
+	    <key>itemType</key>
+	    <integer>142</integer>
+	    <key>pos_x</key>
+	    <integer>0</integer>
+	    <key>pos_y</key>
+	    <integer>528</integer>
+	    <key>uniqueID</key>
+	    <integer>5908</integer>
+	</dict>
+    </array>
+</dict>
+</plist>

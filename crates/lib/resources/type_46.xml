@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>dynamicObjects</key>
+    <array>
+	<dict>
+	    <key>chestType</key>
+	    <integer>3</integer>
+	    <key>flipped</key>
+	    <false/>
+	    <key>floatPos</key>
+	    <array>
+		<real>4944.5</real>
+		<real>792</real>
+	    </array>
+	    <key>interactionObjectType</key>
+	    <integer>2</integer>
+	    <key>isInUse</key>
+	    <false/>
+	    <key>paintColor</key>
+	    <integer>0</integer>
+	    <key>pos_x</key>
+	    <integer>4944</integer>
+	    <key>pos_y</key>
+	    <integer>792</integer>
+	    <key>saveTime</key>
+	    <real>5183.600024998188</real>
+	    <key>uniqueID</key>
+	    <integer>139285</integer>
+	</dict>
+    </array>
+</dict>
+</plist>
