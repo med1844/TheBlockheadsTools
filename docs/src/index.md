@@ -38,7 +38,7 @@ python -c "import the_blockheads_tools_py"
 
 If it silently completes without throwing an error, you're good to go!
 
-### Web GUI
+### Editor on Web
 
 The editor GUI can run in the browser. To serve it locally, you'll need the WebAssembly target and `trunk`:
 
@@ -53,10 +53,10 @@ cargo install trunk
 cd crates/web_gui
 
 # Serve the web GUI locally
-trunk serve
+trunk serve --release
 ```
 
-Then, open your browser and navigate to the address `trunk` provides (usually `http://127.0.0.1:8080`).
+Then, open your browser and navigate to the address `trunk` provides (usually `localhost:8080`).
 
 ## Next steps
 

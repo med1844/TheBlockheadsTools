@@ -4,7 +4,7 @@ name: Deploy Editor and Docs
 on:
   push:
     branches:
-      - rust
+      - main
 
 permissions:
   contents: read
