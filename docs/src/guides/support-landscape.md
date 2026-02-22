@@ -40,7 +40,7 @@ The Blockheads_1.7.6_APKPure/
 
 ## Edit manifest
 
-Open `AndroidManifest.xml` with your favorite text editor, edit these lines from:
+Open `AndroidManifest.xml` with your favorite text editor, edit these lines:
 
 ```diff
 - <meta-data android:name="apportable.orientation" android:value="portrait"/>

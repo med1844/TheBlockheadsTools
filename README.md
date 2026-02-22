@@ -11,7 +11,8 @@ While we don't fully understand every detail of the game save format yet, this t
 
 - Explore your game world dynamically using a highly efficient 3D viewer (available for desktop and web).
 
-  ![Online World Viewer](docs/src/assets/editor.png)
+  ![World Viewer (Zoomed In)](docs/src/assets/editor_zoom_in.png)
+  ![World Viewer (Zoomed Out)](docs/src/assets/editor_zoom_out.png)
 
 - Use Python scripts to automate tasks such as modifying blocks, giving items, or changing blockhead inventories.
 

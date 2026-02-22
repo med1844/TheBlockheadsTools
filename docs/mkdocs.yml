@@ -48,8 +48,8 @@ nav:
     - Examples: getting-started/examples.md
   - Guides:
     - Setup emulator: guides/setup-emulator.md
+    - Setup server: guides/setup-server.md
     - Fix rotation: guides/support-landscape.md
-    - Server development: guides/server-development.md
 markdown_extensions:
   - admonition
   - pymdownx.snippets:
