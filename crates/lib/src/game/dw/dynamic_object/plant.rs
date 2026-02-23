@@ -29,10 +29,9 @@ pub struct NormalPlant {
     #[serde(flatten)]
     pub plant: Plant,
     pub available_food: f32,
-    // Note: `lightDict` is intentionally discarded due to failure
-    // of handling both `flatten` and `skip serialization if` in the same struct.
+    // #[serde(default)]
+    // pub light_dict: Option<ArtificialLight>,
 }
-
 inherit!(NormalPlant -> Plant, plant);
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

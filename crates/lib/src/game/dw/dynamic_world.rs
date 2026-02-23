@@ -1,8 +1,15 @@
 use super::{
     super::coord::ChunkCoord,
     dynamic_object::{
-        CarrotPlant, ChilliPlant, CornPlant, DynamicObjectList, FlaxPlant, KelpPlant,
-        SunflowerPlant, TomatoPlant, TulipPlant, VinePlant, WheatPlant,
+        DynamicObjectList,
+        plant::{
+            CarrotPlant, ChilliPlant, CornPlant, FlaxPlant, KelpPlant, SunflowerPlant, TomatoPlant,
+            TulipPlant, VinePlant, WheatPlant,
+        },
+        tree::{
+            AppleTree, CactusTree, CherryTree, CoconutTree, CoffeeTree, GemTree, LimeTree,
+            MangoTree, MapleTree, OrangeTree, PineTree,
+        },
     },
 };
 use crate::{BhError, BhResult};
@@ -118,15 +125,15 @@ impl<T: Serialize> ToXmlPlist for DynamicObjectList<T> {
 /// Contains all different types of dynamic objects that one chunk might have.
 #[derive(Debug, Default, PartialEq)]
 pub struct ChunkDynamicObjects {
-    pub apple_tree: Vec<u8>,
-    pub maple_tree: Vec<u8>,
-    pub mango_tree: Vec<u8>,
-    pub pine_tree: Vec<u8>,
-    pub cactus_tree: Vec<u8>,
-    pub coconut_tree: Vec<u8>,
-    pub orange_tree: Vec<u8>,
-    pub cherry_tree: Vec<u8>,
-    pub coffee_tree: Vec<u8>,
+    pub apple_tree: DynamicObjectList<AppleTree>,
+    pub maple_tree: DynamicObjectList<MapleTree>,
+    pub mango_tree: DynamicObjectList<MangoTree>,
+    pub pine_tree: DynamicObjectList<PineTree>,
+    pub cactus_tree: DynamicObjectList<CactusTree>,
+    pub coconut_tree: DynamicObjectList<CoconutTree>,
+    pub orange_tree: DynamicObjectList<OrangeTree>,
+    pub cherry_tree: DynamicObjectList<CherryTree>,
+    pub coffee_tree: DynamicObjectList<CoffeeTree>,
     pub flax_plant: DynamicObjectList<FlaxPlant>,
     pub sunflower_plant: DynamicObjectList<SunflowerPlant>,
     pub corn_plant: DynamicObjectList<CornPlant>,
@@ -150,7 +157,7 @@ pub struct ChunkDynamicObjects {
     pub kelp_plant: DynamicObjectList<KelpPlant>,
     pub clown_fish: Vec<u8>,
     pub shark: Vec<u8>,
-    pub lime_tree: Vec<u8>,
+    pub lime_tree: DynamicObjectList<LimeTree>,
     pub wire: Vec<u8>,
     pub cave_troll: Vec<u8>,
     pub rail: Vec<u8>,
@@ -164,7 +171,7 @@ pub struct ChunkDynamicObjects {
     pub stairs: Vec<u8>,
     pub elevator_motor: Vec<u8>,
     pub elevator_shaft: Vec<u8>,
-    pub gem_tree: Vec<u8>,
+    pub gem_tree: DynamicObjectList<GemTree>,
     pub vine_plant: DynamicObjectList<VinePlant>,
     pub tulip_plant: DynamicObjectList<TulipPlant>,
     pub wheat_plant: DynamicObjectList<WheatPlant>,
@@ -174,16 +181,27 @@ pub struct ChunkDynamicObjects {
 
 impl ChunkDynamicObjects {
     pub fn num_objects(&self) -> usize {
-        self.tomato_plant.len()
+        self.apple_tree.len()
+            + self.maple_tree.len()
+            + self.mango_tree.len()
+            + self.pine_tree.len()
+            + self.cactus_tree.len()
+            + self.coconut_tree.len()
+            + self.orange_tree.len()
+            + self.cherry_tree.len()
+            + self.coffee_tree.len()
+            + self.flax_plant.len()
+            + self.sunflower_plant.len()
             + self.corn_plant.len()
             + self.carrot_plant.len()
             + self.chilli_plant.len()
-            + self.sunflower_plant.len()
-            + self.flax_plant.len()
             + self.kelp_plant.len()
-            + self.tulip_plant.len()
+            + self.lime_tree.len()
+            + self.gem_tree.len()
             + self.vine_plant.len()
+            + self.tulip_plant.len()
             + self.wheat_plant.len()
+            + self.tomato_plant.len()
     }
 }
 
@@ -217,15 +235,15 @@ impl DynamicWorld {
                 .entry(coord)
                 .or_insert_with(ChunkDynamicObjects::default);
             match dyn_obj_type {
-                DynamicObjectType::AppleTree => entry.apple_tree = v.to_vec(),
-                DynamicObjectType::MapleTree => entry.maple_tree = v.to_vec(),
-                DynamicObjectType::MangoTree => entry.mango_tree = v.to_vec(),
-                DynamicObjectType::PineTree => entry.pine_tree = v.to_vec(),
-                DynamicObjectType::CactusTree => entry.cactus_tree = v.to_vec(),
-                DynamicObjectType::CoconutTree => entry.coconut_tree = v.to_vec(),
-                DynamicObjectType::OrangeTree => entry.orange_tree = v.to_vec(),
-                DynamicObjectType::CherryTree => entry.cherry_tree = v.to_vec(),
-                DynamicObjectType::CoffeeTree => entry.coffee_tree = v.to_vec(),
+                DynamicObjectType::AppleTree => entry.apple_tree = plist::from_bytes(v)?,
+                DynamicObjectType::MapleTree => entry.maple_tree = plist::from_bytes(v)?,
+                DynamicObjectType::MangoTree => entry.mango_tree = plist::from_bytes(v)?,
+                DynamicObjectType::PineTree => entry.pine_tree = plist::from_bytes(v)?,
+                DynamicObjectType::CactusTree => entry.cactus_tree = plist::from_bytes(v)?,
+                DynamicObjectType::CoconutTree => entry.coconut_tree = plist::from_bytes(v)?,
+                DynamicObjectType::OrangeTree => entry.orange_tree = plist::from_bytes(v)?,
+                DynamicObjectType::CherryTree => entry.cherry_tree = plist::from_bytes(v)?,
+                DynamicObjectType::CoffeeTree => entry.coffee_tree = plist::from_bytes(v)?,
                 DynamicObjectType::FlaxPlant => entry.flax_plant = plist::from_bytes(v)?,
                 DynamicObjectType::SunflowerPlant => entry.sunflower_plant = plist::from_bytes(v)?,
                 DynamicObjectType::CornPlant => entry.corn_plant = plist::from_bytes(v)?,
@@ -249,7 +267,7 @@ impl DynamicWorld {
                 DynamicObjectType::KelpPlant => entry.kelp_plant = plist::from_bytes(v)?,
                 DynamicObjectType::ClownFish => entry.clown_fish = v.to_vec(),
                 DynamicObjectType::Shark => entry.shark = v.to_vec(),
-                DynamicObjectType::LimeTree => entry.lime_tree = v.to_vec(),
+                DynamicObjectType::LimeTree => entry.lime_tree = plist::from_bytes(v)?,
                 DynamicObjectType::Wire => entry.wire = v.to_vec(),
                 DynamicObjectType::CaveTroll => entry.cave_troll = v.to_vec(),
                 DynamicObjectType::Rail => entry.rail = v.to_vec(),
@@ -263,7 +281,7 @@ impl DynamicWorld {
                 DynamicObjectType::Stairs => entry.stairs = v.to_vec(),
                 DynamicObjectType::ElevatorMotor => entry.elevator_motor = v.to_vec(),
                 DynamicObjectType::ElevatorShaft => entry.elevator_shaft = v.to_vec(),
-                DynamicObjectType::GemTree => entry.gem_tree = v.to_vec(),
+                DynamicObjectType::GemTree => entry.gem_tree = plist::from_bytes(v)?,
                 DynamicObjectType::VinePlant => entry.vine_plant = plist::from_bytes(v)?,
                 DynamicObjectType::TulipPlant => entry.tulip_plant = plist::from_bytes(v)?,
                 DynamicObjectType::WheatPlant => entry.wheat_plant = plist::from_bytes(v)?,
@@ -400,26 +418,18 @@ mod tests {
 
         let mut monster = ChunkDynamicObjects::default();
 
-        monster.tomato_plant = read_test_xml(DynamicObjectType::TomatoPlant);
-        monster.corn_plant = read_test_xml(DynamicObjectType::CornPlant);
-        monster.carrot_plant = read_test_xml(DynamicObjectType::CarrotPlant);
-        monster.chilli_plant = read_test_xml(DynamicObjectType::ChilliPlant);
-        monster.sunflower_plant = read_test_xml(DynamicObjectType::SunflowerPlant);
+        monster.apple_tree = read_test_xml(DynamicObjectType::AppleTree);
+        monster.maple_tree = read_test_xml(DynamicObjectType::MapleTree);
+        monster.mango_tree = read_test_xml(DynamicObjectType::MangoTree);
+        monster.pine_tree = read_test_xml(DynamicObjectType::PineTree);
+        monster.cactus_tree = read_test_xml(DynamicObjectType::CactusTree);
+        monster.coconut_tree = read_test_xml(DynamicObjectType::CoconutTree);
+        monster.orange_tree = read_test_xml(DynamicObjectType::OrangeTree);
+        monster.cherry_tree = read_test_xml(DynamicObjectType::CherryTree);
+        monster.coffee_tree = read_test_xml(DynamicObjectType::CoffeeTree);
         monster.flax_plant = read_test_xml(DynamicObjectType::FlaxPlant);
-        monster.kelp_plant = read_test_xml(DynamicObjectType::KelpPlant);
-        monster.tulip_plant = read_test_xml(DynamicObjectType::TulipPlant);
-        monster.vine_plant = read_test_xml(DynamicObjectType::VinePlant);
-        monster.wheat_plant = read_test_xml(DynamicObjectType::WheatPlant);
-
-        monster.apple_tree = vec![1, 0xAA, 0xBB];
-        monster.maple_tree = vec![2, 0xAA, 0xBB];
-        monster.mango_tree = vec![3, 0xAA, 0xBB];
-        monster.pine_tree = vec![4, 0xAA, 0xBB];
-        monster.cactus_tree = vec![5, 0xAA, 0xBB];
-        monster.coconut_tree = vec![6, 0xAA, 0xBB];
-        monster.orange_tree = vec![7, 0xAA, 0xBB];
-        monster.cherry_tree = vec![8, 0xAA, 0xBB];
-        monster.coffee_tree = vec![9, 0xAA, 0xBB];
+        monster.sunflower_plant = read_test_xml(DynamicObjectType::SunflowerPlant);
+        monster.corn_plant = read_test_xml(DynamicObjectType::CornPlant);
         monster.dodo = vec![13, 0xAA, 0xBB];
         monster.item = vec![14, 0xAA, 0xBB];
         monster.fire = vec![16, 0xAA, 0xBB];
@@ -431,13 +441,16 @@ mod tests {
         monster.bed = vec![23, 0xAA, 0xBB];
         monster.dropbear = vec![25, 0xAA, 0xBB];
         monster.gather_block = vec![26, 0xAA, 0xBB];
+        monster.carrot_plant = read_test_xml(DynamicObjectType::CarrotPlant);
         monster.donkey = vec![28, 0xAA, 0xBB];
         monster.egg = vec![30, 0xAA, 0xBB];
         monster.window = vec![31, 0xAA, 0xBB];
         monster.boat = vec![32, 0xAA, 0xBB];
+        monster.chilli_plant = read_test_xml(DynamicObjectType::ChilliPlant);
+        monster.kelp_plant = read_test_xml(DynamicObjectType::KelpPlant);
         monster.clown_fish = vec![35, 0xAA, 0xBB];
         monster.shark = vec![36, 0xAA, 0xBB];
-        monster.lime_tree = vec![37, 0xAA, 0xBB];
+        monster.lime_tree = read_test_xml(DynamicObjectType::LimeTree);
         monster.wire = vec![38, 0xAA, 0xBB];
         monster.cave_troll = vec![39, 0xAA, 0xBB];
         monster.rail = vec![40, 0xAA, 0xBB];
@@ -451,7 +464,11 @@ mod tests {
         monster.stairs = vec![54, 0xAA, 0xBB];
         monster.elevator_motor = vec![55, 0xAA, 0xBB];
         monster.elevator_shaft = vec![56, 0xAA, 0xBB];
-        monster.gem_tree = vec![57, 0xAA, 0xBB];
+        monster.gem_tree = read_test_xml(DynamicObjectType::GemTree);
+        monster.vine_plant = read_test_xml(DynamicObjectType::VinePlant);
+        monster.tulip_plant = read_test_xml(DynamicObjectType::TulipPlant);
+        monster.wheat_plant = read_test_xml(DynamicObjectType::WheatPlant);
+        monster.tomato_plant = read_test_xml(DynamicObjectType::TomatoPlant);
         monster.yak = vec![63, 0xAA, 0xBB];
 
         let coord = ChunkCoord::new(10, 20).unwrap();

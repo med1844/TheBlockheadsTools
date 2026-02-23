@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::ops::{Deref, DerefMut};
 use typed_floats::NonNaNFinite;
 
@@ -107,7 +108,7 @@ pub struct ArtificialLight {
 }
 inherit!(ArtificialLight -> DynamicObject, obj);
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize_repr, Deserialize_repr)]
 #[repr(u8)]
 pub enum LightDirection {
     All = 0,
@@ -134,5 +135,5 @@ pub struct Blockhead {
     pub state: plist::Data,
 }
 
-mod plant;
-pub use plant::*;
+pub mod plant;
+pub mod tree;

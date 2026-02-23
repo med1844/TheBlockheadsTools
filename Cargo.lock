@@ -3227,6 +3227,7 @@ dependencies = [
  "num_enum",
  "plist",
  "serde",
+ "serde_repr",
  "strum_macros",
  "thiserror 2.0.18",
  "typed_floats",

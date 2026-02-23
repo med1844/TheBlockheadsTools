@@ -11,6 +11,7 @@ maybe-owned = "0.3.4"
 num_enum = { workspace = true }
 plist = { workspace = true }
 serde = { version = "1.0.219", features = ["derive"] }
+serde_repr = "0.1.20"
 strum_macros = "0.27.2"
 thiserror = "2.0.12"
 typed_floats = { version = "1.0.7", features = ["serde"] }

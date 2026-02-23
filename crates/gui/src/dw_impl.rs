@@ -1,7 +1,7 @@
 // Implements traits for dynamic object types defined in lib
 use super::gpu::dw::{DwIconInstanceRaw, ToIconInstance};
 use the_blockheads_tools_lib::game::{
-    dw::dynamic_object::{CarrotPlant, CornPlant, TomatoPlant},
+    dw::dynamic_object::plant::{CarrotPlant, CornPlant, TomatoPlant},
     item::ItemType,
 };
 
