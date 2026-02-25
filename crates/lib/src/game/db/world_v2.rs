@@ -1,3 +1,4 @@
+use crate::util::serde::{deserialize_some, serialize_some};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -10,15 +11,30 @@ pub struct WorldV2 {
     pub distance_ordered_food_types: plist::Data, // suspect: Vec<ItemId>, where ItemId = u32
     pub expert_mode: bool,
     pub found_items: plist::Data, // bplist dict
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "deserialize_some",
+        serialize_with = "serialize_some",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub host_port: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "deserialize_some",
+        serialize_with = "serialize_some",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub max_players: Option<String>,
     #[serde(rename = "migrationComplete_1.7")]
     pub migration_complete_v1_7: bool,
     pub no_rain_timer: f64,
     pub portal_level: u64,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "deserialize_some",
+        serialize_with = "serialize_some",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub preview_image_data: Option<plist::Data>,
     pub random_seed: u64,
     pub remote_game: bool,

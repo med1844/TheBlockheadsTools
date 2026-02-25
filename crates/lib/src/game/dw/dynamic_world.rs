@@ -1,7 +1,7 @@
 use super::{
     super::coord::ChunkCoord,
     dynamic_object::{
-        DynamicObjectList,
+        DynamicObjectList, DynamicObjectType,
         plant::{
             CarrotPlant, ChilliPlant, CornPlant, FlaxPlant, KelpPlant, SunflowerPlant, TomatoPlant,
             TulipPlant, VinePlant, WheatPlant,
@@ -12,81 +12,14 @@ use super::{
         },
     },
 };
-use crate::{BhError, BhResult};
+use crate::BhResult;
 use lmdb_rs::{
     codec::types::{Bytes, Str},
     database::Database,
     txn::{RoTxn, RwTxn},
 };
-use num_enum::TryFromPrimitive;
 use serde::Serialize;
 use std::{collections::HashMap, io::Write, ops::Deref};
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, TryFromPrimitive)]
-#[repr(u16)]
-pub enum DynamicObjectType {
-    AppleTree = 1,
-    MapleTree = 2,
-    MangoTree = 3,
-    PineTree = 4,
-    CactusTree = 5,
-    CoconutTree = 6,
-    OrangeTree = 7,
-    CherryTree = 8,
-    CoffeeTree = 9,
-    FlaxPlant = 10,
-    SunflowerPlant = 11,
-    CornPlant = 12,
-    Dodo = 13,
-    Item = 14,
-    Fire = 16,
-    Torch = 17,
-    GlowBlock = 18,
-    Ladder = 19,
-    Door = 20,
-    ArtificialLight = 21,
-    Bed = 23,
-    Dropbear = 25,
-    GatherBlock = 26,
-    CarrotPlant = 27,
-    Donkey = 28,
-    Egg = 30,
-    Window = 31,
-    Boat = 32,
-    ChilliPlant = 33,
-    KelpPlant = 34,
-    ClownFish = 35,
-    Shark = 36,
-    LimeTree = 37,
-    Wire = 38,
-    CaveTroll = 39,
-    Rail = 40,
-    Workbench = 45,
-    Chest = 46,
-    Sign = 47,
-    TradingPost = 48,
-    TradePortal = 50,
-    Scorpion = 51,
-    Column = 53,
-    Stairs = 54,
-    ElevatorMotor = 55,
-    ElevatorShaft = 56,
-    GemTree = 57,
-    VinePlant = 58,
-    TulipPlant = 59,
-    WheatPlant = 61,
-    TomatoPlant = 62,
-    Yak = 63,
-}
-
-impl DynamicObjectType {
-    fn try_from_str(s: &str) -> BhResult<Self> {
-        let value: u16 = s
-            .parse()
-            .map_err(|_| BhError::ParseError(format!("Dynamic object type {} is invalid", s)))?;
-        Self::try_from(value).map_err(|e| BhError::InvalidDynamicOjectId(e.number))
-    }
-}
 
 trait IsEmpty {
     fn is_empty(&self) -> bool;

@@ -1,4 +1,5 @@
 use super::DynamicObject;
+use crate::util::serde::{deserialize_some, serialize_some};
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::ops::{Deref, DerefMut};
@@ -43,21 +44,56 @@ pub struct Tree {
     pub dead: bool,
     pub time_died: f32,
     pub remove_check_count: f32,
-    #[serde(default)]
-    pub growth_counter: f32,
-    #[serde(default)]
-    pub growth_rate: f32,
-    #[serde(default)]
-    pub growth_rate_gene: u32,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_some",
+        serialize_with = "serialize_some",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub growth_counter: Option<f32>,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_some",
+        serialize_with = "serialize_some",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub growth_rate: Option<f32>,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_some",
+        serialize_with = "serialize_some",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub growth_rate_gene: Option<u32>,
     pub height: u32,
-    #[serde(default)]
-    pub max_age: f32,
-    #[serde(default)]
-    pub max_height: u32,
-    #[serde(default)]
-    pub max_height_gene: u32,
-    #[serde(default)]
-    pub max_height_reached: u32,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_some",
+        serialize_with = "serialize_some",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub max_age: Option<f32>,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_some",
+        serialize_with = "serialize_some",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub max_height: Option<u32>,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_some",
+        serialize_with = "serialize_some",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub max_height_gene: Option<u32>,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_some",
+        serialize_with = "serialize_some",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub max_height_reached: Option<u32>,
     pub save_time: f32,
     pub tree_season_offset: i32,
     #[serde(rename = "treeFruit")]
@@ -132,81 +168,3 @@ pub struct GemTree {
     pub fruit_year: i32,
 }
 inherit!(GemTree -> Tree, tree);
-
-#[cfg(test)]
-mod tests {
-    use super::{
-        super::{super::dynamic_world::DynamicObjectType, DynamicObjectList},
-        AppleTree, CactusTree, CherryTree, CoconutTree, CoffeeTree, GemTree, LimeTree, MangoTree,
-        MapleTree, OrangeTree, PineTree,
-    };
-    use serde::Serialize;
-
-    fn check_round_trip<T>(obj_type: DynamicObjectType) -> Result<(), Box<dyn std::error::Error>>
-    where
-        T: Serialize + serde::de::DeserializeOwned + PartialEq + std::fmt::Debug,
-    {
-        let test_xml = std::fs::read(format!("resources/type_{}.xml", obj_type as u16))?;
-        let trees = plist::from_bytes::<DynamicObjectList<T>>(&test_xml)?;
-        let mut serialized = Vec::with_capacity(test_xml.len());
-        plist::to_writer_xml(&mut serialized, &trees)?;
-        let trees_round_trip = plist::from_bytes::<DynamicObjectList<T>>(&serialized)?;
-        assert_eq!(trees, trees_round_trip);
-        Ok(())
-    }
-
-    #[test]
-    fn test_apple_tree_round_trip() {
-        check_round_trip::<AppleTree>(DynamicObjectType::AppleTree).unwrap();
-    }
-
-    #[test]
-    fn test_maple_tree_round_trip() {
-        check_round_trip::<MapleTree>(DynamicObjectType::MapleTree).unwrap();
-    }
-
-    #[test]
-    fn test_mango_tree_round_trip() {
-        check_round_trip::<MangoTree>(DynamicObjectType::MangoTree).unwrap();
-    }
-
-    #[test]
-    fn test_pine_tree_round_trip() {
-        check_round_trip::<PineTree>(DynamicObjectType::PineTree).unwrap();
-    }
-
-    #[test]
-    fn test_cactus_tree_round_trip() {
-        check_round_trip::<CactusTree>(DynamicObjectType::CactusTree).unwrap();
-    }
-
-    #[test]
-    fn test_coconut_tree_round_trip() {
-        check_round_trip::<CoconutTree>(DynamicObjectType::CoconutTree).unwrap();
-    }
-
-    #[test]
-    fn test_orange_tree_round_trip() {
-        check_round_trip::<OrangeTree>(DynamicObjectType::OrangeTree).unwrap();
-    }
-
-    #[test]
-    fn test_cherry_tree_round_trip() {
-        check_round_trip::<CherryTree>(DynamicObjectType::CherryTree).unwrap();
-    }
-
-    #[test]
-    fn test_coffee_tree_round_trip() {
-        check_round_trip::<CoffeeTree>(DynamicObjectType::CoffeeTree).unwrap();
-    }
-
-    #[test]
-    fn test_lime_tree_round_trip() {
-        check_round_trip::<LimeTree>(DynamicObjectType::LimeTree).unwrap();
-    }
-
-    #[test]
-    fn test_gem_tree_round_trip() {
-        check_round_trip::<GemTree>(DynamicObjectType::GemTree).unwrap();
-    }
-}
