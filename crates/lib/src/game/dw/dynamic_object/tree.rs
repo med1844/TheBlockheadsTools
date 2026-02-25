@@ -39,7 +39,7 @@ pub struct TreeFruit {
 #[serde(rename_all = "camelCase")]
 pub struct Tree {
     #[serde(flatten)]
-    pub obj: DynamicObject,
+    obj: DynamicObject,
     pub age: f32,
     pub dead: bool,
     pub time_died: f32,
@@ -105,24 +105,24 @@ inherit!(Tree -> DynamicObject, obj);
 #[serde(rename_all = "camelCase")]
 pub struct AppleTree {
     #[serde(flatten)]
-    pub tree: Tree,
+    tree: Tree,
     pub available_food: f32,
 }
 inherit!(AppleTree -> Tree, tree);
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct MapleTree(pub Tree);
+pub struct MapleTree(Tree);
 inherit!(MapleTree -> Tree);
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct MangoTree(pub Tree);
+pub struct MangoTree(Tree);
 inherit!(MangoTree -> Tree);
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PineTree {
     #[serde(flatten)]
-    pub tree: Tree,
+    tree: Tree,
     pub available_food: f32,
 }
 inherit!(PineTree -> Tree, tree);
@@ -131,7 +131,7 @@ inherit!(PineTree -> Tree, tree);
 #[serde(rename_all = "camelCase")]
 pub struct CactusTree {
     #[serde(flatten)]
-    pub tree: Tree,
+    tree: Tree,
     pub available_food: f32,
     pub split_direction: bool,
     pub split_height_a: u32,
@@ -140,30 +140,30 @@ pub struct CactusTree {
 inherit!(CactusTree -> Tree, tree);
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct CoconutTree(pub Tree);
+pub struct CoconutTree(Tree);
 inherit!(CoconutTree -> Tree);
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct OrangeTree(pub Tree);
+pub struct OrangeTree(Tree);
 inherit!(OrangeTree -> Tree);
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct CherryTree(pub Tree);
+pub struct CherryTree(Tree);
 inherit!(CherryTree -> Tree);
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct CoffeeTree(pub Tree);
+pub struct CoffeeTree(Tree);
 inherit!(CoffeeTree -> Tree);
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct LimeTree(pub Tree);
+pub struct LimeTree(Tree);
 inherit!(LimeTree -> Tree);
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GemTree {
     #[serde(flatten)]
-    pub tree: Tree,
+    tree: Tree,
     pub gem_tree_type: TreeType,
     pub fruit_year: i32,
 }

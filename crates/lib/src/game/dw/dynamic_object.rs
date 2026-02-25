@@ -203,6 +203,7 @@ pub struct Blockhead {
     pub state: plist::Data,
 }
 
+pub mod animal;
 pub mod plant;
 pub mod tree;
 
@@ -210,6 +211,7 @@ pub mod tree;
 mod tests {
     use super::{
         DynamicObjectList, DynamicObjectType,
+        animal::{CaveTroll, ClownFish, Dodo, Donkey, DropBear, Scorpion, Shark, Yak},
         plant::{
             ChilliPlant, CornPlant, FlaxPlant, KelpPlant, SunflowerPlant, TomatoPlant, TulipPlant,
             VinePlant, WheatPlant,
@@ -309,6 +311,21 @@ mod tests {
     }
 
     #[test]
+    fn test_dodo_round_trip() {
+        check_round_trip::<Dodo>(DynamicObjectType::Dodo).unwrap();
+    }
+
+    #[test]
+    fn test_drop_bear_round_trip() {
+        check_round_trip::<DropBear>(DynamicObjectType::Dropbear).unwrap();
+    }
+
+    #[test]
+    fn test_donkey_round_trip() {
+        check_round_trip::<Donkey>(DynamicObjectType::Donkey).unwrap();
+    }
+
+    #[test]
     fn test_chilli_round_trip() {
         check_round_trip::<ChilliPlant>(DynamicObjectType::ChilliPlant).unwrap();
     }
@@ -316,6 +333,31 @@ mod tests {
     #[test]
     fn test_kelp_round_trip() {
         check_round_trip::<KelpPlant>(DynamicObjectType::KelpPlant).unwrap();
+    }
+
+    #[test]
+    fn test_cave_troll_round_trip() {
+        check_round_trip::<CaveTroll>(DynamicObjectType::CaveTroll).unwrap();
+    }
+
+    #[test]
+    fn test_scorpion_round_trip() {
+        check_round_trip::<Scorpion>(DynamicObjectType::Scorpion).unwrap();
+    }
+
+    #[test]
+    fn test_yak_round_trip() {
+        check_round_trip::<Yak>(DynamicObjectType::Yak).unwrap();
+    }
+
+    #[test]
+    fn test_clown_fish_round_trip() {
+        check_round_trip::<ClownFish>(DynamicObjectType::ClownFish).unwrap();
+    }
+
+    #[test]
+    fn test_shark_round_trip() {
+        check_round_trip::<Shark>(DynamicObjectType::Shark).unwrap();
     }
 
     #[test]

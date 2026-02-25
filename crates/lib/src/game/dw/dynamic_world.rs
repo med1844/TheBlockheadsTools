@@ -2,6 +2,7 @@ use super::{
     super::coord::ChunkCoord,
     dynamic_object::{
         DynamicObjectList, DynamicObjectType,
+        animal::{CaveTroll, ClownFish, Dodo, Donkey, DropBear, Scorpion, Shark, Yak},
         plant::{
             CarrotPlant, ChilliPlant, CornPlant, FlaxPlant, KelpPlant, SunflowerPlant, TomatoPlant,
             TulipPlant, VinePlant, WheatPlant,
@@ -70,7 +71,7 @@ pub struct ChunkDynamicObjects {
     pub flax_plant: DynamicObjectList<FlaxPlant>,
     pub sunflower_plant: DynamicObjectList<SunflowerPlant>,
     pub corn_plant: DynamicObjectList<CornPlant>,
-    pub dodo: Vec<u8>,
+    pub dodo: DynamicObjectList<Dodo>,
     pub item: Vec<u8>,
     pub fire: Vec<u8>,
     pub torch: Vec<u8>,
@@ -79,27 +80,27 @@ pub struct ChunkDynamicObjects {
     pub door: Vec<u8>,
     pub artificial_light: Vec<u8>,
     pub bed: Vec<u8>,
-    pub dropbear: Vec<u8>,
+    pub dropbear: DynamicObjectList<DropBear>,
     pub gather_block: Vec<u8>,
     pub carrot_plant: DynamicObjectList<CarrotPlant>,
-    pub donkey: Vec<u8>,
+    pub donkey: DynamicObjectList<Donkey>,
     pub egg: Vec<u8>,
     pub window: Vec<u8>,
     pub boat: Vec<u8>,
     pub chilli_plant: DynamicObjectList<ChilliPlant>,
     pub kelp_plant: DynamicObjectList<KelpPlant>,
-    pub clown_fish: Vec<u8>,
-    pub shark: Vec<u8>,
+    pub clown_fish: DynamicObjectList<ClownFish>,
+    pub shark: DynamicObjectList<Shark>,
     pub lime_tree: DynamicObjectList<LimeTree>,
     pub wire: Vec<u8>,
-    pub cave_troll: Vec<u8>,
+    pub cave_troll: DynamicObjectList<CaveTroll>,
     pub rail: Vec<u8>,
     pub workbench: Vec<u8>,
     pub chest: Vec<u8>,
     pub sign: Vec<u8>,
     pub trading_post: Vec<u8>,
     pub trade_portal: Vec<u8>,
-    pub scorpion: Vec<u8>,
+    pub scorpion: DynamicObjectList<Scorpion>,
     pub column: Vec<u8>,
     pub stairs: Vec<u8>,
     pub elevator_motor: Vec<u8>,
@@ -109,7 +110,7 @@ pub struct ChunkDynamicObjects {
     pub tulip_plant: DynamicObjectList<TulipPlant>,
     pub wheat_plant: DynamicObjectList<WheatPlant>,
     pub tomato_plant: DynamicObjectList<TomatoPlant>,
-    pub yak: Vec<u8>,
+    pub yak: DynamicObjectList<Yak>,
 }
 
 impl ChunkDynamicObjects {
@@ -126,15 +127,23 @@ impl ChunkDynamicObjects {
             + self.flax_plant.len()
             + self.sunflower_plant.len()
             + self.corn_plant.len()
+            + self.dodo.len()
+            + self.dropbear.len()
             + self.carrot_plant.len()
+            + self.donkey.len()
             + self.chilli_plant.len()
             + self.kelp_plant.len()
+            + self.clown_fish.len()
+            + self.shark.len()
             + self.lime_tree.len()
+            + self.cave_troll.len()
+            + self.scorpion.len()
             + self.gem_tree.len()
             + self.vine_plant.len()
             + self.tulip_plant.len()
             + self.wheat_plant.len()
             + self.tomato_plant.len()
+            + self.yak.len()
     }
 }
 
@@ -180,7 +189,7 @@ impl DynamicWorld {
                 DynamicObjectType::FlaxPlant => entry.flax_plant = plist::from_bytes(v)?,
                 DynamicObjectType::SunflowerPlant => entry.sunflower_plant = plist::from_bytes(v)?,
                 DynamicObjectType::CornPlant => entry.corn_plant = plist::from_bytes(v)?,
-                DynamicObjectType::Dodo => entry.dodo = v.to_vec(),
+                DynamicObjectType::Dodo => entry.dodo = plist::from_bytes(v)?,
                 DynamicObjectType::Item => entry.item = v.to_vec(),
                 DynamicObjectType::Fire => entry.fire = v.to_vec(),
                 DynamicObjectType::Torch => entry.torch = v.to_vec(),
@@ -189,27 +198,27 @@ impl DynamicWorld {
                 DynamicObjectType::Door => entry.door = v.to_vec(),
                 DynamicObjectType::ArtificialLight => entry.artificial_light = v.to_vec(),
                 DynamicObjectType::Bed => entry.bed = v.to_vec(),
-                DynamicObjectType::Dropbear => entry.dropbear = v.to_vec(),
+                DynamicObjectType::Dropbear => entry.dropbear = plist::from_bytes(v)?,
                 DynamicObjectType::GatherBlock => entry.gather_block = v.to_vec(),
                 DynamicObjectType::CarrotPlant => entry.carrot_plant = plist::from_bytes(v)?,
-                DynamicObjectType::Donkey => entry.donkey = v.to_vec(),
+                DynamicObjectType::Donkey => entry.donkey = plist::from_bytes(v)?,
                 DynamicObjectType::Egg => entry.egg = v.to_vec(),
                 DynamicObjectType::Window => entry.window = v.to_vec(),
                 DynamicObjectType::Boat => entry.boat = v.to_vec(),
                 DynamicObjectType::ChilliPlant => entry.chilli_plant = plist::from_bytes(v)?,
                 DynamicObjectType::KelpPlant => entry.kelp_plant = plist::from_bytes(v)?,
-                DynamicObjectType::ClownFish => entry.clown_fish = v.to_vec(),
-                DynamicObjectType::Shark => entry.shark = v.to_vec(),
+                DynamicObjectType::ClownFish => entry.clown_fish = plist::from_bytes(v)?,
+                DynamicObjectType::Shark => entry.shark = plist::from_bytes(v)?,
                 DynamicObjectType::LimeTree => entry.lime_tree = plist::from_bytes(v)?,
                 DynamicObjectType::Wire => entry.wire = v.to_vec(),
-                DynamicObjectType::CaveTroll => entry.cave_troll = v.to_vec(),
+                DynamicObjectType::CaveTroll => entry.cave_troll = plist::from_bytes(v)?,
                 DynamicObjectType::Rail => entry.rail = v.to_vec(),
                 DynamicObjectType::Workbench => entry.workbench = v.to_vec(),
                 DynamicObjectType::Chest => entry.chest = v.to_vec(),
                 DynamicObjectType::Sign => entry.sign = v.to_vec(),
                 DynamicObjectType::TradingPost => entry.trading_post = v.to_vec(),
                 DynamicObjectType::TradePortal => entry.trade_portal = v.to_vec(),
-                DynamicObjectType::Scorpion => entry.scorpion = v.to_vec(),
+                DynamicObjectType::Scorpion => entry.scorpion = plist::from_bytes(v)?,
                 DynamicObjectType::Column => entry.column = v.to_vec(),
                 DynamicObjectType::Stairs => entry.stairs = v.to_vec(),
                 DynamicObjectType::ElevatorMotor => entry.elevator_motor = v.to_vec(),
@@ -219,7 +228,7 @@ impl DynamicWorld {
                 DynamicObjectType::TulipPlant => entry.tulip_plant = plist::from_bytes(v)?,
                 DynamicObjectType::WheatPlant => entry.wheat_plant = plist::from_bytes(v)?,
                 DynamicObjectType::TomatoPlant => entry.tomato_plant = plist::from_bytes(v)?,
-                DynamicObjectType::Yak => entry.yak = v.to_vec(),
+                DynamicObjectType::Yak => entry.yak = plist::from_bytes(v)?,
             }
         }
         Ok(Self(map))
@@ -363,7 +372,7 @@ mod tests {
         monster.flax_plant = read_test_xml(DynamicObjectType::FlaxPlant);
         monster.sunflower_plant = read_test_xml(DynamicObjectType::SunflowerPlant);
         monster.corn_plant = read_test_xml(DynamicObjectType::CornPlant);
-        monster.dodo = vec![13, 0xAA, 0xBB];
+        monster.dodo = read_test_xml(DynamicObjectType::Dodo);
         monster.item = vec![14, 0xAA, 0xBB];
         monster.fire = vec![16, 0xAA, 0xBB];
         monster.torch = vec![17, 0xAA, 0xBB];
@@ -372,27 +381,27 @@ mod tests {
         monster.door = vec![20, 0xAA, 0xBB];
         monster.artificial_light = vec![21, 0xAA, 0xBB];
         monster.bed = vec![23, 0xAA, 0xBB];
-        monster.dropbear = vec![25, 0xAA, 0xBB];
+        monster.dropbear = read_test_xml(DynamicObjectType::Dropbear);
         monster.gather_block = vec![26, 0xAA, 0xBB];
         monster.carrot_plant = read_test_xml(DynamicObjectType::CarrotPlant);
-        monster.donkey = vec![28, 0xAA, 0xBB];
+        monster.donkey = read_test_xml(DynamicObjectType::Donkey);
         monster.egg = vec![30, 0xAA, 0xBB];
         monster.window = vec![31, 0xAA, 0xBB];
         monster.boat = vec![32, 0xAA, 0xBB];
         monster.chilli_plant = read_test_xml(DynamicObjectType::ChilliPlant);
         monster.kelp_plant = read_test_xml(DynamicObjectType::KelpPlant);
-        monster.clown_fish = vec![35, 0xAA, 0xBB];
-        monster.shark = vec![36, 0xAA, 0xBB];
+        monster.clown_fish = read_test_xml(DynamicObjectType::ClownFish);
+        monster.shark = read_test_xml(DynamicObjectType::Shark);
         monster.lime_tree = read_test_xml(DynamicObjectType::LimeTree);
         monster.wire = vec![38, 0xAA, 0xBB];
-        monster.cave_troll = vec![39, 0xAA, 0xBB];
+        monster.cave_troll = read_test_xml(DynamicObjectType::CaveTroll);
         monster.rail = vec![40, 0xAA, 0xBB];
         monster.workbench = vec![45, 0xAA, 0xBB];
         monster.chest = vec![46, 0xAA, 0xBB];
         monster.sign = vec![47, 0xAA, 0xBB];
         monster.trading_post = vec![48, 0xAA, 0xBB];
         monster.trade_portal = vec![50, 0xAA, 0xBB];
-        monster.scorpion = vec![51, 0xAA, 0xBB];
+        monster.scorpion = read_test_xml(DynamicObjectType::Scorpion);
         monster.column = vec![53, 0xAA, 0xBB];
         monster.stairs = vec![54, 0xAA, 0xBB];
         monster.elevator_motor = vec![55, 0xAA, 0xBB];
@@ -402,7 +411,7 @@ mod tests {
         monster.tulip_plant = read_test_xml(DynamicObjectType::TulipPlant);
         monster.wheat_plant = read_test_xml(DynamicObjectType::WheatPlant);
         monster.tomato_plant = read_test_xml(DynamicObjectType::TomatoPlant);
-        monster.yak = vec![63, 0xAA, 0xBB];
+        monster.yak = read_test_xml(DynamicObjectType::Yak);
 
         let coord = ChunkCoord::new(10, 20).unwrap();
         let mut map = HashMap::new();

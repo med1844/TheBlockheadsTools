@@ -6,44 +6,50 @@
 	<array>
 		<dict>
 			<key>age</key>
-			<real>1025.5357666015625</real>
+			<real>35220.55859375</real>
 			<key>breed</key>
 			<integer>0</integer>
 			<key>damage</key>
 			<integer>0</integer>
+			<key>dead</key>
+			<false/>
+			<key>defendSquare.x</key>
+			<integer>13396</integer>
+			<key>defendSquare.y</key>
+			<integer>185</integer>
 			<key>floatPos</key>
 			<array>
-				<real>3398.5</real>
-				<real>709.0</real>
+				<real>13396.5</real>
+				<real>185.0</real>
 			</array>
 			<key>fullness</key>
-			<real>1308.379150390625</real>
-			<key>hair</key>
-			<real>1025.5357666015625</real>
+			<real>1619.0474853515625</real>
 			<key>hasBeenFedByBlockheadOrChest</key>
 			<false/>
 			<key>hasBred</key>
 			<false/>
 			<key>layCooldownTimer</key>
-			<real>362.8672790527344</real>
+			<real>216.74949645996094</real>
 			<key>layTimer</key>
 			<real>0.0</real>
 			<key>mateBreed</key>
 			<integer>0</integer>
 			<key>mateCooldownTimer</key>
-			<real>-0.6992590427398682</real>
-			<key>milk</key>
-			<real>0.6992590427398682</real>
+			<real>-0.36580896377563477</real>
 			<key>pos_x</key>
-			<integer>3398</integer>
+			<integer>13396</integer>
 			<key>pos_y</key>
-			<integer>709</integer>
+			<integer>185</integer>
 			<key>saveTime</key>
-			<real>20519.322265625</real>
+			<real>13392.001953125</real>
+			<key>state</key>
+			<data>
+			AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+			</data>
 			<key>tameCooldownTimer</key>
 			<real>0.0</real>
 			<key>uniqueID</key>
-			<integer>448835</integer>
+			<integer>74387</integer>
 		</dict>
 	</array>
 </dict>

@@ -3,12 +3,11 @@ use crate::util::serde::{deserialize_some, serialize_some};
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
 
-// Corresponds to Plant
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Plant {
     #[serde(flatten)]
-    pub obj: DynamicObject,
+    obj: DynamicObject,
     pub save_time: f64,
     pub season_offset: i32,
     pub gather_progress: i32,
@@ -21,14 +20,13 @@ pub struct Plant {
     pub growth_rate: f32,
     pub growth_rate_gene: u16,
 }
-
 inherit!(Plant -> DynamicObject, obj);
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NormalPlant {
     #[serde(flatten)]
-    pub plant: Plant,
+    plant: Plant,
     pub available_food: f32,
     #[serde(
         default,
@@ -41,38 +39,38 @@ pub struct NormalPlant {
 inherit!(NormalPlant -> Plant, plant);
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct CornPlant(pub NormalPlant);
+pub struct CornPlant(NormalPlant);
 inherit!(CornPlant -> NormalPlant);
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct CarrotPlant(pub NormalPlant);
+pub struct CarrotPlant(NormalPlant);
 inherit!(CarrotPlant -> NormalPlant);
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct TomatoPlant(pub NormalPlant);
+pub struct TomatoPlant(NormalPlant);
 inherit!(TomatoPlant -> NormalPlant);
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct WheatPlant(pub NormalPlant);
+pub struct WheatPlant(NormalPlant);
 inherit!(WheatPlant -> NormalPlant);
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ChilliPlant(pub NormalPlant);
+pub struct ChilliPlant(NormalPlant);
 inherit!(ChilliPlant -> NormalPlant);
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct SunflowerPlant(pub NormalPlant);
+pub struct SunflowerPlant(NormalPlant);
 inherit!(SunflowerPlant -> NormalPlant);
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct FlaxPlant(pub NormalPlant);
+pub struct FlaxPlant(NormalPlant);
 inherit!(FlaxPlant -> NormalPlant);
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct KelpPlant {
     #[serde(flatten)]
-    pub normal_plant: NormalPlant,
+    normal_plant: NormalPlant,
     pub growth_timer: f32,
     pub number_of_occupied_tiles_above: i32,
 }
@@ -82,7 +80,7 @@ inherit!(KelpPlant -> NormalPlant, normal_plant);
 #[serde(rename_all = "camelCase")]
 pub struct TulipPlant {
     #[serde(flatten)]
-    pub normal_plant: NormalPlant,
+    normal_plant: NormalPlant,
     pub color_genes: u16,
     pub mate_color_genes: u16,
     pub mix_genes: u16,
@@ -93,7 +91,7 @@ inherit!(TulipPlant -> NormalPlant, normal_plant);
 #[serde(rename_all = "camelCase")]
 pub struct VinePlant {
     #[serde(flatten)]
-    pub normal_plant: NormalPlant,
+    normal_plant: NormalPlant,
     pub growth_timer: f32,
     pub number_of_occupied_tiles_below: i32,
 }
