@@ -18,12 +18,20 @@ fn main() -> BhResult<()> {
         .unwrap()
         .unwrap();
 
-    let mut found = [false; 64];
+    // let mut found = [false; 64];
+    let mut found = [
+        false, true, true, true, true, true, true, true, true, true, true, true, true, true, true,
+        false, false, true, true, false, false, false, false, false, false, true, false, true,
+        true, false, false, false, false, true, true, true, true, true, false, true, false, false,
+        false, false, false, false, false, false, false, false, false, true, false, false, false,
+        false, false, true, true, true, false, true, true, true,
+    ];
     fs::create_dir_all("test_data").unwrap();
 
     for kv in dw_db.iter(&rtxn).unwrap() {
         if let Ok((k, v)) = kv
-            && let Some((_, type_id_str)) = k.split_once("/")
+            && let Some((chunk_coord, type_id_str)) = k.split_once("/")
+            && chunk_coord == "349_20"
             && let Ok(type_id) = type_id_str.parse::<usize>()
             && type_id < 64
             && !found[type_id]

@@ -1,5 +1,4 @@
-use super::{ArtificialLight, DynamicObject};
-use crate::util::serde::{deserialize_some, serialize_some};
+use super::DynamicObject;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::ops::{Deref, DerefMut};

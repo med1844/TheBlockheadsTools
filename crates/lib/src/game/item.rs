@@ -1,10 +1,11 @@
 use crate::{
     BhError, BhResult,
-    game::dw::dynamic_object::DynamicObject,
+    game::dw::dynamic_object::InteractionObject,
     util::gzip::{compress_into, decompress},
 };
 use num_enum::{FromPrimitive, TryFromPrimitive};
 use serde::{Deserialize, Serialize, de::Error as DeError, ser::Error as SerError};
+use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::{
     fmt::Display,
     ops::{Deref, DerefMut},
@@ -12,7 +13,17 @@ use std::{
 use strum_macros::IntoStaticStr;
 use typed_floats::NonNaNFinite;
 
-#[derive(Debug, IntoStaticStr, TryFromPrimitive)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    IntoStaticStr,
+    TryFromPrimitive,
+    Serialize_repr,
+    Deserialize_repr,
+)]
 #[repr(u16)]
 pub enum ItemType {
     Unknown = 0,
@@ -444,17 +455,6 @@ pub enum ItemType {
     LuminousPlaster = 1105,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct InteractionObject {
-    #[serde(flatten)]
-    pub parent: DynamicObject,
-    pub interaction_object_type: u64,
-    pub is_in_use: bool,
-    pub flipped: bool,
-    pub paint_color: u16,
-}
-
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, IntoStaticStr, FromPrimitive,
 )]
@@ -484,8 +484,6 @@ pub struct ChestData {
     pub parent: InteractionObject,
     pub chest_type: ChestType,
     pub save_item_slots: [Slot; Self::NUM_SLOTS],
-    #[serde(rename = "ownerID")]
-    pub owner_id: String,
 }
 
 impl ChestData {
@@ -556,8 +554,6 @@ pub struct WorkbenchData {
     pub last_world_time: NonNaNFinite<f32>,
     pub level: u8,
     pub save_time: NonNaNFinite<f32>,
-    #[serde(rename = "ownerID")]
-    pub owner_id: String,
     pub selected_index: u8,
     pub workbench_type: WorkbenchType,
     pub x_scroll: NonNaNFinite<f32>,
@@ -1131,6 +1127,7 @@ mod tests {
                     pos_x: 10,
                     pos_y: 20,
                     unique_id: crate::game::dw::dynamic_object::UniqueID::new(123),
+                    owner_id: Some("test_owner".to_string()),
                 },
                 interaction_object_type: 46,
                 is_in_use: false,
@@ -1139,7 +1136,6 @@ mod tests {
             },
             chest_type: ChestType::Standard,
             save_item_slots: [const { Slot(vec![]) }; 16],
-            owner_id: "test_owner".to_string(),
         };
 
         let item = Item {
@@ -1165,6 +1161,7 @@ mod tests {
                     pos_x: 5,
                     pos_y: 5,
                     unique_id: crate::game::dw::dynamic_object::UniqueID::new(456),
+                    owner_id: Some("wb_owner".to_string()),
                 },
                 interaction_object_type: 45,
                 is_in_use: false,
@@ -1183,7 +1180,6 @@ mod tests {
             last_world_time: 0.0f32.try_into().unwrap(),
             level: 1,
             save_time: 100.0f32.try_into().unwrap(),
-            owner_id: "wb_owner".to_string(),
             selected_index: 0,
             workbench_type: WorkbenchType::Workbench,
             x_scroll: 0.0f32.try_into().unwrap(),

@@ -1,4 +1,7 @@
-use crate::{BhError, BhResult};
+use crate::{
+    BhError, BhResult,
+    util::serde::{deserialize_some, serialize_some},
+};
 use num_enum::TryFromPrimitive;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
@@ -29,7 +32,7 @@ pub enum DynamicObjectType {
     Door = 20,
     ArtificialLight = 21,
     Bed = 23,
-    Dropbear = 25,
+    DropBear = 25,
     GatherBlock = 26,
     CarrotPlant = 27,
     Donkey = 28,
@@ -112,6 +115,12 @@ pub struct DynamicObjectList<T> {
     dynamic_objects: Vec<T>,
 }
 
+impl<T> DynamicObjectList<T> {
+    pub(crate) fn num_obj(&self) -> usize {
+        self.len()
+    }
+}
+
 impl<T> Deref for DynamicObjectList<T> {
     type Target = Vec<T>;
     fn deref(&self) -> &Self::Target {
@@ -156,6 +165,25 @@ pub struct DynamicObject {
     pub pos_y: u16,
     #[serde(rename = "uniqueID")]
     pub unique_id: UniqueID,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_some",
+        serialize_with = "serialize_some",
+        skip_serializing_if = "Option::is_none",
+        rename = "ownerID"
+    )]
+    pub owner_id: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InteractionObject {
+    #[serde(flatten)]
+    pub parent: DynamicObject,
+    pub interaction_object_type: u64,
+    pub is_in_use: bool,
+    pub flipped: bool,
+    pub paint_color: u16,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -204,6 +232,7 @@ pub struct Blockhead {
 }
 
 pub mod animal;
+pub mod craft;
 pub mod plant;
 pub mod tree;
 
@@ -212,9 +241,10 @@ mod tests {
     use super::{
         DynamicObjectList, DynamicObjectType,
         animal::{CaveTroll, ClownFish, Dodo, Donkey, DropBear, Scorpion, Shark, Yak},
+        craft::{Bed, Boat, Door, Ladder, Rail, Window, Wire},
         plant::{
-            ChilliPlant, CornPlant, FlaxPlant, KelpPlant, SunflowerPlant, TomatoPlant, TulipPlant,
-            VinePlant, WheatPlant,
+            CarrotPlant, ChilliPlant, CornPlant, FlaxPlant, KelpPlant, SunflowerPlant, TomatoPlant,
+            TulipPlant, VinePlant, WheatPlant,
         },
         tree::{
             AppleTree, CactusTree, CherryTree, CoconutTree, CoffeeTree, GemTree, LimeTree,
@@ -251,142 +281,58 @@ mod tests {
     }
 
     #[test]
-    fn test_apple_tree_round_trip() {
+    fn test_round_trip() {
         check_round_trip::<AppleTree>(DynamicObjectType::AppleTree).unwrap();
-    }
-
-    #[test]
-    fn test_maple_tree_round_trip() {
         check_round_trip::<MapleTree>(DynamicObjectType::MapleTree).unwrap();
-    }
-
-    #[test]
-    fn test_mango_tree_round_trip() {
         check_round_trip::<MangoTree>(DynamicObjectType::MangoTree).unwrap();
-    }
-
-    #[test]
-    fn test_pine_tree_round_trip() {
         check_round_trip::<PineTree>(DynamicObjectType::PineTree).unwrap();
-    }
-
-    #[test]
-    fn test_cactus_tree_round_trip() {
         check_round_trip::<CactusTree>(DynamicObjectType::CactusTree).unwrap();
-    }
-
-    #[test]
-    fn test_coconut_tree_round_trip() {
         check_round_trip::<CoconutTree>(DynamicObjectType::CoconutTree).unwrap();
-    }
-
-    #[test]
-    fn test_orange_tree_round_trip() {
         check_round_trip::<OrangeTree>(DynamicObjectType::OrangeTree).unwrap();
-    }
-
-    #[test]
-    fn test_cherry_tree_round_trip() {
         check_round_trip::<CherryTree>(DynamicObjectType::CherryTree).unwrap();
-    }
-
-    #[test]
-    fn test_coffee_tree_round_trip() {
         check_round_trip::<CoffeeTree>(DynamicObjectType::CoffeeTree).unwrap();
-    }
-
-    #[test]
-    fn test_flax_round_trip() {
         check_round_trip::<FlaxPlant>(DynamicObjectType::FlaxPlant).unwrap();
-    }
-
-    #[test]
-    fn test_sunflower_round_trip() {
         check_round_trip::<SunflowerPlant>(DynamicObjectType::SunflowerPlant).unwrap();
-    }
-
-    #[test]
-    fn test_corn_round_trip() {
         check_round_trip::<CornPlant>(DynamicObjectType::CornPlant).unwrap();
-    }
-
-    #[test]
-    fn test_dodo_round_trip() {
         check_round_trip::<Dodo>(DynamicObjectType::Dodo).unwrap();
-    }
-
-    #[test]
-    fn test_drop_bear_round_trip() {
-        check_round_trip::<DropBear>(DynamicObjectType::Dropbear).unwrap();
-    }
-
-    #[test]
-    fn test_donkey_round_trip() {
+        // check_round_trip::<Item>(DynamicObjectType::Item).unwrap();
+        // check_round_trip::<Fire>(DynamicObjectType::Fire).unwrap();
+        // check_round_trip::<Torch>(DynamicObjectType::Torch).unwrap();
+        // check_round_trip::<GlowBlock>(DynamicObjectType::GlowBlock).unwrap();
+        check_round_trip::<Ladder>(DynamicObjectType::Ladder).unwrap();
+        check_round_trip::<Door>(DynamicObjectType::Door).unwrap();
+        // check_round_trip::<ArtificialLight>(DynamicObjectType::ArtificialLight).unwrap();
+        check_round_trip::<Bed>(DynamicObjectType::Bed).unwrap();
+        check_round_trip::<DropBear>(DynamicObjectType::DropBear).unwrap();
+        // check_round_trip::<GatherBlock>(DynamicObjectType::GatherBlock).unwrap();
+        check_round_trip::<CarrotPlant>(DynamicObjectType::CarrotPlant).unwrap();
         check_round_trip::<Donkey>(DynamicObjectType::Donkey).unwrap();
-    }
-
-    #[test]
-    fn test_chilli_round_trip() {
+        // check_round_trip::<Egg>(DynamicObjectType::Egg).unwrap();
+        check_round_trip::<Window>(DynamicObjectType::Window).unwrap();
+        check_round_trip::<Boat>(DynamicObjectType::Boat).unwrap();
         check_round_trip::<ChilliPlant>(DynamicObjectType::ChilliPlant).unwrap();
-    }
-
-    #[test]
-    fn test_kelp_round_trip() {
         check_round_trip::<KelpPlant>(DynamicObjectType::KelpPlant).unwrap();
-    }
-
-    #[test]
-    fn test_cave_troll_round_trip() {
-        check_round_trip::<CaveTroll>(DynamicObjectType::CaveTroll).unwrap();
-    }
-
-    #[test]
-    fn test_scorpion_round_trip() {
-        check_round_trip::<Scorpion>(DynamicObjectType::Scorpion).unwrap();
-    }
-
-    #[test]
-    fn test_yak_round_trip() {
-        check_round_trip::<Yak>(DynamicObjectType::Yak).unwrap();
-    }
-
-    #[test]
-    fn test_clown_fish_round_trip() {
         check_round_trip::<ClownFish>(DynamicObjectType::ClownFish).unwrap();
-    }
-
-    #[test]
-    fn test_shark_round_trip() {
         check_round_trip::<Shark>(DynamicObjectType::Shark).unwrap();
-    }
-
-    #[test]
-    fn test_lime_tree_round_trip() {
         check_round_trip::<LimeTree>(DynamicObjectType::LimeTree).unwrap();
-    }
-
-    #[test]
-    fn test_gem_tree_round_trip() {
+        check_round_trip::<Wire>(DynamicObjectType::Wire).unwrap();
+        check_round_trip::<CaveTroll>(DynamicObjectType::CaveTroll).unwrap();
+        check_round_trip::<Rail>(DynamicObjectType::Rail).unwrap();
+        // check_round_trip::<Workbench>(DynamicObjectType::Workbench).unwrap();
+        // check_round_trip::<Chest>(DynamicObjectType::Chest).unwrap();
+        // check_round_trip::<Sign>(DynamicObjectType::Sign).unwrap();
+        // check_round_trip::<TradingPost>(DynamicObjectType::TradingPost).unwrap();
+        // check_round_trip::<TradePortal>(DynamicObjectType::TradePortal).unwrap();
+        check_round_trip::<Scorpion>(DynamicObjectType::Scorpion).unwrap();
+        // check_round_trip::<Column>(DynamicObjectType::Column).unwrap();
+        // check_round_trip::<Stairs>(DynamicObjectType::Stairs).unwrap();
+        // check_round_trip::<ElevatorMotor>(DynamicObjectType::ElevatorMotor).unwrap();
+        // check_round_trip::<ElevatorShaft>(DynamicObjectType::ElevatorShaft).unwrap();
         check_round_trip::<GemTree>(DynamicObjectType::GemTree).unwrap();
-    }
-
-    #[test]
-    fn test_vine_round_trip() {
         check_round_trip::<VinePlant>(DynamicObjectType::VinePlant).unwrap();
-    }
-
-    #[test]
-    fn test_tulip_round_trip() {
         check_round_trip::<TulipPlant>(DynamicObjectType::TulipPlant).unwrap();
-    }
-
-    #[test]
-    fn test_wheat_round_trip() {
         check_round_trip::<WheatPlant>(DynamicObjectType::WheatPlant).unwrap();
-    }
-
-    #[test]
-    fn test_tomato_round_trip() {
         check_round_trip::<TomatoPlant>(DynamicObjectType::TomatoPlant).unwrap();
+        check_round_trip::<Yak>(DynamicObjectType::Yak).unwrap();
     }
 }

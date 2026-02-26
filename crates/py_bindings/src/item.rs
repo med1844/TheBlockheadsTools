@@ -1,10 +1,9 @@
 use super::{into_py_err, lib};
 use lib::game::{
-    dw::dynamic_object::{DynamicObject, UniqueID},
+    dw::dynamic_object::{DynamicObject, InteractionObject, UniqueID},
     item::{
-        fmt_item_display, fmt_slot_display, ChestData, ChestType, Extra, InteractionObject,
-        Inventory, Item, ItemType, ItemView, PigmentColor, Slot, SlotView, WorkbenchData,
-        WorkbenchType,
+        fmt_item_display, fmt_slot_display, ChestData, ChestType, Extra, Inventory, Item, ItemType,
+        ItemView, PigmentColor, Slot, SlotView, WorkbenchData, WorkbenchType,
     },
 };
 use num_enum::TryFromPrimitive;

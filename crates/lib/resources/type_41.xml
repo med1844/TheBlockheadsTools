@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>dynamicObjects</key>
+	<array>
+		<dict>
+			<key>engineIsRight</key>
+			<false/>
+			<key>floatPos</key>
+			<array>
+				<real>11172.5</real>
+				<real>668</real>
+			</array>
+			<key>ownerID</key>
+			<string>server</string>
+			<key>pos_x</key>
+			<integer>11172</integer>
+			<key>pos_y</key>
+			<integer>668</integer>
+			<key>uniqueID</key>
+			<integer>1312</integer>
+		</dict>
+	</array>
+</dict>
+</plist>
