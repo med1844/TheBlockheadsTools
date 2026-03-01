@@ -96,12 +96,18 @@ pub struct ChunkDynamicObjects {
     pub wire: DynamicObjectList<Wire>,
     pub cave_troll: DynamicObjectList<CaveTroll>,
     pub rail: DynamicObjectList<Rail>,
+    pub hand_car: Vec<u8>,
+    pub steam_locomotive: Vec<u8>,
+    pub freight_car: Vec<u8>,
+    pub passenger_car: Vec<u8>,
     pub workbench: Vec<u8>,
     pub chest: Vec<u8>,
     pub sign: Vec<u8>,
     pub trading_post: Vec<u8>,
+    pub train_station: Vec<u8>,
     pub trade_portal: Vec<u8>,
     pub scorpion: DynamicObjectList<Scorpion>,
+    pub painting: Vec<u8>,
     pub column: Vec<u8>,
     pub stairs: Vec<u8>,
     pub elevator_motor: Vec<u8>,
@@ -109,9 +115,11 @@ pub struct ChunkDynamicObjects {
     pub gem_tree: DynamicObjectList<GemTree>,
     pub vine_plant: DynamicObjectList<VinePlant>,
     pub tulip_plant: DynamicObjectList<TulipPlant>,
+    pub ownership_sign: Vec<u8>,
     pub wheat_plant: DynamicObjectList<WheatPlant>,
     pub tomato_plant: DynamicObjectList<TomatoPlant>,
     pub yak: DynamicObjectList<Yak>,
+    pub mirror: Vec<u8>,
 }
 
 impl ChunkDynamicObjects {
@@ -152,12 +160,18 @@ impl ChunkDynamicObjects {
             + self.wire.num_obj()
             + self.cave_troll.num_obj()
             + self.rail.num_obj()
+            // + self.hand_car.num_obj()
+            // + self.steam_locomotive.num_obj()
+            // + self.freight_car.num_obj()
+            // + self.passenger_car.num_obj()
             // + self.workbench.num_obj()
             // + self.chest.num_obj()
             // + self.sign.num_obj()
             // + self.trading_post.num_obj()
+            // + self.train_station.num_obj()
             // + self.trade_portal.num_obj()
             + self.scorpion.num_obj()
+            // + self.painting.num_obj()
             // + self.column.num_obj()
             // + self.stairs.num_obj()
             // + self.elevator_motor.num_obj()
@@ -165,9 +179,11 @@ impl ChunkDynamicObjects {
             + self.gem_tree.num_obj()
             + self.vine_plant.num_obj()
             + self.tulip_plant.num_obj()
+            // + self.ownership_sign.num_obj()
             + self.wheat_plant.num_obj()
             + self.tomato_plant.num_obj()
             + self.yak.num_obj()
+        // + self.mirror.num_obj()
     }
 }
 
@@ -237,12 +253,18 @@ impl DynamicWorld {
                 DynamicObjectType::Wire => entry.wire = plist::from_bytes(v)?,
                 DynamicObjectType::CaveTroll => entry.cave_troll = plist::from_bytes(v)?,
                 DynamicObjectType::Rail => entry.rail = plist::from_bytes(v)?,
+                DynamicObjectType::HandCar => entry.hand_car = v.to_vec(),
+                DynamicObjectType::SteamLocomotive => entry.steam_locomotive = v.to_vec(),
+                DynamicObjectType::FreightCar => entry.freight_car = v.to_vec(),
+                DynamicObjectType::PassengerCar => entry.passenger_car = v.to_vec(),
                 DynamicObjectType::Workbench => entry.workbench = v.to_vec(),
                 DynamicObjectType::Chest => entry.chest = v.to_vec(),
                 DynamicObjectType::Sign => entry.sign = v.to_vec(),
                 DynamicObjectType::TradingPost => entry.trading_post = v.to_vec(),
+                DynamicObjectType::TrainStation => entry.train_station = v.to_vec(),
                 DynamicObjectType::TradePortal => entry.trade_portal = v.to_vec(),
                 DynamicObjectType::Scorpion => entry.scorpion = plist::from_bytes(v)?,
+                DynamicObjectType::Painting => entry.painting = v.to_vec(),
                 DynamicObjectType::Column => entry.column = v.to_vec(),
                 DynamicObjectType::Stairs => entry.stairs = v.to_vec(),
                 DynamicObjectType::ElevatorMotor => entry.elevator_motor = v.to_vec(),
@@ -250,9 +272,11 @@ impl DynamicWorld {
                 DynamicObjectType::GemTree => entry.gem_tree = plist::from_bytes(v)?,
                 DynamicObjectType::VinePlant => entry.vine_plant = plist::from_bytes(v)?,
                 DynamicObjectType::TulipPlant => entry.tulip_plant = plist::from_bytes(v)?,
+                DynamicObjectType::OwnershipSign => entry.ownership_sign = v.to_vec(),
                 DynamicObjectType::WheatPlant => entry.wheat_plant = plist::from_bytes(v)?,
                 DynamicObjectType::TomatoPlant => entry.tomato_plant = plist::from_bytes(v)?,
                 DynamicObjectType::Yak => entry.yak = plist::from_bytes(v)?,
+                DynamicObjectType::Mirror => entry.mirror = v.to_vec(),
             }
         }
         Ok(Self(map))
@@ -316,12 +340,18 @@ impl DynamicWorld {
             put(db, wtxn, &coord, Wire, &obj.wire)?;
             put(db, wtxn, &coord, CaveTroll, &obj.cave_troll)?;
             put(db, wtxn, &coord, Rail, &obj.rail)?;
+            put(db, wtxn, &coord, HandCar, &obj.hand_car)?;
+            put(db, wtxn, &coord, SteamLocomotive, &obj.steam_locomotive)?;
+            put(db, wtxn, &coord, FreightCar, &obj.freight_car)?;
+            put(db, wtxn, &coord, PassengerCar, &obj.passenger_car)?;
             put(db, wtxn, &coord, Workbench, &obj.workbench)?;
             put(db, wtxn, &coord, Chest, &obj.chest)?;
             put(db, wtxn, &coord, Sign, &obj.sign)?;
             put(db, wtxn, &coord, TradingPost, &obj.trading_post)?;
+            put(db, wtxn, &coord, TrainStation, &obj.train_station)?;
             put(db, wtxn, &coord, TradePortal, &obj.trade_portal)?;
             put(db, wtxn, &coord, Scorpion, &obj.scorpion)?;
+            put(db, wtxn, &coord, Painting, &obj.painting)?;
             put(db, wtxn, &coord, Column, &obj.column)?;
             put(db, wtxn, &coord, Stairs, &obj.stairs)?;
             put(db, wtxn, &coord, ElevatorMotor, &obj.elevator_motor)?;
@@ -329,9 +359,11 @@ impl DynamicWorld {
             put(db, wtxn, &coord, GemTree, &obj.gem_tree)?;
             put(db, wtxn, &coord, VinePlant, &obj.vine_plant)?;
             put(db, wtxn, &coord, TulipPlant, &obj.tulip_plant)?;
+            put(db, wtxn, &coord, OwnershipSign, &obj.ownership_sign)?;
             put(db, wtxn, &coord, WheatPlant, &obj.wheat_plant)?;
             put(db, wtxn, &coord, TomatoPlant, &obj.tomato_plant)?;
             put(db, wtxn, &coord, Yak, &obj.yak)?;
+            put(db, wtxn, &coord, Mirror, &obj.mirror)?;
         }
         Ok(())
     }

@@ -47,12 +47,18 @@ pub enum DynamicObjectType {
     Wire = 38,
     CaveTroll = 39,
     Rail = 40,
+    HandCar = 41,
+    SteamLocomotive = 42,
+    FreightCar = 43,
+    PassengerCar = 44,
     Workbench = 45,
     Chest = 46,
     Sign = 47,
     TradingPost = 48,
+    TrainStation = 49,
     TradePortal = 50,
     Scorpion = 51,
+    Painting = 52,
     Column = 53,
     Stairs = 54,
     ElevatorMotor = 55,
@@ -60,9 +66,11 @@ pub enum DynamicObjectType {
     GemTree = 57,
     VinePlant = 58,
     TulipPlant = 59,
+    OwnershipSign = 60,
     WheatPlant = 61,
     TomatoPlant = 62,
     Yak = 63,
+    Mirror = 64,
 }
 
 impl DynamicObjectType {
@@ -318,12 +326,18 @@ mod tests {
         check_round_trip::<Wire>(DynamicObjectType::Wire).unwrap();
         check_round_trip::<CaveTroll>(DynamicObjectType::CaveTroll).unwrap();
         check_round_trip::<Rail>(DynamicObjectType::Rail).unwrap();
+        // check_round_trip::<HandCar>(DynamicObjectType::HandCar).unwrap();
+        // check_round_trip::<SteamLocomotive>(DynamicObjectType::SteamLocomotive).unwrap();
+        // check_round_trip::<FreightCar>(DynamicObjectType::FreightCar).unwrap();
+        // check_round_trip::<PassengerCar>(DynamicObjectType::PassengerCar).unwrap();
         // check_round_trip::<Workbench>(DynamicObjectType::Workbench).unwrap();
         // check_round_trip::<Chest>(DynamicObjectType::Chest).unwrap();
         // check_round_trip::<Sign>(DynamicObjectType::Sign).unwrap();
         // check_round_trip::<TradingPost>(DynamicObjectType::TradingPost).unwrap();
+        // check_round_trip::<TrainStation>(DynamicObjectType::TrainStation).unwrap();
         // check_round_trip::<TradePortal>(DynamicObjectType::TradePortal).unwrap();
         check_round_trip::<Scorpion>(DynamicObjectType::Scorpion).unwrap();
+        // check_round_trip::<Painting>(DynamicObjectType::Painting).unwrap();
         // check_round_trip::<Column>(DynamicObjectType::Column).unwrap();
         // check_round_trip::<Stairs>(DynamicObjectType::Stairs).unwrap();
         // check_round_trip::<ElevatorMotor>(DynamicObjectType::ElevatorMotor).unwrap();
@@ -331,8 +345,10 @@ mod tests {
         check_round_trip::<GemTree>(DynamicObjectType::GemTree).unwrap();
         check_round_trip::<VinePlant>(DynamicObjectType::VinePlant).unwrap();
         check_round_trip::<TulipPlant>(DynamicObjectType::TulipPlant).unwrap();
+        // check_round_trip::<OwnershipSign>(DynamicObjectType::OwnershipSign).unwrap();
         check_round_trip::<WheatPlant>(DynamicObjectType::WheatPlant).unwrap();
         check_round_trip::<TomatoPlant>(DynamicObjectType::TomatoPlant).unwrap();
         check_round_trip::<Yak>(DynamicObjectType::Yak).unwrap();
+        // check_round_trip::<Mirror>(DynamicObjectType::Mirror).unwrap();
     }
 }
