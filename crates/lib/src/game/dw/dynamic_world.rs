@@ -8,6 +8,7 @@ use super::{
             CarrotPlant, ChilliPlant, CornPlant, FlaxPlant, KelpPlant, SunflowerPlant, TomatoPlant,
             TulipPlant, VinePlant, WheatPlant,
         },
+        train::{FreightCar, HandCar, PassengerCar, SteamLocomotive},
         tree::{
             AppleTree, CactusTree, CherryTree, CoconutTree, CoffeeTree, GemTree, LimeTree,
             MangoTree, MapleTree, OrangeTree, PineTree,
@@ -96,10 +97,10 @@ pub struct ChunkDynamicObjects {
     pub wire: DynamicObjectList<Wire>,
     pub cave_troll: DynamicObjectList<CaveTroll>,
     pub rail: DynamicObjectList<Rail>,
-    pub hand_car: Vec<u8>,
-    pub steam_locomotive: Vec<u8>,
-    pub freight_car: Vec<u8>,
-    pub passenger_car: Vec<u8>,
+    pub hand_car: DynamicObjectList<HandCar>,
+    pub steam_locomotive: DynamicObjectList<SteamLocomotive>,
+    pub freight_car: DynamicObjectList<FreightCar>,
+    pub passenger_car: DynamicObjectList<PassengerCar>,
     pub workbench: Vec<u8>,
     pub chest: Vec<u8>,
     pub sign: Vec<u8>,
@@ -160,10 +161,10 @@ impl ChunkDynamicObjects {
             + self.wire.num_obj()
             + self.cave_troll.num_obj()
             + self.rail.num_obj()
-            // + self.hand_car.num_obj()
-            // + self.steam_locomotive.num_obj()
-            // + self.freight_car.num_obj()
-            // + self.passenger_car.num_obj()
+            + self.hand_car.num_obj()
+            + self.steam_locomotive.num_obj()
+            + self.freight_car.num_obj()
+            + self.passenger_car.num_obj()
             // + self.workbench.num_obj()
             // + self.chest.num_obj()
             // + self.sign.num_obj()
@@ -187,6 +188,7 @@ impl ChunkDynamicObjects {
     }
 }
 
+// TODO: handle chest data like `349_20/chest_834` and `trainchest_1342`
 #[derive(Debug)]
 pub struct DynamicWorld(HashMap<ChunkCoord, ChunkDynamicObjects>);
 
@@ -253,10 +255,12 @@ impl DynamicWorld {
                 DynamicObjectType::Wire => entry.wire = plist::from_bytes(v)?,
                 DynamicObjectType::CaveTroll => entry.cave_troll = plist::from_bytes(v)?,
                 DynamicObjectType::Rail => entry.rail = plist::from_bytes(v)?,
-                DynamicObjectType::HandCar => entry.hand_car = v.to_vec(),
-                DynamicObjectType::SteamLocomotive => entry.steam_locomotive = v.to_vec(),
-                DynamicObjectType::FreightCar => entry.freight_car = v.to_vec(),
-                DynamicObjectType::PassengerCar => entry.passenger_car = v.to_vec(),
+                DynamicObjectType::HandCar => entry.hand_car = plist::from_bytes(v)?,
+                DynamicObjectType::SteamLocomotive => {
+                    entry.steam_locomotive = plist::from_bytes(v)?
+                }
+                DynamicObjectType::FreightCar => entry.freight_car = plist::from_bytes(v)?,
+                DynamicObjectType::PassengerCar => entry.passenger_car = plist::from_bytes(v)?,
                 DynamicObjectType::Workbench => entry.workbench = v.to_vec(),
                 DynamicObjectType::Chest => entry.chest = v.to_vec(),
                 DynamicObjectType::Sign => entry.sign = v.to_vec(),
@@ -452,12 +456,18 @@ mod tests {
         monster.wire = read_test_xml(DynamicObjectType::Wire);
         monster.cave_troll = read_test_xml(DynamicObjectType::CaveTroll);
         monster.rail = read_test_xml(DynamicObjectType::Rail);
+        monster.hand_car = read_test_xml(DynamicObjectType::HandCar);
+        monster.steam_locomotive = read_test_xml(DynamicObjectType::SteamLocomotive);
+        monster.freight_car = read_test_xml(DynamicObjectType::FreightCar);
+        monster.passenger_car = read_test_xml(DynamicObjectType::PassengerCar);
         monster.workbench = vec![45, 0xAA, 0xBB];
         monster.chest = vec![46, 0xAA, 0xBB];
         monster.sign = vec![47, 0xAA, 0xBB];
         monster.trading_post = vec![48, 0xAA, 0xBB];
+        monster.train_station = vec![49, 0xAA, 0xBB];
         monster.trade_portal = vec![50, 0xAA, 0xBB];
         monster.scorpion = read_test_xml(DynamicObjectType::Scorpion);
+        monster.painting = vec![52, 0xAA, 0xBB];
         monster.column = vec![53, 0xAA, 0xBB];
         monster.stairs = vec![54, 0xAA, 0xBB];
         monster.elevator_motor = vec![55, 0xAA, 0xBB];
@@ -465,9 +475,11 @@ mod tests {
         monster.gem_tree = read_test_xml(DynamicObjectType::GemTree);
         monster.vine_plant = read_test_xml(DynamicObjectType::VinePlant);
         monster.tulip_plant = read_test_xml(DynamicObjectType::TulipPlant);
+        monster.ownership_sign = vec![60, 0xAA, 0xBB];
         monster.wheat_plant = read_test_xml(DynamicObjectType::WheatPlant);
         monster.tomato_plant = read_test_xml(DynamicObjectType::TomatoPlant);
         monster.yak = read_test_xml(DynamicObjectType::Yak);
+        monster.mirror = vec![64, 0xAA, 0xBB];
 
         let coord = ChunkCoord::new(10, 20).unwrap();
         let mut map = HashMap::new();
@@ -542,12 +554,18 @@ mod tests {
             check_key(DynamicObjectType::Wire);
             check_key(DynamicObjectType::CaveTroll);
             check_key(DynamicObjectType::Rail);
+            check_key(DynamicObjectType::HandCar);
+            check_key(DynamicObjectType::SteamLocomotive);
+            check_key(DynamicObjectType::FreightCar);
+            check_key(DynamicObjectType::PassengerCar);
             check_key(DynamicObjectType::Workbench);
             check_key(DynamicObjectType::Chest);
             check_key(DynamicObjectType::Sign);
             check_key(DynamicObjectType::TradingPost);
+            check_key(DynamicObjectType::TrainStation);
             check_key(DynamicObjectType::TradePortal);
             check_key(DynamicObjectType::Scorpion);
+            check_key(DynamicObjectType::Painting);
             check_key(DynamicObjectType::Column);
             check_key(DynamicObjectType::Stairs);
             check_key(DynamicObjectType::ElevatorMotor);
@@ -555,9 +573,11 @@ mod tests {
             check_key(DynamicObjectType::GemTree);
             check_key(DynamicObjectType::VinePlant);
             check_key(DynamicObjectType::TulipPlant);
+            check_key(DynamicObjectType::OwnershipSign);
             check_key(DynamicObjectType::WheatPlant);
             check_key(DynamicObjectType::TomatoPlant);
             check_key(DynamicObjectType::Yak);
+            check_key(DynamicObjectType::Mirror);
 
             let round_tripped_dw = DynamicWorld::from_db(&db, &rtxn).unwrap();
             let round_tripped_dw_chunk = round_tripped_dw.chunk_at(coord).unwrap();

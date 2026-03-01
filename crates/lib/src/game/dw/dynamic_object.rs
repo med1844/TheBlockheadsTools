@@ -242,6 +242,7 @@ pub struct Blockhead {
 pub mod animal;
 pub mod craft;
 pub mod plant;
+pub mod train;
 pub mod tree;
 
 #[cfg(test)]
@@ -254,6 +255,7 @@ mod tests {
             CarrotPlant, ChilliPlant, CornPlant, FlaxPlant, KelpPlant, SunflowerPlant, TomatoPlant,
             TulipPlant, VinePlant, WheatPlant,
         },
+        train::{FreightCar, HandCar, PassengerCar, SteamLocomotive},
         tree::{
             AppleTree, CactusTree, CherryTree, CoconutTree, CoffeeTree, GemTree, LimeTree,
             MangoTree, MapleTree, OrangeTree, PineTree,
@@ -326,10 +328,10 @@ mod tests {
         check_round_trip::<Wire>(DynamicObjectType::Wire).unwrap();
         check_round_trip::<CaveTroll>(DynamicObjectType::CaveTroll).unwrap();
         check_round_trip::<Rail>(DynamicObjectType::Rail).unwrap();
-        // check_round_trip::<HandCar>(DynamicObjectType::HandCar).unwrap();
-        // check_round_trip::<SteamLocomotive>(DynamicObjectType::SteamLocomotive).unwrap();
-        // check_round_trip::<FreightCar>(DynamicObjectType::FreightCar).unwrap();
-        // check_round_trip::<PassengerCar>(DynamicObjectType::PassengerCar).unwrap();
+        check_round_trip::<HandCar>(DynamicObjectType::HandCar).unwrap();
+        check_round_trip::<SteamLocomotive>(DynamicObjectType::SteamLocomotive).unwrap();
+        check_round_trip::<FreightCar>(DynamicObjectType::FreightCar).unwrap();
+        check_round_trip::<PassengerCar>(DynamicObjectType::PassengerCar).unwrap();
         // check_round_trip::<Workbench>(DynamicObjectType::Workbench).unwrap();
         // check_round_trip::<Chest>(DynamicObjectType::Chest).unwrap();
         // check_round_trip::<Sign>(DynamicObjectType::Sign).unwrap();
