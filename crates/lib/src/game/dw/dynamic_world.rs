@@ -3,12 +3,15 @@ use super::{
     dynamic_object::{
         DynamicObjectList, DynamicObjectType,
         animal::{CaveTroll, ClownFish, Dodo, Donkey, DropBear, Scorpion, Shark, Yak},
-        craft::{Bed, Boat, Door, Ladder, Rail, Window, Wire},
+        craft::{
+            Bed, Boat, Column, Door, ElevatorMotor, ElevatorShaft, Ladder, Rail, Sign, Stairs,
+            TradePortal, TradingPost, Window, Wire,
+        },
         plant::{
             CarrotPlant, ChilliPlant, CornPlant, FlaxPlant, KelpPlant, SunflowerPlant, TomatoPlant,
             TulipPlant, VinePlant, WheatPlant,
         },
-        train::{FreightCar, HandCar, PassengerCar, SteamLocomotive},
+        train::{FreightCar, HandCar, PassengerCar, SteamLocomotive, TrainStation},
         tree::{
             AppleTree, CactusTree, CherryTree, CoconutTree, CoffeeTree, GemTree, LimeTree,
             MangoTree, MapleTree, OrangeTree, PineTree,
@@ -103,16 +106,16 @@ pub struct ChunkDynamicObjects {
     pub passenger_car: DynamicObjectList<PassengerCar>,
     pub workbench: Vec<u8>,
     pub chest: Vec<u8>,
-    pub sign: Vec<u8>,
-    pub trading_post: Vec<u8>,
-    pub train_station: Vec<u8>,
-    pub trade_portal: Vec<u8>,
+    pub sign: DynamicObjectList<Sign>,
+    pub trading_post: DynamicObjectList<TradingPost>,
+    pub train_station: DynamicObjectList<TrainStation>,
+    pub trade_portal: DynamicObjectList<TradePortal>,
     pub scorpion: DynamicObjectList<Scorpion>,
     pub painting: Vec<u8>,
-    pub column: Vec<u8>,
-    pub stairs: Vec<u8>,
-    pub elevator_motor: Vec<u8>,
-    pub elevator_shaft: Vec<u8>,
+    pub column: DynamicObjectList<Column>,
+    pub stairs: DynamicObjectList<Stairs>,
+    pub elevator_motor: DynamicObjectList<ElevatorMotor>,
+    pub elevator_shaft: DynamicObjectList<ElevatorShaft>,
     pub gem_tree: DynamicObjectList<GemTree>,
     pub vine_plant: DynamicObjectList<VinePlant>,
     pub tulip_plant: DynamicObjectList<TulipPlant>,
@@ -167,16 +170,16 @@ impl ChunkDynamicObjects {
             + self.passenger_car.num_obj()
             // + self.workbench.num_obj()
             // + self.chest.num_obj()
-            // + self.sign.num_obj()
-            // + self.trading_post.num_obj()
-            // + self.train_station.num_obj()
-            // + self.trade_portal.num_obj()
+            + self.sign.num_obj()
+            + self.trading_post.num_obj()
+            + self.train_station.num_obj()
+            + self.trade_portal.num_obj()
             + self.scorpion.num_obj()
             // + self.painting.num_obj()
-            // + self.column.num_obj()
-            // + self.stairs.num_obj()
-            // + self.elevator_motor.num_obj()
-            // + self.elevator_shaft.num_obj()
+            + self.column.num_obj()
+            + self.stairs.num_obj()
+            + self.elevator_motor.num_obj()
+            + self.elevator_shaft.num_obj()
             + self.gem_tree.num_obj()
             + self.vine_plant.num_obj()
             + self.tulip_plant.num_obj()
@@ -263,16 +266,16 @@ impl DynamicWorld {
                 DynamicObjectType::PassengerCar => entry.passenger_car = plist::from_bytes(v)?,
                 DynamicObjectType::Workbench => entry.workbench = v.to_vec(),
                 DynamicObjectType::Chest => entry.chest = v.to_vec(),
-                DynamicObjectType::Sign => entry.sign = v.to_vec(),
-                DynamicObjectType::TradingPost => entry.trading_post = v.to_vec(),
-                DynamicObjectType::TrainStation => entry.train_station = v.to_vec(),
-                DynamicObjectType::TradePortal => entry.trade_portal = v.to_vec(),
+                DynamicObjectType::Sign => entry.sign = plist::from_bytes(v)?,
+                DynamicObjectType::TradingPost => entry.trading_post = plist::from_bytes(v)?,
+                DynamicObjectType::TrainStation => entry.train_station = plist::from_bytes(v)?,
+                DynamicObjectType::TradePortal => entry.trade_portal = plist::from_bytes(v)?,
                 DynamicObjectType::Scorpion => entry.scorpion = plist::from_bytes(v)?,
                 DynamicObjectType::Painting => entry.painting = v.to_vec(),
-                DynamicObjectType::Column => entry.column = v.to_vec(),
-                DynamicObjectType::Stairs => entry.stairs = v.to_vec(),
-                DynamicObjectType::ElevatorMotor => entry.elevator_motor = v.to_vec(),
-                DynamicObjectType::ElevatorShaft => entry.elevator_shaft = v.to_vec(),
+                DynamicObjectType::Column => entry.column = plist::from_bytes(v)?,
+                DynamicObjectType::Stairs => entry.stairs = plist::from_bytes(v)?,
+                DynamicObjectType::ElevatorMotor => entry.elevator_motor = plist::from_bytes(v)?,
+                DynamicObjectType::ElevatorShaft => entry.elevator_shaft = plist::from_bytes(v)?,
                 DynamicObjectType::GemTree => entry.gem_tree = plist::from_bytes(v)?,
                 DynamicObjectType::VinePlant => entry.vine_plant = plist::from_bytes(v)?,
                 DynamicObjectType::TulipPlant => entry.tulip_plant = plist::from_bytes(v)?,
@@ -462,16 +465,16 @@ mod tests {
         monster.passenger_car = read_test_xml(DynamicObjectType::PassengerCar);
         monster.workbench = vec![45, 0xAA, 0xBB];
         monster.chest = vec![46, 0xAA, 0xBB];
-        monster.sign = vec![47, 0xAA, 0xBB];
-        monster.trading_post = vec![48, 0xAA, 0xBB];
-        monster.train_station = vec![49, 0xAA, 0xBB];
-        monster.trade_portal = vec![50, 0xAA, 0xBB];
+        monster.sign = read_test_xml(DynamicObjectType::Sign);
+        monster.trading_post = read_test_xml(DynamicObjectType::TradingPost);
+        monster.train_station = read_test_xml(DynamicObjectType::TrainStation);
+        monster.trade_portal = read_test_xml(DynamicObjectType::TradePortal);
         monster.scorpion = read_test_xml(DynamicObjectType::Scorpion);
         monster.painting = vec![52, 0xAA, 0xBB];
-        monster.column = vec![53, 0xAA, 0xBB];
-        monster.stairs = vec![54, 0xAA, 0xBB];
-        monster.elevator_motor = vec![55, 0xAA, 0xBB];
-        monster.elevator_shaft = vec![56, 0xAA, 0xBB];
+        monster.column = read_test_xml(DynamicObjectType::Column);
+        monster.stairs = read_test_xml(DynamicObjectType::Stairs);
+        monster.elevator_motor = read_test_xml(DynamicObjectType::ElevatorMotor);
+        monster.elevator_shaft = read_test_xml(DynamicObjectType::ElevatorShaft);
         monster.gem_tree = read_test_xml(DynamicObjectType::GemTree);
         monster.vine_plant = read_test_xml(DynamicObjectType::VinePlant);
         monster.tulip_plant = read_test_xml(DynamicObjectType::TulipPlant);

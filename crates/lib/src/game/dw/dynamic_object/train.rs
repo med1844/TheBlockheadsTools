@@ -1,4 +1,4 @@
-use super::{deserialize_some, serialize_some, DynamicObject, UniqueID};
+use super::{deserialize_some, serialize_some, DynamicObject, InteractionObject, UniqueID};
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
 
@@ -58,3 +58,13 @@ inherit!(FreightCar -> TrainCar);
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PassengerCar(TrainCar);
 inherit!(PassengerCar -> TrainCar);
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrainStation {
+    #[serde(flatten)]
+    obj: InteractionObject,
+    pub text: String,
+    pub save_time: f64,
+}
+inherit!(TrainStation -> InteractionObject, obj);

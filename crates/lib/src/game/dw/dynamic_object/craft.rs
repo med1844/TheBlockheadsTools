@@ -135,3 +135,108 @@ pub struct Rail {
 }
 inherit!(Rail -> DynamicObject, obj);
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Sign {
+    #[serde(flatten)]
+    obj: InteractionObject,
+    pub text: String,
+    pub connection_type: u64,
+    pub offset_type: u64,
+    pub save_time: f64,
+}
+inherit!(Sign -> InteractionObject, obj);
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TradingPost {
+    #[serde(flatten)]
+    obj: InteractionObject,
+    pub coin_count: u32,
+    pub price_tier: u32,
+    pub save_time: f64,
+    pub sell_slot: plist::Value,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub seller_client_name: Option<String>,
+}
+inherit!(TradingPost -> InteractionObject, obj);
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TradePortal {
+    #[serde(flatten)]
+    obj: InteractionObject,
+    pub level: u32,
+    pub save_time: f64,
+    pub local_price_offsets: plist::Dictionary,
+    pub light_dict: super::ArtificialLight,
+}
+inherit!(TradePortal -> InteractionObject, obj);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr)]
+#[repr(u8)]
+pub enum ColumnConfiguration {
+    Undefined = 0,
+    NoPlinth = 1,
+    PlinthBelow = 2,
+    PlinthAbove = 3,
+    PlinthAboveAndBelow = 4,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Column {
+    #[serde(flatten)]
+    obj: DynamicObject,
+    pub item_type: ItemType,
+    pub paint_color: u16,
+    pub configuration: ColumnConfiguration,
+}
+inherit!(Column -> DynamicObject, obj);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr)]
+#[repr(u8)]
+pub enum StairsConfiguration {
+    Undefined = 0,
+    HighRightSolid = 1,
+    HighLeftSolid = 2,
+    HighRightFloating = 3,
+    HighLeftFloating = 4,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Stairs {
+    #[serde(flatten)]
+    obj: DynamicObject,
+    pub item_type: ItemType,
+    pub paint_color: u16,
+    pub configuration: StairsConfiguration,
+}
+inherit!(Stairs -> DynamicObject, obj);
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ElevatorMotor {
+    #[serde(flatten)]
+    obj: DynamicObject,
+    pub item_type: ItemType,
+    pub available_electricity: u16,
+    pub min_y: u16,
+    pub max_y: u16,
+}
+inherit!(ElevatorMotor -> DynamicObject, obj);
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ElevatorShaft {
+    #[serde(flatten)]
+    obj: DynamicObject,
+    pub item_type: ItemType,
+    #[serde(rename = "lastKnownMotorPos.x")]
+    pub last_known_motor_pos_x: i32,
+    #[serde(rename = "lastKnownMotorPos.y")]
+    pub last_known_motor_pos_y: u16,
+    pub paint_color: u16,
+}
+inherit!(ElevatorShaft -> DynamicObject, obj);

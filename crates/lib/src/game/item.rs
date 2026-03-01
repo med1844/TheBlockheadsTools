@@ -1027,6 +1027,7 @@ mod tests {
         ChestData, ChestType, Extra, Inventory, Item, ItemType, PigmentColor, Slot, WorkbenchData,
         WorkbenchType,
     };
+    use crate::game::dw::dynamic_object::InteractionObjectType;
 
     #[test]
     fn test_color_round_trip() {
@@ -1129,7 +1130,7 @@ mod tests {
                     unique_id: crate::game::dw::dynamic_object::UniqueID::new(123),
                     owner_id: Some("test_owner".to_string()),
                 },
-                interaction_object_type: 46,
+                interaction_object_type: InteractionObjectType::Chest,
                 is_in_use: false,
                 flipped: false,
                 paint_color: 0,
@@ -1163,7 +1164,7 @@ mod tests {
                     unique_id: crate::game::dw::dynamic_object::UniqueID::new(456),
                     owner_id: Some("wb_owner".to_string()),
                 },
-                interaction_object_type: 45,
+                interaction_object_type: InteractionObjectType::Workbench,
                 is_in_use: false,
                 flipped: false,
                 paint_color: 0,

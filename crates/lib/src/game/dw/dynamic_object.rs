@@ -183,12 +183,27 @@ pub struct DynamicObject {
     pub owner_id: Option<String>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr)]
+#[repr(u8)]
+pub enum InteractionObjectType {
+    InteractionObject = 0,
+    Workbench = 1,
+    Chest = 2,
+    Bed = 3,
+    Sign = 4,
+    TradingPost = 5,
+    TrainStation = 6,
+    TradePortal = 7,
+    OwnershipSign = 8,
+    Mirror = 9,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InteractionObject {
     #[serde(flatten)]
     pub parent: DynamicObject,
-    pub interaction_object_type: u64,
+    pub interaction_object_type: InteractionObjectType,
     pub is_in_use: bool,
     pub flipped: bool,
     pub paint_color: u16,
@@ -250,12 +265,15 @@ mod tests {
     use super::{
         DynamicObjectList, DynamicObjectType,
         animal::{CaveTroll, ClownFish, Dodo, Donkey, DropBear, Scorpion, Shark, Yak},
-        craft::{Bed, Boat, Door, Ladder, Rail, Window, Wire},
+        craft::{
+            Bed, Boat, Column, Door, ElevatorMotor, ElevatorShaft, Ladder, Rail, Sign, Stairs,
+            TradePortal, TradingPost, Window, Wire,
+        },
         plant::{
             CarrotPlant, ChilliPlant, CornPlant, FlaxPlant, KelpPlant, SunflowerPlant, TomatoPlant,
             TulipPlant, VinePlant, WheatPlant,
         },
-        train::{FreightCar, HandCar, PassengerCar, SteamLocomotive},
+        train::{FreightCar, HandCar, PassengerCar, SteamLocomotive, TrainStation},
         tree::{
             AppleTree, CactusTree, CherryTree, CoconutTree, CoffeeTree, GemTree, LimeTree,
             MangoTree, MapleTree, OrangeTree, PineTree,
@@ -334,16 +352,16 @@ mod tests {
         check_round_trip::<PassengerCar>(DynamicObjectType::PassengerCar).unwrap();
         // check_round_trip::<Workbench>(DynamicObjectType::Workbench).unwrap();
         // check_round_trip::<Chest>(DynamicObjectType::Chest).unwrap();
-        // check_round_trip::<Sign>(DynamicObjectType::Sign).unwrap();
-        // check_round_trip::<TradingPost>(DynamicObjectType::TradingPost).unwrap();
-        // check_round_trip::<TrainStation>(DynamicObjectType::TrainStation).unwrap();
-        // check_round_trip::<TradePortal>(DynamicObjectType::TradePortal).unwrap();
+        check_round_trip::<Sign>(DynamicObjectType::Sign).unwrap();
+        check_round_trip::<TradingPost>(DynamicObjectType::TradingPost).unwrap();
+        check_round_trip::<TrainStation>(DynamicObjectType::TrainStation).unwrap();
+        check_round_trip::<TradePortal>(DynamicObjectType::TradePortal).unwrap();
         check_round_trip::<Scorpion>(DynamicObjectType::Scorpion).unwrap();
         // check_round_trip::<Painting>(DynamicObjectType::Painting).unwrap();
-        // check_round_trip::<Column>(DynamicObjectType::Column).unwrap();
-        // check_round_trip::<Stairs>(DynamicObjectType::Stairs).unwrap();
-        // check_round_trip::<ElevatorMotor>(DynamicObjectType::ElevatorMotor).unwrap();
-        // check_round_trip::<ElevatorShaft>(DynamicObjectType::ElevatorShaft).unwrap();
+        check_round_trip::<Column>(DynamicObjectType::Column).unwrap();
+        check_round_trip::<Stairs>(DynamicObjectType::Stairs).unwrap();
+        check_round_trip::<ElevatorMotor>(DynamicObjectType::ElevatorMotor).unwrap();
+        check_round_trip::<ElevatorShaft>(DynamicObjectType::ElevatorShaft).unwrap();
         check_round_trip::<GemTree>(DynamicObjectType::GemTree).unwrap();
         check_round_trip::<VinePlant>(DynamicObjectType::VinePlant).unwrap();
         check_round_trip::<TulipPlant>(DynamicObjectType::TulipPlant).unwrap();

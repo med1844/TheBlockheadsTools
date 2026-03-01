@@ -27,11 +27,15 @@
 			<key>pos_y</key>
 			<integer>641</integer>
 			<key>priceTier</key>
-			<integer>0</integer>
+			<integer>85</integer>
 			<key>saveTime</key>
-			<real>3470.5969599634409</real>
+			<real>4902.6949884295464</real>
 			<key>sellSlot</key>
-			<array/>
+			<array>
+				<data>
+				NwAAAAAAAAw=
+				</data>
+			</array>
 			<key>uniqueID</key>
 			<integer>803</integer>
 		</dict>
