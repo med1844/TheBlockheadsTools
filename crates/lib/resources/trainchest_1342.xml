@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>chestType</key>
+	<integer>0</integer>
+	<key>flipped</key>
+	<false/>
+	<key>floatPos</key>
+	<array>
+		<real>11179.5</real>
+		<real>668</real>
+	</array>
+	<key>interactionObjectType</key>
+	<integer>2</integer>
+	<key>isInUse</key>
+	<false/>
+	<key>paintColor</key>
+	<integer>0</integer>
+	<key>pos_x</key>
+	<integer>11179</integer>
+	<key>pos_y</key>
+	<integer>668</integer>
+	<key>saveItemSlots</key>
+	<array>
+		<array>
+			<data>
+			GQQAAAAAAAA=
+			</data>
+		</array>
+		<array/>
+		<array/>
+		<array/>
+		<array/>
+		<array/>
+		<array/>
+		<array/>
+		<array/>
+		<array/>
+		<array/>
+		<array/>
+		<array/>
+		<array/>
+		<array/>
+		<array/>
+	</array>
+	<key>saveTime</key>
+	<real>4865.3284095153213</real>
+	<key>uniqueID</key>
+	<integer>1343</integer>
+</dict>
+</plist>

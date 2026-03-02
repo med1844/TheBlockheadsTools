@@ -268,6 +268,7 @@ mod tests {
     use super::{
         DynamicObjectList, DynamicObjectType,
         animal::{CaveTroll, ClownFish, Dodo, Donkey, DropBear, Scorpion, Shark, Yak},
+        chest::Chest,
         craft::{
             Bed, Boat, Column, Door, ElevatorMotor, ElevatorShaft, Ladder, Rail, Sign, Stairs,
             TradePortal, TradingPost, Window, Wire,
@@ -354,7 +355,7 @@ mod tests {
         check_round_trip::<FreightCar>(DynamicObjectType::FreightCar).unwrap();
         check_round_trip::<PassengerCar>(DynamicObjectType::PassengerCar).unwrap();
         // check_round_trip::<Workbench>(DynamicObjectType::Workbench).unwrap();
-        // check_round_trip::<Chest>(DynamicObjectType::Chest).unwrap();
+        check_round_trip::<Chest>(DynamicObjectType::Chest).unwrap();
         check_round_trip::<Sign>(DynamicObjectType::Sign).unwrap();
         check_round_trip::<TradingPost>(DynamicObjectType::TradingPost).unwrap();
         check_round_trip::<TrainStation>(DynamicObjectType::TrainStation).unwrap();

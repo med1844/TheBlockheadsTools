@@ -3,6 +3,7 @@ use super::{
     dynamic_object::{
         DynamicObjectList, DynamicObjectType,
         animal::{CaveTroll, ClownFish, Dodo, Donkey, DropBear, Scorpion, Shark, Yak},
+        chest::Chest,
         craft::{
             Bed, Boat, Column, Door, ElevatorMotor, ElevatorShaft, Ladder, Rail, Sign, Stairs,
             TradePortal, TradingPost, Window, Wire,
@@ -105,7 +106,7 @@ pub struct ChunkDynamicObjects {
     pub freight_car: DynamicObjectList<FreightCar>,
     pub passenger_car: DynamicObjectList<PassengerCar>,
     pub workbench: Vec<u8>,
-    pub chest: Vec<u8>,
+    pub chest: DynamicObjectList<Chest>,
     pub sign: DynamicObjectList<Sign>,
     pub trading_post: DynamicObjectList<TradingPost>,
     pub train_station: DynamicObjectList<TrainStation>,
@@ -169,7 +170,7 @@ impl ChunkDynamicObjects {
             + self.freight_car.num_obj()
             + self.passenger_car.num_obj()
             // + self.workbench.num_obj()
-            // + self.chest.num_obj()
+            + self.chest.num_obj()
             + self.sign.num_obj()
             + self.trading_post.num_obj()
             + self.train_station.num_obj()
@@ -265,7 +266,7 @@ impl DynamicWorld {
                 DynamicObjectType::FreightCar => entry.freight_car = plist::from_bytes(v)?,
                 DynamicObjectType::PassengerCar => entry.passenger_car = plist::from_bytes(v)?,
                 DynamicObjectType::Workbench => entry.workbench = v.to_vec(),
-                DynamicObjectType::Chest => entry.chest = v.to_vec(),
+                DynamicObjectType::Chest => entry.chest = plist::from_bytes(v)?,
                 DynamicObjectType::Sign => entry.sign = plist::from_bytes(v)?,
                 DynamicObjectType::TradingPost => entry.trading_post = plist::from_bytes(v)?,
                 DynamicObjectType::TrainStation => entry.train_station = plist::from_bytes(v)?,
@@ -464,7 +465,7 @@ mod tests {
         monster.freight_car = read_test_xml(DynamicObjectType::FreightCar);
         monster.passenger_car = read_test_xml(DynamicObjectType::PassengerCar);
         monster.workbench = vec![45, 0xAA, 0xBB];
-        monster.chest = vec![46, 0xAA, 0xBB];
+        monster.chest = read_test_xml(DynamicObjectType::Chest);
         monster.sign = read_test_xml(DynamicObjectType::Sign);
         monster.trading_post = read_test_xml(DynamicObjectType::TradingPost);
         monster.train_station = read_test_xml(DynamicObjectType::TrainStation);
