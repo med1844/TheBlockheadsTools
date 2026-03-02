@@ -24,7 +24,7 @@ pub enum DynamicObjectType {
     SunflowerPlant = 11,
     CornPlant = 12,
     Dodo = 13,
-    Item = 14,
+    DroppedItem = 14,
     Fire = 16,
     Torch = 17,
     GlowBlock = 18,
@@ -202,18 +202,37 @@ pub enum InteractionObjectType {
 #[serde(rename_all = "camelCase")]
 pub struct InteractionObject {
     #[serde(flatten)]
-    pub parent: DynamicObject,
+    obj: DynamicObject,
     pub interaction_object_type: InteractionObjectType,
     pub is_in_use: bool,
     pub flipped: bool,
     pub paint_color: u16,
+}
+inherit!(InteractionObject -> DynamicObject, obj);
+
+impl InteractionObject {
+    pub fn new(
+        obj: DynamicObject,
+        interaction_object_type: InteractionObjectType,
+        is_in_use: bool,
+        flipped: bool,
+        paint_color: u16,
+    ) -> Self {
+        Self {
+            obj,
+            interaction_object_type,
+            is_in_use,
+            flipped,
+            paint_color,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ArtificialLight {
     #[serde(flatten)]
-    pub obj: DynamicObject,
+    obj: DynamicObject,
     pub max_red: u32,
     pub max_green: u32,
     pub max_blue: u32,
@@ -235,30 +254,14 @@ pub enum LightDirection {
     Up = 2,
 }
 
-// NOTE: final_goal_square_x/y, load_requires_recalculation are optional and needs serde(default)
-// which doesn't work together with serde(flatten), which is needed for DynamicObject.
-// Either manually flatten DynamicObject, or remove these fields. For now we go latter.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Blockhead {
-    #[serde(flatten)]
-    pub obj: DynamicObject,
-    pub actions: plist::Value,
-    pub clothing_increment_timer: u64,
-    pub double_time_unlocked: bool,
-    pub interaction_item_index: i64, // could be -1... my god
-    pub interaction_item_sub_index: i64,
-    pub name: String,
-    pub selected_tool_index: u64,
-    pub skin_options: plist::Data,
-    pub state: plist::Data,
-}
-
 pub mod animal;
+pub mod blockhead;
+pub mod chest;
 pub mod craft;
 pub mod plant;
 pub mod train;
 pub mod tree;
+pub mod workbench;
 
 #[cfg(test)]
 mod tests {
@@ -323,7 +326,7 @@ mod tests {
         check_round_trip::<SunflowerPlant>(DynamicObjectType::SunflowerPlant).unwrap();
         check_round_trip::<CornPlant>(DynamicObjectType::CornPlant).unwrap();
         check_round_trip::<Dodo>(DynamicObjectType::Dodo).unwrap();
-        // check_round_trip::<Item>(DynamicObjectType::Item).unwrap();
+        // check_round_trip::<DroppedItem>(DynamicObjectType::DroppedItem).unwrap();
         // check_round_trip::<Fire>(DynamicObjectType::Fire).unwrap();
         // check_round_trip::<Torch>(DynamicObjectType::Torch).unwrap();
         // check_round_trip::<GlowBlock>(DynamicObjectType::GlowBlock).unwrap();

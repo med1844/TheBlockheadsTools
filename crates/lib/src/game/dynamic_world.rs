@@ -1,5 +1,5 @@
 use super::{
-    super::coord::ChunkCoord,
+    coord::ChunkCoord,
     dynamic_object::{
         DynamicObjectList, DynamicObjectType,
         animal::{CaveTroll, ClownFish, Dodo, Donkey, DropBear, Scorpion, Shark, Yak},
@@ -77,7 +77,7 @@ pub struct ChunkDynamicObjects {
     pub sunflower_plant: DynamicObjectList<SunflowerPlant>,
     pub corn_plant: DynamicObjectList<CornPlant>,
     pub dodo: DynamicObjectList<Dodo>,
-    pub item: Vec<u8>,
+    pub dropped_item: Vec<u8>,
     pub fire: Vec<u8>,
     pub torch: Vec<u8>,
     pub glow_block: Vec<u8>,
@@ -235,7 +235,7 @@ impl DynamicWorld {
                 DynamicObjectType::SunflowerPlant => entry.sunflower_plant = plist::from_bytes(v)?,
                 DynamicObjectType::CornPlant => entry.corn_plant = plist::from_bytes(v)?,
                 DynamicObjectType::Dodo => entry.dodo = plist::from_bytes(v)?,
-                DynamicObjectType::Item => entry.item = v.to_vec(),
+                DynamicObjectType::DroppedItem => entry.dropped_item = v.to_vec(),
                 DynamicObjectType::Fire => entry.fire = v.to_vec(),
                 DynamicObjectType::Torch => entry.torch = v.to_vec(),
                 DynamicObjectType::GlowBlock => entry.glow_block = v.to_vec(),
@@ -324,7 +324,7 @@ impl DynamicWorld {
             put(db, wtxn, &coord, SunflowerPlant, &obj.sunflower_plant)?;
             put(db, wtxn, &coord, CornPlant, &obj.corn_plant)?;
             put(db, wtxn, &coord, Dodo, &obj.dodo)?;
-            put(db, wtxn, &coord, Item, &obj.item)?;
+            put(db, wtxn, &coord, DroppedItem, &obj.dropped_item)?;
             put(db, wtxn, &coord, Fire, &obj.fire)?;
             put(db, wtxn, &coord, Torch, &obj.torch)?;
             put(db, wtxn, &coord, GlowBlock, &obj.glow_block)?;
@@ -436,7 +436,7 @@ mod tests {
         monster.sunflower_plant = read_test_xml(DynamicObjectType::SunflowerPlant);
         monster.corn_plant = read_test_xml(DynamicObjectType::CornPlant);
         monster.dodo = read_test_xml(DynamicObjectType::Dodo);
-        monster.item = vec![14, 0xAA, 0xBB];
+        monster.dropped_item = vec![14, 0xAA, 0xBB];
         monster.fire = vec![16, 0xAA, 0xBB];
         monster.torch = vec![17, 0xAA, 0xBB];
         monster.glow_block = vec![18, 0xAA, 0xBB];
@@ -534,7 +534,7 @@ mod tests {
             check_key(DynamicObjectType::SunflowerPlant);
             check_key(DynamicObjectType::CornPlant);
             check_key(DynamicObjectType::Dodo);
-            check_key(DynamicObjectType::Item);
+            check_key(DynamicObjectType::DroppedItem);
             check_key(DynamicObjectType::Fire);
             check_key(DynamicObjectType::Torch);
             check_key(DynamicObjectType::GlowBlock);

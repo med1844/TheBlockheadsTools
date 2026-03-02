@@ -1,5 +1,8 @@
 use super::{chunk::ChunksPy, into_py_err, item::InventoryPy, lib, SharedWorldDb};
-use lib::{game::db::world_db::WorldDb, DynArch};
+use lib::{
+    game::{db::world_db::WorldDb, dynamic_object::UniqueID},
+    DynArch,
+};
 use num_enum::TryFromPrimitive;
 use pyo3::prelude::*;
 use std::{
@@ -429,7 +432,7 @@ impl BlockheadPy {
     #[getter]
     fn get_inventory(&self, py: Python<'_>) -> PyResult<Option<Py<InventoryPy>>> {
         let world_db = self.read();
-        let unique_id = world_db.main.blockheads[self.index].obj.unique_id.clone();
+        let unique_id = world_db.main.blockheads[self.index].unique_id.clone();
         if let Some(inv) = world_db.main.blockhead_inventories.get(&unique_id) {
             Ok(Some(InventoryPy::inflate(py, inv.clone())?))
         } else {
@@ -440,7 +443,7 @@ impl BlockheadPy {
     #[setter]
     fn set_inventory(&self, py: Python<'_>, inventory: Option<Py<InventoryPy>>) -> PyResult<()> {
         let mut world_db = self.write();
-        let unique_id = world_db.main.blockheads[self.index].obj.unique_id.clone();
+        let unique_id = world_db.main.blockheads[self.index].unique_id.clone();
         if let Some(inv_py) = inventory {
             let inv = inv_py.bind(py).borrow().deflate(py);
             world_db.main.blockhead_inventories.insert(unique_id, inv);
@@ -510,11 +513,7 @@ impl WorldDbMainPy {
         id: u64,
     ) -> PyResult<Option<Py<InventoryPy>>> {
         let world_db = self.inner.read().unwrap();
-        if let Some(inv) = world_db
-            .main
-            .blockhead_inventories
-            .get(&lib::game::dw::dynamic_object::UniqueID::new(id))
-        {
+        if let Some(inv) = world_db.main.blockhead_inventories.get(&UniqueID::new(id)) {
             Ok(Some(InventoryPy::inflate(py, inv.clone())?))
         } else {
             Ok(None)
@@ -528,7 +527,7 @@ impl WorldDbMainPy {
         inventory: Option<Py<InventoryPy>>,
     ) -> PyResult<()> {
         let mut world_db = self.inner.write().unwrap();
-        let unique_id = lib::game::dw::dynamic_object::UniqueID::new(id);
+        let unique_id = UniqueID::new(id);
         if let Some(inv_py) = inventory {
             let inv = inv_py.bind(py).borrow().deflate(py);
             world_db.main.blockhead_inventories.insert(unique_id, inv);

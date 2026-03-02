@@ -34,7 +34,7 @@ fn main() -> BhResult<()> {
             && chunk_coord == "349_20"
             && let Ok(type_id) = type_id_str.parse::<usize>()
             && type_id < 64
-            && !found[type_id]
+            && type_id == 14
             && let Ok(dict) = plist::from_bytes::<plist::Dictionary>(v)
             && let Some(dyn_objs) = dict.get("dynamicObjects").and_then(|v| v.as_array())
             && !dyn_objs.is_empty()

@@ -1,6 +1,6 @@
 use eframe::wgpu::{self, util::DeviceExt};
 use std::collections::HashMap;
-use the_blockheads_tools_lib::game::{coord::ChunkCoord, dw::dynamic_world::ChunkDynamicObjects};
+use the_blockheads_tools_lib::game::{coord::ChunkCoord, dynamic_world::ChunkDynamicObjects};
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]

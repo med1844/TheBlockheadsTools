@@ -1,9 +1,14 @@
 use super::{into_py_err, lib};
 use lib::game::{
-    dw::dynamic_object::{DynamicObject, InteractionObject, UniqueID},
+    dynamic_object::{
+        blockhead::Inventory,
+        chest::{ChestData, ChestType},
+        workbench::{Workbench, WorkbenchType},
+        DynamicObject, InteractionObject, InteractionObjectType, UniqueID,
+    },
     item::{
-        fmt_item_display, fmt_slot_display, ChestData, ChestType, Extra, Inventory, Item, ItemType,
-        ItemView, PigmentColor, Slot, SlotView, WorkbenchData, WorkbenchType,
+        fmt_item_display, fmt_slot_display, Extra, Item, ItemType, ItemView, PigmentColor, Slot,
+        SlotView,
     },
 };
 use num_enum::TryFromPrimitive;
@@ -475,8 +480,8 @@ impl From<ChestType> for ChestTypePy {
 }
 
 impl From<ChestTypePy> for ChestType {
-    fn from(val: ChestTypePy) -> Self {
-        Self::from(val as u8)
+    fn from(value: ChestTypePy) -> Self {
+        Self::try_from(value as u8).expect("Enums are out of sync!")
     }
 }
 
@@ -525,8 +530,8 @@ impl From<WorkbenchType> for WorkbenchTypePy {
 }
 
 impl From<WorkbenchTypePy> for WorkbenchType {
-    fn from(val: WorkbenchTypePy) -> Self {
-        Self::from(val as u8)
+    fn from(value: WorkbenchTypePy) -> Self {
+        Self::try_from(value as u8).expect("Enums are out of sync!")
     }
 }
 
@@ -552,8 +557,8 @@ impl From<PigmentColor> for PigmentColorPy {
 }
 
 impl From<PigmentColorPy> for PigmentColor {
-    fn from(val: PigmentColorPy) -> Self {
-        Self::try_from(val as u8).expect("Enums are out of sync!")
+    fn from(value: PigmentColorPy) -> Self {
+        Self::try_from(value as u8).expect("Enums are out of sync!")
     }
 }
 
@@ -658,7 +663,7 @@ pub struct ChestExtraPy {
     #[pyo3(get, set)]
     pub chest_type: ChestTypePy,
     #[pyo3(get, set)]
-    pub owner_id: String,
+    pub owner_id: Option<String>,
     #[pyo3(get, set)]
     pub is_in_use: bool,
     #[pyo3(get, set)]
@@ -688,26 +693,25 @@ impl std::fmt::Debug for ChestExtraPy {
 
 impl ChestExtraPy {
     pub fn inflate(py: Python<'_>, chest: ChestData) -> PyResult<Py<Self>> {
-        let mut items = Vec::with_capacity(ChestData::NUM_SLOTS);
-        for slot in chest.save_item_slots {
-            items.push(SlotPy::inflate(py, slot)?);
-        }
         Py::new(
             py,
             Self {
                 chest_type: chest.chest_type.into(),
-                items,
-                owner_id: chest.owner_id,
-                is_in_use: chest.parent.is_in_use,
-                flipped: chest.parent.flipped,
-                paint_color: chest.parent.paint_color,
-                pos_x: chest.parent.parent.pos_x,
-                pos_y: chest.parent.parent.pos_y,
-                float_pos: [
-                    chest.parent.parent.float_pos[0].into(),
-                    chest.parent.parent.float_pos[1].into(),
-                ],
-                unique_id: *chest.parent.parent.unique_id.inner(),
+                owner_id: chest.owner_id.clone(),
+                is_in_use: chest.is_in_use,
+                flipped: chest.flipped,
+                paint_color: chest.paint_color,
+                pos_x: chest.pos_x,
+                pos_y: chest.pos_y,
+                float_pos: [chest.float_pos[0].into(), chest.float_pos[1].into()],
+                unique_id: *chest.unique_id.inner(),
+                items: {
+                    let mut items = Vec::with_capacity(ChestData::NUM_SLOTS);
+                    for slot in chest.save_item_slots {
+                        items.push(SlotPy::inflate(py, slot)?);
+                    }
+                    items
+                },
             },
         )
     }
@@ -719,9 +723,9 @@ impl ChestExtraPy {
                 save_item_slots[i] = si_py.bind(py).borrow().deflate(py);
             }
         }
-        ChestData {
-            parent: InteractionObject {
-                parent: DynamicObject {
+        ChestData::new(
+            InteractionObject::new(
+                DynamicObject {
                     float_pos: [
                         self.float_pos[0].try_into().unwrap_or_default(),
                         self.float_pos[1].try_into().unwrap_or_default(),
@@ -729,16 +733,16 @@ impl ChestExtraPy {
                     pos_x: self.pos_x,
                     pos_y: self.pos_y,
                     unique_id: UniqueID::new(self.unique_id),
+                    owner_id: self.owner_id.clone(),
                 },
-                interaction_object_type: 0, // Placeholder
-                is_in_use: self.is_in_use,
-                flipped: self.flipped,
-                paint_color: self.paint_color,
-            },
-            chest_type: self.chest_type.into(),
+                InteractionObjectType::Chest,
+                self.is_in_use,
+                self.flipped,
+                self.paint_color,
+            ),
+            self.chest_type.into(),
             save_item_slots,
-            owner_id: self.owner_id.clone(),
-        }
+        )
     }
 
     pub fn clone_ref(&self, py: Python<'_>) -> Py<Self> {
@@ -764,12 +768,12 @@ impl ChestExtraPy {
 #[pymethods]
 impl ChestExtraPy {
     #[new]
-    #[pyo3(signature = (items=None, chest_type=ChestTypePy::Standard, owner_id="server".to_string()))]
+    #[pyo3(signature = (items=None, chest_type=ChestTypePy::Standard, owner_id=None))]
     fn new(
         py: Python<'_>,
         items: Option<Vec<Py<SlotPy>>>,
         chest_type: ChestTypePy,
-        owner_id: String,
+        owner_id: Option<String>,
     ) -> PyResult<Py<Self>> {
         let items = match items {
             Some(items) => {
@@ -845,7 +849,7 @@ impl ChestExtraPy {
             })
             .collect();
         format!(
-            "ChestExtra(type={:?}, owner_id=\"{}\", items=[{}])",
+            "ChestExtra(type={:?}, owner_id={:?}, items=[{}])",
             self.chest_type,
             self.owner_id,
             items_repr.join(", ")
@@ -864,7 +868,7 @@ impl ChestExtraPy {
             })
             .collect();
         format!(
-            "ChestData {{ type: {:?}, items: [{}] }}",
+            "Chest {{ type: {:?}, items: [{}] }}",
             self.chest_type,
             items_str.join(", ")
         )
@@ -879,7 +883,7 @@ pub struct WorkbenchExtraPy {
     #[pyo3(get, set)]
     pub level: u8,
     #[pyo3(get, set)]
-    pub owner_id: String,
+    pub owner_id: Option<String>,
     #[pyo3(get, set)]
     pub is_in_use: bool,
     #[pyo3(get, set)]
@@ -923,23 +927,20 @@ pub struct WorkbenchExtraPy {
 }
 
 impl WorkbenchExtraPy {
-    pub fn inflate(py: Python<'_>, workbench: WorkbenchData) -> PyResult<Py<Self>> {
+    pub fn inflate(py: Python<'_>, workbench: Workbench) -> PyResult<Py<Self>> {
         Py::new(
             py,
             Self {
                 workbench_type: workbench.workbench_type.into(),
                 level: workbench.level,
-                owner_id: workbench.owner_id,
-                is_in_use: workbench.parent.is_in_use,
-                flipped: workbench.parent.flipped,
-                paint_color: workbench.parent.paint_color,
-                pos_x: workbench.parent.parent.pos_x,
-                pos_y: workbench.parent.parent.pos_y,
-                float_pos: [
-                    workbench.parent.parent.float_pos[0].get(),
-                    workbench.parent.parent.float_pos[1].get(),
-                ],
-                unique_id: *workbench.parent.parent.unique_id.inner(),
+                owner_id: workbench.owner_id.clone(),
+                is_in_use: workbench.is_in_use,
+                flipped: workbench.flipped,
+                paint_color: workbench.paint_color,
+                pos_x: workbench.pos_x,
+                pos_y: workbench.pos_y,
+                float_pos: [workbench.float_pos[0].get(), workbench.float_pos[1].get()],
+                unique_id: *workbench.unique_id.inner(),
 
                 available_electricity: workbench.available_electricity,
                 craft_progress_count: workbench.craft_progress_count.get(),
@@ -958,10 +959,10 @@ impl WorkbenchExtraPy {
         )
     }
 
-    pub fn deflate(&self) -> WorkbenchData {
-        WorkbenchData {
-            parent: InteractionObject {
-                parent: DynamicObject {
+    pub fn deflate(&self) -> Workbench {
+        Workbench::new(
+            InteractionObject::new(
+                DynamicObject {
                     float_pos: [
                         self.float_pos[0].try_into().unwrap_or_default(),
                         self.float_pos[1].try_into().unwrap_or_default(),
@@ -969,29 +970,29 @@ impl WorkbenchExtraPy {
                     pos_x: self.pos_x,
                     pos_y: self.pos_y,
                     unique_id: UniqueID::new(self.unique_id),
+                    owner_id: self.owner_id.clone(),
                 },
-                interaction_object_type: 0,
-                is_in_use: self.is_in_use,
-                flipped: self.flipped,
-                paint_color: self.paint_color,
-            },
-            available_electricity: self.available_electricity,
-            craft_progress_count: self.craft_progress_count.try_into().unwrap(),
-            fire_spread_timer: self.fire_spread_timer.try_into().unwrap(),
-            fuel_fraction: self.fuel_fraction.try_into().unwrap(),
-            has_fuel: self.has_fuel,
-            hurry_cost: self.hurry_cost,
-            hurry_seconds: self.hurry_seconds.try_into().unwrap(),
-            hurry_timer: self.hurry_timer.try_into().unwrap(),
-            hurrying: self.hurrying,
-            last_world_time: self.last_world_time.try_into().unwrap(),
-            level: self.level,
-            save_time: self.save_time.try_into().unwrap(),
-            owner_id: self.owner_id.clone(),
-            selected_index: self.selected_index,
-            workbench_type: self.workbench_type.into(),
-            x_scroll: self.x_scroll.try_into().unwrap(),
-        }
+                InteractionObjectType::Workbench,
+                self.is_in_use,
+                self.flipped,
+                self.paint_color,
+            ),
+            self.available_electricity,
+            self.craft_progress_count.try_into().unwrap(),
+            self.fire_spread_timer.try_into().unwrap(),
+            self.fuel_fraction.try_into().unwrap(),
+            self.has_fuel,
+            self.hurry_cost,
+            self.hurry_seconds.try_into().unwrap(),
+            self.hurry_timer.try_into().unwrap(),
+            self.hurrying,
+            self.last_world_time.try_into().unwrap(),
+            self.level,
+            self.save_time.try_into().unwrap(),
+            self.selected_index,
+            self.workbench_type.into(),
+            self.x_scroll.try_into().unwrap(),
+        )
     }
 
     pub fn clone_ref(&self, py: Python<'_>) -> Py<Self> {
@@ -1031,12 +1032,12 @@ impl WorkbenchExtraPy {
 #[pymethods]
 impl WorkbenchExtraPy {
     #[new]
-    #[pyo3(signature = (workbench_type=WorkbenchTypePy::Workbench, level=1, owner_id="server".to_string()))]
+    #[pyo3(signature = (workbench_type=WorkbenchTypePy::Workbench, level=1, owner_id=None))]
     fn new(
         py: Python<'_>,
         workbench_type: WorkbenchTypePy,
         level: u8,
-        owner_id: String,
+        owner_id: Option<String>,
     ) -> PyResult<Py<Self>> {
         Py::new(
             py,
@@ -1071,7 +1072,7 @@ impl WorkbenchExtraPy {
 
     fn __repr__(&self) -> String {
         format!(
-            "WorkbenchExtra(type={:?}, level={}, owner_id=\"{}\", pos_x={}, pos_y={})",
+            "WorkbenchExtra(type={:?}, level={}, owner_id={:?}, pos_x={}, pos_y={})",
             self.workbench_type, self.level, self.owner_id, self.pos_x, self.pos_y
         )
     }

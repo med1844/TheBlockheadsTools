@@ -219,7 +219,7 @@ def test_chest_dispatch():
     match item.extra:
         case ChestExtra(chest_type=ctype, owner_id=owner):
             assert ctype == ChestType.Gold
-            assert owner == "server"
+            assert owner is None
         case _:
             pytest.fail("Should have matched ChestExtra")
 
@@ -257,7 +257,7 @@ def test_workbench_basic():
     wb = WorkbenchExtra()
     assert wb.workbench_type == WorkbenchType.Workbench
     assert wb.level == 1
-    assert wb.owner_id == "server"
+    assert wb.owner_id is None
 
     wb = WorkbenchExtra(WorkbenchType.Craft, 2, "crafter")
     assert wb.workbench_type == WorkbenchType.Craft

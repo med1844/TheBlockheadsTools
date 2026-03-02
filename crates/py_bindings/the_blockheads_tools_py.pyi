@@ -508,7 +508,7 @@ class BasketExtra:
 
 class ChestExtra:
     chest_type: ChestType
-    owner_id: str
+    owner_id: Optional[str]
     is_in_use: bool
     flipped: bool
     paint_color: int
@@ -521,7 +521,7 @@ class ChestExtra:
         self,
         items: Optional[list[Slot]] = None,
         chest_type: ChestType = ChestType.Standard,
-        owner_id: str = "server",
+        owner_id: Optional[str] = None,
     ) -> None: ...
     def __len__(self) -> int: ...
     def __getitem__(self, index: int) -> Slot: ...

@@ -1,5 +1,5 @@
 use super::{
-    super::{chunk::Chunks, dw::dynamic_world::DynamicWorld},
+    super::{chunk::Chunks, dynamic_world::DynamicWorld},
     world_db_main::WorldDbMain,
 };
 use crate::{BhError, BhResult};

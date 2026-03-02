@@ -1,7 +1,7 @@
 use super::{
-    super::{
-        dw::dynamic_object::{Blockhead, DynamicObjectList, UniqueID},
-        item::Inventory,
+    super::dynamic_object::{
+        DynamicObjectList, UniqueID,
+        blockhead::{Blockhead, Inventory},
     },
     dynamic_world_v2::DynamicWorldV2,
     world_v2::WorldV2,

@@ -1,6 +1,5 @@
 use super::{
-    super::super::item::ItemType, DynamicObject, InteractionObject, deserialize_some,
-    serialize_some,
+    super::item::ItemType, DynamicObject, InteractionObject, deserialize_some, serialize_some,
 };
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
