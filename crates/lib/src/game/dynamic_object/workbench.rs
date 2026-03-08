@@ -5,7 +5,6 @@ use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::ops::{Deref, DerefMut};
 use strum_macros::IntoStaticStr;
-use typed_floats::NonNaNFinite;
 
 #[derive(
     Debug,
@@ -62,20 +61,20 @@ pub struct Workbench {
     #[serde(flatten)]
     obj: InteractionObject,
     pub available_electricity: u64,
-    pub craft_progress_count: NonNaNFinite<f32>,
-    pub fire_spread_timer: NonNaNFinite<f32>,
-    pub fuel_fraction: NonNaNFinite<f32>,
+    pub craft_progress_count: f32,
+    pub fire_spread_timer: f32,
+    pub fuel_fraction: f32,
     pub has_fuel: bool,
     pub hurry_cost: u64,
-    pub hurry_seconds: NonNaNFinite<f32>,
-    pub hurry_timer: NonNaNFinite<f32>,
+    pub hurry_seconds: f32,
+    pub hurry_timer: f32,
     pub hurrying: bool,
-    pub last_world_time: NonNaNFinite<f32>,
+    pub last_world_time: f32,
     pub level: u8,
-    pub save_time: NonNaNFinite<f32>,
+    pub save_time: f32,
     pub selected_index: u8,
     pub workbench_type: WorkbenchType,
-    pub x_scroll: NonNaNFinite<f32>,
+    pub x_scroll: f32,
     #[serde(
         default,
         deserialize_with = "deserialize_some",
@@ -91,20 +90,20 @@ impl Workbench {
     pub fn new(
         obj: InteractionObject,
         available_electricity: u64,
-        craft_progress_count: NonNaNFinite<f32>,
-        fire_spread_timer: NonNaNFinite<f32>,
-        fuel_fraction: NonNaNFinite<f32>,
+        craft_progress_count: f32,
+        fire_spread_timer: f32,
+        fuel_fraction: f32,
         has_fuel: bool,
         hurry_cost: u64,
-        hurry_seconds: NonNaNFinite<f32>,
-        hurry_timer: NonNaNFinite<f32>,
+        hurry_seconds: f32,
+        hurry_timer: f32,
         hurrying: bool,
-        last_world_time: NonNaNFinite<f32>,
+        last_world_time: f32,
         level: u8,
-        save_time: NonNaNFinite<f32>,
+        save_time: f32,
         selected_index: u8,
         workbench_type: WorkbenchType,
-        x_scroll: NonNaNFinite<f32>,
+        x_scroll: f32,
         light_dict: Option<ArtificialLight>,
     ) -> Self {
         Self {

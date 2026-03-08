@@ -6,7 +6,6 @@ use num_enum::TryFromPrimitive;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::ops::{Deref, DerefMut};
-use typed_floats::NonNaNFinite;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, TryFromPrimitive)]
 #[repr(u16)]
@@ -165,10 +164,10 @@ impl UniqueID {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DynamicObject {
     #[serde(rename = "floatPos")]
-    pub float_pos: [NonNaNFinite<f32>; 2],
+    pub float_pos: [f32; 2],
     pub pos_x: u64,
     pub pos_y: u16,
     #[serde(rename = "uniqueID")]
@@ -198,7 +197,7 @@ pub enum InteractionObjectType {
     Mirror = 9,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InteractionObject {
     #[serde(flatten)]
