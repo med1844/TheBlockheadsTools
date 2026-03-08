@@ -1,3 +1,5 @@
+use crate::BhResult;
+
 /// Recursively compare two plist::Value trees, collecting key-set
 /// differences. Reports contaminated keys (in serialized but not original)
 /// and lost keys (in original but not serialized).
@@ -41,4 +43,10 @@ pub fn diff_plist_keys(
         }
         _ => {} // Leaf values — struct equality already covers correctness
     }
+}
+
+pub fn to_xml_plist<T: serde::ser::Serialize>(value: &T) -> BhResult<Vec<u8>> {
+    let mut serialized = Vec::new();
+    plist::to_writer_xml(&mut serialized, value)?;
+    Ok(serialized)
 }

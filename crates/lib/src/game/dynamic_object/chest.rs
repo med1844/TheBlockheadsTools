@@ -2,7 +2,15 @@ use super::{
     super::item::{ItemType, Slot},
     InteractionObject,
 };
-use crate::util::serde::{deserialize_some, serialize_some};
+use crate::{
+    util::{
+        error::ChestError,
+        gzip::{compress, decompress},
+        plist::to_xml_plist,
+        serde::{deserialize_some, serialize_some},
+    },
+    {BhError, BhResult},
+};
 use num_enum::TryFromPrimitive;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
@@ -29,7 +37,7 @@ pub enum ChestType {
     Shelf = 2,
     Gold = 3,
     Portal = 4,
-    DisplayCabinet = 5,
+    Cabinet = 5,
     Feeder = 6,
 }
 
@@ -39,30 +47,150 @@ impl From<ChestType> for u8 {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ChestData {
-    #[serde(flatten)]
-    obj: InteractionObject,
-    pub chest_type: ChestType,
-    pub save_item_slots: [Slot; Self::NUM_SLOTS],
+const NUM_STANDARD_SLOTS: usize = 4 * 4;
+const NUM_SHELF_SLOTS: usize = 2 * 2;
+type StandardSlots = [Slot; NUM_STANDARD_SLOTS];
+type ShelfSlots = [Slot; NUM_SHELF_SLOTS];
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ChestSlots {
+    Standard(StandardSlots),
+    Safe(StandardSlots),
+    Shelf {
+        render_items: Option<[ItemType; NUM_SHELF_SLOTS]>,
+        item_data_bs: Option<[u16; NUM_SHELF_SLOTS]>,
+        slots: ShelfSlots,
+    },
+    Gold(StandardSlots),
+    Portal,
+    Cabinet {
+        render_items: Option<[ItemType; NUM_SHELF_SLOTS]>,
+        item_data_bs: Option<[u16; NUM_SHELF_SLOTS]>,
+        slots: ShelfSlots,
+    },
+    Feeder(StandardSlots),
 }
 
-impl ChestData {
-    pub const NUM_SLOTS: usize = 16;
-}
-inherit!(ChestData -> InteractionObject, obj);
-
-impl ChestData {
-    pub fn new(
-        interaction_object: InteractionObject,
+impl ChestSlots {
+    pub fn from_chest_type_and_slots(
         chest_type: ChestType,
-        save_item_slots: [Slot; Self::NUM_SLOTS],
-    ) -> Self {
-        Self {
-            obj: interaction_object,
-            chest_type,
-            save_item_slots,
+        slots: Option<Vec<Slot>>,
+        render_items: Option<[ItemType; NUM_SHELF_SLOTS]>,
+        item_data_bs: Option<[u16; NUM_SHELF_SLOTS]>,
+    ) -> BhResult<Self> {
+        match (slots, chest_type) {
+            (
+                Some(slots),
+                ChestType::Standard | ChestType::Safe | ChestType::Gold | ChestType::Feeder,
+            ) => {
+                let slots: Result<[Slot; NUM_STANDARD_SLOTS], Vec<Slot>> = slots.try_into();
+                match slots {
+                    Ok(slots) => {
+                        Ok(match chest_type {
+                            ChestType::Standard => Self::Standard(slots),
+                            ChestType::Safe => Self::Safe(slots),
+                            ChestType::Gold => Self::Gold(slots),
+                            ChestType::Feeder => Self::Feeder(slots),
+                            _ => unreachable!(), // bad design
+                        })
+                    }
+                    Err(slots) => Err(BhError::ChestError(ChestError::NumSlotsMismatch(
+                        NUM_STANDARD_SLOTS,
+                        slots.len(),
+                        chest_type.into(),
+                    ))),
+                }
+            }
+            (Some(slots), ChestType::Shelf | ChestType::Cabinet) => {
+                let slots: Result<[Slot; NUM_SHELF_SLOTS], Vec<Slot>> = slots.try_into();
+                match slots {
+                    Ok(slots) => {
+                        Ok(match chest_type {
+                            ChestType::Shelf => Self::Shelf {
+                                render_items,
+                                item_data_bs,
+                                slots,
+                            },
+                            ChestType::Cabinet => Self::Cabinet {
+                                render_items,
+                                item_data_bs,
+                                slots,
+                            },
+                            _ => unreachable!(), // bad design
+                        })
+                    }
+                    Err(slots) => Err(BhError::ChestError(ChestError::NumSlotsMismatch(
+                        NUM_SHELF_SLOTS,
+                        slots.len(),
+                        chest_type.into(),
+                    ))),
+                }
+            }
+            (slots, ChestType::Portal) => match slots {
+                Some(_) => Err(BhError::ChestError(ChestError::PortalChestHaveSlots)),
+                None => Ok(Self::Portal),
+            },
+            (
+                None,
+                ChestType::Standard
+                | ChestType::Safe
+                | ChestType::Shelf
+                | ChestType::Gold
+                | ChestType::Cabinet
+                | ChestType::Feeder,
+            ) => Err(BhError::ChestError(ChestError::NoSaveItemSlot(
+                chest_type.into(),
+            ))),
+        }
+    }
+
+    #[allow(clippy::type_complexity)]
+    fn to_chest_type_and_slots(
+        &self,
+    ) -> (
+        ChestType,
+        Option<Vec<Slot>>,
+        Option<[ItemType; NUM_SHELF_SLOTS]>,
+        Option<[u16; NUM_SHELF_SLOTS]>,
+    ) {
+        match self {
+            Self::Standard(s) => (ChestType::Standard, Some(s.to_vec()), None, None),
+            Self::Safe(s) => (ChestType::Safe, Some(s.to_vec()), None, None),
+            Self::Shelf {
+                render_items,
+                item_data_bs,
+                slots,
+            } => (
+                ChestType::Shelf,
+                Some(slots.to_vec()),
+                *render_items,
+                *item_data_bs,
+            ),
+            Self::Gold(s) => (ChestType::Gold, Some(s.to_vec()), None, None),
+            Self::Portal => (ChestType::Portal, None, None, None),
+            Self::Cabinet {
+                render_items,
+                item_data_bs,
+                slots,
+            } => (
+                ChestType::Cabinet,
+                Some(slots.to_vec()),
+                *render_items,
+                *item_data_bs,
+            ),
+            Self::Feeder(s) => (ChestType::Feeder, Some(s.to_vec()), None, None),
+        }
+    }
+
+    pub fn as_slots(&self) -> Option<&[Slot]> {
+        match self {
+            Self::Standard(s) | Self::Safe(s) | Self::Gold(s) | ChestSlots::Feeder(s) => {
+                Some(s.as_slice())
+            }
+            ChestSlots::Shelf { slots, .. } | ChestSlots::Cabinet { slots, .. } => {
+                Some(slots.as_slice())
+            }
+            ChestSlots::Portal => None,
         }
     }
 }
@@ -70,16 +198,33 @@ impl ChestData {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Chest {
     obj: InteractionObject,
-    pub chest_type: ChestType,
-    pub shelf_render_items: Option<[ItemType; 4]>,
-    pub shelf_item_data_bs: Option<[u16; 4]>,
     pub save_time: f64,
+    pub slots: ChestSlots,
 }
 inherit!(Chest -> InteractionObject, obj);
 
+// Chest data from binary item
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ChestItem {
+    #[serde(flatten)]
+    obj: InteractionObject,
+    pub chest_type: ChestType,
+    pub save_time: f64,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_some",
+        serialize_with = "serialize_some",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub save_item_slots: Option<Vec<Slot>>,
+}
+inherit!(ChestItem -> InteractionObject, obj);
+
+// Contains metadata of a chest stored in dynamic world sub-db
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct ChestRaw {
+pub(crate) struct ChestMeta {
     #[serde(flatten)]
     obj: InteractionObject,
     chest_type: ChestType,
@@ -151,136 +296,117 @@ struct ChestRaw {
     )]
     shelf_item_data_bs_3: Option<u16>,
 }
+inherit!(ChestMeta -> InteractionObject, obj);
 
-impl TryFrom<ChestRaw> for Chest {
-    type Error = String;
+impl Chest {
+    pub(crate) fn from_meta_and_slots(
+        meta: ChestMeta,
+        slot_bytes: Option<&[u8]>,
+    ) -> BhResult<Self> {
+        let save_item_slots: Option<Vec<Slot>> = match slot_bytes {
+            Some(bytes) => {
+                let decompressed = decompress(bytes)?;
+                Some(plist::from_bytes(&decompressed)?)
+            }
+            None => None,
+        };
 
-    fn try_from(raw: ChestRaw) -> Result<Self, Self::Error> {
-        let render_items = match (
-            raw.shelf_render_items_0,
-            raw.shelf_render_items_1,
-            raw.shelf_render_items_2,
-            raw.shelf_render_items_3,
+        let shelf_render_items = match (
+            meta.shelf_render_items_0,
+            meta.shelf_render_items_1,
+            meta.shelf_render_items_2,
+            meta.shelf_render_items_3,
         ) {
             (Some(r0), Some(r1), Some(r2), Some(r3)) => Some([r0, r1, r2, r3]),
             (None, None, None, None) => None,
-            _ => return Err("Incomplete shelf_render_items array".to_string()),
+            _ => {
+                return Err(BhError::ChestError(ChestError::IncompleteShelfRenderItems));
+            }
         };
 
-        let data_bs = match (
-            raw.shelf_item_data_bs_0,
-            raw.shelf_item_data_bs_1,
-            raw.shelf_item_data_bs_2,
-            raw.shelf_item_data_bs_3,
+        let shelf_item_data_bs = match (
+            meta.shelf_item_data_bs_0,
+            meta.shelf_item_data_bs_1,
+            meta.shelf_item_data_bs_2,
+            meta.shelf_item_data_bs_3,
         ) {
             (Some(d0), Some(d1), Some(d2), Some(d3)) => Some([d0, d1, d2, d3]),
             (None, None, None, None) => None,
-            _ => return Err("Incomplete shelf_item_data_bs array".to_string()),
+            _ => {
+                return Err(BhError::ChestError(ChestError::IncompleteItemDataBs));
+            }
         };
 
-        if render_items.is_some() != data_bs.is_some() {
-            return Err(
-                "Mismatched presence of shelf_render_items and shelf_item_data_bs".to_string(),
-            );
-        }
+        let slots = ChestSlots::from_chest_type_and_slots(
+            meta.chest_type,
+            save_item_slots,
+            shelf_render_items,
+            shelf_item_data_bs,
+        )?;
 
         Ok(Self {
-            obj: raw.obj,
-            chest_type: raw.chest_type,
-            save_time: raw.save_time,
-            shelf_render_items: render_items,
-            shelf_item_data_bs: data_bs,
+            obj: meta.obj,
+            save_time: meta.save_time,
+            slots,
         })
     }
-}
 
-impl From<Chest> for ChestRaw {
-    fn from(chest: Chest) -> Self {
-        let (r0, r1, r2, r3) = match chest.shelf_render_items {
+    pub(crate) fn to_meta_and_slots(&self) -> BhResult<(ChestMeta, Option<Vec<u8>>)> {
+        let (chest_type, save_item_slots, shelf_render_items, shelf_item_data_bs) =
+            self.slots.to_chest_type_and_slots();
+        let (r0, r1, r2, r3) = match shelf_render_items {
             Some([a, b, c, d]) => (Some(a), Some(b), Some(c), Some(d)),
             None => (None, None, None, None),
         };
-        let (d0, d1, d2, d3) = match chest.shelf_item_data_bs {
+        let (d0, d1, d2, d3) = match shelf_item_data_bs {
             Some([a, b, c, d]) => (Some(a), Some(b), Some(c), Some(d)),
             None => (None, None, None, None),
         };
-
-        Self {
-            obj: chest.obj,
-            chest_type: chest.chest_type,
-            save_time: chest.save_time,
-            shelf_render_items_0: r0,
-            shelf_render_items_1: r1,
-            shelf_render_items_2: r2,
-            shelf_render_items_3: r3,
-            shelf_item_data_bs_0: d0,
-            shelf_item_data_bs_1: d1,
-            shelf_item_data_bs_2: d2,
-            shelf_item_data_bs_3: d3,
-        }
-    }
-}
-
-impl Serialize for Chest {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        ChestRaw::from(self.clone()).serialize(serializer)
-    }
-}
-
-impl<'de> Deserialize<'de> for Chest {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let raw = ChestRaw::deserialize(deserializer)?;
-        Chest::try_from(raw).map_err(serde::de::Error::custom)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{
-        super::{
-            super::item::{Extra, Item, ItemType},
-            DynamicObject, InteractionObject, InteractionObjectType, UniqueID,
-        },
-        ChestData, ChestType, Slot,
-    };
-
-    #[test]
-    fn test_extra_chest_isolation() {
-        let chest_data = ChestData {
-            obj: InteractionObject {
-                obj: DynamicObject {
-                    float_pos: [0.0f32.try_into().unwrap(), 0.0f32.try_into().unwrap()],
-                    pos_x: 10,
-                    pos_y: 20,
-                    unique_id: UniqueID::new(123),
-                    owner_id: Some("test_owner".to_string()),
-                },
-                interaction_object_type: InteractionObjectType::Chest,
-                is_in_use: false,
-                flipped: false,
-                paint_color: 0,
+        let slot_bytes = match &save_item_slots {
+            Some(slots) => {
+                let compressed = compress(&to_xml_plist(slots)?)?;
+                Some(compressed)
+            }
+            None => None,
+        };
+        Ok((
+            ChestMeta {
+                obj: self.obj.clone(), // should be cheap if there's no owner id
+                chest_type,
+                save_time: self.save_time,
+                shelf_render_items_0: r0,
+                shelf_render_items_1: r1,
+                shelf_render_items_2: r2,
+                shelf_render_items_3: r3,
+                shelf_item_data_bs_0: d0,
+                shelf_item_data_bs_1: d1,
+                shelf_item_data_bs_2: d2,
+                shelf_item_data_bs_3: d3,
             },
-            chest_type: ChestType::Standard,
-            save_item_slots: [const { Slot(vec![]) }; 16],
-        };
+            slot_bytes,
+        ))
+    }
 
-        let item = Item {
-            type_id: ItemType::Chest as u16,
-            data_a: 0,
-            data_b: 0,
-            selected_sub_item_index: 0,
-            padding: 0,
-            extra: Some(Extra::Chest(Box::new(chest_data))),
-        };
+    pub(crate) fn from_chest_item(chest_item: ChestItem) -> BhResult<Self> {
+        Ok(Self {
+            obj: chest_item.obj,
+            save_time: chest_item.save_time,
+            slots: ChestSlots::from_chest_type_and_slots(
+                chest_item.chest_type,
+                chest_item.save_item_slots,
+                None,
+                None,
+            )?,
+        })
+    }
 
-        let serialized = plist::to_value(&item).unwrap();
-        let deserialized: Item = plist::from_value(&serialized).unwrap();
-        assert_eq!(item, deserialized);
+    pub(crate) fn to_chest_item(&self) -> ChestItem {
+        let (chest_type, slots, _, _) = self.slots.to_chest_type_and_slots();
+        ChestItem {
+            obj: self.obj.clone(),
+            chest_type,
+            save_time: self.save_time,
+            save_item_slots: slots,
+        }
     }
 }

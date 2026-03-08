@@ -1,4 +1,7 @@
-use super::dynamic_object::{chest::ChestData, workbench::Workbench};
+use super::dynamic_object::{
+    chest::{Chest, ChestItem},
+    workbench::Workbench,
+};
 use crate::{
     BhError, BhResult,
     util::gzip::{compress_into, decompress},
@@ -457,7 +460,7 @@ pub enum ItemType {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Extra {
     Basket([Slot; Self::NUM_SLOT_BASKET]),
-    Chest(Box<ChestData>),
+    Chest(Box<Chest>),
     Workbench(Box<Workbench>),
 }
 
@@ -478,9 +481,12 @@ impl<'de> Deserialize<'de> for Extra {
         } else if let Some(value @ plist::Value::Dictionary(d)) = dict.get("d")
             && d.contains_key("chestType")
         {
-            Ok(Self::Chest(plist::from_value(value).map_err(|e| {
-                D::Error::custom(format!("plist error: {}", e))
-            })?))
+            let chest_item: ChestItem = plist::from_value(value)
+                .map_err(|e| D::Error::custom(format!("plist error: {}", e)))?;
+            Ok(Self::Chest(Box::new(
+                Chest::from_chest_item(chest_item)
+                    .map_err(|e| D::Error::custom(format!("can't parse chest: {}", e)))?,
+            )))
         } else if let Some(value @ plist::Value::Dictionary(d)) = dict.get("d")
             && d.contains_key("workbenchType")
         {
@@ -508,9 +514,10 @@ impl Serialize for Extra {
                 );
             }
             Self::Chest(chest) => {
+                let chest_item = chest.to_chest_item();
                 dict.insert(
                     "d".to_string(),
-                    plist::to_value(chest).map_err(|e| S::Error::custom(e.to_string()))?,
+                    plist::to_value(&chest_item).map_err(|e| S::Error::custom(e.to_string()))?,
                 );
             }
             Self::Workbench(workbench) => {
@@ -545,11 +552,48 @@ impl Display for Extra {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Extra::Basket(items) => f.debug_list().entries(items.iter().map(AsDisplay)).finish(),
-            Extra::Chest(chest) => f
-                .debug_struct("ChestData")
-                .field("type", &chest.chest_type)
-                .field("items", &AsDisplay(&ListDisplay(&chest.save_item_slots)))
-                .finish(),
+            Extra::Chest(chest) => {
+                use crate::game::dynamic_object::chest::{ChestSlots, ChestType};
+                let mut builder = f.debug_struct("ChestData");
+                match &chest.slots {
+                    ChestSlots::Standard(slots) => builder
+                        .field("type", &ChestType::Standard)
+                        .field("items", &AsDisplay(&ListDisplay(slots.as_slice()))),
+                    ChestSlots::Safe(slots) => builder
+                        .field("type", &ChestType::Safe)
+                        .field("items", &AsDisplay(&ListDisplay(slots.as_slice()))),
+                    ChestSlots::Gold(slots) => builder
+                        .field("type", &ChestType::Gold)
+                        .field("items", &AsDisplay(&ListDisplay(slots.as_slice()))),
+                    ChestSlots::Feeder(slots) => builder
+                        .field("type", &ChestType::Feeder)
+                        .field("items", &AsDisplay(&ListDisplay(slots.as_slice()))),
+                    ChestSlots::Portal => builder.field("type", &ChestType::Portal),
+                    ChestSlots::Shelf {
+                        render_items,
+                        slots,
+                        ..
+                    } => {
+                        builder.field("type", &ChestType::Shelf);
+                        if let Some(items) = render_items {
+                            builder.field("render_items", items);
+                        }
+                        builder.field("items", &AsDisplay(&ListDisplay(slots.as_slice())))
+                    }
+                    ChestSlots::Cabinet {
+                        render_items,
+                        slots,
+                        ..
+                    } => {
+                        builder.field("type", &ChestType::Cabinet);
+                        if let Some(items) = render_items {
+                            builder.field("render_items", items);
+                        }
+                        builder.field("items", &AsDisplay(&ListDisplay(slots.as_slice())))
+                    }
+                };
+                builder.finish()
+            }
             Extra::Workbench(workbench) => std::fmt::Debug::fmt(workbench, f),
         }
     }
@@ -996,5 +1040,163 @@ mod tests {
         let serialized = plist::to_value(&slot).unwrap();
         let deserialized: Slot = plist::from_value(&serialized).unwrap();
         assert_eq!(slot, deserialized);
+    }
+
+    #[test]
+    fn test_standard_chest_extra_deserialization() {
+        let xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
+<plist version=\"1.0\">
+<dict>
+        <key>d</key>
+        <dict>
+                <key>chestType</key>
+                <integer>0</integer>
+                <key>flipped</key>
+                <false/>
+                <key>floatPos</key>
+                <array>
+                        <real>11191.5</real>
+                        <real>670</real>
+                </array>
+                <key>interactionObjectType</key>
+                <integer>2</integer>
+                <key>isInUse</key>
+                <false/>
+                <key>ownerID</key>
+                <string>server</string>
+                <key>paintColor</key>
+                <integer>0</integer>
+                <key>pos_x</key>
+                <integer>11191</integer>
+                <key>pos_y</key>
+                <integer>670</integer>
+                <key>saveItemSlots</key>
+                <array>
+                        <array/>
+                        <array/>
+                        <array/>
+                        <array/>
+                        <array/>
+                        <array/>
+                        <array/>
+                        <array/>
+                        <array/>
+                        <array/>
+                        <array/>
+                        <array/>
+                        <array/>
+                        <array/>
+                        <array/>
+                        <array/>
+                </array>
+                <key>saveTime</key>
+                <real>5018.8335087001324</real>
+                <key>uniqueID</key>
+                <integer>5952</integer>
+        </dict>
+</dict>
+</plist>";
+        let extra: Extra = plist::from_reader_xml(xml.as_bytes()).unwrap();
+        assert!(matches!(extra, Extra::Chest(..)));
+    }
+
+    #[test]
+    fn test_shelf_extra_deserialization() {
+        let xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
+<plist version=\"1.0\">
+<dict>
+        <key>d</key>
+        <dict>
+                <key>chestType</key>
+                <integer>2</integer>
+                <key>flipped</key>
+                <false/>
+                <key>floatPos</key>
+                <array>
+                        <real>11191.5</real>
+                        <real>668</real>
+                </array>
+                <key>interactionObjectType</key>
+                <integer>2</integer>
+                <key>isInUse</key>
+                <false/>
+                <key>ownerID</key>
+                <string>server</string>
+                <key>paintColor</key>
+                <integer>0</integer>
+                <key>pos_x</key>
+                <integer>11191</integer>
+                <key>pos_y</key>
+                <integer>668</integer>
+                <key>saveItemSlots</key>
+                <array>
+                        <array>
+                                <data>
+                                8wAAAAAAAAA=
+                                </data>
+                        </array>
+                        <array>
+                                <data>
+                                +QAAAAAAAAA=
+                                </data>
+                        </array>
+                        <array>
+                                <data>
+                                LgQAAAAAAAA=
+                                </data>
+                        </array>
+                        <array/>
+                </array>
+                <key>saveTime</key>
+                <real>5034.406163521111</real>
+                <key>uniqueID</key>
+                <integer>836</integer>
+        </dict>
+</dict>
+</plist>";
+        let extra: Extra = plist::from_reader_xml(xml.as_bytes()).unwrap();
+        assert!(matches!(extra, Extra::Chest(..)));
+    }
+
+    #[test]
+    fn test_portal_chest_extra_deserialization() {
+        let xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
+<plist version=\"1.0\">
+<dict>
+        <key>d</key>
+        <dict>
+                <key>chestType</key>
+                <integer>4</integer>
+                <key>flipped</key>
+                <false/>
+                <key>floatPos</key>
+                <array>
+                        <real>11193.5</real>
+                        <real>668</real>
+                </array>
+                <key>interactionObjectType</key>
+                <integer>2</integer>
+                <key>isInUse</key>
+                <false/>
+                <key>ownerID</key>
+                <string>server</string>
+                <key>paintColor</key>
+                <integer>0</integer>
+                <key>pos_x</key>
+                <integer>11193</integer>
+                <key>pos_y</key>
+                <integer>668</integer>
+                <key>saveTime</key>
+                <real>5061.7033485174179</real>
+                <key>uniqueID</key>
+                <integer>838</integer>
+        </dict>
+</dict>
+</plist>";
+        let extra: Extra = plist::from_reader_xml(xml.as_bytes()).unwrap();
+        assert!(matches!(extra, Extra::Chest(..)));
     }
 }

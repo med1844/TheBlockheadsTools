@@ -1,6 +1,20 @@
 use thiserror::Error;
 
 #[derive(Debug, Error)]
+pub enum ChestError {
+    #[error("Incomplete shelf_render_items array")]
+    IncompleteShelfRenderItems,
+    #[error("Incomplete shelf_item_data_bs array")]
+    IncompleteItemDataBs,
+    #[error("Num slots mismatch: expected {0}, got {1} for type {2}")]
+    NumSlotsMismatch(usize, usize, &'static str),
+    #[error("Get save_item_slot when portal chest shouldn't have one")]
+    PortalChestHaveSlots,
+    #[error("No save_item_slot when chest type {0} should have one")]
+    NoSaveItemSlot(&'static str),
+}
+
+#[derive(Debug, Error)]
 pub enum BhError {
     #[error("Plist deserialization error: {0}")]
     PlistError(#[from] plist::Error),
@@ -26,6 +40,8 @@ pub enum BhError {
     MissingKey(&'static str),
     #[error("Lmdb error: {0}")]
     LmdbError(#[from] lmdb_rs::error::Error),
+    #[error("Failed to parse chest")]
+    ChestError(#[from] ChestError),
 }
 
 pub type BhResult<T> = Result<T, BhError>;

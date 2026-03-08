@@ -3,7 +3,7 @@ use super::{
     dynamic_object::{
         DynamicObjectList, DynamicObjectType,
         animal::{CaveTroll, ClownFish, Dodo, Donkey, DropBear, Scorpion, Shark, Yak},
-        chest::Chest,
+        chest::{Chest, ChestMeta},
         craft::{
             Bed, Boat, Column, Door, ElevatorMotor, ElevatorShaft, Ladder, Rail, Sign, Stairs,
             TradePortal, TradingPost, Window, Wire,
@@ -58,7 +58,7 @@ impl ToXmlPlist for Vec<u8> {
 impl<T: Serialize> ToXmlPlist for DynamicObjectList<T> {
     fn to_plist(&self) -> Vec<u8> {
         let mut serialized = Vec::new();
-        plist::to_writer_xml(&mut serialized, self).unwrap();
+        plist::to_writer_xml(&mut serialized, self).unwrap(); // TODO must be safe
         serialized
     }
 }
@@ -267,7 +267,20 @@ impl DynamicWorld {
                 DynamicObjectType::FreightCar => entry.freight_car = plist::from_bytes(v)?,
                 DynamicObjectType::PassengerCar => entry.passenger_car = plist::from_bytes(v)?,
                 DynamicObjectType::Workbench => entry.workbench = plist::from_bytes(v)?,
-                DynamicObjectType::Chest => entry.chest = plist::from_bytes(v)?,
+                DynamicObjectType::Chest => {
+                    let chest_metas: DynamicObjectList<ChestMeta> = plist::from_bytes(v)?;
+                    entry.chest = chest_metas
+                        .into_inner()
+                        .into_iter()
+                        .map(|chest_meta| {
+                            let slot_bytes = db.get(
+                                rtxn,
+                                &format!("{}/chest_{}", coord_str, chest_meta.unique_id.inner()),
+                            )?;
+                            Chest::from_meta_and_slots(chest_meta, slot_bytes)
+                        })
+                        .collect::<BhResult<DynamicObjectList<Chest>>>()?
+                }
                 DynamicObjectType::Sign => entry.sign = plist::from_bytes(v)?,
                 DynamicObjectType::TradingPost => entry.trading_post = plist::from_bytes(v)?,
                 DynamicObjectType::TrainStation => entry.train_station = plist::from_bytes(v)?,
@@ -286,7 +299,7 @@ impl DynamicWorld {
                 DynamicObjectType::TomatoPlant => entry.tomato_plant = plist::from_bytes(v)?,
                 DynamicObjectType::Yak => entry.yak = plist::from_bytes(v)?,
                 DynamicObjectType::Mirror => entry.mirror = v.to_vec(),
-            }
+            };
         }
         Ok(Self(map))
     }
@@ -354,7 +367,22 @@ impl DynamicWorld {
             put(db, wtxn, &coord, FreightCar, &obj.freight_car)?;
             put(db, wtxn, &coord, PassengerCar, &obj.passenger_car)?;
             put(db, wtxn, &coord, Workbench, &obj.workbench)?;
-            put(db, wtxn, &coord, Chest, &obj.chest)?;
+            let chest_metas = obj
+                .chest
+                .iter()
+                .map(|c| -> BhResult<ChestMeta> {
+                    let (chest_meta, slot_bytes) = c.to_meta_and_slots()?;
+                    if let Some(slot_bytes) = slot_bytes {
+                        db.put(
+                            wtxn,
+                            &format!("{}/chest_{}", &coord, chest_meta.unique_id.inner()),
+                            &slot_bytes,
+                        )?;
+                    }
+                    Ok(chest_meta)
+                })
+                .collect::<BhResult<DynamicObjectList<ChestMeta>>>()?;
+            put(db, wtxn, &coord, Chest, &chest_metas)?;
             put(db, wtxn, &coord, Sign, &obj.sign)?;
             put(db, wtxn, &coord, TradingPost, &obj.trading_post)?;
             put(db, wtxn, &coord, TrainStation, &obj.train_station)?;
@@ -381,9 +409,18 @@ impl DynamicWorld {
 #[cfg(test)]
 mod tests {
     use super::{ChunkDynamicObjects, DynamicObjectType, DynamicWorld};
-    use crate::game::coord::ChunkCoord;
-    use lmdb_rs::arch::DynArch;
-    use lmdb_rs::env::{Env, EnvWrite};
+    use crate::game::{
+        coord::ChunkCoord,
+        dynamic_object::{
+            DynamicObjectList,
+            chest::{Chest, ChestMeta},
+        },
+    };
+    use lmdb_rs::{
+        arch::DynArch,
+        codec::types::{Bytes, Str},
+        env::{Env, EnvWrite},
+    };
     use std::collections::HashMap;
 
     #[test]
@@ -466,7 +503,23 @@ mod tests {
         monster.freight_car = read_test_xml(DynamicObjectType::FreightCar);
         monster.passenger_car = read_test_xml(DynamicObjectType::PassengerCar);
         monster.workbench = read_test_xml(DynamicObjectType::Workbench);
-        monster.chest = read_test_xml(DynamicObjectType::Chest);
+        let chest_metas: DynamicObjectList<ChestMeta> = read_test_xml(DynamicObjectType::Chest);
+        monster.chest = chest_metas
+            .into_inner()
+            .into_iter()
+            .map(|meta| {
+                let id = *meta.unique_id.inner();
+                let slot_path = format!("resources/chest_{}.xml.gz", id);
+                let slot_bytes = std::fs::read(&slot_path).ok();
+                Chest::from_meta_and_slots(meta, slot_bytes.as_deref())
+                    .unwrap_or_else(|e| panic!("Failed to construct test chest {}: {:?}", id, e))
+            })
+            .collect();
+        let chest_ids: Vec<_> = monster
+            .chest
+            .iter()
+            .filter_map(|c| c.slots.as_slots().map(|_| c.unique_id.clone()))
+            .collect();
         monster.sign = read_test_xml(DynamicObjectType::Sign);
         monster.trading_post = read_test_xml(DynamicObjectType::TradingPost);
         monster.train_station = read_test_xml(DynamicObjectType::TrainStation);
@@ -506,10 +559,7 @@ mod tests {
             let env = Env::new(&buffer).unwrap();
             let rtxn = env.read_txn().unwrap();
             let db = env
-                .open_database::<lmdb_rs::codec::types::Str, lmdb_rs::codec::types::Bytes>(
-                    &rtxn,
-                    Some("dw"),
-                )
+                .open_database::<Str, Bytes>(&rtxn, Some("dw"))
                 .unwrap()
                 .unwrap();
 
@@ -583,6 +633,14 @@ mod tests {
             check_key(DynamicObjectType::TomatoPlant);
             check_key(DynamicObjectType::Yak);
             check_key(DynamicObjectType::Mirror);
+            for chest_id in chest_ids {
+                let key = format!("{}/chest_{}", coord_str, chest_id.inner());
+                assert!(
+                    db.get(&rtxn, &key).unwrap().is_some(),
+                    "Key {} missing",
+                    key
+                );
+            }
 
             let round_tripped_dw = DynamicWorld::from_db(&db, &rtxn).unwrap();
             let round_tripped_dw_chunk = round_tripped_dw.chunk_at(coord).unwrap();
