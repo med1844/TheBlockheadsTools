@@ -29,9 +29,9 @@ pub struct Blockhead {
 inherit!(Blockhead -> DynamicObject, obj);
 
 // An inventory of a blockhead
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct Inventory(pub [Slot; Self::NUM_SLOTS]);
+pub struct Inventory([Slot; Self::NUM_SLOTS]);
 
 impl Inventory {
     pub const NUM_SLOTS: usize = 8;

@@ -236,7 +236,7 @@ pub struct ArtificialLight {
     pub max_red: u32,
     pub max_green: u32,
     pub max_blue: u32,
-    pub max_heat: u32,
+    pub max_heat: i32,
     pub radius: u32,
     #[serde(rename = "contributionGridOrigin.x")]
     pub contribution_grid_origin_x: i32,
@@ -282,6 +282,7 @@ mod tests {
             AppleTree, CactusTree, CherryTree, CoconutTree, CoffeeTree, GemTree, LimeTree,
             MangoTree, MapleTree, OrangeTree, PineTree,
         },
+        workbench::Workbench,
     };
     use crate::util::plist::diff_plist_keys;
 
@@ -354,7 +355,7 @@ mod tests {
         check_round_trip::<SteamLocomotive>(DynamicObjectType::SteamLocomotive).unwrap();
         check_round_trip::<FreightCar>(DynamicObjectType::FreightCar).unwrap();
         check_round_trip::<PassengerCar>(DynamicObjectType::PassengerCar).unwrap();
-        // check_round_trip::<Workbench>(DynamicObjectType::Workbench).unwrap();
+        check_round_trip::<Workbench>(DynamicObjectType::Workbench).unwrap();
         check_round_trip::<Chest>(DynamicObjectType::Chest).unwrap();
         check_round_trip::<Sign>(DynamicObjectType::Sign).unwrap();
         check_round_trip::<TradingPost>(DynamicObjectType::TradingPost).unwrap();

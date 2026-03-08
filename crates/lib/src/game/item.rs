@@ -454,7 +454,7 @@ pub enum ItemType {
     LuminousPlaster = 1105,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Extra {
     Basket([Slot; Self::NUM_SLOT_BASKET]),
     Chest(Box<ChestData>),
@@ -555,7 +555,7 @@ impl Display for Extra {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Item {
     pub type_id: u16,
     pub data_a: u16,
@@ -841,7 +841,7 @@ impl Display for Item {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct Slot(pub Vec<Item>); // TODO consider switch to smallvec
 

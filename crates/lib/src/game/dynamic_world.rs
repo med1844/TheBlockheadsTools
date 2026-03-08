@@ -17,6 +17,7 @@ use super::{
             AppleTree, CactusTree, CherryTree, CoconutTree, CoffeeTree, GemTree, LimeTree,
             MangoTree, MapleTree, OrangeTree, PineTree,
         },
+        workbench::Workbench,
     },
 };
 use crate::BhResult;
@@ -105,7 +106,7 @@ pub struct ChunkDynamicObjects {
     pub steam_locomotive: DynamicObjectList<SteamLocomotive>,
     pub freight_car: DynamicObjectList<FreightCar>,
     pub passenger_car: DynamicObjectList<PassengerCar>,
-    pub workbench: Vec<u8>,
+    pub workbench: DynamicObjectList<Workbench>,
     pub chest: DynamicObjectList<Chest>,
     pub sign: DynamicObjectList<Sign>,
     pub trading_post: DynamicObjectList<TradingPost>,
@@ -265,7 +266,7 @@ impl DynamicWorld {
                 }
                 DynamicObjectType::FreightCar => entry.freight_car = plist::from_bytes(v)?,
                 DynamicObjectType::PassengerCar => entry.passenger_car = plist::from_bytes(v)?,
-                DynamicObjectType::Workbench => entry.workbench = v.to_vec(),
+                DynamicObjectType::Workbench => entry.workbench = plist::from_bytes(v)?,
                 DynamicObjectType::Chest => entry.chest = plist::from_bytes(v)?,
                 DynamicObjectType::Sign => entry.sign = plist::from_bytes(v)?,
                 DynamicObjectType::TradingPost => entry.trading_post = plist::from_bytes(v)?,
@@ -464,7 +465,7 @@ mod tests {
         monster.steam_locomotive = read_test_xml(DynamicObjectType::SteamLocomotive);
         monster.freight_car = read_test_xml(DynamicObjectType::FreightCar);
         monster.passenger_car = read_test_xml(DynamicObjectType::PassengerCar);
-        monster.workbench = vec![45, 0xAA, 0xBB];
+        monster.workbench = read_test_xml(DynamicObjectType::Workbench);
         monster.chest = read_test_xml(DynamicObjectType::Chest);
         monster.sign = read_test_xml(DynamicObjectType::Sign);
         monster.trading_post = read_test_xml(DynamicObjectType::TradingPost);

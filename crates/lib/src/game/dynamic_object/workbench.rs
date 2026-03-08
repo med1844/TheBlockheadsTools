@@ -1,4 +1,5 @@
-use super::InteractionObject;
+use super::{ArtificialLight, InteractionObject};
+use crate::util::serde::{deserialize_some, serialize_some};
 use num_enum::TryFromPrimitive;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
@@ -55,7 +56,7 @@ pub enum WorkbenchType {
     PizzaOven = 31,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Workbench {
     #[serde(flatten)]
@@ -75,6 +76,13 @@ pub struct Workbench {
     pub selected_index: u8,
     pub workbench_type: WorkbenchType,
     pub x_scroll: NonNaNFinite<f32>,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_some",
+        serialize_with = "serialize_some",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub light_dict: Option<ArtificialLight>,
 }
 inherit!(Workbench -> InteractionObject, obj);
 
@@ -97,6 +105,7 @@ impl Workbench {
         selected_index: u8,
         workbench_type: WorkbenchType,
         x_scroll: NonNaNFinite<f32>,
+        light_dict: Option<ArtificialLight>,
     ) -> Self {
         Self {
             obj,
@@ -115,6 +124,7 @@ impl Workbench {
             selected_index,
             workbench_type,
             x_scroll,
+            light_dict,
         }
     }
 }
@@ -160,6 +170,7 @@ mod tests {
             selected_index: 0,
             workbench_type: WorkbenchType::Workbench,
             x_scroll: 0.0f32.try_into().unwrap(),
+            light_dict: None,
         };
 
         let item = Item {
