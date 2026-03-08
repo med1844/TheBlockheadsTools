@@ -35,6 +35,10 @@ pub struct Inventory([Slot; Self::NUM_SLOTS]);
 
 impl Inventory {
     pub const NUM_SLOTS: usize = 8;
+
+    pub fn new(slots: [Slot; Self::NUM_SLOTS]) -> Self {
+        Self(slots)
+    }
 }
 
 impl Deref for Inventory {
@@ -53,6 +57,14 @@ impl DerefMut for Inventory {
 impl Display for Inventory {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_list().entries(self.iter().map(AsDisplay)).finish()
+    }
+}
+
+impl IntoIterator for Inventory {
+    type Item = Slot;
+    type IntoIter = std::array::IntoIter<Self::Item, { Self::NUM_SLOTS }>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
     }
 }
 

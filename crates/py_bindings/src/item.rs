@@ -703,7 +703,7 @@ impl ChestExtraPy {
                 paint_color: chest.paint_color,
                 pos_x: chest.pos_x,
                 pos_y: chest.pos_y,
-                float_pos: [chest.float_pos[0].into(), chest.float_pos[1].into()],
+                float_pos: [chest.float_pos[0], chest.float_pos[1]],
                 unique_id: *chest.unique_id.inner(),
                 items: {
                     let mut items = Vec::with_capacity(ChestData::NUM_SLOTS);
@@ -726,10 +726,7 @@ impl ChestExtraPy {
         ChestData::new(
             InteractionObject::new(
                 DynamicObject {
-                    float_pos: [
-                        self.float_pos[0].try_into().unwrap_or_default(),
-                        self.float_pos[1].try_into().unwrap_or_default(),
-                    ],
+                    float_pos: [self.float_pos[0], self.float_pos[1]],
                     pos_x: self.pos_x,
                     pos_y: self.pos_y,
                     unique_id: UniqueID::new(self.unique_id),
@@ -939,22 +936,22 @@ impl WorkbenchExtraPy {
                 paint_color: workbench.paint_color,
                 pos_x: workbench.pos_x,
                 pos_y: workbench.pos_y,
-                float_pos: [workbench.float_pos[0].get(), workbench.float_pos[1].get()],
+                float_pos: [workbench.float_pos[0], workbench.float_pos[1]],
                 unique_id: *workbench.unique_id.inner(),
 
                 available_electricity: workbench.available_electricity,
-                craft_progress_count: workbench.craft_progress_count.get(),
-                fire_spread_timer: workbench.fire_spread_timer.get(),
-                fuel_fraction: workbench.fuel_fraction.get(),
+                craft_progress_count: workbench.craft_progress_count,
+                fire_spread_timer: workbench.fire_spread_timer,
+                fuel_fraction: workbench.fuel_fraction,
                 has_fuel: workbench.has_fuel,
                 hurry_cost: workbench.hurry_cost,
-                hurry_seconds: workbench.hurry_seconds.get(),
-                hurry_timer: workbench.hurry_timer.get(),
+                hurry_seconds: workbench.hurry_seconds,
+                hurry_timer: workbench.hurry_timer,
                 hurrying: workbench.hurrying,
-                last_world_time: workbench.last_world_time.get(),
-                save_time: workbench.save_time.get(),
+                last_world_time: workbench.last_world_time,
+                save_time: workbench.save_time,
                 selected_index: workbench.selected_index,
-                x_scroll: workbench.x_scroll.get(),
+                x_scroll: workbench.x_scroll,
             },
         )
     }
@@ -963,10 +960,7 @@ impl WorkbenchExtraPy {
         Workbench::new(
             InteractionObject::new(
                 DynamicObject {
-                    float_pos: [
-                        self.float_pos[0].try_into().unwrap_or_default(),
-                        self.float_pos[1].try_into().unwrap_or_default(),
-                    ],
+                    float_pos: [self.float_pos[0], self.float_pos[1]],
                     pos_x: self.pos_x,
                     pos_y: self.pos_y,
                     unique_id: UniqueID::new(self.unique_id),
@@ -978,20 +972,21 @@ impl WorkbenchExtraPy {
                 self.paint_color,
             ),
             self.available_electricity,
-            self.craft_progress_count.try_into().unwrap(),
-            self.fire_spread_timer.try_into().unwrap(),
-            self.fuel_fraction.try_into().unwrap(),
+            self.craft_progress_count,
+            self.fire_spread_timer,
+            self.fuel_fraction,
             self.has_fuel,
             self.hurry_cost,
-            self.hurry_seconds.try_into().unwrap(),
-            self.hurry_timer.try_into().unwrap(),
+            self.hurry_seconds,
+            self.hurry_timer,
             self.hurrying,
-            self.last_world_time.try_into().unwrap(),
+            self.last_world_time,
             self.level,
-            self.save_time.try_into().unwrap(),
+            self.save_time,
             self.selected_index,
             self.workbench_type.into(),
-            self.x_scroll.try_into().unwrap(),
+            self.x_scroll,
+            None, // TODO add artificial dict
         )
     }
 
@@ -1594,7 +1589,7 @@ pub struct InventoryPy {
 impl InventoryPy {
     pub fn inflate(py: Python<'_>, inventory: Inventory) -> PyResult<Py<Self>> {
         let mut slots = Vec::with_capacity(Inventory::NUM_SLOTS);
-        for slot in inventory.0 {
+        for slot in inventory {
             slots.push(SlotPy::inflate(py, slot)?);
         }
         Py::new(py, Self { slots })
@@ -1607,7 +1602,7 @@ impl InventoryPy {
                 slots[i] = slot_py.bind(py).borrow().deflate(py);
             }
         }
-        Inventory(slots)
+        Inventory::new(slots)
     }
 
     pub fn clone_ref(&self, py: Python<'_>) -> Py<Self> {
