@@ -1,73 +1,127 @@
 use super::{
-    super::{chunk::Chunks, dynamic_world::DynamicWorld},
-    world_db_main::WorldDbMain,
+    super::{
+        chunk::{Chunks, ChunksError},
+        dynamic_world::{DynamicWorld, DynamicWorldError},
+    },
+    world_db_main::{Main, MainError},
 };
-use crate::{BhError, BhResult};
 use lmdb_rs::{
     arch::DynArch,
     codec::types::{Bytes, Str},
     env::{Env, EnvWrite},
 };
+use snafu::{OptionExt, ResultExt, Snafu};
 use std::{
     fs::File,
     io::{Read, Write},
     path::Path,
 };
 
+#[derive(Debug, Snafu)]
+pub enum WorldDbError {
+    #[snafu(display("Failed to initialize LMDB environment: {source}"))]
+    InitEnv { source: lmdb_rs::error::Error },
+    #[snafu(display("Failed to open database {name}: {source}"))]
+    OpenDatabase {
+        source: lmdb_rs::error::Error,
+        name: &'static str,
+    },
+    #[snafu(display("No database named {name}"))]
+    MissingDatabase { name: &'static str },
+    #[snafu(display("Failed to create database {name}: {source}"))]
+    CreateDatabase {
+        source: lmdb_rs::error::Error,
+        name: &'static str,
+    },
+    #[snafu(display("Failed to load sub-db `main`: {source}"))]
+    LoadMain { source: MainError },
+    #[snafu(display("Failed to save sub-db `main`: {source}"))]
+    SaveMain { source: MainError },
+    #[snafu(display("Failed to load sub-db `blocks`: {source}"))]
+    LoadBlocks { source: ChunksError },
+    #[snafu(display("Failed to save sub-db `blocks`: {source}"))]
+    SaveBlocks { source: ChunksError },
+    #[snafu(display("Failed to load sub-db `dw`: {source}"))]
+    LoadDw { source: DynamicWorldError },
+    #[snafu(display("Failed to save sub-db `dw`: {source}"))]
+    SaveDw { source: DynamicWorldError },
+    #[snafu(display("Failed to commit changes: {source}"))]
+    Commit { source: lmdb_rs::error::Error },
+    #[snafu(display("Failed to open file: {source}"))]
+    OpenFile { source: std::io::Error },
+    #[snafu(display("Failed to read file: {source}"))]
+    ReadFile { source: std::io::Error },
+    #[snafu(display("Failed to create file: {source}"))]
+    CreateFile { source: std::io::Error },
+}
+
+type Result<T> = std::result::Result<T, WorldDbError>;
+
 #[derive(Debug)]
 pub struct WorldDb {
     pub chunks: Chunks,
     pub dw: DynamicWorld,
-    pub main: WorldDbMain,
+    pub main: Main,
 }
 
 impl WorldDb {
-    pub fn from_bytes(data: &[u8]) -> BhResult<Self> {
-        let env = Env::new(data)?;
-        let rtxn = env.read_txn()?;
+    pub fn from_bytes(data: &[u8]) -> Result<Self> {
+        let env = Env::new(data).context(InitEnvSnafu)?;
+        let rtxn = env.read_txn().context(InitEnvSnafu)?;
 
-        let open_db = |name: &str| env.open_database::<Str, Bytes>(&rtxn, Some(name));
-        let (Some(blocks), Some(dw), Some(main)) =
-            (open_db("blocks")?, open_db("dw")?, open_db("main")?)
-        else {
-            return Err(BhError::MissingKey(
-                "One or more of `block`, `dw` or `main` is missing in the database",
-            ));
+        let open_db = |name: &'static str| {
+            env.open_database::<Str, Bytes>(&rtxn, Some(name))
+                .context(OpenDatabaseSnafu { name })?
+                .context(MissingDatabaseSnafu { name })
         };
-        let main = WorldDbMain::from_db(&main, &rtxn)?;
-        let chunks = Chunks::from_db(&blocks, &rtxn, main.world_v2.world_width_macro)?;
-        let dw = DynamicWorld::from_db(&dw, &rtxn)?;
+        let blocks = open_db("blocks")?;
+        let main = open_db("main")?;
+        let dw = open_db("dw")?;
+
+        let main = Main::from_db(&main, &rtxn).context(LoadMainSnafu)?;
+        let chunks = Chunks::from_db(&blocks, &rtxn, main.world_v2.world_width_macro)
+            .context(LoadBlocksSnafu)?;
+        let dw = DynamicWorld::from_db(&dw, &rtxn).context(LoadDwSnafu)?;
 
         Ok(Self { chunks, dw, main })
     }
 
-    pub fn write_to<W: Write>(&self, writer: W, arch: DynArch) -> BhResult<()> {
+    pub fn write_to<W: Write>(&self, writer: W, arch: DynArch) -> Result<()> {
         let mut env = EnvWrite::new(writer, arch);
 
-        let mut wtxn = env.write_txn()?;
+        let mut wtxn = env.write_txn().context(InitEnvSnafu)?;
+        let mut create_db = |name: &'static str| {
+            wtxn.create_database(Some(name))
+                .context(CreateDatabaseSnafu { name })
+        };
 
-        let blocks_db = wtxn.create_database(Some("blocks"))?;
-        self.chunks.to_db(&blocks_db, &mut wtxn)?;
-        let dw_db = wtxn.create_database(Some("dw"))?;
-        self.dw.to_db(&dw_db, &mut wtxn)?;
-        let main_db = wtxn.create_database(Some("main"))?;
-        self.main.to_db(&main_db, &mut wtxn)?;
+        let blocks_db = create_db("blocks")?;
+        let main_db = create_db("main")?;
+        let dw_db = create_db("dw")?;
 
-        wtxn.commit()?;
+        self.chunks
+            .to_db(&blocks_db, &mut wtxn)
+            .context(SaveBlocksSnafu)?;
+        self.main
+            .to_db(&main_db, &mut wtxn)
+            .context(SaveMainSnafu)?;
+        self.dw.to_db(&dw_db, &mut wtxn).context(SaveDwSnafu)?;
+
+        wtxn.commit().context(CommitSnafu)?;
         Ok(())
     }
 
-    pub fn from_path<P: AsRef<Path>>(path: P) -> BhResult<Self> {
+    pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self> {
         let mut data = Vec::new();
         {
-            let mut file = File::open(path.as_ref().join("data.mdb"))?;
-            let _ = file.read_to_end(&mut data)?;
+            let mut file = File::open(path.as_ref().join("data.mdb")).context(OpenFileSnafu)?;
+            let _ = file.read_to_end(&mut data).context(ReadFileSnafu)?;
         }
         Self::from_bytes(&data)
     }
 
-    pub fn to_path<P: AsRef<Path>>(&self, path: P, arch: DynArch) -> BhResult<()> {
-        let file = File::create_new(path.as_ref().join("data.mdb"))?;
+    pub fn to_path<P: AsRef<Path>>(&self, path: P, arch: DynArch) -> Result<()> {
+        let file = File::create_new(path.as_ref().join("data.mdb")).context(CreateFileSnafu)?;
         self.write_to(file, arch)
     }
 }

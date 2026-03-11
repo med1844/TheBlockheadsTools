@@ -1,6 +1,22 @@
-use crate::{BhError, BhResult};
 use num_enum::TryFromPrimitive;
+use snafu::prelude::*;
 use strum_macros::{Display, IntoStaticStr};
+
+#[derive(Debug, Snafu)]
+pub enum BlockError {
+    #[snafu(display("Invalid block type ID {id}: {source}"))]
+    InvalidBlockTypeId {
+        id: u8,
+        source: num_enum::TryFromPrimitiveError<BlockType>,
+    },
+    #[snafu(display("Invalid block content type ID {id}: {source}"))]
+    InvalidBlockContentTypeId {
+        id: u8,
+        source: num_enum::TryFromPrimitiveError<BlockContentType>,
+    },
+}
+
+type Result<T> = std::result::Result<T, BlockError>;
 
 /// An enumeration of block types.
 ///
@@ -70,7 +86,7 @@ pub enum BlockType {
     TradePortalBaseEmerald = 63,
     TradePortalBaseRuby = 64,
     TradePortalBaseDiamond = 65,
-    PlatinumBlock = 67,
+    // PlatinumBlock = 67,
     TitaniumBlock = 68,
     CarbonFiberBlock = 69,
     Gravel = 70,
@@ -203,15 +219,17 @@ pub trait Block {
         self.as_bytes()[CONTENT]
     }
 
-    fn fg(&self) -> BhResult<BlockType> {
-        BlockType::try_from(self.fg_raw()).map_err(|e| BhError::InvalidBlockIdError(e.number))
+    fn fg(&self) -> Result<BlockType> {
+        let raw = self.fg_raw();
+        BlockType::try_from(raw).context(InvalidBlockTypeIdSnafu { id: raw })
     }
-    fn bg(&self) -> BhResult<BlockType> {
-        BlockType::try_from(self.bg_raw()).map_err(|e| BhError::InvalidBlockIdError(e.number))
+    fn bg(&self) -> Result<BlockType> {
+        let raw = self.bg_raw();
+        BlockType::try_from(raw).context(InvalidBlockTypeIdSnafu { id: raw })
     }
-    fn content(&self) -> BhResult<BlockContentType> {
-        BlockContentType::try_from(self.content_raw())
-            .map_err(|e| BhError::InvalidBlockContentIdError(e.number))
+    fn content(&self) -> Result<BlockContentType> {
+        let raw = self.content_raw();
+        BlockContentType::try_from(raw).context(InvalidBlockContentTypeIdSnafu { id: raw })
     }
     fn height(&self) -> u8 {
         self.as_bytes()[HEIGHT]

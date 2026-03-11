@@ -2,18 +2,32 @@ use super::dynamic_object::{
     chest::{Chest, ChestItem},
     workbench::Workbench,
 };
-use crate::{
-    BhError, BhResult,
-    util::gzip::{compress_into, decompress},
-};
+use crate::util::gzip::{compress_into, decompress};
 use num_enum::TryFromPrimitive;
 use serde::{Deserialize, Serialize, de::Error as DeError, ser::Error as SerError};
 use serde_repr::{Deserialize_repr, Serialize_repr};
+use snafu::prelude::*;
 use std::{
     fmt::Display,
     ops::{Deref, DerefMut},
 };
 use strum_macros::IntoStaticStr;
+
+#[derive(Debug, Snafu)]
+pub enum ItemError {
+    #[snafu(display("Invalid item type ID {id}: {source}"))]
+    InvalidItemTypeId {
+        id: u16,
+        source: num_enum::TryFromPrimitiveError<ItemType>,
+    },
+    #[snafu(display("Invalid color type ID {id}: {source}"))]
+    InvalidColorTypeId {
+        id: u8,
+        source: num_enum::TryFromPrimitiveError<PigmentColor>,
+    },
+}
+
+type Result<T> = std::result::Result<T, ItemError>;
 
 #[derive(
     Debug,
@@ -469,7 +483,7 @@ impl Extra {
 }
 
 impl<'de> Deserialize<'de> for Extra {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
@@ -501,7 +515,7 @@ impl<'de> Deserialize<'de> for Extra {
 }
 
 impl Serialize for Extra {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
@@ -610,7 +624,7 @@ pub struct Item {
 }
 
 impl<'de> Deserialize<'de> for Item {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
@@ -656,7 +670,7 @@ impl<'de> Deserialize<'de> for Item {
 }
 
 impl Serialize for Item {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
@@ -695,7 +709,7 @@ pub enum PigmentColor {
     CopperBlue = 8,
 }
 
-pub fn item_type_to_str(item_type: BhResult<ItemType>) -> String {
+fn item_type_to_str(item_type: Result<ItemType>) -> String {
     item_type
         .map(|item_type| {
             let item_type_str: &'static str = item_type.into();
@@ -715,7 +729,7 @@ pub fn fmt_item_display<T: ItemView + ?Sized>(
     f: &mut std::fmt::Formatter<'_>,
 ) -> std::fmt::Result {
     let type_id = item.type_id();
-    let item_type = ItemType::try_from(type_id).map_err(|e| BhError::InvalidItemTypeId(e.number));
+    let item_type = ItemType::try_from(type_id).context(InvalidItemTypeIdSnafu { id: type_id });
     let type_name = item_type_to_str(item_type);
     if item.has_extra() {
         f.write_str(&type_name)?;
@@ -761,7 +775,7 @@ pub fn fmt_slot_display<S: SlotView + ?Sized>(
         let is_stacked = count > 1;
 
         let item_type =
-            ItemType::try_from(first_type).map_err(|e| BhError::InvalidItemTypeId(e.number));
+            ItemType::try_from(first_type).context(InvalidItemTypeIdSnafu { id: first_type });
         let type_name = item_type_to_str(item_type);
 
         match (all_same_type, any_extra, is_stacked) {
@@ -793,8 +807,9 @@ impl Item {
         &mut self.type_id
     }
 
-    pub fn item_type(&self) -> BhResult<ItemType> {
-        ItemType::try_from(self.item_type_raw()).map_err(|e| BhError::InvalidItemTypeId(e.number))
+    pub fn item_type(&self) -> Result<ItemType> {
+        let raw = self.item_type_raw();
+        ItemType::try_from(raw).context(InvalidItemTypeIdSnafu { id: raw })
     }
 
     pub fn set_item_type(&mut self, item_type: ItemType) {
@@ -826,18 +841,18 @@ impl Item {
         color_bits << 4
     }
 
-    pub fn decode_colors(mut color_bits: u16) -> BhResult<[PigmentColor; Self::MAX_COLORS]> {
+    pub fn decode_colors(mut color_bits: u16) -> Result<[PigmentColor; Self::MAX_COLORS]> {
         let mut colors = [PigmentColor::Transparent; _];
         color_bits >>= 4;
         for color_mut in colors.iter_mut().rev() {
             *color_mut = PigmentColor::try_from((color_bits & 0b1111) as u8)
-                .map_err(|e| BhError::InvalidColorId(e.number))?;
+                .with_context(|e| InvalidColorTypeIdSnafu { id: e.number })?;
             color_bits >>= 4;
         }
         Ok(colors)
     }
 
-    pub fn color(&self) -> BhResult<[PigmentColor; Self::MAX_COLORS]> {
+    pub fn color(&self) -> Result<[PigmentColor; Self::MAX_COLORS]> {
         Self::decode_colors(self.data_b)
     }
 

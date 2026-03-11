@@ -1,8 +1,5 @@
 use super::{
-    super::util::{
-        error::BhResult,
-        gzip::{compress_into, decompress_exact_into, decompress_into},
-    },
+    super::util::gzip::{compress_into, decompress_exact_into, decompress_into},
     block::{BlockView, BlockViewMut},
     coord::{BlockCoord, ChunkCoord, ChunkOffset},
 };
@@ -11,6 +8,7 @@ use lmdb_rs::{
     database::Database,
     txn::{RoTxn, RwTxn},
 };
+use snafu::prelude::*;
 use std::io::Write;
 
 type ChunkBytes = [u8; Chunk::NUM_BYTES];
@@ -48,6 +46,22 @@ impl<'a> ChunkViewMut<'a> {
     }
 }
 
+#[derive(Debug, Snafu)]
+pub enum ChunkError {
+    #[snafu(display("Failed to compress chunk: {source}"))]
+    CompressChunk { source: std::io::Error },
+    #[snafu(display("Failed to decompress chunk: {source}"))]
+    DecompressChunk { source: std::io::Error },
+    #[snafu(display("Invalid chunk size, expect {expect}, got {got}: {source}"))]
+    InvalidChunkSize {
+        expect: usize,
+        got: usize,
+        source: std::array::TryFromSliceError,
+    },
+}
+
+type ChunkResult<T> = std::result::Result<T, ChunkError>;
+
 #[derive(Debug, Clone)]
 pub struct Chunk(Box<ChunkBytes>); // 5 unknown bytes
 
@@ -78,9 +92,9 @@ impl Chunk {
         self.0.as_mut_slice()
     }
 
-    pub fn compress(&self) -> BhResult<CompressedChunk> {
+    pub fn compress(&self) -> ChunkResult<CompressedChunk> {
         let mut compressed_bytes = Vec::new();
-        compress_into(self.as_bytes(), &mut compressed_bytes)?;
+        compress_into(self.as_bytes(), &mut compressed_bytes).context(CompressChunkSnafu)?;
         Ok(CompressedChunk::new(compressed_bytes))
     }
 }
@@ -93,15 +107,20 @@ impl CompressedChunk {
         Self(bytes)
     }
 
-    pub fn decompress_view<'a>(&self, buffer: &'a mut Vec<u8>) -> BhResult<ChunkView<'a>> {
+    pub fn decompress_view<'a>(&self, buffer: &'a mut Vec<u8>) -> ChunkResult<ChunkView<'a>> {
         buffer.clear();
-        decompress_into(&self.0, buffer)?;
-        Ok(ChunkView(buffer.as_slice().try_into()?))
+        decompress_into(&self.0, buffer).context(DecompressChunkSnafu)?;
+        Ok(ChunkView(buffer.as_slice().try_into().context(
+            InvalidChunkSizeSnafu {
+                expect: Chunk::NUM_BYTES,
+                got: buffer.len(),
+            },
+        )?))
     }
 
-    pub fn decompress(&self) -> BhResult<Chunk> {
+    pub fn decompress(&self) -> ChunkResult<Chunk> {
         let mut chunk = Chunk::new_empty();
-        decompress_exact_into(&self.0, chunk.as_bytes_mut())?;
+        decompress_exact_into(&self.0, chunk.as_bytes_mut()).context(DecompressChunkSnafu)?;
         Ok(chunk)
     }
 
@@ -133,6 +152,19 @@ impl Iterator for ChunkIndexIter {
     }
 }
 
+#[derive(Debug, Snafu)]
+pub enum ChunksError {
+    #[snafu(display("Failed to iterate over database: {source}"))]
+    IterateDatabase { source: lmdb_rs::error::Error },
+    #[snafu(display("Failed to put entry with key {key} in database: {source}"))]
+    PutEntry {
+        key: String,
+        source: lmdb_rs::error::Error,
+    },
+}
+
+type ChunksResult<T> = std::result::Result<T, ChunksError>;
+
 #[derive(Debug)]
 pub struct Chunks(Vec<Option<CompressedChunk>>);
 
@@ -147,9 +179,13 @@ impl Chunks {
         &self.0
     }
 
-    pub fn from_db(db: &Database<Str, Bytes>, rtxn: &RoTxn, world_width: u32) -> BhResult<Self> {
+    pub fn from_db(
+        db: &Database<Str, Bytes>,
+        rtxn: &RoTxn,
+        world_width: u32,
+    ) -> ChunksResult<Self> {
         let mut chunks = vec![None; world_width as usize * Self::NUM_CHUNK_PER_COL];
-        for pair in db.iter(rtxn)? {
+        for pair in db.iter(rtxn).context(IterateDatabaseSnafu)? {
             if let Ok((k, v)) = pair
                 && let Ok(coord) = ChunkCoord::try_from_str(k)
             {
@@ -159,10 +195,16 @@ impl Chunks {
         Ok(Self(chunks))
     }
 
-    pub fn to_db<W: Write>(&self, db: &Database<Str, Bytes>, wtxn: &mut RwTxn<W>) -> BhResult<()> {
+    pub fn to_db<W: Write>(
+        &self,
+        db: &Database<Str, Bytes>,
+        wtxn: &mut RwTxn<W>,
+    ) -> ChunksResult<()> {
         for (coord, chunk) in ChunkIndexIter::default().zip(self.0.iter()) {
             if let Some(chunk) = chunk {
-                db.put(wtxn, coord.to_string().as_str(), chunk.as_bytes())?;
+                let coord_str = coord.to_string();
+                db.put(wtxn, coord_str.as_str(), chunk.as_bytes())
+                    .context(PutEntrySnafu { key: coord_str })?;
             }
         }
         Ok(())
@@ -192,7 +234,7 @@ impl Chunks {
         &mut self,
         coord: I,
         chunk_buffer: &'a mut Vec<u8>,
-    ) -> Option<BhResult<BlockView<'a>>> {
+    ) -> Option<ChunkResult<BlockView<'a>>> {
         let block_coord = coord.into();
         let (chunk_coord, chunk_block_coord) = block_coord.decompose();
         self.chunk_at(chunk_coord).map(|chunk| {

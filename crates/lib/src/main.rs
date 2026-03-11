@@ -1,8 +1,11 @@
-use lmdb_rs::env::Env;
+use lmdb_rs::{
+    codec::types::{Bytes, Str},
+    env::Env,
+};
+use snafu::Whatever;
 use std::fs;
-use the_blockheads_tools_lib::BhResult;
 
-fn main() -> BhResult<()> {
+fn main() -> Result<(), Whatever> {
     let args: Vec<String> = std::env::args().collect();
     assert!(args.len() == 2);
 
@@ -11,17 +14,14 @@ fn main() -> BhResult<()> {
     let env = Env::new(&db_data).unwrap();
     let rtxn = env.read_txn().unwrap();
     // let dw_db = env
-    //     .open_database::<lmdb_rs::codec::types::Str, lmdb_rs::codec::types::Bytes>(
+    //     .open_database::<Str, Bytes>(
     //         &rtxn,
     //         Some("dw"),
     //     )
     //     .unwrap()
     //     .unwrap();
     let main_db = env
-        .open_database::<lmdb_rs::codec::types::Str, lmdb_rs::codec::types::Bytes>(
-            &rtxn,
-            Some("main"),
-        )
+        .open_database::<Str, Bytes>(&rtxn, Some("main"))
         .unwrap()
         .unwrap();
     for kv in main_db.iter(&rtxn).unwrap() {

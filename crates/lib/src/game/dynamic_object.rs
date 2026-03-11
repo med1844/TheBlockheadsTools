@@ -1,11 +1,30 @@
-use crate::{
-    BhError, BhResult,
-    util::serde::{deserialize_some, serialize_some},
-};
+use crate::util::serde::{deserialize_some, serialize_some};
 use num_enum::TryFromPrimitive;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
+use snafu::prelude::*;
 use std::ops::{Deref, DerefMut};
+
+#[derive(Debug, Snafu)]
+pub enum DynamicObjectError {
+    #[snafu(display("Failed to parse {type_str} as dynamic object type: {source}"))]
+    ParseObjTypeAsInt {
+        type_str: String,
+        source: std::num::ParseIntError,
+    },
+    #[snafu(display("Failed to parse {unique_id_str} as u64: {source}"))]
+    ParseUniqueIdAsInt {
+        unique_id_str: String,
+        source: std::num::ParseIntError,
+    },
+    #[snafu(display("Invalid dynamic object type ID {id}: {source}"))]
+    InvalidDynamicObjectTypeId {
+        id: u16,
+        source: num_enum::TryFromPrimitiveError<DynamicObjectType>,
+    },
+}
+
+type Result<T> = std::result::Result<T, DynamicObjectError>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, TryFromPrimitive)]
 #[repr(u16)]
@@ -73,11 +92,11 @@ pub enum DynamicObjectType {
 }
 
 impl DynamicObjectType {
-    pub fn try_from_str(s: &str) -> BhResult<Self> {
-        let value: u16 = s
-            .parse()
-            .map_err(|_| BhError::ParseError(format!("Dynamic object type {} is invalid", s)))?;
-        Self::try_from(value).map_err(|e| BhError::InvalidDynamicOjectId(e.number))
+    pub fn try_from_str(s: &str) -> Result<Self> {
+        let value: u16 = s.parse().with_context(|_| ParseObjTypeAsIntSnafu {
+            type_str: s.to_owned(),
+        })?;
+        Self::try_from(value).context(InvalidDynamicObjectTypeIdSnafu { id: value })
     }
 }
 
@@ -171,10 +190,10 @@ impl UniqueID {
         Self(id)
     }
 
-    pub fn try_from_str(s: &str) -> BhResult<Self> {
-        let value: u64 = s
-            .parse()
-            .map_err(|_| BhError::ParseError(format!("{} is not a number", s)))?;
+    pub fn try_from_str(s: &str) -> Result<Self> {
+        let value: u64 = s.parse().with_context(|_| ParseUniqueIdAsIntSnafu {
+            unique_id_str: s.to_owned(),
+        })?;
         Ok(Self(value))
     }
 

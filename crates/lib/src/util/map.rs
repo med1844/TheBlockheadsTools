@@ -1,4 +1,3 @@
-use super::error::BhResult;
 use lmdb_rs::{
     codec::types::{Bytes, Str},
     database::Database,
@@ -10,7 +9,7 @@ use std::{collections::HashMap, io::Write, ops::Deref};
 pub struct Map(HashMap<String, Vec<u8>>);
 
 impl Map {
-    pub fn from_db(db: &Database<Str, Bytes>, rtxn: &RoTxn) -> BhResult<Self> {
+    pub fn from_db(db: &Database<Str, Bytes>, rtxn: &RoTxn) -> Result<Self, lmdb_rs::error::Error> {
         Ok(Self(
             db.iter(rtxn)?
                 .filter_map(|v| v.ok())
@@ -19,7 +18,11 @@ impl Map {
         ))
     }
 
-    pub fn to_db<W: Write>(&self, db: &Database<Str, Bytes>, wtxn: &mut RwTxn<W>) -> BhResult<()> {
+    pub fn to_db<W: Write>(
+        &self,
+        db: &Database<Str, Bytes>,
+        wtxn: &mut RwTxn<W>,
+    ) -> Result<(), lmdb_rs::error::Error> {
         for (k, v) in self.0.iter() {
             db.put(wtxn, k, v)?;
         }

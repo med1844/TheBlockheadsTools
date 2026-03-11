@@ -1,16 +1,48 @@
+use super::chunk::{Chunk, Chunks};
+use snafu::prelude::*;
 use std::fmt::Display;
 
-use crate::{BhError, BhResult};
+#[derive(Debug, Snafu)]
+pub enum CoordError {
+    #[snafu(display("Coord {label} exceeds limit: {limit}, got {got}"))]
+    CoordOutOfLimit {
+        limit: u64,
+        got: u64,
+        label: &'static str,
+    },
+    #[snafu(display("Missing {label} coordinate in {raw_coord}"))]
+    MissingCoordInStr {
+        raw_coord: String,
+        label: &'static str,
+    },
+    #[snafu(display(
+        "Too many parts in coordinate {raw_coord}. Expected 'x_y' format where x and y are decimal numbers."
+    ))]
+    InvalidChunkCoordFormat { raw_coord: String },
+    #[snafu(display(
+        "Failed to parse {label} coordinate `{coord_str}` as {target_type}: {source}"
+    ))]
+    ParseStrCoordAsInt {
+        label: &'static str,
+        coord_str: String,
+        target_type: &'static str,
+        source: std::num::ParseIntError,
+    },
+}
+
+type Result<T> = std::result::Result<T, CoordError>;
 
 // helper function to check if given coord is smaller than max value.
-fn check_coord_limit(val: u64, max_val: u64) -> BhResult<()> {
-    match val < max_val {
-        false => Err(BhError::CoordError {
-            input: val,
+fn check_coord_limit(val: u64, max_val: u64, label: &'static str) -> Result<()> {
+    ensure!(
+        val < max_val,
+        CoordOutOfLimitSnafu {
             limit: max_val,
-        }),
-        true => Ok(()),
-    }
+            got: val,
+            label,
+        }
+    );
+    Ok(())
 }
 
 /// Block coordinate within a chunk. 0 <= x < 32, 0 <= y < 32.
@@ -32,9 +64,9 @@ pub struct ChunkBlockCoord {
 }
 
 impl ChunkBlockCoord {
-    pub fn new(x: u8, y: u8) -> BhResult<Self> {
-        check_coord_limit(x as u64, 32)?;
-        check_coord_limit(y as u64, 32)?;
+    pub fn new(x: u8, y: u8) -> Result<Self> {
+        check_coord_limit(x as u64, Chunk::NUM_BLOCK_PER_ROW as u64, "x")?;
+        check_coord_limit(y as u64, Chunk::NUM_BLOCK_PER_COL as u64, "y")?;
         Ok(Self { x, y })
     }
 
@@ -80,38 +112,48 @@ impl ChunkCoord {
     /// Attempts to create a `ChunkCoord` from a string in the format "x_y".
     /// Returns `Err(BhError::ParseError)` for malformed strings or invalid numbers,
     /// or `Err(BhError::CoordError)` if coordinates are out of their initial type bounds.
-    pub fn try_from_str<S: AsRef<str>>(s: S) -> BhResult<Self> {
+    pub fn try_from_str<S: AsRef<str>>(s: S) -> Result<Self> {
         let s = s.as_ref();
         let mut parts = s.split('_');
 
-        let x_str = parts
-            .next()
-            .ok_or_else(|| BhError::ParseError(format!("Missing x coordinate in {}", s)))?;
-        let y_str = parts
-            .next()
-            .ok_or_else(|| BhError::ParseError(format!("Missing y coordinate in {}", s)))?;
+        let x_str = parts.next().with_context(|| MissingCoordInStrSnafu {
+            raw_coord: s.to_owned(),
+            label: "x",
+        })?;
+        let y_str = parts.next().with_context(|| MissingCoordInStrSnafu {
+            raw_coord: s.to_owned(),
+            label: "y",
+        })?;
 
         if parts.next().is_some() {
-            return Err(BhError::ParseError(format!(
-                "Too many parts in coordinate {}. Expected 'x_y' format.",
-                s
-            )));
+            return InvalidChunkCoordFormatSnafu {
+                raw_coord: s.to_owned(),
+            }
+            .fail();
         }
 
-        let x = x_str.parse::<u32>().map_err(|e| {
-            BhError::ParseError(format!("Failed to parse x coordinate as u32: {}", e))
-        })?;
-        let y = y_str.parse::<u8>().map_err(|e| {
-            BhError::ParseError(format!("Failed to parse y coordinate as u8: {}", e))
-        })?;
+        let x = x_str
+            .parse::<u32>()
+            .with_context(|_| ParseStrCoordAsIntSnafu {
+                label: "x",
+                coord_str: x_str.to_owned(),
+                target_type: "u32",
+            })?;
+        let y = y_str
+            .parse::<u8>()
+            .with_context(|_| ParseStrCoordAsIntSnafu {
+                label: "y",
+                coord_str: y_str.to_owned(),
+                target_type: "u8",
+            })?;
 
         Self::new(x, y)
     }
 
     /// Creates a new `ChunkCoord` after validating its coordinates.
     /// Returns `Err(BhError::CoordError)` if `y` is out of its valid range (0..32).
-    pub fn new(x: u32, y: u8) -> BhResult<Self> {
-        check_coord_limit(y as u64, 32)?;
+    pub fn new(x: u32, y: u8) -> Result<Self> {
+        check_coord_limit(y as u64, Chunks::NUM_CHUNK_PER_COL as u64, "y")?;
         Ok(Self { x, y })
     }
 
@@ -140,8 +182,12 @@ pub struct BlockCoord {
 impl BlockCoord {
     /// Creates a new `BlockCoord` after validating its coordinates.
     /// Returns `Err(BhError::CoordError)` if `y` is out of its valid range (0..1024).
-    pub fn new(x: u32, y: u16) -> BhResult<Self> {
-        check_coord_limit(y as u64, 1024)?;
+    pub fn new(x: u32, y: u16) -> Result<Self> {
+        check_coord_limit(
+            y as u64,
+            (Chunk::NUM_BLOCK_PER_COL * Chunks::NUM_CHUNK_PER_COL) as u64,
+            "y",
+        )?;
         Ok(Self { x, y })
     }
 

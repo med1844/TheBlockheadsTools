@@ -1,9 +1,9 @@
 use super::{
-    coord::ChunkCoord,
+    coord::{ChunkCoord, CoordError},
     dynamic_object::{
         DynamicObjectList, DynamicObjectType,
         animal::{CaveTroll, ClownFish, Dodo, Donkey, DropBear, Scorpion, Shark, Yak},
-        chest::{Chest, ChestMeta},
+        chest::{Chest, ChestError, ChestMeta},
         craft::{
             Bed, Boat, Column, Door, ElevatorMotor, ElevatorShaft, Ladder, Rail, Sign, Stairs,
             TradePortal, TradingPost, Window, Wire,
@@ -20,13 +20,13 @@ use super::{
         workbench::Workbench,
     },
 };
-use crate::BhResult;
 use lmdb_rs::{
     codec::types::{Bytes, Str},
     database::Database,
     txn::{RoTxn, RwTxn},
 };
 use serde::Serialize;
+use snafu::prelude::*;
 use std::{collections::HashMap, io::Write, ops::Deref};
 
 trait IsEmpty {
@@ -193,6 +193,43 @@ impl ChunkDynamicObjects {
     }
 }
 
+#[derive(Debug, Snafu)]
+pub enum DynamicWorldError {
+    #[snafu(display("Failed to iterate over database: {source}"))]
+    IterateDatabase { source: lmdb_rs::error::Error },
+    #[snafu(display("Failed to deserialize {object_type:?}: {source}"))]
+    DeserializeObject {
+        object_type: DynamicObjectType,
+        source: plist::Error,
+    },
+    #[snafu(display("Failed to get entry {key} from database: {source}"))]
+    GetEntry {
+        source: lmdb_rs::error::Error,
+        key: String,
+    },
+    #[snafu(display("Failed to put entry with key {key} in database: {source}"))]
+    PutEntry {
+        key: String,
+        source: lmdb_rs::error::Error,
+    },
+    #[snafu(display("Failed to load chest {id} in chunk {coord}: {source}"))]
+    LoadChest {
+        id: u64,
+        coord: ChunkCoord,
+        source: ChestError,
+    },
+    #[snafu(display("Failed to save chest {id} in chunk {coord}: {source}"))]
+    SaveChest {
+        id: u64,
+        coord: ChunkCoord,
+        source: ChestError,
+    },
+    #[snafu(display("Failed to parse chunk coord {coord}: {source}"))]
+    ParseChunkCoordFromStr { coord: String, source: CoordError },
+}
+
+type Result<T> = std::result::Result<T, DynamicWorldError>;
+
 // TODO: handle chest data like `349_20/chest_834` and `trainchest_1342`
 #[derive(Debug)]
 pub struct DynamicWorld(HashMap<ChunkCoord, ChunkDynamicObjects>);
@@ -206,105 +243,127 @@ impl DynamicWorld {
         self.0.iter()
     }
 
-    pub fn from_db(db: &Database<Str, Bytes>, rtxn: &RoTxn) -> BhResult<Self> {
+    pub fn from_db(db: &Database<Str, Bytes>, rtxn: &RoTxn) -> Result<Self> {
         let mut map = HashMap::new();
-        for (k, v) in db.iter(rtxn)?.filter_map(|v| v.ok()) {
+        for (k, v) in db
+            .iter(rtxn)
+            .context(IterateDatabaseSnafu)?
+            .filter_map(|v| v.ok())
+        {
             let Some((coord_str, type_id_str)) = k.split_once("/") else {
+                println!("Found key {} we don't understand in dynamic world", k);
                 continue;
             };
-            let coord = ChunkCoord::try_from_str(coord_str)?;
-            let Ok(dyn_obj_type) = DynamicObjectType::try_from_str(type_id_str) else {
-                println!(
-                    "Found object type {} we don't understand in chunk {}",
-                    type_id_str, coord_str
-                );
+            let coord = ChunkCoord::try_from_str(coord_str).with_context(|_| {
+                ParseChunkCoordFromStrSnafu {
+                    coord: coord_str.to_owned(),
+                }
+            })?;
+            let Ok(obj_type) = DynamicObjectType::try_from_str(type_id_str) else {
+                if !type_id_str.starts_with("chest_") {
+                    println!(
+                        "Found object type {} we don't understand in chunk in dynamic world {}",
+                        type_id_str, coord_str
+                    );
+                }
                 continue;
             };
             let entry = map
                 .entry(coord)
                 .or_insert_with(ChunkDynamicObjects::default);
-            match dyn_obj_type {
-                DynamicObjectType::AppleTree => entry.apple_tree = plist::from_bytes(v)?,
-                DynamicObjectType::MapleTree => entry.maple_tree = plist::from_bytes(v)?,
-                DynamicObjectType::MangoTree => entry.mango_tree = plist::from_bytes(v)?,
-                DynamicObjectType::PineTree => entry.pine_tree = plist::from_bytes(v)?,
-                DynamicObjectType::CactusTree => entry.cactus_tree = plist::from_bytes(v)?,
-                DynamicObjectType::CoconutTree => entry.coconut_tree = plist::from_bytes(v)?,
-                DynamicObjectType::OrangeTree => entry.orange_tree = plist::from_bytes(v)?,
-                DynamicObjectType::CherryTree => entry.cherry_tree = plist::from_bytes(v)?,
-                DynamicObjectType::CoffeeTree => entry.coffee_tree = plist::from_bytes(v)?,
-                DynamicObjectType::FlaxPlant => entry.flax_plant = plist::from_bytes(v)?,
-                DynamicObjectType::SunflowerPlant => entry.sunflower_plant = plist::from_bytes(v)?,
-                DynamicObjectType::CornPlant => entry.corn_plant = plist::from_bytes(v)?,
-                DynamicObjectType::Dodo => entry.dodo = plist::from_bytes(v)?,
+
+            fn load<T: serde::de::DeserializeOwned>(
+                bytes: &[u8],
+                dyn_obj_type: DynamicObjectType,
+            ) -> Result<T> {
+                plist::from_bytes(bytes).context(DeserializeObjectSnafu {
+                    object_type: dyn_obj_type,
+                })
+            }
+
+            match obj_type {
+                DynamicObjectType::AppleTree => entry.apple_tree = load(v, obj_type)?,
+                DynamicObjectType::MapleTree => entry.maple_tree = load(v, obj_type)?,
+                DynamicObjectType::MangoTree => entry.mango_tree = load(v, obj_type)?,
+                DynamicObjectType::PineTree => entry.pine_tree = load(v, obj_type)?,
+                DynamicObjectType::CactusTree => entry.cactus_tree = load(v, obj_type)?,
+                DynamicObjectType::CoconutTree => entry.coconut_tree = load(v, obj_type)?,
+                DynamicObjectType::OrangeTree => entry.orange_tree = load(v, obj_type)?,
+                DynamicObjectType::CherryTree => entry.cherry_tree = load(v, obj_type)?,
+                DynamicObjectType::CoffeeTree => entry.coffee_tree = load(v, obj_type)?,
+                DynamicObjectType::FlaxPlant => entry.flax_plant = load(v, obj_type)?,
+                DynamicObjectType::SunflowerPlant => entry.sunflower_plant = load(v, obj_type)?,
+                DynamicObjectType::CornPlant => entry.corn_plant = load(v, obj_type)?,
+                DynamicObjectType::Dodo => entry.dodo = load(v, obj_type)?,
                 DynamicObjectType::DroppedItem => entry.dropped_item = v.to_vec(),
                 DynamicObjectType::Fire => entry.fire = v.to_vec(),
                 DynamicObjectType::Torch => entry.torch = v.to_vec(),
                 DynamicObjectType::GlowBlock => entry.glow_block = v.to_vec(),
-                DynamicObjectType::Ladder => entry.ladder = plist::from_bytes(v)?,
-                DynamicObjectType::Door => entry.door = plist::from_bytes(v)?,
+                DynamicObjectType::Ladder => entry.ladder = load(v, obj_type)?,
+                DynamicObjectType::Door => entry.door = load(v, obj_type)?,
                 DynamicObjectType::ArtificialLight => entry.artificial_light = v.to_vec(),
-                DynamicObjectType::Bed => entry.bed = plist::from_bytes(v)?,
-                DynamicObjectType::DropBear => entry.dropbear = plist::from_bytes(v)?,
+                DynamicObjectType::Bed => entry.bed = load(v, obj_type)?,
+                DynamicObjectType::DropBear => entry.dropbear = load(v, obj_type)?,
                 DynamicObjectType::GatherBlock => entry.gather_block = v.to_vec(),
-                DynamicObjectType::CarrotPlant => entry.carrot_plant = plist::from_bytes(v)?,
-                DynamicObjectType::Donkey => entry.donkey = plist::from_bytes(v)?,
+                DynamicObjectType::CarrotPlant => entry.carrot_plant = load(v, obj_type)?,
+                DynamicObjectType::Donkey => entry.donkey = load(v, obj_type)?,
                 DynamicObjectType::Egg => entry.egg = v.to_vec(),
-                DynamicObjectType::Window => entry.window = plist::from_bytes(v)?,
-                DynamicObjectType::Boat => entry.boat = plist::from_bytes(v)?,
-                DynamicObjectType::ChilliPlant => entry.chilli_plant = plist::from_bytes(v)?,
-                DynamicObjectType::KelpPlant => entry.kelp_plant = plist::from_bytes(v)?,
-                DynamicObjectType::ClownFish => entry.clown_fish = plist::from_bytes(v)?,
-                DynamicObjectType::Shark => entry.shark = plist::from_bytes(v)?,
-                DynamicObjectType::LimeTree => entry.lime_tree = plist::from_bytes(v)?,
-                DynamicObjectType::Wire => entry.wire = plist::from_bytes(v)?,
-                DynamicObjectType::CaveTroll => entry.cave_troll = plist::from_bytes(v)?,
-                DynamicObjectType::Rail => entry.rail = plist::from_bytes(v)?,
-                DynamicObjectType::HandCar => entry.hand_car = plist::from_bytes(v)?,
-                DynamicObjectType::SteamLocomotive => {
-                    entry.steam_locomotive = plist::from_bytes(v)?
-                }
-                DynamicObjectType::FreightCar => entry.freight_car = plist::from_bytes(v)?,
-                DynamicObjectType::PassengerCar => entry.passenger_car = plist::from_bytes(v)?,
-                DynamicObjectType::Workbench => entry.workbench = plist::from_bytes(v)?,
+                DynamicObjectType::Window => entry.window = load(v, obj_type)?,
+                DynamicObjectType::Boat => entry.boat = load(v, obj_type)?,
+                DynamicObjectType::ChilliPlant => entry.chilli_plant = load(v, obj_type)?,
+                DynamicObjectType::KelpPlant => entry.kelp_plant = load(v, obj_type)?,
+                DynamicObjectType::ClownFish => entry.clown_fish = load(v, obj_type)?,
+                DynamicObjectType::Shark => entry.shark = load(v, obj_type)?,
+                DynamicObjectType::LimeTree => entry.lime_tree = load(v, obj_type)?,
+                DynamicObjectType::Wire => entry.wire = load(v, obj_type)?,
+                DynamicObjectType::CaveTroll => entry.cave_troll = load(v, obj_type)?,
+                DynamicObjectType::Rail => entry.rail = load(v, obj_type)?,
+                DynamicObjectType::HandCar => entry.hand_car = load(v, obj_type)?,
+                DynamicObjectType::SteamLocomotive => entry.steam_locomotive = load(v, obj_type)?,
+                DynamicObjectType::FreightCar => entry.freight_car = load(v, obj_type)?,
+                DynamicObjectType::PassengerCar => entry.passenger_car = load(v, obj_type)?,
+                DynamicObjectType::Workbench => entry.workbench = load(v, obj_type)?,
                 DynamicObjectType::Chest => {
-                    let chest_metas: DynamicObjectList<ChestMeta> = plist::from_bytes(v)?;
+                    let chest_metas: DynamicObjectList<ChestMeta> =
+                        plist::from_bytes(v).context(DeserializeObjectSnafu {
+                            object_type: obj_type,
+                        })?;
                     entry.chest = chest_metas
                         .into_inner()
                         .into_iter()
                         .map(|chest_meta| {
-                            let slot_bytes = db.get(
-                                rtxn,
-                                &format!("{}/chest_{}", coord_str, chest_meta.unique_id.inner()),
-                            )?;
+                            let id = *chest_meta.unique_id.inner();
+                            let key = format!("{}/chest_{}", coord_str, id);
+                            let slot_bytes = db.get(rtxn, &key).context(GetEntrySnafu { key })?;
                             Chest::from_meta_and_slots(chest_meta, slot_bytes)
+                                .context(LoadChestSnafu { coord, id })
                         })
-                        .collect::<BhResult<DynamicObjectList<Chest>>>()?
+                        .collect::<Result<DynamicObjectList<Chest>>>()?
                 }
-                DynamicObjectType::Sign => entry.sign = plist::from_bytes(v)?,
-                DynamicObjectType::TradingPost => entry.trading_post = plist::from_bytes(v)?,
-                DynamicObjectType::TrainStation => entry.train_station = plist::from_bytes(v)?,
-                DynamicObjectType::TradePortal => entry.trade_portal = plist::from_bytes(v)?,
-                DynamicObjectType::Scorpion => entry.scorpion = plist::from_bytes(v)?,
+                DynamicObjectType::Sign => entry.sign = load(v, obj_type)?,
+                DynamicObjectType::TradingPost => entry.trading_post = load(v, obj_type)?,
+                DynamicObjectType::TrainStation => entry.train_station = load(v, obj_type)?,
+                DynamicObjectType::TradePortal => entry.trade_portal = load(v, obj_type)?,
+                DynamicObjectType::Scorpion => entry.scorpion = load(v, obj_type)?,
                 DynamicObjectType::Painting => entry.painting = v.to_vec(),
-                DynamicObjectType::Column => entry.column = plist::from_bytes(v)?,
-                DynamicObjectType::Stairs => entry.stairs = plist::from_bytes(v)?,
-                DynamicObjectType::ElevatorMotor => entry.elevator_motor = plist::from_bytes(v)?,
-                DynamicObjectType::ElevatorShaft => entry.elevator_shaft = plist::from_bytes(v)?,
-                DynamicObjectType::GemTree => entry.gem_tree = plist::from_bytes(v)?,
-                DynamicObjectType::VinePlant => entry.vine_plant = plist::from_bytes(v)?,
-                DynamicObjectType::TulipPlant => entry.tulip_plant = plist::from_bytes(v)?,
+                DynamicObjectType::Column => entry.column = load(v, obj_type)?,
+                DynamicObjectType::Stairs => entry.stairs = load(v, obj_type)?,
+                DynamicObjectType::ElevatorMotor => entry.elevator_motor = load(v, obj_type)?,
+                DynamicObjectType::ElevatorShaft => entry.elevator_shaft = load(v, obj_type)?,
+                DynamicObjectType::GemTree => entry.gem_tree = load(v, obj_type)?,
+                DynamicObjectType::VinePlant => entry.vine_plant = load(v, obj_type)?,
+                DynamicObjectType::TulipPlant => entry.tulip_plant = load(v, obj_type)?,
                 DynamicObjectType::OwnershipSign => entry.ownership_sign = v.to_vec(),
-                DynamicObjectType::WheatPlant => entry.wheat_plant = plist::from_bytes(v)?,
-                DynamicObjectType::TomatoPlant => entry.tomato_plant = plist::from_bytes(v)?,
-                DynamicObjectType::Yak => entry.yak = plist::from_bytes(v)?,
+                DynamicObjectType::WheatPlant => entry.wheat_plant = load(v, obj_type)?,
+                DynamicObjectType::TomatoPlant => entry.tomato_plant = load(v, obj_type)?,
+                DynamicObjectType::Yak => entry.yak = load(v, obj_type)?,
                 DynamicObjectType::Mirror => entry.mirror = v.to_vec(),
             };
         }
         Ok(Self(map))
     }
 
-    pub fn to_db<W: Write>(&self, db: &Database<Str, Bytes>, wtxn: &mut RwTxn<W>) -> BhResult<()> {
+    pub fn to_db<W: Write>(&self, db: &Database<Str, Bytes>, wtxn: &mut RwTxn<W>) -> Result<()> {
         #[inline(always)]
         fn put<W: Write, T: ToXmlPlist + IsEmpty>(
             db: &Database<Str, Bytes>,
@@ -312,95 +371,96 @@ impl DynamicWorld {
             coord_str: &str,
             obj_type: DynamicObjectType,
             value: &T,
-        ) -> BhResult<()> {
+        ) -> Result<()> {
+            let key = format!("{}/{}", coord_str, obj_type as u16);
             if !value.is_empty() {
-                db.put(
-                    wtxn,
-                    &format!("{}/{}", coord_str, obj_type as u16),
-                    &value.to_plist(),
-                )?;
+                db.put(wtxn, &key, &value.to_plist())
+                    .context(PutEntrySnafu { key })?;
             }
             Ok(())
         }
 
         for (coord, obj) in self.0.iter() {
-            let coord = coord.to_string();
+            let coord_str = coord.to_string();
             use DynamicObjectType::*;
-            put(db, wtxn, &coord, AppleTree, &obj.apple_tree)?;
-            put(db, wtxn, &coord, MapleTree, &obj.maple_tree)?;
-            put(db, wtxn, &coord, MangoTree, &obj.mango_tree)?;
-            put(db, wtxn, &coord, PineTree, &obj.pine_tree)?;
-            put(db, wtxn, &coord, CactusTree, &obj.cactus_tree)?;
-            put(db, wtxn, &coord, CoconutTree, &obj.coconut_tree)?;
-            put(db, wtxn, &coord, OrangeTree, &obj.orange_tree)?;
-            put(db, wtxn, &coord, CherryTree, &obj.cherry_tree)?;
-            put(db, wtxn, &coord, CoffeeTree, &obj.coffee_tree)?;
-            put(db, wtxn, &coord, FlaxPlant, &obj.flax_plant)?;
-            put(db, wtxn, &coord, SunflowerPlant, &obj.sunflower_plant)?;
-            put(db, wtxn, &coord, CornPlant, &obj.corn_plant)?;
-            put(db, wtxn, &coord, Dodo, &obj.dodo)?;
-            put(db, wtxn, &coord, DroppedItem, &obj.dropped_item)?;
-            put(db, wtxn, &coord, Fire, &obj.fire)?;
-            put(db, wtxn, &coord, Torch, &obj.torch)?;
-            put(db, wtxn, &coord, GlowBlock, &obj.glow_block)?;
-            put(db, wtxn, &coord, Ladder, &obj.ladder)?;
-            put(db, wtxn, &coord, Door, &obj.door)?;
-            put(db, wtxn, &coord, ArtificialLight, &obj.artificial_light)?;
-            put(db, wtxn, &coord, Bed, &obj.bed)?;
-            put(db, wtxn, &coord, DropBear, &obj.dropbear)?;
-            put(db, wtxn, &coord, GatherBlock, &obj.gather_block)?;
-            put(db, wtxn, &coord, CarrotPlant, &obj.carrot_plant)?;
-            put(db, wtxn, &coord, Donkey, &obj.donkey)?;
-            put(db, wtxn, &coord, Egg, &obj.egg)?;
-            put(db, wtxn, &coord, Window, &obj.window)?;
-            put(db, wtxn, &coord, Boat, &obj.boat)?;
-            put(db, wtxn, &coord, ChilliPlant, &obj.chilli_plant)?;
-            put(db, wtxn, &coord, KelpPlant, &obj.kelp_plant)?;
-            put(db, wtxn, &coord, ClownFish, &obj.clown_fish)?;
-            put(db, wtxn, &coord, Shark, &obj.shark)?;
-            put(db, wtxn, &coord, LimeTree, &obj.lime_tree)?;
-            put(db, wtxn, &coord, Wire, &obj.wire)?;
-            put(db, wtxn, &coord, CaveTroll, &obj.cave_troll)?;
-            put(db, wtxn, &coord, Rail, &obj.rail)?;
-            put(db, wtxn, &coord, HandCar, &obj.hand_car)?;
-            put(db, wtxn, &coord, SteamLocomotive, &obj.steam_locomotive)?;
-            put(db, wtxn, &coord, FreightCar, &obj.freight_car)?;
-            put(db, wtxn, &coord, PassengerCar, &obj.passenger_car)?;
-            put(db, wtxn, &coord, Workbench, &obj.workbench)?;
+            put(db, wtxn, &coord_str, AppleTree, &obj.apple_tree)?;
+            put(db, wtxn, &coord_str, MapleTree, &obj.maple_tree)?;
+            put(db, wtxn, &coord_str, MangoTree, &obj.mango_tree)?;
+            put(db, wtxn, &coord_str, PineTree, &obj.pine_tree)?;
+            put(db, wtxn, &coord_str, CactusTree, &obj.cactus_tree)?;
+            put(db, wtxn, &coord_str, CoconutTree, &obj.coconut_tree)?;
+            put(db, wtxn, &coord_str, OrangeTree, &obj.orange_tree)?;
+            put(db, wtxn, &coord_str, CherryTree, &obj.cherry_tree)?;
+            put(db, wtxn, &coord_str, CoffeeTree, &obj.coffee_tree)?;
+            put(db, wtxn, &coord_str, FlaxPlant, &obj.flax_plant)?;
+            put(db, wtxn, &coord_str, SunflowerPlant, &obj.sunflower_plant)?;
+            put(db, wtxn, &coord_str, CornPlant, &obj.corn_plant)?;
+            put(db, wtxn, &coord_str, Dodo, &obj.dodo)?;
+            put(db, wtxn, &coord_str, DroppedItem, &obj.dropped_item)?;
+            put(db, wtxn, &coord_str, Fire, &obj.fire)?;
+            put(db, wtxn, &coord_str, Torch, &obj.torch)?;
+            put(db, wtxn, &coord_str, GlowBlock, &obj.glow_block)?;
+            put(db, wtxn, &coord_str, Ladder, &obj.ladder)?;
+            put(db, wtxn, &coord_str, Door, &obj.door)?;
+            put(db, wtxn, &coord_str, ArtificialLight, &obj.artificial_light)?;
+            put(db, wtxn, &coord_str, Bed, &obj.bed)?;
+            put(db, wtxn, &coord_str, DropBear, &obj.dropbear)?;
+            put(db, wtxn, &coord_str, GatherBlock, &obj.gather_block)?;
+            put(db, wtxn, &coord_str, CarrotPlant, &obj.carrot_plant)?;
+            put(db, wtxn, &coord_str, Donkey, &obj.donkey)?;
+            put(db, wtxn, &coord_str, Egg, &obj.egg)?;
+            put(db, wtxn, &coord_str, Window, &obj.window)?;
+            put(db, wtxn, &coord_str, Boat, &obj.boat)?;
+            put(db, wtxn, &coord_str, ChilliPlant, &obj.chilli_plant)?;
+            put(db, wtxn, &coord_str, KelpPlant, &obj.kelp_plant)?;
+            put(db, wtxn, &coord_str, ClownFish, &obj.clown_fish)?;
+            put(db, wtxn, &coord_str, Shark, &obj.shark)?;
+            put(db, wtxn, &coord_str, LimeTree, &obj.lime_tree)?;
+            put(db, wtxn, &coord_str, Wire, &obj.wire)?;
+            put(db, wtxn, &coord_str, CaveTroll, &obj.cave_troll)?;
+            put(db, wtxn, &coord_str, Rail, &obj.rail)?;
+            put(db, wtxn, &coord_str, HandCar, &obj.hand_car)?;
+            put(db, wtxn, &coord_str, SteamLocomotive, &obj.steam_locomotive)?;
+            put(db, wtxn, &coord_str, FreightCar, &obj.freight_car)?;
+            put(db, wtxn, &coord_str, PassengerCar, &obj.passenger_car)?;
+            put(db, wtxn, &coord_str, Workbench, &obj.workbench)?;
             let chest_metas = obj
                 .chest
                 .iter()
-                .map(|c| -> BhResult<ChestMeta> {
-                    let (chest_meta, slot_bytes) = c.to_meta_and_slots()?;
+                .map(|c| -> Result<ChestMeta> {
+                    let id = *c.unique_id.inner();
+                    let (chest_meta, slot_bytes) =
+                        c.to_meta_and_slots().context(SaveChestSnafu {
+                            id,
+                            coord: coord.to_owned(),
+                        })?;
+                    let key = format!("{}/chest_{}", &coord_str, id);
                     if let Some(slot_bytes) = slot_bytes {
-                        db.put(
-                            wtxn,
-                            &format!("{}/chest_{}", &coord, chest_meta.unique_id.inner()),
-                            &slot_bytes,
-                        )?;
+                        db.put(wtxn, &key, &slot_bytes)
+                            .context(PutEntrySnafu { key })?;
                     }
                     Ok(chest_meta)
                 })
-                .collect::<BhResult<DynamicObjectList<ChestMeta>>>()?;
-            put(db, wtxn, &coord, Chest, &chest_metas)?;
-            put(db, wtxn, &coord, Sign, &obj.sign)?;
-            put(db, wtxn, &coord, TradingPost, &obj.trading_post)?;
-            put(db, wtxn, &coord, TrainStation, &obj.train_station)?;
-            put(db, wtxn, &coord, TradePortal, &obj.trade_portal)?;
-            put(db, wtxn, &coord, Scorpion, &obj.scorpion)?;
-            put(db, wtxn, &coord, Painting, &obj.painting)?;
-            put(db, wtxn, &coord, Column, &obj.column)?;
-            put(db, wtxn, &coord, Stairs, &obj.stairs)?;
-            put(db, wtxn, &coord, ElevatorMotor, &obj.elevator_motor)?;
-            put(db, wtxn, &coord, ElevatorShaft, &obj.elevator_shaft)?;
-            put(db, wtxn, &coord, GemTree, &obj.gem_tree)?;
-            put(db, wtxn, &coord, VinePlant, &obj.vine_plant)?;
-            put(db, wtxn, &coord, TulipPlant, &obj.tulip_plant)?;
-            put(db, wtxn, &coord, OwnershipSign, &obj.ownership_sign)?;
-            put(db, wtxn, &coord, WheatPlant, &obj.wheat_plant)?;
-            put(db, wtxn, &coord, TomatoPlant, &obj.tomato_plant)?;
-            put(db, wtxn, &coord, Yak, &obj.yak)?;
-            put(db, wtxn, &coord, Mirror, &obj.mirror)?;
+                .collect::<Result<DynamicObjectList<ChestMeta>>>()?;
+            put(db, wtxn, &coord_str, Chest, &chest_metas)?;
+            put(db, wtxn, &coord_str, Sign, &obj.sign)?;
+            put(db, wtxn, &coord_str, TradingPost, &obj.trading_post)?;
+            put(db, wtxn, &coord_str, TrainStation, &obj.train_station)?;
+            put(db, wtxn, &coord_str, TradePortal, &obj.trade_portal)?;
+            put(db, wtxn, &coord_str, Scorpion, &obj.scorpion)?;
+            put(db, wtxn, &coord_str, Painting, &obj.painting)?;
+            put(db, wtxn, &coord_str, Column, &obj.column)?;
+            put(db, wtxn, &coord_str, Stairs, &obj.stairs)?;
+            put(db, wtxn, &coord_str, ElevatorMotor, &obj.elevator_motor)?;
+            put(db, wtxn, &coord_str, ElevatorShaft, &obj.elevator_shaft)?;
+            put(db, wtxn, &coord_str, GemTree, &obj.gem_tree)?;
+            put(db, wtxn, &coord_str, VinePlant, &obj.vine_plant)?;
+            put(db, wtxn, &coord_str, TulipPlant, &obj.tulip_plant)?;
+            put(db, wtxn, &coord_str, OwnershipSign, &obj.ownership_sign)?;
+            put(db, wtxn, &coord_str, WheatPlant, &obj.wheat_plant)?;
+            put(db, wtxn, &coord_str, TomatoPlant, &obj.tomato_plant)?;
+            put(db, wtxn, &coord_str, Yak, &obj.yak)?;
+            put(db, wtxn, &coord_str, Mirror, &obj.mirror)?;
         }
         Ok(())
     }

@@ -2,18 +2,15 @@ use super::{
     super::item::{ItemType, Slot},
     InteractionObject,
 };
-use crate::{
-    util::{
-        error::ChestError,
-        gzip::{compress, decompress},
-        plist::to_xml_plist,
-        serde::{deserialize_some, serialize_some},
-    },
-    {BhError, BhResult},
+use crate::util::{
+    gzip::{compress, decompress},
+    plist::to_xml_plist,
+    serde::{deserialize_some, serialize_some},
 };
 use num_enum::TryFromPrimitive;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
+use snafu::prelude::*;
 use std::ops::{Deref, DerefMut};
 use strum_macros::IntoStaticStr;
 
@@ -52,6 +49,34 @@ const NUM_SHELF_SLOTS: usize = 2 * 2;
 type StandardSlots = [Slot; NUM_STANDARD_SLOTS];
 type ShelfSlots = [Slot; NUM_SHELF_SLOTS];
 
+#[derive(Debug, Snafu)]
+pub enum ChestError {
+    #[snafu(display("Incomplete shelf_render_items array"))]
+    IncompleteShelfRenderItems,
+    #[snafu(display("Incomplete shelf_item_data_bs array"))]
+    IncompleteItemDataBs,
+    #[snafu(display("Num slots mismatch: expected {expected}, got {got} for type {chest_type:?}"))]
+    NumSlotsMismatch {
+        expected: usize,
+        got: usize,
+        chest_type: ChestType,
+    },
+    #[snafu(display("Get save_item_slot when portal chest shouldn't have one"))]
+    PortalChestHaveSlots,
+    #[snafu(display("No save_item_slot when chest type {chest_type:?} should have one"))]
+    NoSaveItemSlot { chest_type: ChestType },
+    #[snafu(display("Failed to compress slots: {source}"))]
+    CompressSlots { source: std::io::Error },
+    #[snafu(display("Failed to decompress slots: {source}"))]
+    DecompressSlots { source: std::io::Error },
+    #[snafu(display("Failed to deserialize slots: {source}"))]
+    DeserializeSlots { source: plist::Error },
+    #[snafu(display("Failed to serialize slots: {source}"))]
+    SerializeSlots { source: plist::Error },
+}
+
+type Result<T> = std::result::Result<T, ChestError>;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum ChestSlots {
     Standard(StandardSlots),
@@ -77,13 +102,14 @@ impl ChestSlots {
         slots: Option<Vec<Slot>>,
         render_items: Option<[ItemType; NUM_SHELF_SLOTS]>,
         item_data_bs: Option<[u16; NUM_SHELF_SLOTS]>,
-    ) -> BhResult<Self> {
+    ) -> Result<Self> {
         match (slots, chest_type) {
             (
                 Some(slots),
                 ChestType::Standard | ChestType::Safe | ChestType::Gold | ChestType::Feeder,
             ) => {
-                let slots: Result<[Slot; NUM_STANDARD_SLOTS], Vec<Slot>> = slots.try_into();
+                let slots: std::result::Result<[Slot; NUM_STANDARD_SLOTS], Vec<Slot>> =
+                    slots.try_into();
                 match slots {
                     Ok(slots) => {
                         Ok(match chest_type {
@@ -94,15 +120,17 @@ impl ChestSlots {
                             _ => unreachable!(), // bad design
                         })
                     }
-                    Err(slots) => Err(BhError::ChestError(ChestError::NumSlotsMismatch(
-                        NUM_STANDARD_SLOTS,
-                        slots.len(),
-                        chest_type.into(),
-                    ))),
+                    Err(slots) => NumSlotsMismatchSnafu {
+                        expected: NUM_STANDARD_SLOTS,
+                        got: slots.len(),
+                        chest_type,
+                    }
+                    .fail(),
                 }
             }
             (Some(slots), ChestType::Shelf | ChestType::Cabinet) => {
-                let slots: Result<[Slot; NUM_SHELF_SLOTS], Vec<Slot>> = slots.try_into();
+                let slots: std::result::Result<[Slot; NUM_SHELF_SLOTS], Vec<Slot>> =
+                    slots.try_into();
                 match slots {
                     Ok(slots) => {
                         Ok(match chest_type {
@@ -119,15 +147,16 @@ impl ChestSlots {
                             _ => unreachable!(), // bad design
                         })
                     }
-                    Err(slots) => Err(BhError::ChestError(ChestError::NumSlotsMismatch(
-                        NUM_SHELF_SLOTS,
-                        slots.len(),
-                        chest_type.into(),
-                    ))),
+                    Err(slots) => NumSlotsMismatchSnafu {
+                        expected: NUM_SHELF_SLOTS,
+                        got: slots.len(),
+                        chest_type,
+                    }
+                    .fail(),
                 }
             }
             (slots, ChestType::Portal) => match slots {
-                Some(_) => Err(BhError::ChestError(ChestError::PortalChestHaveSlots)),
+                Some(_) => PortalChestHaveSlotsSnafu.fail(),
                 None => Ok(Self::Portal),
             },
             (
@@ -138,9 +167,7 @@ impl ChestSlots {
                 | ChestType::Gold
                 | ChestType::Cabinet
                 | ChestType::Feeder,
-            ) => Err(BhError::ChestError(ChestError::NoSaveItemSlot(
-                chest_type.into(),
-            ))),
+            ) => NoSaveItemSlotSnafu { chest_type }.fail(),
         }
     }
 
@@ -299,14 +326,11 @@ pub(crate) struct ChestMeta {
 inherit!(ChestMeta -> InteractionObject, obj);
 
 impl Chest {
-    pub(crate) fn from_meta_and_slots(
-        meta: ChestMeta,
-        slot_bytes: Option<&[u8]>,
-    ) -> BhResult<Self> {
+    pub(crate) fn from_meta_and_slots(meta: ChestMeta, slot_bytes: Option<&[u8]>) -> Result<Self> {
         let save_item_slots: Option<Vec<Slot>> = match slot_bytes {
             Some(bytes) => {
-                let decompressed = decompress(bytes)?;
-                Some(plist::from_bytes(&decompressed)?)
+                let decompressed = decompress(bytes).context(DecompressSlotsSnafu)?;
+                Some(plist::from_bytes(&decompressed).context(DeserializeSlotsSnafu)?)
             }
             None => None,
         };
@@ -320,7 +344,7 @@ impl Chest {
             (Some(r0), Some(r1), Some(r2), Some(r3)) => Some([r0, r1, r2, r3]),
             (None, None, None, None) => None,
             _ => {
-                return Err(BhError::ChestError(ChestError::IncompleteShelfRenderItems));
+                return IncompleteShelfRenderItemsSnafu.fail();
             }
         };
 
@@ -333,7 +357,7 @@ impl Chest {
             (Some(d0), Some(d1), Some(d2), Some(d3)) => Some([d0, d1, d2, d3]),
             (None, None, None, None) => None,
             _ => {
-                return Err(BhError::ChestError(ChestError::IncompleteItemDataBs));
+                return IncompleteItemDataBsSnafu.fail();
             }
         };
 
@@ -351,7 +375,7 @@ impl Chest {
         })
     }
 
-    pub(crate) fn to_meta_and_slots(&self) -> BhResult<(ChestMeta, Option<Vec<u8>>)> {
+    pub(crate) fn to_meta_and_slots(&self) -> Result<(ChestMeta, Option<Vec<u8>>)> {
         let (chest_type, save_item_slots, shelf_render_items, shelf_item_data_bs) =
             self.slots.to_chest_type_and_slots();
         let (r0, r1, r2, r3) = match shelf_render_items {
@@ -364,7 +388,8 @@ impl Chest {
         };
         let slot_bytes = match &save_item_slots {
             Some(slots) => {
-                let compressed = compress(&to_xml_plist(slots)?)?;
+                let compressed = compress(&to_xml_plist(slots).context(SerializeSlotsSnafu)?)
+                    .context(CompressSlotsSnafu)?;
                 Some(compressed)
             }
             None => None,
@@ -387,7 +412,7 @@ impl Chest {
         ))
     }
 
-    pub(crate) fn from_chest_item(chest_item: ChestItem) -> BhResult<Self> {
+    pub(crate) fn from_chest_item(chest_item: ChestItem) -> Result<Self> {
         Ok(Self {
             obj: chest_item.obj,
             save_time: chest_item.save_time,
