@@ -1,6 +1,6 @@
 use crate::arch::{Arch, Arch32, Arch64, DynArch};
 use crate::constants::MDB_MAGIC;
-use crate::error::{Error, Result};
+use crate::page::{PageError, PageResult as Result};
 use crate::page::header::PageHeader;
 use std::convert::TryInto;
 
@@ -27,7 +27,7 @@ impl<'a> MetaPage<'a> {
     /// Parse meta page, auto-detecting architecture
     pub fn parse(data: &'a [u8]) -> Result<(Self, DynArch)> {
         if data.len() < 64 {
-            return Err(Error::UnexpectedEof {
+            return Err(PageError::UnexpectedEof {
                 expected: 64,
                 available: data.len(),
             });
@@ -63,7 +63,7 @@ impl<'a> MetaPage<'a> {
                 }
             }
         } else {
-            return Err(Error::InvalidMagic {
+            return Err(PageError::InvalidMagic {
                 expected: MDB_MAGIC,
                 found: magic16,
             });
@@ -72,7 +72,7 @@ impl<'a> MetaPage<'a> {
         // Verify version
         let version = u32::from_le_bytes(data[offset + 4..offset + 8].try_into().unwrap());
         if version != 1 {
-            return Err(Error::UnsupportedVersion { version });
+            return Err(PageError::UnsupportedVersion { version });
         }
 
         let header = PageHeader::new(data);
@@ -195,7 +195,7 @@ mod tests {
         write_meta_32(&mut data, 0xBADF00D, 1, 4096);
         assert!(matches!(
             MetaPage::parse(&data),
-            Err(Error::InvalidMagic { .. })
+            Err(PageError::InvalidMagic { .. })
         ));
     }
 

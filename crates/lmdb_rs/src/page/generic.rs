@@ -1,7 +1,7 @@
 use crate::arch::DynArch;
 use crate::arch::{Arch, Arch32};
 use crate::constants::{P_BRANCH, P_LEAF, P_LEAF2, P_META, P_OVERFLOW};
-use crate::error::{Error, Result};
+use crate::page::{PageError, PageResult as Result};
 use crate::page::branch::BranchPage;
 use crate::page::header::PageHeader;
 use crate::page::leaf::LeafPage;
@@ -23,7 +23,7 @@ impl<'a> Page<'a> {
         // Peek header
         if data.len() < 16 {
             // Basic size check (min header is 12 or 16)
-            return Err(Error::UnexpectedEof {
+            return Err(PageError::UnexpectedEof {
                 expected: 16,
                 available: data.len(),
             });

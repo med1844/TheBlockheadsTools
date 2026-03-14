@@ -2,11 +2,33 @@ use crate::arch::DynArch;
 use crate::codec::BytesDecode;
 use crate::database::Database;
 use crate::db_record::DbRecord;
-use crate::error::Result;
 use crate::page::meta::MetaPage;
-use crate::txn::RoTxn;
-use crate::txn::RwTxn;
+use crate::txn::{RoTxn, RwTxn, TxnError};
+use snafu::{ResultExt, Snafu};
 use std::io::Write;
+
+#[derive(Debug, Snafu)]
+pub enum EnvError {
+    #[snafu(display("Failed to parse meta page during environment bootstrap: {source}"))]
+    MetaParse { source: crate::page::PageError },
+
+    #[snafu(display("Failed to initialize read transaction: {source}"))]
+    ReadTransactionStart { source: TxnError },
+
+    #[snafu(display("Failed to initialize write transaction: {source}"))]
+    WriteTransactionStart { source: TxnError },
+
+    #[snafu(display("Error while opening database '{name:?}': {source}"))]
+    DatabaseOpen {
+        name: Option<String>,
+        source: TxnError,
+    },
+
+    #[snafu(display("IO error during environment operation: {source}"))]
+    Io { source: std::io::Error },
+}
+
+pub type EnvResult<T> = std::result::Result<T, EnvError>;
 
 /// Database environment (read-only, from bytes).
 pub struct Env<'a> {
@@ -18,10 +40,11 @@ pub struct Env<'a> {
 
 impl<'a> Env<'a> {
     /// Open environment from bytes, auto-detecting architecture.
-    pub fn new(data: &'a [u8]) -> Result<Self> {
+    pub fn new(data: &'a [u8]) -> EnvResult<Self> {
         // 1. Read Meta 0 to determine Page Size
         // We must successfully read Meta 0 to bootstrap.
-        let (mut active_meta, mut active_arch) = MetaPage::parse(&data[0..])?;
+        let (mut active_meta, mut active_arch): (MetaPage, DynArch) =
+            MetaPage::parse(&data[0..]).context(MetaParseSnafu)?;
 
         let page_size = active_meta.page_size() as usize;
         let meta1_offset = page_size;
@@ -72,8 +95,8 @@ impl<'a> Env<'a> {
     }
 
     /// Create read transaction.
-    pub fn read_txn(&'a self) -> Result<RoTxn<'a>> {
-        RoTxn::new(self)
+    pub fn read_txn(&'a self) -> EnvResult<RoTxn<'a>> {
+        RoTxn::new(self).context(ReadTransactionStartSnafu)
     }
 
     /// Open a typed database.
@@ -81,12 +104,14 @@ impl<'a> Env<'a> {
         &self,
         txn: &RoTxn<'a>,
         name: Option<&str>,
-    ) -> Result<Option<Database<'a, K, V>>>
+    ) -> EnvResult<Option<Database<'a, K, V>>>
     where
         K: BytesDecode<'a>,
         V: BytesDecode<'a>,
     {
-        txn.open_database(name)
+        txn.open_database(name).with_context(|_| DatabaseOpenSnafu {
+            name: name.map(|s| s.to_string()),
+        })
     }
 }
 
@@ -121,7 +146,7 @@ impl<W: Write> EnvWrite<W> {
     /// Note: Since this library implements a "bulk loader" logic,
     /// effectively only one write transaction is supported per file creation.
     /// The transaction will buffer all writes in memory until `commit()` is called.
-    pub fn write_txn(&mut self) -> Result<RwTxn<'_, W>> {
+    pub fn write_txn(&mut self) -> EnvResult<RwTxn<'_, W>> {
         Ok(RwTxn::new(self))
     }
 }

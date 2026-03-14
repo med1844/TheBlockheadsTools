@@ -1,5 +1,4 @@
-use super::{BytesDecode, BytesEncode};
-use crate::error::{Error, Result};
+use super::{BytesDecode, BytesEncode, CodecError, Result};
 use std::borrow::Cow;
 use std::str;
 
@@ -18,7 +17,7 @@ impl<'a> BytesDecode<'a> for Str {
     type DItem = &'a str;
 
     fn bytes_decode(bytes: &'a [u8]) -> Result<Self::DItem> {
-        str::from_utf8(bytes).map_err(|_| Error::InvalidUtf8)
+        str::from_utf8(bytes).map_err(|_| CodecError::InvalidUtf8)
     }
 }
 
@@ -60,7 +59,7 @@ mod tests {
         // invalid sequence (0xFF)
         let invalid = b"hello\xFFworld";
         let res = Str::bytes_decode(invalid);
-        assert!(matches!(res, Err(Error::InvalidUtf8)));
+        assert!(matches!(res, Err(CodecError::InvalidUtf8)));
     }
 
     #[test]

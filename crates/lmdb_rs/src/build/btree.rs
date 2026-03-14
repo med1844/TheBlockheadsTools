@@ -2,6 +2,7 @@ use crate::arch::Arch;
 use crate::build::overflow::OverflowBuilder;
 use crate::build::page::{BranchPageBuilder, LeafPageBuilder};
 use crate::db_record::DbRecord;
+use crate::build::{BuildError, BuildResult};
 use std::marker::PhantomData;
 
 /// Bulk B+Tree builder
@@ -55,7 +56,7 @@ impl<A: Arch> BTreeBuilder<A> {
     }
 
     /// Add sorted entries and build tree
-    pub fn build<'a, I>(mut self, entries: I) -> Result<TreeBuildResult, crate::error::Error>
+    pub fn build<'a, I>(mut self, entries: I) -> BuildResult<TreeBuildResult>
     where
         I: IntoIterator<Item = (&'a [u8], &'a [u8])>,
     {
@@ -115,7 +116,7 @@ impl<A: Arch> BTreeBuilder<A> {
                     // Empty page couldn't take 1 entry?
                     // If it's overflow, maybe the overflow POINTER itself didn't fit (unlikely unless page is tiny).
                     // If it's normal, then key+val > page capacity.
-                    return Err(crate::error::Error::PageFull);
+                    return Err(BuildError::PageFull);
                 }
 
                 // 2. Finalize current page
@@ -155,7 +156,7 @@ impl<A: Arch> BTreeBuilder<A> {
                 };
 
                 if !retry_success {
-                    return Err(crate::error::Error::PageFull);
+                    return Err(BuildError::PageFull);
                 }
             }
         }
@@ -203,7 +204,7 @@ impl<A: Arch> BTreeBuilder<A> {
                 if !current_branch.push(key, child_pgno) {
                     if current_branch.is_empty() {
                         // Entry too big for branch? Unlikely unless key is huge.
-                        return Err(crate::error::Error::PageFull);
+                        return Err(BuildError::PageFull);
                     }
 
                     let pgno = self.next_page;
@@ -219,7 +220,7 @@ impl<A: Arch> BTreeBuilder<A> {
                     current_branch = BranchPageBuilder::new(self.page_size);
                     current_branch_min_key = Some(key);
                     if !current_branch.push(key, child_pgno) {
-                        return Err(crate::error::Error::PageFull);
+                        return Err(BuildError::PageFull);
                     }
                 }
             }

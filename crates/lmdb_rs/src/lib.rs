@@ -62,3 +62,7 @@ pub mod error;
 pub mod page;
 pub mod txn;
 pub mod write;
+
+pub use crate::error::{
+    BuildError, CodecError, CursorError, DatabaseError, EnvError, PageError, TxnError,
+};

@@ -1,6 +1,6 @@
 use crate::arch::DynArch;
 use crate::constants::{P_LEAF, P_LEAF2};
-use crate::error::{Error, Result};
+use crate::page::{PageError, PageResult as Result};
 use crate::page::header::PageHeader;
 use crate::page::node::Node;
 use std::cmp::Ordering;
@@ -28,7 +28,7 @@ impl<'a> LeafPage<'a> {
     pub fn new(data: &'a [u8], arch: DynArch) -> Result<Self> {
         // Minimal check: at least 12 bytes (32-bit header)
         if data.len() < 12 {
-            return Err(Error::UnexpectedEof {
+            return Err(PageError::UnexpectedEof {
                 expected: 12,
                 available: data.len(),
             });
@@ -38,7 +38,7 @@ impl<'a> LeafPage<'a> {
         // Full check
         let required_header = PageHeader::header_size(arch);
         if data.len() < required_header {
-            return Err(Error::UnexpectedEof {
+            return Err(PageError::UnexpectedEof {
                 expected: required_header,
                 available: data.len(),
             });
@@ -47,7 +47,7 @@ impl<'a> LeafPage<'a> {
         let flags = header.flags(arch);
 
         if (flags & P_LEAF) == 0 && (flags & P_LEAF2) == 0 {
-            return Err(Error::InvalidPageType {
+            return Err(PageError::InvalidPageType {
                 expected: P_LEAF,
                 found: flags,
             });
@@ -69,7 +69,7 @@ impl<'a> LeafPage<'a> {
     fn get_node_offset(&self, index: usize) -> Result<usize> {
         let num_keys = self.num_keys();
         if index >= num_keys {
-            return Err(Error::UnexpectedEof {
+            return Err(PageError::UnexpectedEof {
                 expected: index,
                 available: num_keys,
             });
@@ -78,7 +78,7 @@ impl<'a> LeafPage<'a> {
         // Use dynamic header size
         let ptr_offset = PageHeader::header_size(self.arch) + index * 2;
         if self.data.len() < ptr_offset + 2 {
-            return Err(Error::UnexpectedEof {
+            return Err(PageError::UnexpectedEof {
                 expected: ptr_offset + 2,
                 available: self.data.len(),
             });
@@ -88,7 +88,7 @@ impl<'a> LeafPage<'a> {
             u16::from_le_bytes(self.data[ptr_offset..ptr_offset + 2].try_into().unwrap()) as usize;
 
         if node_offset >= self.data.len() {
-            return Err(Error::UnexpectedEof {
+            return Err(PageError::UnexpectedEof {
                 expected: node_offset,
                 available: self.data.len(),
             });

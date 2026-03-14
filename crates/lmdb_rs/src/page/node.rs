@@ -1,6 +1,6 @@
 use crate::arch::DynArch;
 use crate::constants::{F_BIGDATA, F_DUPDATA, F_SUBDATA, NODE_HEADER_SIZE};
-use crate::error::{Error, Result};
+use crate::page::{PageError, PageResult as Result};
 use std::convert::TryInto;
 use std::fmt::Debug;
 
@@ -27,7 +27,7 @@ impl<'a> Node<'a> {
     /// The slice should start at the beginning of the node.
     pub fn new(data: &'a [u8], arch: DynArch) -> Result<Self> {
         if data.len() < NODE_HEADER_SIZE {
-            return Err(Error::UnexpectedEof {
+            return Err(PageError::UnexpectedEof {
                 expected: NODE_HEADER_SIZE,
                 available: data.len(),
             });

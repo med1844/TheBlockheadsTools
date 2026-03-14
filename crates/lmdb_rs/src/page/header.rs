@@ -1,5 +1,5 @@
 use crate::constants::{P_BRANCH, P_LEAF, P_LEAF2, P_META, P_OVERFLOW};
-use crate::error::Result;
+use crate::page::PageResult as Result;
 use std::convert::TryInto;
 use std::fmt::Debug; // Ensure TryInto is used or remove if not necessary
 

@@ -1,4 +1,4 @@
-use crate::error::{Error, Result};
+use crate::page::{PageError, PageResult as Result};
 use std::convert::TryInto;
 use std::fmt::Debug;
 
@@ -37,7 +37,7 @@ impl Arch for Arch32 {
 
     fn read_pgno(bytes: &[u8]) -> Result<u64> {
         if bytes.len() < 4 {
-            return Err(Error::UnexpectedEof {
+            return Err(PageError::UnexpectedEof {
                 expected: 4,
                 available: bytes.len(),
             });
@@ -48,7 +48,7 @@ impl Arch for Arch32 {
 
     fn read_size(bytes: &[u8]) -> Result<u64> {
         if bytes.len() < 4 {
-            return Err(Error::UnexpectedEof {
+            return Err(PageError::UnexpectedEof {
                 expected: 4,
                 available: bytes.len(),
             });
@@ -85,7 +85,7 @@ impl Arch for Arch64 {
 
     fn read_pgno(bytes: &[u8]) -> Result<u64> {
         if bytes.len() < 8 {
-            return Err(Error::UnexpectedEof {
+            return Err(PageError::UnexpectedEof {
                 expected: 8,
                 available: bytes.len(),
             });
@@ -96,7 +96,7 @@ impl Arch for Arch64 {
 
     fn read_size(bytes: &[u8]) -> Result<u64> {
         if bytes.len() < 8 {
-            return Err(Error::UnexpectedEof {
+            return Err(PageError::UnexpectedEof {
                 expected: 8,
                 available: bytes.len(),
             });
@@ -168,7 +168,7 @@ mod tests {
         let bytes = [0x00; 3];
         assert!(matches!(
             Arch32::read_pgno(&bytes),
-            Err(Error::UnexpectedEof { .. })
+            Err(PageError::UnexpectedEof { .. })
         ));
     }
 }

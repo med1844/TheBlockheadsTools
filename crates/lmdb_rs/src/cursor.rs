@@ -1,8 +1,48 @@
 use crate::arch::DynArch;
 use crate::db_record::DbRecord;
-use crate::error::Result;
 use crate::page::generic::Page;
 use crate::page::header::PageHeader;
+use crate::page::PageError;
+use snafu::{ResultExt, Snafu};
+
+/// Errors that arise during B-tree cursor traversal.
+///
+/// Each variant carries the context that was available at the point of failure
+/// (e.g. which page was being fetched) as well as the underlying `source` error.
+/// The `source` field is what snafu uses to build the error chain printed by
+/// `.context()` call sites.
+#[derive(Debug, Snafu)]
+pub enum CursorError {
+    /// Failed to fetch or parse a page from the environment data.
+    ///
+    /// `pgno` tells you *which* page triggered the failure; `source` tells you *why*.
+    #[snafu(display("Failed to read page {pgno}: {source}"))]
+    GetPage { pgno: u64, source: PageError },
+
+    /// The B-tree structure is internally inconsistent.
+    #[snafu(display("Corrupted B-tree at page {pgno}: {message}"))]
+    CorruptedTree { pgno: u64, message: &'static str },
+
+    /// A page number referenced in the tree is outside the file.
+    #[snafu(display("Invalid page number {pgno}: max is {max}"))]
+    InvalidPageNumber { pgno: u64, max: u64 },
+
+    /// A slice was shorter than the structure being read.
+    #[snafu(display("Unexpected EOF in cursor: expected {expected} bytes, available {available}"))]
+    UnexpectedEof { expected: usize, available: usize },
+
+    /// Underlying page error
+    #[snafu(display("Page error: {source}"))]
+    Page { source: PageError },
+}
+
+pub type CursorResult<T> = std::result::Result<T, CursorError>;
+
+impl From<PageError> for CursorError {
+    fn from(source: PageError) -> Self {
+        CursorError::Page { source }
+    }
+}
 
 #[derive(Debug)]
 pub struct Cursor<'a> {
@@ -34,21 +74,34 @@ impl<'a> Cursor<'a> {
         self.stack.last().map(|(pgno, _)| *pgno)
     }
 
-    fn get_page(&self, pgno: u64) -> Result<Page<'a>> {
+    /// Fetch and parse the page at `pgno`.
+    ///
+    /// This is where `.context()` is used: `Page::new` returns a `Result<_, PageError>`,
+    /// but our caller wants a `CursorError`. Calling `.context(GetPageSnafu { pgno })`
+    /// wraps the `PageError` as `CursorError::GetPage { pgno, source: <the PageError> }`,
+    /// so the final error message reads:
+    ///   "Failed to read page 42: Invalid page type: expected 0x02, found 0x01"
+    fn get_page(&self, pgno: u64) -> CursorResult<Page<'a>> {
         let page_size = self.page_size;
+        let max_page = self.data.len() / page_size;
 
-        // Overflow checks?
-        let offset = pgno as usize * page_size;
-        if offset + page_size > self.data.len() {
-            return Err(crate::error::Error::UnexpectedEof {
-                expected: offset + page_size,
-                available: self.data.len(),
+        // Direct construction: this error belongs to the cursor layer, not the page layer.
+        if pgno as usize >= max_page {
+            return Err(CursorError::InvalidPageNumber {
+                pgno,
+                max: max_page as u64,
             });
         }
+
+        let offset = pgno as usize * page_size;
+        // .context() is the key snafu idiom for wrapping a lower-level error with context.
+        // GetPageSnafu { pgno } is the snafu-generated builder for CursorError::GetPage.
+        // It fills in `pgno` and takes the PageError as `source` automatically.
         Page::new(&self.data[offset..offset + page_size], self.arch)
+            .context(GetPageSnafu { pgno })
     }
 
-    pub fn get(&mut self, key: &[u8]) -> Result<Option<&'a [u8]>> {
+    pub fn get(&mut self, key: &[u8]) -> CursorResult<Option<&'a [u8]>> {
         // Reset to linear traversal from root?
         // Typically 'get' searches from root.
         // We assume stack[0] is root.
@@ -64,12 +117,13 @@ impl<'a> Cursor<'a> {
                     match leaf.search(key) {
                         Ok(idx) => {
                             self.stack.last_mut().unwrap().1 = idx;
-                            let node = leaf.get_node(idx)?;
+                            let node = leaf.get_node(idx).context(GetPageSnafu { pgno })?;
 
                             // Handle Value
                             if node.is_bigdata() {
                                 let overflow_pgno = node.overflow_page_number().ok_or(
-                                    crate::error::Error::CorruptedTree {
+                                    CursorError::CorruptedTree {
+                                        pgno,
                                         message: "Invalid overflow node",
                                     },
                                 )?;
@@ -100,7 +154,7 @@ impl<'a> Cursor<'a> {
                                     let total_len = node.data_size();
 
                                     if start_offset + total_len > self.data.len() {
-                                        return Err(crate::error::Error::UnexpectedEof {
+                                        return Err(CursorError::UnexpectedEof {
                                             expected: start_offset + total_len,
                                             available: self.data.len(),
                                         });
@@ -109,7 +163,8 @@ impl<'a> Cursor<'a> {
                                         &self.data[start_offset..start_offset + total_len],
                                     ));
                                 } else {
-                                    return Err(crate::error::Error::CorruptedTree {
+                                    return Err(CursorError::CorruptedTree {
+                                        pgno: overflow_pgno,
                                         message: "BigData node pointed to non-overflow page",
                                     });
                                 }
@@ -126,7 +181,8 @@ impl<'a> Cursor<'a> {
                     self.stack.push((child_pgno, 0));
                 }
                 _ => {
-                    return Err(crate::error::Error::CorruptedTree {
+                    return Err(CursorError::CorruptedTree {
+                        pgno,
                         message: "Unexpected page type during traversal",
                     });
                 }
@@ -134,7 +190,7 @@ impl<'a> Cursor<'a> {
         }
     }
     /// Navigate to the first (leftmost) entry in the tree
-    pub fn to_first(&mut self) -> Result<Option<(&'a [u8], &'a [u8])>> {
+    pub fn to_first(&mut self) -> CursorResult<Option<(&'a [u8], &'a [u8])>> {
         self.stack.clear();
         self.stack.push((self.root_page, 0));
 
@@ -160,7 +216,8 @@ impl<'a> Cursor<'a> {
                     self.stack.push((node.child_page_number(), 0));
                 }
                 _ => {
-                    return Err(crate::error::Error::CorruptedTree {
+                    return Err(CursorError::CorruptedTree {
+                        pgno,
                         message: "Unexpected page type during traversal",
                     });
                 }
@@ -169,7 +226,7 @@ impl<'a> Cursor<'a> {
     }
 
     /// Advance cursor to next item. Returns Item if found, None if end.
-    pub fn advance(&mut self) -> Result<Option<(&'a [u8], &'a [u8])>> {
+    pub fn advance(&mut self) -> CursorResult<Option<(&'a [u8], &'a [u8])>> {
         if self.stack.is_empty() {
             return Ok(None);
         }
@@ -218,7 +275,8 @@ impl<'a> Cursor<'a> {
                     }
                 }
                 _ => {
-                    return Err(crate::error::Error::CorruptedTree {
+                    return Err(CursorError::CorruptedTree {
+                        pgno,
                         message: "Unexpected page type during traversal",
                     });
                 }
@@ -227,7 +285,7 @@ impl<'a> Cursor<'a> {
     }
 
     // Helper to descend to leftmost leaf from current top of stack
-    fn descend_left(&mut self) -> Result<()> {
+    fn descend_left(&mut self) -> CursorResult<()> {
         loop {
             let (pgno, _) = *self.stack.last().unwrap();
             let page = self.get_page(pgno)?;
@@ -241,7 +299,8 @@ impl<'a> Cursor<'a> {
                     self.stack.push((node.child_page_number(), 0));
                 }
                 _ => {
-                    return Err(crate::error::Error::CorruptedTree {
+                    return Err(CursorError::CorruptedTree {
+                        pgno,
                         message: "Unexpected page type",
                     });
                 }
@@ -249,7 +308,7 @@ impl<'a> Cursor<'a> {
         }
     }
 
-    pub fn get_current(&mut self) -> Result<Option<(&'a [u8], &'a [u8])>> {
+    pub fn get_current(&mut self) -> CursorResult<Option<(&'a [u8], &'a [u8])>> {
         if self.stack.is_empty() {
             return Ok(None);
         }
@@ -268,21 +327,22 @@ impl<'a> Cursor<'a> {
                     // Duplicate logic from get() - reuse?
                     let overflow_pgno =
                         node.overflow_page_number()
-                            .ok_or(crate::error::Error::CorruptedTree {
+                            .ok_or(CursorError::CorruptedTree {
+                                pgno,
                                 message: "Invalid overflow node",
                             })?; // Modified this line
                     let total_len = node.data_size();
                     let header_sz = PageHeader::header_size(self.arch); // Added this line
                     let start_offset = overflow_pgno as usize * self.page_size + header_sz; // Modified this line
                     if start_offset + total_len > self.data.len() {
-                        return Err(crate::error::Error::UnexpectedEof {
+                        return Err(CursorError::UnexpectedEof {
                             expected: start_offset + total_len,
                             available: self.data.len(),
                         });
                     }
                     &self.data[start_offset..start_offset + total_len]
                 } else {
-                    node.val_data().ok_or(crate::error::Error::UnexpectedEof {
+                    node.val_data().ok_or(CursorError::UnexpectedEof {
                         expected: 0,
                         available: 0,
                     })?
@@ -294,7 +354,7 @@ impl<'a> Cursor<'a> {
         }
     }
 
-    pub fn seek(&mut self, key: &[u8]) -> Result<Option<(&'a [u8], &'a [u8])>> {
+    pub fn seek(&mut self, key: &[u8]) -> CursorResult<Option<(&'a [u8], &'a [u8])>> {
         self.stack.clear();
         self.stack.push((self.root_page, 0));
 
@@ -322,7 +382,8 @@ impl<'a> Cursor<'a> {
                     self.stack.push((child_pgno, 0));
                 }
                 _ => {
-                    return Err(crate::error::Error::CorruptedTree {
+                    return Err(CursorError::CorruptedTree {
+                        pgno,
                         message: "Unexpected page type during traversal",
                     });
                 }
@@ -330,7 +391,7 @@ impl<'a> Cursor<'a> {
         }
     }
 
-    pub fn iter_start(&mut self) -> Result<CursorIter<'_, 'a>> {
+    pub fn iter_start(&mut self) -> CursorResult<CursorIter<'_, 'a>> {
         self.to_first()?;
         Ok(CursorIter {
             cursor: self,
@@ -338,7 +399,7 @@ impl<'a> Cursor<'a> {
         })
     }
 
-    pub fn iter_start_owned(mut self) -> Result<OwnedCursorIter<'a>> {
+    pub fn iter_start_owned(mut self) -> CursorResult<OwnedCursorIter<'a>> {
         self.to_first()?;
         Ok(OwnedCursorIter {
             cursor: self,
@@ -346,7 +407,7 @@ impl<'a> Cursor<'a> {
         })
     }
 
-    pub fn iter_from(&mut self, key: &[u8]) -> Result<CursorIter<'_, 'a>> {
+    pub fn iter_from(&mut self, key: &[u8]) -> CursorResult<CursorIter<'_, 'a>> {
         self.seek(key)?;
         Ok(CursorIter {
             cursor: self,
@@ -355,10 +416,10 @@ impl<'a> Cursor<'a> {
     }
 
     /// Find a named database in the main DB (assuming this cursor is on Main DB).
-    pub fn find_db(&mut self, name: &str) -> Result<Option<DbRecord>> {
+    pub fn find_db(&mut self, name: &str) -> CursorResult<Option<DbRecord>> {
         if let Some(val_slice) = self.get(name.as_bytes())? {
             // Parse MDB_db struct from value
-            let db = DbRecord::from_bytes(val_slice, self.arch)?;
+            let db = DbRecord::from_bytes(val_slice, self.arch).context(PageSnafu)?;
             Ok(Some(db))
         } else {
             Ok(None)
@@ -366,7 +427,7 @@ impl<'a> Cursor<'a> {
     }
 
     /// List all named databases in the main DB.
-    pub fn list_dbs(&mut self) -> Result<Vec<(String, DbRecord)>> {
+    pub fn list_dbs(&mut self) -> CursorResult<Vec<(String, DbRecord)>> {
         let mut dbs = Vec::new();
         let arch = self.arch; // avoid capture
 
@@ -387,9 +448,7 @@ impl<'a> Cursor<'a> {
                         // println!("DEBUG: Key not UTF8");
                     }
                 }
-                Err(_) => {
-                    // println!("DEBUG: Iteration error");
-                }
+                Err(e) => return Err(e),
             }
         }
         Ok(dbs)
@@ -409,7 +468,7 @@ pub struct CursorIter<'c, 'a> {
 }
 
 impl<'c, 'a> Iterator for CursorIter<'c, 'a> {
-    type Item = Result<(&'a [u8], &'a [u8])>;
+    type Item = CursorResult<(&'a [u8], &'a [u8])>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.should_advance {
@@ -435,7 +494,7 @@ pub struct OwnedCursorIter<'a> {
 }
 
 impl<'a> Iterator for OwnedCursorIter<'a> {
-    type Item = Result<(&'a [u8], &'a [u8])>;
+    type Item = CursorResult<(&'a [u8], &'a [u8])>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.should_advance {

@@ -1894,6 +1894,7 @@ dependencies = [
  "clap",
  "divan",
  "memmap2",
+ "snafu",
  "stats_alloc",
 ]
 

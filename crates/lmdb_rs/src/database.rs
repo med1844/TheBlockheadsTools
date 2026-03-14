@@ -1,11 +1,31 @@
-use crate::codec::BytesDecode;
-use crate::codec::BytesEncode;
-use crate::cursor::Cursor;
+use crate::codec::{CodecError, BytesDecode, BytesEncode};
+use crate::cursor::{Cursor, CursorError};
 use crate::db_record::DbRecord;
-use crate::error::Result;
 use crate::txn::RoTxn;
+use snafu::{ResultExt, Snafu};
 use std::io::Write;
 use std::marker::PhantomData;
+
+#[derive(Debug, Snafu)]
+pub enum DatabaseError {
+    /// Cannot read from a database handle opened for writing
+    #[snafu(display("Cannot read from a write-only database handle"))]
+    WriteOnlyHandle,
+
+    /// Cannot write to a database handle opened for reading
+    #[snafu(display("Cannot write to a read-only database handle"))]
+    ReadOnlyHandle,
+
+    /// Error during cursor operations
+    #[snafu(display("Cursor error: {source}"))]
+    Cursor { source: CursorError },
+
+    /// Error during key/value codec operations
+    #[snafu(display("Codec error: {source}"))]
+    Codec { source: CodecError },
+}
+
+pub type DatabaseResult<T> = std::result::Result<T, DatabaseError>;
 
 #[derive(Debug, Clone)]
 pub(crate) enum DbCore {
@@ -50,17 +70,13 @@ where
     V: BytesDecode<'a>,
 {
     /// Get entry from database (Read mode only).
-    pub fn get<'txn>(&self, txn: &'txn RoTxn<'a>, key: &K::EItem) -> Result<Option<V::DItem>> {
+    pub fn get<'txn>(&self, txn: &'txn RoTxn<'a>, key: &K::EItem) -> DatabaseResult<Option<V::DItem>> {
         let record = match &self.core {
             DbCore::Read(r) => r,
-            DbCore::Write(_) => {
-                return Err(crate::error::Error::Io(std::io::Error::other(
-                    "Cannot read from Write DB",
-                )));
-            }
+            DbCore::Write(_) => return Err(DatabaseError::WriteOnlyHandle),
         };
 
-        let key_bytes = K::bytes_encode(key)?;
+        let key_bytes = K::bytes_encode(key).context(CodecSnafu)?;
         let env = txn.env();
         let mut cursor = Cursor::new(
             env.raw_data(),
@@ -69,8 +85,8 @@ where
             env.page_size(),
         );
 
-        if let Some(val_bytes) = cursor.get(&key_bytes)? {
-            let val = V::bytes_decode(val_bytes)?;
+        if let Some(val_bytes) = cursor.get(&key_bytes).context(CursorSnafu)? {
+            let val = V::bytes_decode(val_bytes).context(CodecSnafu)?;
             Ok(Some(val))
         } else {
             Ok(None)
@@ -78,14 +94,10 @@ where
     }
 
     /// Iterator (Read mode only).
-    pub fn iter<'txn>(&self, txn: &'txn RoTxn<'a>) -> Result<RoIter<'txn, 'a, K, V>> {
+    pub fn iter<'txn>(&self, txn: &'txn RoTxn<'a>) -> DatabaseResult<RoIter<'txn, 'a, K, V>> {
         let record = match &self.core {
             DbCore::Read(r) => r,
-            DbCore::Write(_) => {
-                return Err(crate::error::Error::Io(std::io::Error::other(
-                    "Cannot iterate Write DB",
-                )));
-            }
+            DbCore::Write(_) => return Err(DatabaseError::WriteOnlyHandle),
         };
 
         let env = txn.env();
@@ -96,7 +108,7 @@ where
             env.page_size(),
         );
 
-        let iter = cursor.iter_start_owned()?;
+        let iter = cursor.iter_start_owned().context(CursorSnafu)?;
 
         Ok(RoIter {
             iter,
@@ -117,16 +129,14 @@ where
         txn: &mut crate::txn::RwTxn<'_, W>,
         key: &K::EItem,
         value: &V::EItem,
-    ) -> Result<()> {
+    ) -> DatabaseResult<()> {
         if let DbCore::Write(name) = &self.core {
-            let k_bytes = K::bytes_encode(key)?;
-            let v_bytes = V::bytes_encode(value)?;
+            let k_bytes = K::bytes_encode(key).context(CodecSnafu)?;
+            let v_bytes = V::bytes_encode(value).context(CodecSnafu)?;
             txn.append(name, &k_bytes, &v_bytes);
             Ok(())
         } else {
-            Err(crate::error::Error::Io(std::io::Error::other(
-                "Cannot write to Read DB",
-            )))
+            Err(DatabaseError::ReadOnlyHandle)
         }
     }
 }
@@ -143,22 +153,22 @@ where
     K: BytesDecode<'a>,
     V: BytesDecode<'a>,
 {
-    type Item = Result<(K::DItem, V::DItem)>;
+    type Item = DatabaseResult<(K::DItem, V::DItem)>;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.iter.next() {
             Some(Ok((k, v))) => {
-                let decoded_k = match K::bytes_decode(k) {
+                let decoded_k = match K::bytes_decode(k).context(CodecSnafu) {
                     Ok(val) => val,
                     Err(e) => return Some(Err(e)),
                 };
-                let decoded_v = match V::bytes_decode(v) {
+                let decoded_v = match V::bytes_decode(v).context(CodecSnafu) {
                     Ok(val) => val,
                     Err(e) => return Some(Err(e)),
                 };
                 Some(Ok((decoded_k, decoded_v)))
             }
-            Some(Err(e)) => Some(Err(e)),
+            Some(Err(e)) => Some(Err(DatabaseError::Cursor { source: e })),
             None => None,
         }
     }

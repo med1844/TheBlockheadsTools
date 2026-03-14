@@ -56,7 +56,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let meta1_res = if mmap.len() >= meta1_offset + 512 {
         MetaPage::parse(&mmap[meta1_offset..])
     } else {
-        Err(lmdb_rs::error::Error::UnexpectedEof {
+        Err(lmdb_rs::page::PageError::UnexpectedEof {
             expected: meta1_offset + 512,
             available: mmap.len(),
         })

@@ -1,7 +1,7 @@
 use crate::arch::Arch;
 use crate::arch::DynArch;
 use crate::constants::P_OVERFLOW;
-use crate::error::{Error, Result};
+use crate::page::{PageError, PageResult as Result};
 use crate::page::header::PageHeader;
 use std::borrow::Cow;
 
@@ -25,7 +25,7 @@ impl<'a> OverflowReader<'a> {
         // Basic bounds check for start page
         let start_offset = start_page as usize * page_size;
         if start_offset >= env_data.len() {
-            return Err(Error::UnexpectedEof {
+            return Err(PageError::UnexpectedEof {
                 expected: start_offset + 16,
                 available: env_data.len(),
             });
@@ -35,7 +35,7 @@ impl<'a> OverflowReader<'a> {
         let header_slice = &env_data[start_offset..];
         if header_slice.len() < 16 {
             // Min header size
-            return Err(Error::UnexpectedEof {
+            return Err(PageError::UnexpectedEof {
                 expected: 16,
                 available: header_slice.len(),
             });
@@ -45,7 +45,7 @@ impl<'a> OverflowReader<'a> {
         let flags = header.flags(arch);
 
         if (flags & P_OVERFLOW) == 0 {
-            return Err(Error::InvalidPageType {
+            return Err(PageError::InvalidPageType {
                 expected: P_OVERFLOW,
                 found: flags,
             });
@@ -86,9 +86,9 @@ impl<'a> OverflowReader<'a> {
     /// Read all overflow data (may span multiple pages)
     /// Returns slice if contiguous (always true for LMDB mmap?), otherwise allocates (not needed here?)
     pub fn read(&self) -> Result<Cow<'a, [u8]>> {
-        let slice = self.try_as_slice().ok_or(Error::UnexpectedEof {
+        let slice = self.try_as_slice().ok_or(PageError::UnexpectedEof {
             expected: self.total_size,
-            available: 0, // Unknown actual
+            available: 0,
         })?;
         Ok(Cow::Borrowed(slice))
     }

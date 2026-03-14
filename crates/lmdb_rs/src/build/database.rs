@@ -36,11 +36,7 @@ impl<A: Arch> DatabaseBuilder<A> {
 
     /// Add a named database with its entries.
     /// entries: Iterator of (key, val). keys must be sorted.
-    pub fn add_sorted_database<'a, I>(
-        &mut self,
-        name: &str,
-        entries: I,
-    ) -> Result<(), crate::error::Error>
+    pub fn add_sorted_database<'a, I>(&mut self, name: &str, entries: I) -> crate::build::BuildResult<()>
     where
         I: Iterator<Item = (&'a [u8], &'a [u8])>,
     {
@@ -66,7 +62,7 @@ impl<A: Arch> DatabaseBuilder<A> {
         let _ = self.add_sorted_database(name, iter);
     }
 
-    pub fn build(self) -> Result<BuildResult, crate::error::Error> {
+    pub fn build(self) -> crate::build::BuildResult<BuildResult> {
         // 1. Create Main DB entries sorted by name
         // We do NOT sort `built_dbs` directly because that would scramble the physical page order.
         let mut indices: Vec<usize> = (0..self.built_dbs.len()).collect();

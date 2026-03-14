@@ -3,6 +3,9 @@ name = "lmdb-rs"
 version = "0.1.0"
 edition = "2024"
 
+[dependencies]
+snafu = { workspace = true }
+
 [dev-dependencies]
 clap = { version = "4.5.54", features = ["derive"] }
 divan = "0.1.21"

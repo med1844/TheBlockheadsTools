@@ -6,10 +6,27 @@ use crate::cursor::Cursor;
 use crate::database::Database;
 use crate::db_record::DbRecord;
 use crate::env::Env;
-use crate::error::Result;
 use crate::write::{ByteArena, SliceId};
+use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
 use std::io::Write;
+
+#[derive(Debug, Snafu)]
+pub enum TxnError {
+    #[snafu(display("No named database '{name}' found"))]
+    DatabaseNotFound { name: String },
+
+    #[snafu(display("Build error: {source}"))]
+    Build { source: crate::build::BuildError },
+
+    #[snafu(display("Cursor error during transaction: {source}"))]
+    Cursor { source: crate::cursor::CursorError },
+
+    #[snafu(display("IO error while writing transaction data: {source}"))]
+    Io { source: std::io::Error },
+}
+
+pub type TxnResult<T> = std::result::Result<T, TxnError>;
 
 /// Read-only transaction.
 pub struct RoTxn<'a> {
@@ -17,7 +34,7 @@ pub struct RoTxn<'a> {
 }
 
 impl<'a> RoTxn<'a> {
-    pub(crate) fn new(env: &'a Env<'a>) -> Result<Self> {
+    pub(crate) fn new(env: &'a Env<'a>) -> TxnResult<Self> {
         Ok(Self { env })
     }
 
@@ -27,7 +44,7 @@ impl<'a> RoTxn<'a> {
     }
 
     /// Commit transaction (no-op for read-only).
-    pub fn commit(self) -> Result<()> {
+    pub fn commit(self) -> TxnResult<()> {
         Ok(())
     }
 
@@ -35,7 +52,7 @@ impl<'a> RoTxn<'a> {
     pub fn abort(self) {}
 
     /// Open a database.
-    pub fn open_database<K, V>(&self, name: Option<&str>) -> Result<Option<Database<'a, K, V>>>
+    pub fn open_database<K, V>(&self, name: Option<&str>) -> TxnResult<Option<Database<'a, K, V>>>
     where
         K: BytesDecode<'a>,
         V: BytesDecode<'a>,
@@ -51,7 +68,7 @@ impl<'a> RoTxn<'a> {
                 self.env.page_size(),
             );
 
-            if let Some(record) = cursor.find_db(db_name)? {
+            if let Some(record) = cursor.find_db(db_name).context(CursorSnafu)? {
                 record
             } else {
                 return Ok(None);
@@ -91,7 +108,7 @@ impl<'e, W: Write> RwTxn<'e, W> {
     /// This returns a `Database` handle configured for writing under the given name.
     /// If `name` is `None`, it refers to the Main DB (usually not written to directly
     /// for data, but supported).
-    pub fn create_database<K, V>(&mut self, name: Option<&str>) -> Result<Database<'static, K, V>> {
+    pub fn create_database<K, V>(&mut self, name: Option<&str>) -> TxnResult<Database<'static, K, V>> {
         let db_name = name.unwrap_or("main").to_string();
         // Initialize buffer if missing
         self.buffers.entry(db_name.clone()).or_default();
@@ -117,14 +134,14 @@ impl<'e, W: Write> RwTxn<'e, W> {
     ///
     /// This sorts all buffered entries, builds the B-Trees, and writes the complete
     /// LMDB file structure to the underlying writer.
-    pub fn commit(self) -> Result<()> {
+    pub fn commit(self) -> TxnResult<()> {
         match self.env.arch {
             DynArch::Arch32 => self.commit_impl::<crate::arch::Arch32>(),
             DynArch::Arch64 => self.commit_impl::<crate::arch::Arch64>(),
         }
     }
 
-    fn commit_impl<A: Arch>(self) -> Result<()> {
+    fn commit_impl<A: Arch>(self) -> TxnResult<()> {
         let page_size = self.env.page_size;
         let mut db_builder = DatabaseBuilder::<A>::new(page_size);
 
@@ -146,10 +163,12 @@ impl<'e, W: Write> RwTxn<'e, W> {
                 .iter()
                 .map(|(kid, vid)| (arena.get(*kid), arena.get(*vid)));
 
-            db_builder.add_sorted_database(&name, iter)?;
+            db_builder
+                .add_sorted_database(&name, iter)
+                .context(BuildSnafu)?;
         }
 
-        let result = db_builder.build()?;
+        let result = db_builder.build().context(BuildSnafu)?;
 
         // Write to writer
         let writer = &mut self.env.writer;
@@ -186,20 +205,18 @@ impl<'e, W: Write> RwTxn<'e, W> {
         // Page 0: Initial empty state (txn_id=0), matching C LMDB's commit pattern.
         // C LMDB writes Meta 0 as the "before" state and Meta 1 as the "after" state.
         let buf0 = meta_builder.build(0, 1, 0, &free_db, &empty_main_db);
-        writer.write_all(&buf0).map_err(crate::error::Error::Io)?;
+        writer.write_all(&buf0).context(IoSnafu)?;
 
         // Page 1: Committed state (txn_id=1) with actual data
         let buf1 = meta_builder.build(1, result.last_page, 1, &free_db, &result.main_db);
-        writer.write_all(&buf1).map_err(crate::error::Error::Io)?;
+        writer.write_all(&buf1).context(IoSnafu)?;
 
         // Data Pages
         for page_buf in result.pages {
-            writer
-                .write_all(&page_buf)
-                .map_err(crate::error::Error::Io)?;
+            writer.write_all(&page_buf).context(IoSnafu)?;
         }
 
-        writer.flush().map_err(crate::error::Error::Io)?;
+        writer.flush().context(IoSnafu)?;
 
         Ok(())
     }

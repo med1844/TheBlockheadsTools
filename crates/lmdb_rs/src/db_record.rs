@@ -1,5 +1,5 @@
 use crate::arch::{Arch, Arch32, Arch64, DynArch};
-use crate::error::{Error, Result};
+use crate::page::{PageError, PageResult as Result};
 use std::convert::TryInto;
 
 /// Represents a named database record stored inside the Main DB.
@@ -28,7 +28,7 @@ impl DbRecord {
         // Validation: 4 (pad) + 2 (flags) + 2 (depth) + 4 * PGNO + 1 * SIZE
         let required = 8 + A::PGNO_SIZE * 4 + A::SIZE_T_SIZE;
         if data.len() < required {
-            return Err(Error::UnexpectedEof {
+            return Err(PageError::UnexpectedEof {
                 expected: required,
                 available: data.len(),
             });
@@ -39,7 +39,6 @@ impl DbRecord {
         let depth = u16::from_le_bytes(data[6..8].try_into().unwrap());
 
         let mut offset = 8;
-
         let branch_pages = A::read_pgno(&data[offset..])?;
         offset += A::PGNO_SIZE;
 

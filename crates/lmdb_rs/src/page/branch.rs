@@ -1,6 +1,6 @@
 use crate::arch::DynArch;
 use crate::constants::P_BRANCH;
-use crate::error::{Error, Result};
+use crate::page::{PageError, PageResult as Result};
 use crate::page::header::PageHeader;
 use crate::page::node::Node;
 use std::cmp::Ordering;
@@ -28,7 +28,7 @@ impl<'a> BranchPage<'a> {
     pub fn new(data: &'a [u8], arch: DynArch) -> Result<Self> {
         // Minimal check
         if data.len() < 12 {
-            return Err(Error::UnexpectedEof {
+            return Err(PageError::UnexpectedEof {
                 expected: 12,
                 available: data.len(),
             });
@@ -38,7 +38,7 @@ impl<'a> BranchPage<'a> {
         // Full check
         let required_header = PageHeader::header_size(arch);
         if data.len() < required_header {
-            return Err(Error::UnexpectedEof {
+            return Err(PageError::UnexpectedEof {
                 expected: required_header,
                 available: data.len(),
             });
@@ -47,7 +47,7 @@ impl<'a> BranchPage<'a> {
         let flags = header.flags(arch);
 
         if (flags & P_BRANCH) == 0 {
-            return Err(Error::InvalidPageType {
+            return Err(PageError::InvalidPageType {
                 expected: P_BRANCH,
                 found: flags,
             });
@@ -68,7 +68,7 @@ impl<'a> BranchPage<'a> {
     fn get_node_offset(&self, index: usize) -> Result<usize> {
         let num_keys = self.num_keys();
         if index >= num_keys {
-            return Err(Error::UnexpectedEof {
+            return Err(PageError::UnexpectedEof {
                 expected: index,
                 available: num_keys,
             });
@@ -77,7 +77,7 @@ impl<'a> BranchPage<'a> {
         // Use dynamic header size for pointer offset
         let ptr_offset = PageHeader::header_size(self.arch) + index * 2;
         if self.data.len() < ptr_offset + 2 {
-            return Err(Error::UnexpectedEof {
+            return Err(PageError::UnexpectedEof {
                 expected: ptr_offset + 2,
                 available: self.data.len(),
             });
@@ -87,7 +87,7 @@ impl<'a> BranchPage<'a> {
             u16::from_le_bytes(self.data[ptr_offset..ptr_offset + 2].try_into().unwrap()) as usize;
 
         if node_offset >= self.data.len() {
-            return Err(Error::UnexpectedEof {
+            return Err(PageError::UnexpectedEof {
                 expected: node_offset,
                 available: self.data.len(),
             });
@@ -108,7 +108,7 @@ impl<'a> BranchPage<'a> {
         let nkeys = self.num_keys();
         if nkeys == 0 {
             // Should not happen for valid branch page (min 2 children usually, or 1)
-            return Err(Error::CorruptedTree {
+            return Err(PageError::CorruptedTree {
                 message: "Empty branch page",
             });
         }
@@ -122,7 +122,7 @@ impl<'a> BranchPage<'a> {
 
         while left < right {
             let mid = left + (right - left) / 2;
-            let node = self.get_node(mid).map_err(|_| Error::UnexpectedEof {
+            let node = self.get_node(mid).map_err(|_| PageError::UnexpectedEof {
                 expected: 0,
                 available: 0,
             })?;
