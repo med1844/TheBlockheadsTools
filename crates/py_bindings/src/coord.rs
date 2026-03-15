@@ -1,6 +1,7 @@
-use super::{into_py_err, lib};
+use super::{lib, CoordSnafu};
 use lib::game::coord::{BlockCoord, ChunkBlockCoord, ChunkCoord};
 use pyo3::prelude::*;
+use snafu::ResultExt;
 use std::hash::Hash;
 
 #[derive(Clone, Hash, PartialEq, Eq)]
@@ -14,7 +15,7 @@ impl ChunkCoordPy {
     #[new]
     fn new(x: u32, y: u8) -> PyResult<Self> {
         Ok(Self {
-            inner: ChunkCoord::new(x, y).map_err(into_py_err)?,
+            inner: ChunkCoord::new(x, y).context(CoordSnafu)?,
         })
     }
 
@@ -48,7 +49,7 @@ impl ChunkBlockCoordPy {
     #[new]
     fn new(x: u8, y: u8) -> PyResult<Self> {
         Ok(Self {
-            inner: ChunkBlockCoord::new(x, y).map_err(into_py_err)?,
+            inner: ChunkBlockCoord::new(x, y).context(CoordSnafu)?,
         })
     }
 
@@ -82,7 +83,7 @@ impl BlockCoordPy {
     #[new]
     fn new(x: u32, y: u16) -> PyResult<Self> {
         Ok(Self {
-            inner: BlockCoord::new(x, y).map_err(into_py_err)?,
+            inner: BlockCoord::new(x, y).context(CoordSnafu)?,
         })
     }
 

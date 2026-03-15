@@ -1,10 +1,11 @@
-use super::{chunk::ChunkPy, into_py_err, lib};
+use super::{chunk::ChunkPy, lib, BlockSnafu};
 use lib::game::{
     block::{Block, BlockContentType, BlockMut, BlockType, BlockView, BlockViewMut},
     coord::ChunkBlockCoord,
 };
 use num_enum::TryFromPrimitive;
 use pyo3::prelude::*;
+use snafu::ResultExt;
 
 #[pyclass(eq, eq_int, name = "BlockType")]
 #[derive(Clone, Copy, PartialEq, TryFromPrimitive)]
@@ -248,7 +249,11 @@ impl BlockPy {
 
     fn fg(&self, py: Python<'_>) -> PyResult<BlockTypePy> {
         self.read(py, |block_view| {
-            block_view.fg().map(Into::into).map_err(into_py_err)
+            block_view
+                .fg()
+                .map(Into::into)
+                .context(BlockSnafu)
+                .map_err(Into::into)
         })
     }
 
@@ -258,7 +263,11 @@ impl BlockPy {
 
     fn bg(&self, py: Python<'_>) -> PyResult<BlockTypePy> {
         self.read(py, |block_view| {
-            block_view.bg().map(Into::into).map_err(into_py_err)
+            block_view
+                .bg()
+                .map(Into::into)
+                .context(BlockSnafu)
+                .map_err(Into::into)
         })
     }
 
@@ -268,7 +277,11 @@ impl BlockPy {
 
     fn content(&self, py: Python<'_>) -> PyResult<BlockContentTypePy> {
         self.read(py, |block_view| {
-            block_view.content().map(Into::into).map_err(into_py_err)
+            block_view
+                .content()
+                .map(Into::into)
+                .context(BlockSnafu)
+                .map_err(Into::into)
         })
     }
 

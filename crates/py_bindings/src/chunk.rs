@@ -1,10 +1,11 @@
 use super::{
     block::BlockPy,
     coord::{BlockCoordPy, ChunkBlockCoordPy, ChunkCoordPy},
-    into_py_err, lib, SharedWorldDb,
+    lib, ChunkSnafu, SharedWorldDb,
 };
 use lib::game::{chunk::Chunk, coord::ChunkCoord};
 use pyo3::prelude::*;
+use snafu::ResultExt;
 use std::{borrow::Cow, collections::HashSet};
 
 #[pyclass(name = "Chunk")]
@@ -101,7 +102,8 @@ impl ChunksPy {
                     .map(|chunk| ChunkPy { inner: chunk })
             })
             .transpose()
-            .map_err(into_py_err)
+            .context(ChunkSnafu)
+            .map_err(Into::into)
     }
 
     fn set_chunk_at(&self, coord: IntoChunkCoord, chunk: &ChunkPy) -> PyResult<()> {
@@ -109,7 +111,7 @@ impl ChunksPy {
             .write()
             .unwrap()
             .chunks
-            .set_chunk_at(coord, chunk.inner.compress().map_err(into_py_err)?);
+            .set_chunk_at(coord, chunk.inner.compress().context(ChunkSnafu)?);
         Ok(())
     }
 }

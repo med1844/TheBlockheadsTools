@@ -11,3 +11,4 @@ crate-type = ["cdylib"]
 pyo3 = { version = "0.26.0", features = ["extension-module"] }
 the-blockheads-tools-lib = { workspace = true }
 num_enum = { workspace = true }
+snafu = { workspace = true }

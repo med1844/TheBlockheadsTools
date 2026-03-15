@@ -1,10 +1,11 @@
-use super::{chunk::ChunksPy, into_py_err, item::InventoryPy, lib, SharedWorldDb};
+use super::{chunk::ChunksPy, item::InventoryPy, lib, SharedWorldDb, WorldDbSnafu};
 use lib::{
     game::{db::world_db::WorldDb, dynamic_object::UniqueID},
     DynArch,
 };
 use num_enum::TryFromPrimitive;
 use pyo3::prelude::*;
+use snafu::ResultExt;
 use std::{
     borrow::Cow,
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
@@ -587,7 +588,7 @@ pub struct WorldDbPy {
 impl WorldDbPy {
     #[staticmethod]
     fn open_path(path: std::path::PathBuf) -> PyResult<Self> {
-        let world_db = WorldDb::from_path(path).map_err(into_py_err)?;
+        let world_db = WorldDb::from_path(path).context(WorldDbSnafu)?;
         Ok(Self {
             inner: Arc::new(RwLock::new(world_db)),
         })
@@ -598,13 +599,13 @@ impl WorldDbPy {
             .read()
             .unwrap()
             .to_path(path, arch.into())
-            .map_err(into_py_err)?;
+            .context(WorldDbSnafu)?;
         Ok(())
     }
 
     #[staticmethod]
     fn open_bytes(data: Vec<u8>) -> PyResult<Self> {
-        let world_db = WorldDb::from_bytes(&data).map_err(into_py_err)?;
+        let world_db = WorldDb::from_bytes(&data).context(WorldDbSnafu)?;
         Ok(Self {
             inner: Arc::new(RwLock::new(world_db)),
         })
@@ -616,7 +617,7 @@ impl WorldDbPy {
             .read()
             .unwrap()
             .write_to(&mut data, arch.into())
-            .map_err(into_py_err)?;
+            .context(WorldDbSnafu)?;
         Ok(Cow::Owned(data))
     }
 

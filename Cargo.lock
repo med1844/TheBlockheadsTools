@@ -2664,6 +2664,7 @@ version = "0.1.0"
 dependencies = [
  "num_enum",
  "pyo3",
+ "snafu",
  "the-blockheads-tools-lib",
 ]
 

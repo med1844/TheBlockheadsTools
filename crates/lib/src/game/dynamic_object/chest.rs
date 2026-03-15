@@ -220,6 +220,18 @@ impl ChestSlots {
             ChestSlots::Portal => None,
         }
     }
+
+    pub fn chest_type(&self) -> ChestType {
+        match self {
+            Self::Standard(_) => ChestType::Standard,
+            Self::Safe(_) => ChestType::Safe,
+            Self::Shelf { .. } => ChestType::Shelf,
+            Self::Gold(_) => ChestType::Gold,
+            Self::Portal => ChestType::Portal,
+            Self::Cabinet { .. } => ChestType::Cabinet,
+            Self::Feeder(_) => ChestType::Feeder,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -229,6 +241,16 @@ pub struct Chest {
     pub slots: ChestSlots,
 }
 inherit!(Chest -> InteractionObject, obj);
+
+impl Chest {
+    pub fn new(obj: InteractionObject, save_time: f64, slots: ChestSlots) -> Self {
+        Self {
+            obj,
+            save_time,
+            slots,
+        }
+    }
+}
 
 // Chest data from binary item
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

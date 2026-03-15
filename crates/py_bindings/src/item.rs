@@ -1,19 +1,20 @@
-use super::{into_py_err, lib};
+use super::{lib, ItemSnafu};
 use lib::game::{
     dynamic_object::{
         blockhead::Inventory,
-        chest::{ChestData, ChestType},
+        chest::{Chest, ChestSlots, ChestType},
         workbench::{Workbench, WorkbenchType},
         DynamicObject, InteractionObject, InteractionObjectType, UniqueID,
     },
     item::{
-        fmt_item_display, fmt_slot_display, Extra, Item, ItemType, ItemView, PigmentColor, Slot,
-        SlotView,
+        fmt_item_display, fmt_slot_display, Extra, Item, ItemError, ItemType, ItemView,
+        PigmentColor, Slot, SlotView,
     },
 };
 use num_enum::TryFromPrimitive;
 use pyo3::exceptions::{PyIndexError, PyValueError};
 use pyo3::prelude::*;
+use snafu::ResultExt;
 
 #[pyclass(eq, eq_int, name = "ItemType")]
 #[derive(Clone, Copy, PartialEq, TryFromPrimitive)]
@@ -692,11 +693,11 @@ impl std::fmt::Debug for ChestExtraPy {
 }
 
 impl ChestExtraPy {
-    pub fn inflate(py: Python<'_>, chest: ChestData) -> PyResult<Py<Self>> {
+    pub fn inflate(py: Python<'_>, chest: Chest) -> PyResult<Py<Self>> {
         Py::new(
             py,
             Self {
-                chest_type: chest.chest_type.into(),
+                chest_type: chest.slots.chest_type().into(),
                 owner_id: chest.owner_id.clone(),
                 is_in_use: chest.is_in_use,
                 flipped: chest.flipped,
@@ -706,24 +707,25 @@ impl ChestExtraPy {
                 float_pos: [chest.float_pos[0], chest.float_pos[1]],
                 unique_id: *chest.unique_id.inner(),
                 items: {
-                    let mut items = Vec::with_capacity(ChestData::NUM_SLOTS);
-                    for slot in chest.save_item_slots {
-                        items.push(SlotPy::inflate(py, slot)?);
-                    }
+                    let items = Vec::with_capacity(16);
+                    // TODO
+                    // for slot in chest.save_item_slots {
+                    //     items.push(SlotPy::inflate(py, slot)?);
+                    // }
                     items
                 },
             },
         )
     }
 
-    pub fn deflate(&self, py: Python<'_>) -> ChestData {
-        let mut save_item_slots = [const { Slot(vec![]) }; ChestData::NUM_SLOTS];
-        for (i, si_py) in self.items.iter().enumerate() {
-            if i < ChestData::NUM_SLOTS {
-                save_item_slots[i] = si_py.bind(py).borrow().deflate(py);
-            }
-        }
-        ChestData::new(
+    pub fn deflate(&self, py: Python<'_>) -> Chest {
+        // let mut save_item_slots = [const { Slot(vec![]) }; 16];
+        // for (i, si_py) in self.items.iter().enumerate() {
+        //     if i < ChestData::NUM_SLOTS {
+        //         save_item_slots[i] = si_py.bind(py).borrow().deflate(py);
+        //     }
+        // }
+        Chest::new(
             InteractionObject::new(
                 DynamicObject {
                     float_pos: [self.float_pos[0], self.float_pos[1]],
@@ -737,8 +739,9 @@ impl ChestExtraPy {
                 self.flipped,
                 self.paint_color,
             ),
-            self.chest_type.into(),
-            save_item_slots,
+            // TODO fix these
+            0.0,
+            ChestSlots::Portal,
         )
     }
 
@@ -772,24 +775,25 @@ impl ChestExtraPy {
         chest_type: ChestTypePy,
         owner_id: Option<String>,
     ) -> PyResult<Py<Self>> {
-        let items = match items {
-            Some(items) => {
-                if items.len() != ChestData::NUM_SLOTS {
-                    return Err(PyValueError::new_err(format!(
-                        "ChestExtra must have exactly {} slots",
-                        ChestData::NUM_SLOTS
-                    )));
-                }
-                items
-            }
-            None => {
-                let mut items = Vec::with_capacity(ChestData::NUM_SLOTS);
-                for _ in 0..ChestData::NUM_SLOTS {
-                    items.push(Py::new(py, SlotPy::default())?);
-                }
-                items
-            }
-        };
+        // let items = match items {
+        //     Some(items) => {
+        //         if items.len() != ChestData::NUM_SLOTS {
+        //             return Err(PyValueError::new_err(format!(
+        //                 "ChestExtra must have exactly {} slots",
+        //                 ChestData::NUM_SLOTS
+        //             )));
+        //         }
+        //         items
+        //     }
+        //     None => {
+        //         let mut items = Vec::with_capacity(ChestData::NUM_SLOTS);
+        //         for _ in 0..ChestData::NUM_SLOTS {
+        //             items.push(Py::new(py, SlotPy::default())?);
+        //         }
+        //         items
+        //     }
+        // };
+        let items = vec![];
         Py::new(
             py,
             Self {
@@ -1344,7 +1348,7 @@ impl ItemPy {
 
     #[getter]
     fn get_colors(&self) -> PyResult<Vec<PigmentColorPy>> {
-        let colors = Item::decode_colors(self.data_b).map_err(into_py_err)?;
+        let colors = Item::decode_colors(self.data_b).context(ItemSnafu)?;
         Ok(colors.into_iter().map(Into::into).collect())
     }
 

@@ -3,30 +3,60 @@ use pyo3::{
     exceptions::{PyException, PyValueError},
     prelude::*,
 };
+use snafu::prelude::*;
 use std::sync::{Arc, RwLock};
-use the_blockheads_tools_lib as lib;
+use the_blockheads_tools_lib::{self as lib};
+
+use lib::game::{
+    block::BlockError, chunk::ChunkError, coord::CoordError, db::world_db::WorldDbError,
+    item::ItemError,
+};
 
 pub type SharedWorldDb = Arc<RwLock<lib::game::db::world_db::WorldDb>>;
 
-pub fn into_py_err(err: lib::BhError) -> PyErr {
-    let error_message = err.to_string();
+#[derive(Debug, Snafu)]
+#[snafu(visibility(pub(crate)))]
+pub enum BindingError {
+    CoordError { source: CoordError },
+    BlockError { source: BlockError },
+    ChunkError { source: ChunkError },
+    WorldDbError { source: WorldDbError },
+    ItemError { source: ItemError },
+}
 
-    match err {
-        lib::BhError::LmdbError(_)
-        | lib::BhError::PlistError(_)
-        | lib::BhError::GzipError(_)
-        | lib::BhError::MissingKey(_) => PyException::new_err(error_message),
-
-        lib::BhError::CoordError { .. }
-        | lib::BhError::ParseError(_)
-        | lib::BhError::InvalidBlockIdError(_)
-        | lib::BhError::InvalidBlockContentIdError(_)
-        | lib::BhError::InvalidDynamicOjectId(_)
-        | lib::BhError::InvalidItemTypeId(_)
-        | lib::BhError::InvalidColorId(_)
-        | lib::BhError::InvalidChunkSize(_) => PyValueError::new_err(error_message),
+impl From<BindingError> for PyErr {
+    fn from(value: BindingError) -> Self {
+        let error_message = value.to_string();
+        match value {
+            BindingError::CoordError { .. }
+            | BindingError::BlockError { .. }
+            | BindingError::ItemError { .. } => PyValueError::new_err(error_message),
+            BindingError::ChunkError { .. } | BindingError::WorldDbError { .. } => {
+                PyException::new_err(error_message)
+            }
+        }
     }
 }
+
+// pub fn into_py_err(err: lib::BhError) -> PyErr {
+//     let error_message = err.to_string();
+
+//     match err {
+//         lib::BhError::LmdbError(_)
+//         | lib::BhError::PlistError(_)
+//         | lib::BhError::GzipError(_)
+//         | lib::BhError::MissingKey(_) => PyException::new_err(error_message),
+
+//         lib::BhError::CoordError { .. }
+//         | lib::BhError::ParseError(_)
+//         | lib::BhError::InvalidBlockIdError(_)
+//         | lib::BhError::InvalidBlockContentIdError(_)
+//         | lib::BhError::InvalidDynamicOjectId(_)
+//         | lib::BhError::InvalidItemTypeId(_)
+//         | lib::BhError::InvalidColorId(_)
+//         | lib::BhError::InvalidChunkSize(_) => PyValueError::new_err(error_message),
+//     }
+// }
 
 // For accessors, they might point to no-longer valid resources.
 // ```py
