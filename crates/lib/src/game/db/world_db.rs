@@ -20,17 +20,17 @@ use std::{
 #[derive(Debug, Snafu)]
 pub enum WorldDbError {
     #[snafu(display("Failed to initialize LMDB environment: {source}"))]
-    InitEnv { source: lmdb_rs::error::Error },
+    InitEnv { source: lmdb_rs::error::EnvError },
     #[snafu(display("Failed to open database {name}: {source}"))]
     OpenDatabase {
-        source: lmdb_rs::error::Error,
+        source: lmdb_rs::error::EnvError,
         name: &'static str,
     },
     #[snafu(display("No database named {name}"))]
     MissingDatabase { name: &'static str },
     #[snafu(display("Failed to create database {name}: {source}"))]
     CreateDatabase {
-        source: lmdb_rs::error::Error,
+        source: lmdb_rs::error::TxnError,
         name: &'static str,
     },
     #[snafu(display("Failed to load sub-db `main`: {source}"))]
@@ -46,7 +46,7 @@ pub enum WorldDbError {
     #[snafu(display("Failed to save sub-db `dw`: {source}"))]
     SaveDw { source: DynamicWorldError },
     #[snafu(display("Failed to commit changes: {source}"))]
-    Commit { source: lmdb_rs::error::Error },
+    Commit { source: lmdb_rs::error::TxnError },
     #[snafu(display("Failed to open file: {source}"))]
     OpenFile { source: std::io::Error },
     #[snafu(display("Failed to read file: {source}"))]

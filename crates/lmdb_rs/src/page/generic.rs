@@ -1,11 +1,11 @@
 use crate::arch::DynArch;
 use crate::arch::{Arch, Arch32};
 use crate::constants::{P_BRANCH, P_LEAF, P_LEAF2, P_META, P_OVERFLOW};
-use crate::page::{PageError, PageResult as Result};
 use crate::page::branch::BranchPage;
 use crate::page::header::PageHeader;
 use crate::page::leaf::LeafPage;
 use crate::page::meta::MetaPage;
+use crate::page::{PageError, PageResult as Result};
 
 /// Generic Page wrapper
 #[derive(Debug)]

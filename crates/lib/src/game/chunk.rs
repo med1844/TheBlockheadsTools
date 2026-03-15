@@ -155,11 +155,13 @@ impl Iterator for ChunkIndexIter {
 #[derive(Debug, Snafu)]
 pub enum ChunksError {
     #[snafu(display("Failed to iterate over database: {source}"))]
-    IterateDatabase { source: lmdb_rs::error::Error },
+    IterateDatabase {
+        source: lmdb_rs::error::DatabaseError,
+    },
     #[snafu(display("Failed to put entry with key {key} in database: {source}"))]
     PutEntry {
         key: String,
-        source: lmdb_rs::error::Error,
+        source: lmdb_rs::error::DatabaseError,
     },
 }
 

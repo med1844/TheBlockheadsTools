@@ -36,7 +36,11 @@ impl<A: Arch> DatabaseBuilder<A> {
 
     /// Add a named database with its entries.
     /// entries: Iterator of (key, val). keys must be sorted.
-    pub fn add_sorted_database<'a, I>(&mut self, name: &str, entries: I) -> crate::build::BuildResult<()>
+    pub fn add_sorted_database<'a, I>(
+        &mut self,
+        name: &str,
+        entries: I,
+    ) -> crate::build::BuildResult<()>
     where
         I: Iterator<Item = (&'a [u8], &'a [u8])>,
     {

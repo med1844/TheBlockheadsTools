@@ -4,7 +4,9 @@ use snafu::Snafu;
 #[derive(Debug, Snafu)]
 pub enum PageError {
     /// Slice was shorter than the structure being parsed.
-    #[snafu(display("Unexpected EOF parsing page: expected {expected} bytes, available {available}"))]
+    #[snafu(display(
+        "Unexpected EOF parsing page: expected {expected} bytes, available {available}"
+    ))]
     UnexpectedEof { expected: usize, available: usize },
 
     /// Page flags indicate the wrong page type for this operation.

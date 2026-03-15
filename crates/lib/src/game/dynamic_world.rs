@@ -196,7 +196,9 @@ impl ChunkDynamicObjects {
 #[derive(Debug, Snafu)]
 pub enum DynamicWorldError {
     #[snafu(display("Failed to iterate over database: {source}"))]
-    IterateDatabase { source: lmdb_rs::error::Error },
+    IterateDatabase {
+        source: lmdb_rs::error::DatabaseError,
+    },
     #[snafu(display("Failed to deserialize {object_type:?}: {source}"))]
     DeserializeObject {
         object_type: DynamicObjectType,
@@ -204,13 +206,13 @@ pub enum DynamicWorldError {
     },
     #[snafu(display("Failed to get entry {key} from database: {source}"))]
     GetEntry {
-        source: lmdb_rs::error::Error,
+        source: lmdb_rs::error::DatabaseError,
         key: String,
     },
     #[snafu(display("Failed to put entry with key {key} in database: {source}"))]
     PutEntry {
         key: String,
-        source: lmdb_rs::error::Error,
+        source: lmdb_rs::error::DatabaseError,
     },
     #[snafu(display("Failed to load chest {id} in chunk {coord}: {source}"))]
     LoadChest {

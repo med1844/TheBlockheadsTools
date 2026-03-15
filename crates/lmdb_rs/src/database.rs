@@ -1,4 +1,4 @@
-use crate::codec::{CodecError, BytesDecode, BytesEncode};
+use crate::codec::{BytesDecode, BytesEncode, CodecError};
 use crate::cursor::{Cursor, CursorError};
 use crate::db_record::DbRecord;
 use crate::txn::RoTxn;
@@ -70,7 +70,11 @@ where
     V: BytesDecode<'a>,
 {
     /// Get entry from database (Read mode only).
-    pub fn get<'txn>(&self, txn: &'txn RoTxn<'a>, key: &K::EItem) -> DatabaseResult<Option<V::DItem>> {
+    pub fn get<'txn>(
+        &self,
+        txn: &'txn RoTxn<'a>,
+        key: &K::EItem,
+    ) -> DatabaseResult<Option<V::DItem>> {
         let record = match &self.core {
             DbCore::Read(r) => r,
             DbCore::Write(_) => return Err(DatabaseError::WriteOnlyHandle),

@@ -19,19 +19,23 @@ use std::{collections::HashMap, io::Write};
 pub enum MainError {
     #[snafu(display("Failed to get entry {key} from database: {source}"))]
     GetEntry {
-        source: lmdb_rs::error::Error,
+        source: lmdb_rs::error::DatabaseError,
         key: &'static str,
     },
     #[snafu(display("Key {key} doesn't exist in database"))]
     MissingKey { key: &'static str },
     #[snafu(display("Failed to iterate over database: {source}"))]
-    IterateDatabase { source: lmdb_rs::error::Error },
+    IterateDatabase {
+        source: lmdb_rs::error::DatabaseError,
+    },
     #[snafu(display("Failed to decode database entry: {source}"))]
-    DecodeEntry { source: lmdb_rs::error::Error },
+    DecodeEntry {
+        source: lmdb_rs::error::DatabaseError,
+    },
     #[snafu(display("Failed to put entry with key {key} in database: {source}"))]
     PutEntry {
         key: String,
-        source: lmdb_rs::error::Error,
+        source: lmdb_rs::error::DatabaseError,
     },
     #[snafu(display(
         "Failed to deserialize inventory of blockhead with unique id = {unique_id}: {source}"

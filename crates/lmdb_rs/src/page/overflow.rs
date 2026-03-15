@@ -1,8 +1,8 @@
 use crate::arch::Arch;
 use crate::arch::DynArch;
 use crate::constants::P_OVERFLOW;
-use crate::page::{PageError, PageResult as Result};
 use crate::page::header::PageHeader;
+use crate::page::{PageError, PageResult as Result};
 use std::borrow::Cow;
 
 /// Handler for multi-page overflow data

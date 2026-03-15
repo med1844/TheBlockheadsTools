@@ -108,7 +108,10 @@ impl<'e, W: Write> RwTxn<'e, W> {
     /// This returns a `Database` handle configured for writing under the given name.
     /// If `name` is `None`, it refers to the Main DB (usually not written to directly
     /// for data, but supported).
-    pub fn create_database<K, V>(&mut self, name: Option<&str>) -> TxnResult<Database<'static, K, V>> {
+    pub fn create_database<K, V>(
+        &mut self,
+        name: Option<&str>,
+    ) -> TxnResult<Database<'static, K, V>> {
         let db_name = name.unwrap_or("main").to_string();
         // Initialize buffer if missing
         self.buffers.entry(db_name.clone()).or_default();

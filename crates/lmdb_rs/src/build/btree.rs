@@ -1,8 +1,8 @@
 use crate::arch::Arch;
 use crate::build::overflow::OverflowBuilder;
 use crate::build::page::{BranchPageBuilder, LeafPageBuilder};
-use crate::db_record::DbRecord;
 use crate::build::{BuildError, BuildResult};
+use crate::db_record::DbRecord;
 use std::marker::PhantomData;
 
 /// Bulk B+Tree builder

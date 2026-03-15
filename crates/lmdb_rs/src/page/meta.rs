@@ -1,7 +1,7 @@
 use crate::arch::{Arch, Arch32, Arch64, DynArch};
 use crate::constants::MDB_MAGIC;
-use crate::page::{PageError, PageResult as Result};
 use crate::page::header::PageHeader;
+use crate::page::{PageError, PageResult as Result};
 use std::convert::TryInto;
 
 use crate::db_record::DbRecord;

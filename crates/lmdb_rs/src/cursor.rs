@@ -1,8 +1,8 @@
 use crate::arch::DynArch;
 use crate::db_record::DbRecord;
+use crate::page::PageError;
 use crate::page::generic::Page;
 use crate::page::header::PageHeader;
-use crate::page::PageError;
 use snafu::{ResultExt, Snafu};
 
 /// Errors that arise during B-tree cursor traversal.
@@ -97,8 +97,7 @@ impl<'a> Cursor<'a> {
         // .context() is the key snafu idiom for wrapping a lower-level error with context.
         // GetPageSnafu { pgno } is the snafu-generated builder for CursorError::GetPage.
         // It fills in `pgno` and takes the PageError as `source` automatically.
-        Page::new(&self.data[offset..offset + page_size], self.arch)
-            .context(GetPageSnafu { pgno })
+        Page::new(&self.data[offset..offset + page_size], self.arch).context(GetPageSnafu { pgno })
     }
 
     pub fn get(&mut self, key: &[u8]) -> CursorResult<Option<&'a [u8]>> {

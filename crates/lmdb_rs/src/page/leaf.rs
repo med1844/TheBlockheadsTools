@@ -1,8 +1,8 @@
 use crate::arch::DynArch;
 use crate::constants::{P_LEAF, P_LEAF2};
-use crate::page::{PageError, PageResult as Result};
 use crate::page::header::PageHeader;
 use crate::page::node::Node;
+use crate::page::{PageError, PageResult as Result};
 use std::cmp::Ordering;
 
 /// Zero-copy leaf page providing key-value iteration

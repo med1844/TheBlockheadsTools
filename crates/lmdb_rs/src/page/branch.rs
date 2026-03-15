@@ -1,8 +1,8 @@
 use crate::arch::DynArch;
 use crate::constants::P_BRANCH;
-use crate::page::{PageError, PageResult as Result};
 use crate::page::header::PageHeader;
 use crate::page::node::Node;
+use crate::page::{PageError, PageResult as Result};
 use std::cmp::Ordering;
 
 /// Zero-copy branch page (internal node of B+Tree)
