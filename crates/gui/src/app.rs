@@ -9,17 +9,18 @@ use super::{
 };
 use eframe::{egui, egui_wgpu, emath::Rect, wgpu};
 use glam::Vec3Swizzles;
+use snafu::prelude::*;
 #[cfg(not(target_arch = "wasm32"))]
 use std::path::PathBuf;
 #[cfg(target_arch = "wasm32")]
 use std::sync::mpsc::{Receiver, Sender, channel};
 use the_blockheads_tools_lib::{
-    BhError, BhResult, DynArch,
+    DynArch,
     game::{
         block::{Block, BlockView},
         chunk::Chunk,
         coord::{BlockCoord, ChunkCoord},
-        db::world_db::WorldDb,
+        db::world_db::{WorldDb, WorldDbError},
     },
 };
 
@@ -119,17 +120,27 @@ impl FileReader {
         }
     }
 
-    fn read_file(&mut self) -> Option<BhResult<Vec<u8>>> {
+    fn read_file(&mut self) -> Option<std::io::Result<Vec<u8>>> {
         match &mut self.state {
             #[cfg(not(target_arch = "wasm32"))]
-            ReaderState::Native { open_path } => open_path
-                .take()
-                .map(|path| std::fs::read(path).map_err(Into::into)),
+            ReaderState::Native { open_path } => open_path.take().map(std::fs::read),
             #[cfg(target_arch = "wasm32")]
             ReaderState::Wasm { receiver, .. } => receiver.try_recv().ok().map(Ok),
         }
     }
 }
+
+#[derive(Debug, Snafu)]
+pub enum EditorAppError {
+    #[snafu(display("Failed to open world_db: {source}"))]
+    OpenWorldDb { source: WorldDbError },
+    #[snafu(display("Failed to save world_db: {source}"))]
+    SaveWorldDb { source: WorldDbError },
+    #[snafu(display("Failed to read world_db bytes: {source}"))]
+    ReadWorldDbBytes { source: std::io::Error },
+}
+
+type Result<T> = std::result::Result<T, EditorAppError>;
 
 pub struct EditorApp {
     world_db: Option<WorldDb>,
@@ -145,8 +156,8 @@ pub struct EditorApp {
     selected_chunk: Option<Chunk>,
 
     file_reader: FileReader,
-    load_err: Option<BhError>,
-    save_err: Option<BhError>,
+    load_err: Option<EditorAppError>,
+    save_err: Option<EditorAppError>,
 
     world_viewport_rect: Rect,
 }
@@ -204,8 +215,8 @@ impl EditorApp {
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         voxel_buffer: &wgpu::Buffer,
-    ) -> BhResult<()> {
-        let mut world_db = WorldDb::from_bytes(&data)?;
+    ) -> Result<()> {
+        let mut world_db = WorldDb::from_bytes(&data).context(OpenWorldDbSnafu)?;
         let spawn_x = world_db.main.world_v2.start_portal_pos_x;
         let spawn_y = world_db.main.world_v2.start_portal_pos_y - 1;
 
@@ -255,7 +266,9 @@ impl EditorApp {
                         // TODO if world_db is empty we should return as error
                         if let Some(world_db) = self.world_db.as_ref()
                             && let Some(save_path) = rfd::FileDialog::new().pick_folder()
-                            && let Err(e) = world_db.to_path(save_path, DynArch::Arch64)
+                            && let Err(e) = world_db
+                                .to_path(save_path, DynArch::Arch64)
+                                .context(SaveWorldDbSnafu)
                         {
                             // TODO allow user select arch
                             self.save_err = Some(e);
@@ -281,7 +294,10 @@ impl EditorApp {
                         && let Some(world_db) = self.world_db.as_ref()
                     {
                         let mut out_bytes = Vec::new();
-                        match world_db.write_to(&mut out_bytes, DynArch::Arch64) {
+                        match world_db
+                            .write_to(&mut out_bytes, DynArch::Arch64)
+                            .context(SaveWorldDbSnafu)
+                        {
                             Ok(()) => {
                                 let task = rfd::AsyncFileDialog::new()
                                     .set_file_name("data.mdb")
@@ -305,14 +321,16 @@ impl EditorApp {
 
         if let Some(state) = frame.wgpu_render_state()
             && let Some(read_result) = self.file_reader.read_file()
-            && let Err(e) = read_result.and_then(|bytes| {
-                let read_renderer = state.renderer.read();
-                let r = read_renderer
-                    .callback_resources
-                    .get::<RenderResources>()
-                    .expect("should have render resources");
-                self.open_world_db(bytes, &state.device, &state.queue, r.voxel_buf())
-            })
+            && let Err(e) = read_result
+                .context(ReadWorldDbBytesSnafu)
+                .and_then(|bytes| {
+                    let read_renderer = state.renderer.read();
+                    let r = read_renderer
+                        .callback_resources
+                        .get::<RenderResources>()
+                        .expect("should have render resources");
+                    self.open_world_db(bytes, &state.device, &state.queue, r.voxel_buf())
+                })
         {
             self.load_err = Some(e);
         }

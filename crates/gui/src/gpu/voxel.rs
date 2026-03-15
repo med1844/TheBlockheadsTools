@@ -1,8 +1,8 @@
 use crate::image_type::ImageType;
-use the_blockheads_tools_lib::{
-    BhResult,
-    game::block::{Block, BlockContentType, BlockType, BlockView},
+use the_blockheads_tools_lib::game::block::{
+    Block, BlockContentType, BlockError, BlockType, BlockView,
 };
+// use snafu::prelude::*;
 
 type BlockIdType = u16;
 
@@ -308,7 +308,7 @@ impl VoxelType {
 }
 
 impl VoxelType {
-    fn fg_from_block_inner<'b>(block: BlockView<'b>) -> BhResult<Self> {
+    fn fg_from_block_inner<'b>(block: BlockView<'b>) -> Result<Self, BlockError> {
         Ok(Self(match (block.fg()?, block.content()?) {
             (BlockType::Air, _) => 2,
             (BlockType::Snow, _) => 5,
@@ -335,7 +335,7 @@ impl VoxelType {
         Self::fg_from_block_inner(block).unwrap_or(Self::UNKNOWN)
     }
 
-    fn mg_from_block_inner<'b>(block: BlockView<'b>) -> BhResult<Self> {
+    fn mg_from_block_inner<'b>(block: BlockView<'b>) -> Result<Self, BlockError> {
         Ok(Self(match block.content()? {
             BlockContentType::Nothing => 2,
             BlockContentType::AppleTreeLeaf => 92,
@@ -398,7 +398,7 @@ impl VoxelType {
         Self::mg_from_block_inner(block).unwrap_or(Self::UNKNOWN)
     }
 
-    fn bg_from_block_inner<'b>(block: BlockView<'b>) -> BhResult<Self> {
+    fn bg_from_block_inner<'b>(block: BlockView<'b>) -> Result<Self, BlockError> {
         Ok(Self(block.bg()? as u16))
     }
 
@@ -408,15 +408,11 @@ impl VoxelType {
 }
 
 pub mod voxel_util {
-
     use super::VoxelType;
     use eframe::wgpu::{self, util::DeviceExt};
-    use the_blockheads_tools_lib::{
-        BhResult,
-        game::{
-            chunk::{Chunk, ChunkView, Chunks},
-            coord::{ChunkBlockCoord, ChunkCoord},
-        },
+    use the_blockheads_tools_lib::game::{
+        chunk::{Chunk, ChunkView, Chunks},
+        coord::{ChunkBlockCoord, ChunkCoord},
     };
 
     const NUM_BLOCK_PER_CHUNK: usize = Chunk::NUM_BLOCK_PER_ROW * Chunk::NUM_BLOCK_PER_COL * 3; // 3 layers
@@ -435,10 +431,12 @@ pub mod voxel_util {
         vec![VoxelType::AIR; NUM_BLOCK_PER_CHUNK * Chunks::NUM_CHUNK_PER_COL * world_width_macro]
     }
 
-    fn fill_chunk_voxel(chunk: ChunkView<'_>, chunk_voxel: &mut [VoxelType]) -> BhResult<()> {
+    fn fill_chunk_voxel(chunk: ChunkView<'_>, chunk_voxel: &mut [VoxelType]) {
         for y in 0..Chunk::NUM_BLOCK_PER_COL {
             for x in 0..Chunk::NUM_BLOCK_PER_ROW {
-                let block = chunk.block_at(ChunkBlockCoord::new(x as u8, y as u8)?);
+                let block = chunk.block_at(
+                    ChunkBlockCoord::new(x as u8, y as u8).expect("x and y must be within limit"),
+                );
                 let fg_type = VoxelType::fg_from_block(block);
                 let mg_type = if fg_type == VoxelType::AIR {
                     VoxelType::mg_from_block(block)
@@ -455,7 +453,6 @@ pub mod voxel_util {
                 chunk_voxel[index + 2] = fg_type;
             }
         }
-        Ok(())
     }
 
     // On wasm32, malloc is extremely slow (20-30ms PER call) if we do too much.
@@ -473,7 +470,7 @@ pub mod voxel_util {
                 if let Some(chunk) = chunk
                     && let Ok(chunk_slice) = chunk.decompress_view(&mut decompress_output)
                 {
-                    let _ = fill_chunk_voxel(chunk_slice, chunk_voxel);
+                    fill_chunk_voxel(chunk_slice, chunk_voxel);
                 }
             });
         world_voxel
@@ -495,9 +492,9 @@ pub mod voxel_util {
         voxel_buffer: &wgpu::Buffer,
         coord: I,
         chunk: &Chunk,
-    ) -> BhResult<()> {
+    ) {
         let mut blocks = [VoxelType(0); NUM_BLOCK_PER_CHUNK];
-        fill_chunk_voxel(chunk.view(), &mut blocks)?;
+        fill_chunk_voxel(chunk.view(), &mut blocks);
 
         let chunk_coord: ChunkCoord = coord.into();
         let offset = (chunk_coord.x() * 32 + chunk_coord.y() as u32) * NUM_BLOCK_PER_CHUNK as u32;
@@ -507,6 +504,5 @@ pub mod voxel_util {
             offset as u64 * size_of::<u16>() as u64,
             bytemuck::cast_slice(&blocks),
         );
-        Ok(())
     }
 }

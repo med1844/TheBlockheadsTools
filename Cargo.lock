@@ -3226,6 +3226,7 @@ dependencies = [
  "log",
  "rayon",
  "rfd",
+ "snafu",
  "the-blockheads-tools-lib",
  "wasm-bindgen-futures",
  "wgpu",

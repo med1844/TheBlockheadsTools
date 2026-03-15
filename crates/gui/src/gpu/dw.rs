@@ -96,6 +96,10 @@ impl DwChunkBuf {
         });
 
         let num_instances = icons.len() as u32;
+        if num_instances == 0 {
+            return None;
+        }
+
         Some(Self {
             instance_buf,
             num_instances,
