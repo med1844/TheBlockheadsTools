@@ -8,6 +8,7 @@ use super::{
             Bed, Boat, Column, Door, ElevatorMotor, ElevatorShaft, Ladder, Rail, Sign, Stairs,
             TradePortal, TradingPost, Window, Wire,
         },
+        dropped_item::DroppedItem,
         plant::{
             CarrotPlant, ChilliPlant, CornPlant, FlaxPlant, KelpPlant, SunflowerPlant, TomatoPlant,
             TulipPlant, VinePlant, WheatPlant,
@@ -46,20 +47,20 @@ impl<T> IsEmpty for DynamicObjectList<T> {
 }
 
 trait ToXmlPlist {
-    fn to_plist(&self) -> Vec<u8>;
+    fn to_plist(&self) -> std::result::Result<Vec<u8>, plist::Error>;
 }
 
 impl ToXmlPlist for Vec<u8> {
-    fn to_plist(&self) -> Vec<u8> {
-        self.clone()
+    fn to_plist(&self) -> std::result::Result<Vec<u8>, plist::Error> {
+        Ok(self.clone())
     }
 }
 
 impl<T: Serialize> ToXmlPlist for DynamicObjectList<T> {
-    fn to_plist(&self) -> Vec<u8> {
+    fn to_plist(&self) -> std::result::Result<Vec<u8>, plist::Error> {
         let mut serialized = Vec::new();
         plist::to_writer_xml(&mut serialized, self).unwrap(); // TODO must be safe
-        serialized
+        Ok(serialized)
     }
 }
 
@@ -79,7 +80,7 @@ pub struct ChunkDynamicObjects {
     pub sunflower_plant: DynamicObjectList<SunflowerPlant>,
     pub corn_plant: DynamicObjectList<CornPlant>,
     pub dodo: DynamicObjectList<Dodo>,
-    pub dropped_item: Vec<u8>,
+    pub dropped_item: DynamicObjectList<DroppedItem>,
     pub fire: Vec<u8>,
     pub torch: Vec<u8>,
     pub glow_block: Vec<u8>,
@@ -143,7 +144,7 @@ impl ChunkDynamicObjects {
             + self.sunflower_plant.num_obj()
             + self.corn_plant.num_obj()
             + self.dodo.num_obj()
-            // + self.item.num_obj()
+            + self.dropped_item.num_obj()
             // + self.fire.num_obj()
             // + self.torch.num_obj()
             // + self.glow_block.num_obj()
@@ -201,6 +202,11 @@ pub enum DynamicWorldError {
     },
     #[snafu(display("Failed to deserialize {object_type:?}: {source}"))]
     DeserializeObject {
+        object_type: DynamicObjectType,
+        source: plist::Error,
+    },
+    #[snafu(display("Failed to serialize {object_type:?}: {source}"))]
+    SerializeObject {
         object_type: DynamicObjectType,
         source: plist::Error,
     },
@@ -297,7 +303,7 @@ impl DynamicWorld {
                 DynamicObjectType::SunflowerPlant => entry.sunflower_plant = load(v, obj_type)?,
                 DynamicObjectType::CornPlant => entry.corn_plant = load(v, obj_type)?,
                 DynamicObjectType::Dodo => entry.dodo = load(v, obj_type)?,
-                DynamicObjectType::DroppedItem => entry.dropped_item = v.to_vec(),
+                DynamicObjectType::DroppedItem => entry.dropped_item = load(v, obj_type)?,
                 DynamicObjectType::Fire => entry.fire = v.to_vec(),
                 DynamicObjectType::Torch => entry.torch = v.to_vec(),
                 DynamicObjectType::GlowBlock => entry.glow_block = v.to_vec(),
@@ -376,8 +382,14 @@ impl DynamicWorld {
         ) -> Result<()> {
             let key = format!("{}/{}", coord_str, obj_type as u16);
             if !value.is_empty() {
-                db.put(wtxn, &key, &value.to_plist())
-                    .context(PutEntrySnafu { key })?;
+                db.put(
+                    wtxn,
+                    &key,
+                    &value.to_plist().context(SerializeObjectSnafu {
+                        object_type: obj_type,
+                    })?,
+                )
+                .context(PutEntrySnafu { key })?;
             }
             Ok(())
         }
@@ -537,7 +549,7 @@ mod tests {
         monster.sunflower_plant = read_test_xml(DynamicObjectType::SunflowerPlant);
         monster.corn_plant = read_test_xml(DynamicObjectType::CornPlant);
         monster.dodo = read_test_xml(DynamicObjectType::Dodo);
-        monster.dropped_item = vec![14, 0xAA, 0xBB];
+        monster.dropped_item = read_test_xml(DynamicObjectType::DroppedItem);
         monster.fire = vec![16, 0xAA, 0xBB];
         monster.torch = vec![17, 0xAA, 0xBB];
         monster.glow_block = vec![18, 0xAA, 0xBB];

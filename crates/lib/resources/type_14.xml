@@ -6,9 +6,85 @@
 	<array>
 		<dict>
 			<key>bounceTimer</key>
-			<real>11.133329391479492</real>
+			<real>6.4333105087280273</real>
 			<key>creationTime</key>
-			<real>4913.8919556289911</real>
+			<real>5161.3229346349835</real>
+			<key>dataA</key>
+			<integer>0</integer>
+			<key>dataB</key>
+			<integer>0</integer>
+			<key>dynamicObjectSaveDict</key>
+			<dict>
+				<key>chestType</key>
+				<integer>2</integer>
+				<key>flipped</key>
+				<false/>
+				<key>floatPos</key>
+				<array>
+					<real>11191.5</real>
+					<real>668</real>
+				</array>
+				<key>interactionObjectType</key>
+				<integer>2</integer>
+				<key>isInUse</key>
+				<false/>
+				<key>paintColor</key>
+				<integer>0</integer>
+				<key>pos_x</key>
+				<integer>11191</integer>
+				<key>pos_y</key>
+				<integer>668</integer>
+				<key>saveItemSlots</key>
+				<array>
+					<array>
+						<data>
+						8wAAAAAAAAA=
+						</data>
+					</array>
+					<array>
+						<data>
+						+QAAAAAAAAA=
+						</data>
+					</array>
+					<array>
+						<data>
+						LgQAAAAAAAA=
+						</data>
+					</array>
+					<array/>
+				</array>
+				<key>saveTime</key>
+				<real>5118.8562386110425</real>
+				<key>uniqueID</key>
+				<integer>8699</integer>
+			</dict>
+			<key>fallSpeed</key>
+			<real>0.0</real>
+			<key>floatPos</key>
+			<array>
+				<real>11196.607421875</real>
+				<real>648.25</real>
+			</array>
+			<key>floatPos[VX]</key>
+			<real>11196.607421875</real>
+			<key>floatPos[VY]</key>
+			<real>648.25</real>
+			<key>hovers</key>
+			<false/>
+			<key>itemType</key>
+			<integer>161</integer>
+			<key>pos_x</key>
+			<integer>11196</integer>
+			<key>pos_y</key>
+			<integer>648</integer>
+			<key>uniqueID</key>
+			<integer>8735</integer>
+		</dict>
+		<dict>
+			<key>bounceTimer</key>
+			<real>4.0332736968994141</real>
+			<key>creationTime</key>
+			<real>5163.7229106500745</real>
 			<key>dataA</key>
 			<integer>0</integer>
 			<key>dataB</key>
@@ -17,332 +93,114 @@
 			<real>0.0</real>
 			<key>floatPos</key>
 			<array>
-				<real>11181.7314453125</real>
-				<real>641.25</real>
+				<real>11195.3173828125</real>
+				<real>648.25</real>
 			</array>
 			<key>floatPos[VX]</key>
-			<real>11181.7314453125</real>
+			<real>11195.3173828125</real>
 			<key>floatPos[VY]</key>
-			<real>641.25</real>
+			<real>648.25</real>
 			<key>hovers</key>
 			<false/>
 			<key>itemType</key>
 			<integer>12</integer>
 			<key>pos_x</key>
-			<integer>11181</integer>
+			<integer>11195</integer>
 			<key>pos_y</key>
-			<integer>641</integer>
+			<integer>648</integer>
 			<key>subItems</key>
 			<array>
-				<array>
-					<data>
-					BAAAAAAAAAw=
-					</data>
-					<data>
-					BAAAAAAAAAA=
-					</data>
-					<data>
-					BAAAAAAAAAA=
-					</data>
-					<data>
-					BAAAAAAAAAA=
-					</data>
-					<data>
-					BAAAAAAAAAA=
-					</data>
-				</array>
-				<array>
-					<data>
-					NgDFAMYAAAw=
-					</data>
-					<data>
-					NgDAAKIAAAA=
-					</data>
-				</array>
 				<array/>
 				<array/>
+				<array/>
+				<array>
+					<data>
+					FgEAAAAAAAw=
+					</data>
+				</array>
 			</array>
 			<key>uniqueID</key>
-			<integer>4837</integer>
+			<integer>8736</integer>
 		</dict>
 		<dict>
 			<key>bounceTimer</key>
-			<real>6.8333549499511719</real>
+			<real>1.7999329566955566</real>
 			<key>creationTime</key>
-			<real>4918.192005649209</real>
+			<real>5165.9562406614423</real>
 			<key>dataA</key>
 			<integer>0</integer>
 			<key>dataB</key>
 			<integer>0</integer>
+			<key>dynamicObjectSaveDict</key>
+			<dict>
+				<key>chestType</key>
+				<integer>0</integer>
+				<key>flipped</key>
+				<false/>
+				<key>floatPos</key>
+				<array>
+					<real>11192.5</real>
+					<real>670</real>
+				</array>
+				<key>interactionObjectType</key>
+				<integer>2</integer>
+				<key>isInUse</key>
+				<false/>
+				<key>paintColor</key>
+				<integer>0</integer>
+				<key>pos_x</key>
+				<integer>11192</integer>
+				<key>pos_y</key>
+				<integer>670</integer>
+				<key>saveItemSlots</key>
+				<array>
+					<array/>
+					<array/>
+					<array/>
+					<array/>
+					<array/>
+					<array/>
+					<array>
+						<data>
+						GwDkAOMAAAA=
+						</data>
+					</array>
+					<array/>
+					<array/>
+					<array/>
+					<array/>
+					<array/>
+					<array/>
+					<array/>
+					<array/>
+					<array/>
+				</array>
+				<key>saveTime</key>
+				<real>5148.4229157045484</real>
+				<key>uniqueID</key>
+				<integer>5951</integer>
+			</dict>
 			<key>fallSpeed</key>
 			<real>0.0</real>
 			<key>floatPos</key>
 			<array>
-				<real>11190.6201171875</real>
-				<real>641.25</real>
+				<real>11193.4365234375</real>
+				<real>648.25</real>
 			</array>
 			<key>floatPos[VX]</key>
-			<real>11190.6201171875</real>
+			<real>11193.4365234375</real>
 			<key>floatPos[VY]</key>
-			<real>641.25</real>
+			<real>648.25</real>
 			<key>hovers</key>
 			<false/>
 			<key>itemType</key>
-			<integer>1049</integer>
-			<key>pos_x</key>
-			<integer>11190</integer>
-			<key>pos_y</key>
-			<integer>641</integer>
-			<key>uniqueID</key>
-			<integer>4838</integer>
-		</dict>
-		<dict>
-			<key>bounceTimer</key>
-			<real>6.8333549499511719</real>
-			<key>creationTime</key>
-			<real>4918.192005649209</real>
-			<key>dataA</key>
-			<integer>0</integer>
-			<key>dataB</key>
-			<integer>0</integer>
-			<key>fallSpeed</key>
-			<real>0.0</real>
-			<key>floatPos</key>
-			<array>
-				<real>11190.5732421875</real>
-				<real>641.25</real>
-			</array>
-			<key>floatPos[VX]</key>
-			<real>11190.5732421875</real>
-			<key>floatPos[VY]</key>
-			<real>641.25</real>
-			<key>hovers</key>
-			<false/>
-			<key>itemType</key>
-			<integer>1049</integer>
-			<key>pos_x</key>
-			<integer>11190</integer>
-			<key>pos_y</key>
-			<integer>641</integer>
-			<key>uniqueID</key>
-			<integer>4839</integer>
-		</dict>
-		<dict>
-			<key>bounceTimer</key>
-			<real>6.8333549499511719</real>
-			<key>creationTime</key>
-			<real>4918.192005649209</real>
-			<key>dataA</key>
-			<integer>0</integer>
-			<key>dataB</key>
-			<integer>0</integer>
-			<key>fallSpeed</key>
-			<real>0.0</real>
-			<key>floatPos</key>
-			<array>
-				<real>11190.396484375</real>
-				<real>641.25</real>
-			</array>
-			<key>floatPos[VX]</key>
-			<real>11190.396484375</real>
-			<key>floatPos[VY]</key>
-			<real>641.25</real>
-			<key>hovers</key>
-			<false/>
-			<key>itemType</key>
-			<integer>1049</integer>
-			<key>pos_x</key>
-			<integer>11190</integer>
-			<key>pos_y</key>
-			<integer>641</integer>
-			<key>uniqueID</key>
-			<integer>4840</integer>
-		</dict>
-		<dict>
-			<key>bounceTimer</key>
-			<real>6.8333549499511719</real>
-			<key>creationTime</key>
-			<real>4918.192005649209</real>
-			<key>dataA</key>
-			<integer>0</integer>
-			<key>dataB</key>
-			<integer>0</integer>
-			<key>fallSpeed</key>
-			<real>0.0</real>
-			<key>floatPos</key>
-			<array>
-				<real>11190.3720703125</real>
-				<real>641.25</real>
-			</array>
-			<key>floatPos[VX]</key>
-			<real>11190.3720703125</real>
-			<key>floatPos[VY]</key>
-			<real>641.25</real>
-			<key>hovers</key>
-			<false/>
-			<key>itemType</key>
-			<integer>1049</integer>
-			<key>pos_x</key>
-			<integer>11190</integer>
-			<key>pos_y</key>
-			<integer>641</integer>
-			<key>uniqueID</key>
-			<integer>4841</integer>
-		</dict>
-		<dict>
-			<key>bounceTimer</key>
-			<real>6.8333549499511719</real>
-			<key>creationTime</key>
-			<real>4918.192005649209</real>
-			<key>dataA</key>
-			<integer>0</integer>
-			<key>dataB</key>
-			<integer>0</integer>
-			<key>fallSpeed</key>
-			<real>0.0</real>
-			<key>floatPos</key>
-			<array>
-				<real>11190.6953125</real>
-				<real>641.25</real>
-			</array>
-			<key>floatPos[VX]</key>
-			<real>11190.6953125</real>
-			<key>floatPos[VY]</key>
-			<real>641.25</real>
-			<key>hovers</key>
-			<false/>
-			<key>itemType</key>
-			<integer>1049</integer>
-			<key>pos_x</key>
-			<integer>11190</integer>
-			<key>pos_y</key>
-			<integer>641</integer>
-			<key>uniqueID</key>
-			<integer>4842</integer>
-		</dict>
-		<dict>
-			<key>bounceTimer</key>
-			<real>6.8333549499511719</real>
-			<key>creationTime</key>
-			<real>4918.192005649209</real>
-			<key>dataA</key>
-			<integer>0</integer>
-			<key>dataB</key>
-			<integer>0</integer>
-			<key>fallSpeed</key>
-			<real>0.0</real>
-			<key>floatPos</key>
-			<array>
-				<real>11190.3232421875</real>
-				<real>641.25</real>
-			</array>
-			<key>floatPos[VX]</key>
-			<real>11190.3232421875</real>
-			<key>floatPos[VY]</key>
-			<real>641.25</real>
-			<key>hovers</key>
-			<false/>
-			<key>itemType</key>
-			<integer>1049</integer>
-			<key>pos_x</key>
-			<integer>11190</integer>
-			<key>pos_y</key>
-			<integer>641</integer>
-			<key>uniqueID</key>
-			<integer>4843</integer>
-		</dict>
-		<dict>
-			<key>bounceTimer</key>
-			<real>6.8333549499511719</real>
-			<key>creationTime</key>
-			<real>4918.192005649209</real>
-			<key>dataA</key>
-			<integer>0</integer>
-			<key>dataB</key>
-			<integer>0</integer>
-			<key>fallSpeed</key>
-			<real>0.0</real>
-			<key>floatPos</key>
-			<array>
-				<real>11190.4599609375</real>
-				<real>641.25</real>
-			</array>
-			<key>floatPos[VX]</key>
-			<real>11190.4599609375</real>
-			<key>floatPos[VY]</key>
-			<real>641.25</real>
-			<key>hovers</key>
-			<false/>
-			<key>itemType</key>
-			<integer>1049</integer>
-			<key>pos_x</key>
-			<integer>11190</integer>
-			<key>pos_y</key>
-			<integer>641</integer>
-			<key>uniqueID</key>
-			<integer>4844</integer>
-		</dict>
-		<dict>
-			<key>bounceTimer</key>
-			<real>6.8333549499511719</real>
-			<key>creationTime</key>
-			<real>4918.192005649209</real>
-			<key>dataA</key>
-			<integer>0</integer>
-			<key>dataB</key>
-			<integer>0</integer>
-			<key>fallSpeed</key>
-			<real>0.0</real>
-			<key>floatPos</key>
-			<array>
-				<real>11190.662109375</real>
-				<real>641.25</real>
-			</array>
-			<key>floatPos[VX]</key>
-			<real>11190.662109375</real>
-			<key>floatPos[VY]</key>
-			<real>641.25</real>
-			<key>hovers</key>
-			<false/>
-			<key>itemType</key>
-			<integer>1049</integer>
-			<key>pos_x</key>
-			<integer>11190</integer>
-			<key>pos_y</key>
-			<integer>641</integer>
-			<key>uniqueID</key>
-			<integer>4845</integer>
-		</dict>
-		<dict>
-			<key>bounceTimer</key>
-			<real>1.96669602394104</real>
-			<key>creationTime</key>
-			<real>4923.0585396438837</real>
-			<key>dataA</key>
-			<integer>258</integer>
-			<key>dataB</key>
-			<integer>0</integer>
-			<key>fallSpeed</key>
-			<real>0.0</real>
-			<key>floatPos</key>
-			<array>
-				<real>11193.7353515625</real>
-				<real>641.25</real>
-			</array>
-			<key>floatPos[VX]</key>
-			<real>11193.7353515625</real>
-			<key>floatPos[VY]</key>
-			<real>641.25</real>
-			<key>hovers</key>
-			<false/>
-			<key>itemType</key>
-			<integer>285</integer>
+			<integer>1043</integer>
 			<key>pos_x</key>
 			<integer>11193</integer>
 			<key>pos_y</key>
-			<integer>641</integer>
+			<integer>648</integer>
 			<key>uniqueID</key>
-			<integer>4910</integer>
+			<integer>8769</integer>
 		</dict>
 	</array>
 </dict>

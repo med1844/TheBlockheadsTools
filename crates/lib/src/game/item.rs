@@ -1,5 +1,5 @@
 use super::dynamic_object::{
-    chest::{Chest, ChestItem},
+    chest::{Chest, ChestError, ChestItem},
     workbench::Workbench,
 };
 use crate::util::gzip::{compress_into, decompress};
@@ -25,6 +25,34 @@ pub enum ItemError {
         id: u8,
         source: num_enum::TryFromPrimitiveError<PigmentColor>,
     },
+    #[snafu(display("Failed to deserialize extra: {source}"))]
+    DeserializeExtra { source: plist::Error },
+    #[snafu(display("Failed to serialize extra: {source}"))]
+    SerializeExtra { source: plist::Error },
+    #[snafu(display("Failed to load chest: {source}"))]
+    LoadChest { source: ChestError },
+    #[snafu(display("Failed to deserialize basket slots: {source}"))]
+    DeserializeBasket { source: plist::Error },
+    #[snafu(display("Failed to serialize basket slots: {source}"))]
+    SerializeBasket { source: plist::Error },
+    #[snafu(display("Failed to deserialize chest data in item: {source}"))]
+    DeserializeChestItem { source: plist::Error },
+    #[snafu(display("Failed to serialize chest data in item: {source}"))]
+    SerializeChestItem { source: plist::Error },
+    #[snafu(display("Failed to deserialize workbench: {source}"))]
+    DeserializeWorkbench { source: plist::Error },
+    #[snafu(display("Failed to serialize workbench: {source}"))]
+    SerializeWorkbench { source: plist::Error },
+    #[snafu(display("No known key in extra: {dict:?}"))]
+    NoKnownKeyInExtra { dict: plist::Dictionary },
+    #[snafu(display(
+        "Item data too short: expected at least 8 bytes, got {got} bytes, data: {data:?}"
+    ))]
+    ItemDataTooShort { got: usize, data: Vec<u8> },
+    #[snafu(display("Failed to decompress item extra as gzip: {source}"))]
+    DecompressExtraBytes { source: std::io::Error },
+    #[snafu(display("Failed to compress item extra as gzip: {source}"))]
+    CompressExtraBytes { source: std::io::Error },
 }
 
 type Result<T> = std::result::Result<T, ItemError>;
@@ -480,6 +508,56 @@ pub enum Extra {
 
 impl Extra {
     pub const NUM_SLOT_BASKET: usize = 4;
+
+    pub(crate) fn from_item_dict(dict: plist::Dictionary) -> Result<Self> {
+        if let Some(value) = dict.get("s") {
+            Ok(Self::Basket(
+                plist::from_value(value).context(DeserializeBasketSnafu)?,
+            ))
+        } else if let Some(value @ plist::Value::Dictionary(d)) = dict.get("d")
+            && d.contains_key("chestType")
+        {
+            let chest_item: ChestItem =
+                plist::from_value(value).context(DeserializeChestItemSnafu)?;
+            Ok(Self::Chest(Box::new(
+                Chest::from_chest_item(chest_item).context(LoadChestSnafu)?,
+            )))
+        } else if let Some(value @ plist::Value::Dictionary(d)) = dict.get("d")
+            && d.contains_key("workbenchType")
+        {
+            Ok(Self::Workbench(
+                plist::from_value(value).context(DeserializeWorkbenchSnafu)?,
+            ))
+        } else {
+            NoKnownKeyInExtraSnafu { dict }.fail()
+        }
+    }
+
+    pub(crate) fn to_item_dict(&self) -> Result<plist::Dictionary> {
+        let mut dict = plist::Dictionary::new();
+        match self {
+            Self::Basket(items) => {
+                dict.insert(
+                    "s".to_string(),
+                    plist::to_value(items).context(SerializeBasketSnafu)?,
+                );
+            }
+            Self::Chest(chest) => {
+                let chest_item = chest.to_chest_item();
+                dict.insert(
+                    "d".to_string(),
+                    plist::to_value(&chest_item).context(SerializeChestItemSnafu)?,
+                );
+            }
+            Self::Workbench(workbench) => {
+                dict.insert(
+                    "d".to_string(),
+                    plist::to_value(workbench).context(SerializeWorkbenchSnafu)?,
+                );
+            }
+        }
+        Ok(dict)
+    }
 }
 
 impl<'de> Deserialize<'de> for Extra {
@@ -488,29 +566,8 @@ impl<'de> Deserialize<'de> for Extra {
         D: serde::Deserializer<'de>,
     {
         let dict = plist::Dictionary::deserialize(deserializer)?;
-        if let Some(value) = dict.get("s") {
-            Ok(Self::Basket(plist::from_value(value).map_err(|e| {
-                D::Error::custom(format!("plist error: {}", e))
-            })?))
-        } else if let Some(value @ plist::Value::Dictionary(d)) = dict.get("d")
-            && d.contains_key("chestType")
-        {
-            let chest_item: ChestItem = plist::from_value(value)
-                .map_err(|e| D::Error::custom(format!("plist error: {}", e)))?;
-            Ok(Self::Chest(Box::new(
-                Chest::from_chest_item(chest_item)
-                    .map_err(|e| D::Error::custom(format!("can't parse chest: {}", e)))?,
-            )))
-        } else if let Some(value @ plist::Value::Dictionary(d)) = dict.get("d")
-            && d.contains_key("workbenchType")
-        {
-            Ok(Self::Workbench(plist::from_value(value).map_err(|e| {
-                D::Error::custom(format!("plist error: {}", e))
-            })?))
-        } else {
-            dbg!(dict);
-            Err(D::Error::custom("No known key in extra"))
-        }
+        Self::from_item_dict(dict)
+            .map_err(|e| D::Error::custom(format!("failed to load item extra: {}", e)))
     }
 }
 
@@ -519,28 +576,9 @@ impl Serialize for Extra {
     where
         S: serde::Serializer,
     {
-        let mut dict = plist::Dictionary::new();
-        match self {
-            Self::Basket(items) => {
-                dict.insert(
-                    "s".to_string(),
-                    plist::to_value(items).map_err(|e| S::Error::custom(e.to_string()))?,
-                );
-            }
-            Self::Chest(chest) => {
-                let chest_item = chest.to_chest_item();
-                dict.insert(
-                    "d".to_string(),
-                    plist::to_value(&chest_item).map_err(|e| S::Error::custom(e.to_string()))?,
-                );
-            }
-            Self::Workbench(workbench) => {
-                dict.insert(
-                    "d".to_string(),
-                    plist::to_value(workbench).map_err(|e| S::Error::custom(e.to_string()))?,
-                );
-            }
-        }
+        let dict = self
+            .to_item_dict()
+            .map_err(|e| S::Error::custom(format!("failed to save item to dict: {}", e)))?;
         dict.serialize(serializer)
     }
 }
@@ -613,6 +651,31 @@ impl Display for Extra {
     }
 }
 
+/// Item as stored in dynamic world XML (DroppedItem, etc.)
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ItemXml {
+    pub item_type: u16,
+    pub data_a: u16,
+    pub data_b: u16,
+
+    #[serde(
+        default,
+        deserialize_with = "crate::util::serde::deserialize_some",
+        serialize_with = "crate::util::serde::serialize_some",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub sub_items: Option<Vec<Slot>>,
+
+    #[serde(
+        default,
+        deserialize_with = "crate::util::serde::deserialize_some",
+        serialize_with = "crate::util::serde::serialize_some",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub dynamic_object_save_dict: Option<plist::Value>,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Item {
     pub type_id: u16,
@@ -623,17 +686,15 @@ pub struct Item {
     pub extra: Option<Extra>,
 }
 
-impl<'de> Deserialize<'de> for Item {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let data: Vec<u8> = plist::Data::deserialize(deserializer)?.into();
+impl Item {
+    fn try_from_bytes(data: Vec<u8>) -> Result<Self> {
         let bytes = data.as_slice();
         if bytes.len() < 8 {
-            return Err(D::Error::custom(
-                "Item data too short: expected at least 8 bytes",
-            ));
+            return ItemDataTooShortSnafu {
+                got: bytes.len(),
+                data,
+            }
+            .fail();
         }
         // SAFETY: from_le_bytes expects [u8; 2], we provide slice exactly that long
         let type_id = u16::from_le_bytes(bytes[0..2].try_into().unwrap());
@@ -649,15 +710,9 @@ impl<'de> Deserialize<'de> for Item {
         let extra = if compressed_extra.is_empty() {
             None
         } else {
-            let extra_bytes = decompress(&compressed_extra).map_err(|e| {
-                D::Error::custom(format!("Failed to decompress item extra as gzip: {:?}", e))
-            })?;
-            Some(
-                plist::from_reader_xml(extra_bytes.as_slice())
-                    .map_err(|e| D::Error::custom(format!("plist error: {}", e)))?,
-            )
+            let extra_bytes = decompress(&compressed_extra).context(DecompressExtraBytesSnafu)?;
+            Some(plist::from_reader_xml(extra_bytes.as_slice()).context(DeserializeExtraSnafu)?)
         };
-
         Ok(Self {
             type_id,
             data_a,
@@ -667,13 +722,8 @@ impl<'de> Deserialize<'de> for Item {
             extra,
         })
     }
-}
 
-impl Serialize for Item {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
+    fn to_bytes(&self) -> Result<Vec<u8>> {
         let mut buffer = Vec::with_capacity(8);
 
         buffer.extend_from_slice(&self.type_id.to_le_bytes());
@@ -683,13 +733,32 @@ impl Serialize for Item {
         buffer.push(self.padding);
         if let Some(extra) = self.extra.as_ref() {
             let mut serialized_extra = Vec::new();
-            plist::to_writer_xml(&mut serialized_extra, extra).map_err(|e| {
-                S::Error::custom(format!("Failed to serialize item extra data: {}", e))
-            })?;
-            compress_into(&serialized_extra, &mut buffer).map_err(|e| {
-                S::Error::custom(format!("Failed to compress item extra data: {}", e))
-            })?;
+            plist::to_writer_xml(&mut serialized_extra, extra).context(SerializeExtraSnafu)?;
+            compress_into(&serialized_extra, &mut buffer).context(CompressExtraBytesSnafu)?;
         }
+        Ok(buffer)
+    }
+}
+
+impl<'de> Deserialize<'de> for Item {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let data = plist::Data::deserialize(deserializer)?.into();
+        Item::try_from_bytes(data)
+            .map_err(|e| D::Error::custom(format!("failed to load item from bytes: {}", e)))
+    }
+}
+
+impl Serialize for Item {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let buffer = self
+            .to_bytes()
+            .map_err(|e| S::Error::custom(format!("failed to save item to bytes: {}", e)))?;
         // Wrap in plist::Data so it renders as <data> in the XML
         plist::Data::new(buffer).serialize(serializer)
     }
@@ -872,6 +941,71 @@ impl Item {
             selected_sub_item_index: 0,
             padding: 0,
             extra: None,
+        }
+    }
+
+    /// Build Item from its XML representation (defaults selectedSubItemIndex/padding to 0)
+    pub(crate) fn from_xml(xml: ItemXml) -> Result<Self> {
+        let extra = if let Some(sub_items) = xml.sub_items {
+            let mut arr = core::array::from_fn(|_| Slot(Vec::new()));
+            for (i, slot) in sub_items
+                .into_iter()
+                .take(Extra::NUM_SLOT_BASKET)
+                .enumerate()
+            {
+                arr[i] = slot;
+            }
+            Some(Extra::Basket(arr))
+        } else if let Some(value) = xml.dynamic_object_save_dict
+            && let plist::Value::Dictionary(dict) = value
+        {
+            if dict.contains_key("chestType") {
+                let dict = plist::Value::Dictionary(dict);
+                let chest_item: ChestItem =
+                    plist::from_value(&dict).context(DeserializeExtraSnafu)?;
+                Some(Extra::Chest(Box::new(
+                    Chest::from_chest_item(chest_item).context(LoadChestSnafu)?,
+                )))
+            } else if dict.contains_key("workbenchType") {
+                let dict = plist::Value::Dictionary(dict);
+                let workbench: Workbench =
+                    plist::from_value(&dict).context(DeserializeExtraSnafu)?;
+                Some(Extra::Workbench(Box::new(workbench)))
+            } else {
+                return NoKnownKeyInExtraSnafu { dict }.fail();
+            }
+        } else {
+            None
+        };
+
+        Ok(Self {
+            type_id: xml.item_type,
+            data_a: xml.data_a,
+            data_b: xml.data_b,
+            selected_sub_item_index: 0,
+            padding: 0,
+            extra,
+        })
+    }
+
+    /// Convert Item to XML representation (drops selectedSubItemIndex/padding)
+    pub(crate) fn to_xml(&self) -> ItemXml {
+        let (sub_items, dynamic_object_save_dict) = match &self.extra {
+            Some(Extra::Basket(items)) => (Some(items.to_vec()), None),
+            Some(Extra::Chest(chest)) => {
+                let chest_item = chest.to_chest_item();
+                (None, Some(plist::to_value(&chest_item).unwrap()))
+            }
+            Some(Extra::Workbench(workbench)) => (None, Some(plist::to_value(workbench).unwrap())),
+            None => (None, None),
+        };
+
+        ItemXml {
+            item_type: self.type_id,
+            data_a: self.data_a,
+            data_b: self.data_b,
+            sub_items,
+            dynamic_object_save_dict,
         }
     }
 }

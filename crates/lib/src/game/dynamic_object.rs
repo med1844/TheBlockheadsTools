@@ -295,6 +295,7 @@ pub mod animal;
 pub mod blockhead;
 pub mod chest;
 pub mod craft;
+pub mod dropped_item;
 pub mod plant;
 pub mod train;
 pub mod tree;
@@ -309,6 +310,7 @@ mod tests {
             Bed, Boat, Column, Door, ElevatorMotor, ElevatorShaft, Ladder, Rail, Sign, Stairs,
             TradePortal, TradingPost, Window, Wire,
         },
+        dropped_item::DroppedItem,
         plant::{
             CarrotPlant, ChilliPlant, CornPlant, FlaxPlant, KelpPlant, SunflowerPlant, TomatoPlant,
             TulipPlant, VinePlant, WheatPlant,
@@ -364,7 +366,7 @@ mod tests {
         check_round_trip::<SunflowerPlant>(DynamicObjectType::SunflowerPlant).unwrap();
         check_round_trip::<CornPlant>(DynamicObjectType::CornPlant).unwrap();
         check_round_trip::<Dodo>(DynamicObjectType::Dodo).unwrap();
-        // check_round_trip::<DroppedItem>(DynamicObjectType::DroppedItem).unwrap();
+        check_round_trip::<DroppedItem>(DynamicObjectType::DroppedItem).unwrap();
         // check_round_trip::<Fire>(DynamicObjectType::Fire).unwrap();
         // check_round_trip::<Torch>(DynamicObjectType::Torch).unwrap();
         // check_round_trip::<GlowBlock>(DynamicObjectType::GlowBlock).unwrap();
