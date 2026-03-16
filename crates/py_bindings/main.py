@@ -1,7 +1,7 @@
 from the_blockheads_tools_py import (
     WorldDb,
     Slot,
-    BasketExtra,
+    BasketSlots,
     Item,
     ItemType,
     StandardChest,
@@ -28,7 +28,7 @@ slots = [
         [
             Item(
                 ItemType.Basket,
-                BasketExtra(
+                BasketSlots(
                     [
                         Slot(
                             [
@@ -123,7 +123,7 @@ slots = [
         [
             Item(
                 ItemType.Basket,
-                BasketExtra(
+                BasketSlots(
                     [
                         Slot([Item(ItemType.TitaniumPickaxe)]),
                         Slot([Item(ItemType.IronAxe)]),
@@ -138,7 +138,7 @@ slots = [
         [
             Item(
                 ItemType.Basket,
-                BasketExtra(
+                BasketSlots(
                     [
                         Slot([Item(ItemType.SteelLantern)] * 99),
                         Slot([Item(ItemType.IronTrapdoor)] * 99),
@@ -153,7 +153,7 @@ slots = [
         [
             Item(
                 ItemType.Basket,
-                BasketExtra(
+                BasketSlots(
                     [
                         Slot([Item(ItemType.Fuel)] * 99),
                         Slot([Item(ItemType.Window)] * 2),
@@ -168,7 +168,7 @@ slots = [
         [
             Item(
                 ItemType.Basket,
-                BasketExtra(
+                BasketSlots(
                     [
                         Slot([Item(ItemType.CopperWire)] * 99),
                         Slot([Item(ItemType.Rail)] * 99),
@@ -183,7 +183,7 @@ slots = [
         [
             Item(
                 ItemType.Basket,
-                BasketExtra(
+                BasketSlots(
                     [
                         Slot([Item(ItemType.SteamLocomotive)]),
                         Slot([Item(ItemType.FreightCar)]),
@@ -198,7 +198,7 @@ slots = [
         [
             Item(
                 ItemType.Basket,
-                BasketExtra(
+                BasketSlots(
                     [
                         Slot(
                             [

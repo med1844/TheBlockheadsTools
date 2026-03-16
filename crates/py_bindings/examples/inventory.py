@@ -28,14 +28,14 @@ def inventory(world_db: WorldDb):
     # --8<-- [end:edit_inventory_basic]
 
     # --8<-- [start:edit_inventory_container]
-    from the_blockheads_tools_py import BasketExtra, StandardChest
+    from the_blockheads_tools_py import BasketSlots, StandardChest
 
     # Add a basket filled with deprecated blocks
     inventory[5] = Slot(
         [
             Item(
                 ItemType.Basket,
-                BasketExtra(
+                BasketSlots(
                     [
                         Slot([Item(ItemType.DeprecatedDirtBlock)] * 111),
                         Slot([Item(ItemType.DeprecatedWoodBlock)] * 222),

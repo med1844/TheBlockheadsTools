@@ -79,7 +79,7 @@ fn the_blockheads_tools_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<item::PigmentColorPy>()?;
     m.add_class::<item::ItemPy>()?;
     m.add_class::<item::SlotPy>()?;
-    m.add_class::<item::BasketExtraPy>()?;
+    m.add_class::<item::BasketSlotsPy>()?;
     m.add_class::<item::InventoryPy>()?;
     m.add_class::<item::ChestPy>()?;
     m.add_class::<item::StandardChestPy>()?;
@@ -89,7 +89,7 @@ fn the_blockheads_tools_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<item::ShelfChestPy>()?;
     m.add_class::<item::CabinetPy>()?;
     m.add_class::<item::PortalChestPy>()?;
-    m.add_class::<item::WorkbenchExtraPy>()?;
+    m.add_class::<item::WorkbenchPy>()?;
 
     m.add_class::<world_db::WorldDbMainPy>()?;
     m.add_class::<world_db::WorldV2Py>()?;

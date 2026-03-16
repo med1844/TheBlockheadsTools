@@ -563,99 +563,99 @@ impl From<PigmentColorPy> for PigmentColor {
     }
 }
 
-#[pyclass(name = "BasketExtra")]
-pub struct BasketExtraPy {
-    items: Vec<Py<SlotPy>>,
+#[pyclass(name = "BasketSlots")]
+pub struct BasketSlotsPy {
+    slots: Vec<Py<SlotPy>>,
 }
 
-impl std::fmt::Debug for BasketExtraPy {
+impl std::fmt::Debug for BasketSlotsPy {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("BasketExtraPy")
-            .field("items", &"<items>")
+        f.debug_struct("BasketSlotsPy")
+            .field("slots", &"<slots>")
             .finish()
     }
 }
 
 #[pymethods]
-impl BasketExtraPy {
+impl BasketSlotsPy {
     #[new]
-    #[pyo3(signature = (items=None))]
-    fn new(items: Option<Vec<Py<SlotPy>>>) -> PyResult<Self> {
-        match items {
-            Some(items) => {
-                if items.len() != Extra::NUM_SLOT_BASKET {
+    #[pyo3(signature = (slots=None))]
+    fn new(slots: Option<Vec<Py<SlotPy>>>) -> PyResult<Self> {
+        match slots {
+            Some(slots) => {
+                if slots.len() != Extra::NUM_SLOT_BASKET {
                     return Err(PyValueError::new_err(format!(
-                        "BasketExtra must have exactly {} slots",
+                        "BasketSlots must have exactly {} slots",
                         Extra::NUM_SLOT_BASKET
                     )));
                 }
-                Ok(Self { items })
+                Ok(Self { slots })
             }
             None => Python::attach(|py| {
-                let mut items = Vec::with_capacity(Extra::NUM_SLOT_BASKET);
+                let mut slots = Vec::with_capacity(Extra::NUM_SLOT_BASKET);
                 for _ in 0..Extra::NUM_SLOT_BASKET {
-                    items.push(Py::new(py, SlotPy::default())?);
+                    slots.push(Py::new(py, SlotPy::default())?);
                 }
-                Ok(Self { items })
+                Ok(Self { slots })
             }),
         }
     }
 
     fn __len__(&self) -> usize {
-        self.items.len()
+        self.slots.len()
     }
 
     fn __getitem__(&self, py: Python<'_>, mut index: isize) -> PyResult<Py<SlotPy>> {
         if index < 0 {
-            index += self.items.len() as isize;
+            index += self.slots.len() as isize;
         }
-        if index < 0 || index >= self.items.len() as isize {
+        if index < 0 || index >= self.slots.len() as isize {
             return Err(pyo3::exceptions::PyIndexError::new_err(
                 "index out of range",
             ));
         }
-        Ok(self.items[index as usize].clone_ref(py))
+        Ok(self.slots[index as usize].clone_ref(py))
     }
 
     fn __setitem__(&mut self, mut index: isize, value: Py<SlotPy>) -> PyResult<()> {
         if index < 0 {
-            index += self.items.len() as isize;
+            index += self.slots.len() as isize;
         }
-        if index < 0 || index >= self.items.len() as isize {
+        if index < 0 || index >= self.slots.len() as isize {
             return Err(pyo3::exceptions::PyIndexError::new_err(
                 "index out of range",
             ));
         }
-        self.items[index as usize] = value;
+        self.slots[index as usize] = value;
         Ok(())
     }
 
     fn __repr__(&self, py: Python<'_>) -> String {
-        let items_repr: Vec<String> = self
-            .items
+        let slots_repr: Vec<String> = self
+            .slots
             .iter()
-            .map(|item| {
-                item.bind(py)
+            .map(|slot| {
+                slot.bind(py)
                     .repr()
                     .map(|s| s.to_string())
                     .unwrap_or_else(|_| "<repr error>".to_string())
             })
             .collect();
-        format!("BasketExtra(items=[{}])", items_repr.join(", "))
+        format!("BasketSlots(slots=[{}])", slots_repr.join(", "))
     }
 
     fn __str__(&self, py: Python<'_>) -> String {
-        let items_str: Vec<String> = self
-            .items
+        let slots_str: Vec<String> = self
+            .slots
             .iter()
-            .map(|item| {
-                item.bind(py)
+            .map(|slot| {
+                slot.bind(py)
                     .str()
                     .map(|s| s.to_string())
                     .unwrap_or_else(|_| "<str error>".to_string())
             })
             .collect();
-        format!("[{}]", items_str.join(", "))
+        format!("[{}]", slots_str.join(", "))
     }
 }
 
@@ -1056,9 +1056,9 @@ impl ChestPy {
     }
 }
 
-#[pyclass(name = "WorkbenchExtra")]
+#[pyclass(name = "Workbench")]
 #[derive(Debug)]
-pub struct WorkbenchExtraPy {
+pub struct WorkbenchPy {
     #[pyo3(get, set)]
     pub workbench_type: WorkbenchTypePy,
     #[pyo3(get, set)]
@@ -1107,7 +1107,7 @@ pub struct WorkbenchExtraPy {
     pub x_scroll: f32,
 }
 
-impl WorkbenchExtraPy {
+impl WorkbenchPy {
     pub fn inflate(py: Python<'_>, workbench: Workbench) -> PyResult<Py<Self>> {
         Py::new(
             py,
@@ -1209,7 +1209,7 @@ impl WorkbenchExtraPy {
 }
 
 #[pymethods]
-impl WorkbenchExtraPy {
+impl WorkbenchPy {
     #[new]
     #[pyo3(signature = (workbench_type=WorkbenchTypePy::Workbench, level=1, owner_id=None))]
     fn new(
@@ -1264,11 +1264,11 @@ impl WorkbenchExtraPy {
 #[derive(FromPyObject, IntoPyObject)]
 pub enum ItemExtraPy {
     #[pyo3(transparent)]
-    Basket(Py<BasketExtraPy>),
+    Basket(Py<BasketSlotsPy>),
     #[pyo3(transparent)]
     Chest(Py<PyAny>),
     #[pyo3(transparent)]
-    Workbench(Py<WorkbenchExtraPy>),
+    Workbench(Py<WorkbenchPy>),
 }
 
 impl ItemExtraPy {
@@ -1285,7 +1285,7 @@ impl std::fmt::Debug for ItemExtraPy {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         Python::attach(|py| match self {
             Self::Basket(basket_py) => f
-                .debug_tuple("BasketExtra")
+                .debug_tuple("BasketSlots")
                 .field(&basket_py.bind(py).borrow())
                 .finish(),
             Self::Chest(chest_py) => f
@@ -1300,7 +1300,7 @@ impl std::fmt::Debug for ItemExtraPy {
                 )
                 .finish(),
             Self::Workbench(bench_py) => f
-                .debug_tuple("WorkbenchExtra")
+                .debug_tuple("Workbench")
                 .field(&bench_py.bind(py).borrow())
                 .finish(),
         })
@@ -1317,11 +1317,11 @@ impl ItemExtraPy {
                     .collect::<PyResult<Vec<_>>>()?;
                 Ok(Self::Basket(Py::new(
                     py,
-                    BasketExtraPy { items: py_items },
+                    BasketSlotsPy { slots: py_items },
                 )?))
             }
             Extra::Chest(chest) => Ok(Self::Chest(ChestPy::inflate(py, *chest)?)),
-            Extra::Workbench(bench) => Ok(Self::Workbench(WorkbenchExtraPy::inflate(py, *bench)?)),
+            Extra::Workbench(bench) => Ok(Self::Workbench(WorkbenchPy::inflate(py, *bench)?)),
         }
     }
 
@@ -1330,7 +1330,7 @@ impl ItemExtraPy {
             Self::Basket(basket_py) => {
                 let basket = basket_py.bind(py).borrow();
                 let mut items = [const { Slot(vec![]) }; Extra::NUM_SLOT_BASKET];
-                for (i, si) in basket.items.iter().enumerate() {
+                for (i, si) in basket.slots.iter().enumerate() {
                     items[i] = si.bind(py).borrow().deflate(py);
                 }
                 Extra::Basket(items)

@@ -3,7 +3,7 @@ from the_blockheads_tools_py import (
     ItemType,
     PigmentColor,
     Slot,
-    BasketExtra,
+    BasketSlots,
     Chest,
     StandardChest,
     SafeChest,
@@ -12,7 +12,7 @@ from the_blockheads_tools_py import (
     ShelfChest,
     Cabinet,
     PortalChest,
-    WorkbenchExtra,
+    Workbench,
     WorkbenchType,
 )
 import pytest
@@ -131,7 +131,7 @@ def test_slot():
 
 def test_basket_extra():
     # Test creation
-    basket = BasketExtra()
+    basket = BasketSlots()
     assert len(basket) == 4
     assert isinstance(basket[0], Slot)
     assert len(basket[0]) == 0
@@ -154,10 +154,10 @@ def test_basket_extra():
 
     # Match dispatch test
     match container_item.extra:
-        case BasketExtra() as basket:
+        case BasketSlots() as basket:
             assert len(basket) == 4
         case _:
-            pytest.fail("Should have matched BasketExtra")
+            pytest.fail("Should have matched BasketSlots")
 
 
 def test_item_repr():
@@ -166,9 +166,9 @@ def test_item_repr():
     assert "type_id=3" in r
     assert "extra=None" in r
 
-    basket = BasketExtra()
+    basket = BasketSlots()
     item_with_basket = Item(ItemType.Basket, extra=basket)
-    assert "BasketExtra" in repr(item_with_basket)
+    assert "BasketSlots" in repr(item_with_basket)
 
 
 def test_chest_basic():
@@ -332,19 +332,19 @@ def test_chest_roundtrip():
 
 
 def test_workbench_basic():
-    wb = WorkbenchExtra()
+    wb = Workbench()
     assert wb.workbench_type == WorkbenchType.Workbench
     assert wb.level == 1
     assert wb.owner_id is None
 
-    wb = WorkbenchExtra(WorkbenchType.Craft, 2, "crafter")
+    wb = Workbench(WorkbenchType.Craft, 2, "crafter")
     assert wb.workbench_type == WorkbenchType.Craft
     assert wb.level == 2
     assert wb.owner_id == "crafter"
 
 
 def test_workbench_properties():
-    wb = WorkbenchExtra()
+    wb = Workbench()
 
     # Test mutability
     wb.level = 5
@@ -364,14 +364,14 @@ def test_workbench_properties():
 
 
 def test_workbench_integration():
-    wb = WorkbenchExtra(WorkbenchType.Easel)
+    wb = Workbench(WorkbenchType.Easel)
     item = Item(ItemType.Easel, extra=wb)
 
-    assert isinstance(item.extra, WorkbenchExtra)
+    assert isinstance(item.extra, Workbench)
     assert item.extra.workbench_type == WorkbenchType.Easel
 
     match item.extra:
-        case WorkbenchExtra(workbench_type=wt):
+        case Workbench(workbench_type=wt):
             assert wt == WorkbenchType.Easel
         case _:
             pytest.fail("Should have matched WorkbenchExtra")
