@@ -142,7 +142,7 @@ mod tests {
     fn test_world_db_plist_fidelity() {
         let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
         let db_resources_dir = format!("{}/../py_bindings/tests/resources/", manifest_dir);
-        let db_names = ["3d7", "9c3"];
+        let db_names = ["3d7", "9c3", "67e"];
 
         let mut diffs = Vec::new();
         for (db_name, db_path) in

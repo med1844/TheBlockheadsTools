@@ -200,14 +200,16 @@ pub enum DynamicWorldError {
     IterateDatabase {
         source: lmdb_rs::error::DatabaseError,
     },
-    #[snafu(display("Failed to deserialize {object_type:?}: {source}"))]
+    #[snafu(display("Failed to deserialize {object_type:?} in {coord}: {source}"))]
     DeserializeObject {
         object_type: DynamicObjectType,
+        coord: ChunkCoord,
         source: plist::Error,
     },
-    #[snafu(display("Failed to serialize {object_type:?}: {source}"))]
+    #[snafu(display("Failed to serialize {object_type:?} in {coord}: {source}"))]
     SerializeObject {
         object_type: DynamicObjectType,
+        coord: String,
         source: plist::Error,
     },
     #[snafu(display("Failed to get entry {key} from database: {source}"))]
@@ -267,7 +269,7 @@ impl DynamicWorld {
                     coord: coord_str.to_owned(),
                 }
             })?;
-            let Ok(obj_type) = DynamicObjectType::try_from_str(type_id_str) else {
+            let Ok(obj_ty) = DynamicObjectType::try_from_str(type_id_str) else {
                 if !type_id_str.starts_with("chest_") {
                     println!(
                         "Found object type {} we don't understand in chunk in dynamic world {}",
@@ -283,58 +285,65 @@ impl DynamicWorld {
             fn load<T: serde::de::DeserializeOwned>(
                 bytes: &[u8],
                 dyn_obj_type: DynamicObjectType,
+                coord: ChunkCoord,
             ) -> Result<T> {
                 plist::from_bytes(bytes).context(DeserializeObjectSnafu {
                     object_type: dyn_obj_type,
+                    coord,
                 })
             }
 
-            match obj_type {
-                DynamicObjectType::AppleTree => entry.apple_tree = load(v, obj_type)?,
-                DynamicObjectType::MapleTree => entry.maple_tree = load(v, obj_type)?,
-                DynamicObjectType::MangoTree => entry.mango_tree = load(v, obj_type)?,
-                DynamicObjectType::PineTree => entry.pine_tree = load(v, obj_type)?,
-                DynamicObjectType::CactusTree => entry.cactus_tree = load(v, obj_type)?,
-                DynamicObjectType::CoconutTree => entry.coconut_tree = load(v, obj_type)?,
-                DynamicObjectType::OrangeTree => entry.orange_tree = load(v, obj_type)?,
-                DynamicObjectType::CherryTree => entry.cherry_tree = load(v, obj_type)?,
-                DynamicObjectType::CoffeeTree => entry.coffee_tree = load(v, obj_type)?,
-                DynamicObjectType::FlaxPlant => entry.flax_plant = load(v, obj_type)?,
-                DynamicObjectType::SunflowerPlant => entry.sunflower_plant = load(v, obj_type)?,
-                DynamicObjectType::CornPlant => entry.corn_plant = load(v, obj_type)?,
-                DynamicObjectType::Dodo => entry.dodo = load(v, obj_type)?,
-                DynamicObjectType::DroppedItem => entry.dropped_item = load(v, obj_type)?,
+            match obj_ty {
+                DynamicObjectType::AppleTree => entry.apple_tree = load(v, obj_ty, coord)?,
+                DynamicObjectType::MapleTree => entry.maple_tree = load(v, obj_ty, coord)?,
+                DynamicObjectType::MangoTree => entry.mango_tree = load(v, obj_ty, coord)?,
+                DynamicObjectType::PineTree => entry.pine_tree = load(v, obj_ty, coord)?,
+                DynamicObjectType::CactusTree => entry.cactus_tree = load(v, obj_ty, coord)?,
+                DynamicObjectType::CoconutTree => entry.coconut_tree = load(v, obj_ty, coord)?,
+                DynamicObjectType::OrangeTree => entry.orange_tree = load(v, obj_ty, coord)?,
+                DynamicObjectType::CherryTree => entry.cherry_tree = load(v, obj_ty, coord)?,
+                DynamicObjectType::CoffeeTree => entry.coffee_tree = load(v, obj_ty, coord)?,
+                DynamicObjectType::FlaxPlant => entry.flax_plant = load(v, obj_ty, coord)?,
+                DynamicObjectType::SunflowerPlant => {
+                    entry.sunflower_plant = load(v, obj_ty, coord)?
+                }
+                DynamicObjectType::CornPlant => entry.corn_plant = load(v, obj_ty, coord)?,
+                DynamicObjectType::Dodo => entry.dodo = load(v, obj_ty, coord)?,
+                DynamicObjectType::DroppedItem => entry.dropped_item = load(v, obj_ty, coord)?,
                 DynamicObjectType::Fire => entry.fire = v.to_vec(),
                 DynamicObjectType::Torch => entry.torch = v.to_vec(),
                 DynamicObjectType::GlowBlock => entry.glow_block = v.to_vec(),
-                DynamicObjectType::Ladder => entry.ladder = load(v, obj_type)?,
-                DynamicObjectType::Door => entry.door = load(v, obj_type)?,
+                DynamicObjectType::Ladder => entry.ladder = load(v, obj_ty, coord)?,
+                DynamicObjectType::Door => entry.door = load(v, obj_ty, coord)?,
                 DynamicObjectType::ArtificialLight => entry.artificial_light = v.to_vec(),
-                DynamicObjectType::Bed => entry.bed = load(v, obj_type)?,
-                DynamicObjectType::DropBear => entry.dropbear = load(v, obj_type)?,
+                DynamicObjectType::Bed => entry.bed = load(v, obj_ty, coord)?,
+                DynamicObjectType::DropBear => entry.dropbear = load(v, obj_ty, coord)?,
                 DynamicObjectType::GatherBlock => entry.gather_block = v.to_vec(),
-                DynamicObjectType::CarrotPlant => entry.carrot_plant = load(v, obj_type)?,
-                DynamicObjectType::Donkey => entry.donkey = load(v, obj_type)?,
+                DynamicObjectType::CarrotPlant => entry.carrot_plant = load(v, obj_ty, coord)?,
+                DynamicObjectType::Donkey => entry.donkey = load(v, obj_ty, coord)?,
                 DynamicObjectType::Egg => entry.egg = v.to_vec(),
-                DynamicObjectType::Window => entry.window = load(v, obj_type)?,
-                DynamicObjectType::Boat => entry.boat = load(v, obj_type)?,
-                DynamicObjectType::ChilliPlant => entry.chilli_plant = load(v, obj_type)?,
-                DynamicObjectType::KelpPlant => entry.kelp_plant = load(v, obj_type)?,
-                DynamicObjectType::ClownFish => entry.clown_fish = load(v, obj_type)?,
-                DynamicObjectType::Shark => entry.shark = load(v, obj_type)?,
-                DynamicObjectType::LimeTree => entry.lime_tree = load(v, obj_type)?,
-                DynamicObjectType::Wire => entry.wire = load(v, obj_type)?,
-                DynamicObjectType::CaveTroll => entry.cave_troll = load(v, obj_type)?,
-                DynamicObjectType::Rail => entry.rail = load(v, obj_type)?,
-                DynamicObjectType::HandCar => entry.hand_car = load(v, obj_type)?,
-                DynamicObjectType::SteamLocomotive => entry.steam_locomotive = load(v, obj_type)?,
-                DynamicObjectType::FreightCar => entry.freight_car = load(v, obj_type)?,
-                DynamicObjectType::PassengerCar => entry.passenger_car = load(v, obj_type)?,
-                DynamicObjectType::Workbench => entry.workbench = load(v, obj_type)?,
+                DynamicObjectType::Window => entry.window = load(v, obj_ty, coord)?,
+                DynamicObjectType::Boat => entry.boat = load(v, obj_ty, coord)?,
+                DynamicObjectType::ChilliPlant => entry.chilli_plant = load(v, obj_ty, coord)?,
+                DynamicObjectType::KelpPlant => entry.kelp_plant = load(v, obj_ty, coord)?,
+                DynamicObjectType::ClownFish => entry.clown_fish = load(v, obj_ty, coord)?,
+                DynamicObjectType::Shark => entry.shark = load(v, obj_ty, coord)?,
+                DynamicObjectType::LimeTree => entry.lime_tree = load(v, obj_ty, coord)?,
+                DynamicObjectType::Wire => entry.wire = load(v, obj_ty, coord)?,
+                DynamicObjectType::CaveTroll => entry.cave_troll = load(v, obj_ty, coord)?,
+                DynamicObjectType::Rail => entry.rail = load(v, obj_ty, coord)?,
+                DynamicObjectType::HandCar => entry.hand_car = load(v, obj_ty, coord)?,
+                DynamicObjectType::SteamLocomotive => {
+                    entry.steam_locomotive = load(v, obj_ty, coord)?
+                }
+                DynamicObjectType::FreightCar => entry.freight_car = load(v, obj_ty, coord)?,
+                DynamicObjectType::PassengerCar => entry.passenger_car = load(v, obj_ty, coord)?,
+                DynamicObjectType::Workbench => entry.workbench = load(v, obj_ty, coord)?,
                 DynamicObjectType::Chest => {
                     let chest_metas: DynamicObjectList<ChestMeta> =
                         plist::from_bytes(v).context(DeserializeObjectSnafu {
-                            object_type: obj_type,
+                            object_type: obj_ty,
+                            coord,
                         })?;
                     entry.chest = chest_metas
                         .into_inner()
@@ -348,23 +357,23 @@ impl DynamicWorld {
                         })
                         .collect::<Result<DynamicObjectList<Chest>>>()?
                 }
-                DynamicObjectType::Sign => entry.sign = load(v, obj_type)?,
-                DynamicObjectType::TradingPost => entry.trading_post = load(v, obj_type)?,
-                DynamicObjectType::TrainStation => entry.train_station = load(v, obj_type)?,
-                DynamicObjectType::TradePortal => entry.trade_portal = load(v, obj_type)?,
-                DynamicObjectType::Scorpion => entry.scorpion = load(v, obj_type)?,
+                DynamicObjectType::Sign => entry.sign = load(v, obj_ty, coord)?,
+                DynamicObjectType::TradingPost => entry.trading_post = load(v, obj_ty, coord)?,
+                DynamicObjectType::TrainStation => entry.train_station = load(v, obj_ty, coord)?,
+                DynamicObjectType::TradePortal => entry.trade_portal = load(v, obj_ty, coord)?,
+                DynamicObjectType::Scorpion => entry.scorpion = load(v, obj_ty, coord)?,
                 DynamicObjectType::Painting => entry.painting = v.to_vec(),
-                DynamicObjectType::Column => entry.column = load(v, obj_type)?,
-                DynamicObjectType::Stairs => entry.stairs = load(v, obj_type)?,
-                DynamicObjectType::ElevatorMotor => entry.elevator_motor = load(v, obj_type)?,
-                DynamicObjectType::ElevatorShaft => entry.elevator_shaft = load(v, obj_type)?,
-                DynamicObjectType::GemTree => entry.gem_tree = load(v, obj_type)?,
-                DynamicObjectType::VinePlant => entry.vine_plant = load(v, obj_type)?,
-                DynamicObjectType::TulipPlant => entry.tulip_plant = load(v, obj_type)?,
+                DynamicObjectType::Column => entry.column = load(v, obj_ty, coord)?,
+                DynamicObjectType::Stairs => entry.stairs = load(v, obj_ty, coord)?,
+                DynamicObjectType::ElevatorMotor => entry.elevator_motor = load(v, obj_ty, coord)?,
+                DynamicObjectType::ElevatorShaft => entry.elevator_shaft = load(v, obj_ty, coord)?,
+                DynamicObjectType::GemTree => entry.gem_tree = load(v, obj_ty, coord)?,
+                DynamicObjectType::VinePlant => entry.vine_plant = load(v, obj_ty, coord)?,
+                DynamicObjectType::TulipPlant => entry.tulip_plant = load(v, obj_ty, coord)?,
                 DynamicObjectType::OwnershipSign => entry.ownership_sign = v.to_vec(),
-                DynamicObjectType::WheatPlant => entry.wheat_plant = load(v, obj_type)?,
-                DynamicObjectType::TomatoPlant => entry.tomato_plant = load(v, obj_type)?,
-                DynamicObjectType::Yak => entry.yak = load(v, obj_type)?,
+                DynamicObjectType::WheatPlant => entry.wheat_plant = load(v, obj_ty, coord)?,
+                DynamicObjectType::TomatoPlant => entry.tomato_plant = load(v, obj_ty, coord)?,
+                DynamicObjectType::Yak => entry.yak = load(v, obj_ty, coord)?,
                 DynamicObjectType::Mirror => entry.mirror = v.to_vec(),
             };
         }
@@ -385,8 +394,9 @@ impl DynamicWorld {
                 db.put(
                     wtxn,
                     &key,
-                    &value.to_plist().context(SerializeObjectSnafu {
+                    &value.to_plist().with_context(|_| SerializeObjectSnafu {
                         object_type: obj_type,
+                        coord: coord_str.to_owned(),
                     })?,
                 )
                 .context(PutEntrySnafu { key })?;
