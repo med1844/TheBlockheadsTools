@@ -1,7 +1,7 @@
 use divan::Bencher;
 use lmdb_rs::arch::Arch64;
 use lmdb_rs::codec::types::{Bytes, Str};
-use lmdb_rs::{Env, EnvWrite};
+use lmdb_rs::env::{Env, EnvWrite};
 use std::env;
 use std::fs;
 use std::path::PathBuf;
