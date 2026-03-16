@@ -28,7 +28,7 @@ def inventory(world_db: WorldDb):
     # --8<-- [end:edit_inventory_basic]
 
     # --8<-- [start:edit_inventory_container]
-    from the_blockheads_tools_py import BasketExtra, ChestExtra
+    from the_blockheads_tools_py import BasketExtra, StandardChest
 
     # Add a basket filled with deprecated blocks
     inventory[5] = Slot(
@@ -52,7 +52,7 @@ def inventory(world_db: WorldDb):
         [
             Item(
                 ItemType.Chest,
-                ChestExtra(
+                StandardChest(
                     [
                         Slot([Item(ItemType.DoubleTime)])
                         if (i ^ j) & 1 == 0
@@ -73,7 +73,7 @@ def inventory(world_db: WorldDb):
     from the_blockheads_tools_py import PigmentColor
 
     chest_extra = inventory[6][0].extra
-    assert isinstance(chest_extra, ChestExtra)
+    assert isinstance(chest_extra, StandardChest)
 
     # Add a broken titanium pickaxe
     damaged_titanium_pickaxe = Item(ItemType.TitaniumPickaxe)

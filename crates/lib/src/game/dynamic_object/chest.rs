@@ -44,8 +44,8 @@ impl From<ChestType> for u8 {
     }
 }
 
-const NUM_STANDARD_SLOTS: usize = 4 * 4;
-const NUM_SHELF_SLOTS: usize = 2 * 2;
+pub const NUM_STANDARD_SLOTS: usize = 4 * 4;
+pub const NUM_SHELF_SLOTS: usize = 2 * 2;
 type StandardSlots = [Slot; NUM_STANDARD_SLOTS];
 type ShelfSlots = [Slot; NUM_SHELF_SLOTS];
 

@@ -4,8 +4,14 @@ from the_blockheads_tools_py import (
     PigmentColor,
     Slot,
     BasketExtra,
-    ChestExtra,
-    ChestType,
+    Chest,
+    StandardChest,
+    SafeChest,
+    GoldChest,
+    FeederChest,
+    ShelfChest,
+    Cabinet,
+    PortalChest,
     WorkbenchExtra,
     WorkbenchType,
 )
@@ -82,7 +88,7 @@ def test_item_edge_cases():
     assert item.damage == 65535
 
     item.data_b = 0x7FFF
-    with pytest.raises(ValueError, match="Invalid color ID: 15"):
+    with pytest.raises(ValueError, match="ItemError"):
         _ = item.colors
 
 
@@ -165,10 +171,9 @@ def test_item_repr():
     assert "BasketExtra" in repr(item_with_basket)
 
 
-def test_chest_extra_basic():
+def test_chest_basic():
     # Test initialization and defaults
-    chest = ChestExtra([Slot()] * 16, ChestType.Safe, owner_id="player1")
-    assert chest.chest_type == ChestType.Safe
+    chest = SafeChest(owner_id="player1")
     assert chest.owner_id == "player1"
     assert len(chest) == 16
     assert chest.flipped == False
@@ -187,7 +192,7 @@ def test_chest_extra_basic():
 
 
 def test_chest_identity_and_mutation():
-    chest = ChestExtra()
+    chest = StandardChest()
     item = Item(ItemType.Apple)
     slot = Slot([item])
 
@@ -208,49 +213,122 @@ def test_chest_identity_and_mutation():
 
 
 def test_chest_dispatch():
-    chest = ChestExtra([Slot()] * 16, ChestType.Gold)
-    item = Item(ItemType.Chest, extra=chest)
+    chest = GoldChest()
+    item = Item(ItemType.GoldenChest, extra=chest)
 
-    assert isinstance(item.extra, ChestExtra)
+    assert isinstance(item.extra, Chest)
+    assert isinstance(item.extra, GoldChest)
     assert item.extra is chest
-    assert item.extra.chest_type == ChestType.Gold
 
     # Match dispatch
     match item.extra:
-        case ChestExtra(chest_type=ctype, owner_id=owner):
-            assert ctype == ChestType.Gold
+        case GoldChest(owner_id=owner):
             assert owner is None
         case _:
-            pytest.fail("Should have matched ChestExtra")
+            pytest.fail("Should have matched GoldChest")
 
 
 def test_chest_validation():
-    chest = ChestExtra()
+    chest = StandardChest()
     assert len(chest) == 16
+
+    with pytest.raises(ValueError):
+        StandardChest(slots=[Slot()])
+
+def test_shelf_chest():
+    shelf = ShelfChest()
+    assert len(shelf) == 4
+    assert shelf.render_items is None
+
+    shelf.render_items = [ItemType.Apple, ItemType.Mango, ItemType.Flint, ItemType.Stick]
+    assert len(shelf.render_items) == 4
+
+    with pytest.raises(ValueError):
+        ShelfChest(slots=[Slot()] * 5)
 
 
 def test_chest_roundtrip():
-    # Creating a complex chest setup
-    chest = ChestExtra([Slot()] * 16, ChestType.Portal, owner_id="portal_master")
-    chest.flipped = True
-    chest.paint_color = 123
-    chest.pos_x = 987654
-    chest.pos_y = 512
-    chest.float_pos = [10.5, 20.5]
-    chest.unique_id = 0xDEADBEEFCAFEBABE
+    # 1. StandardChest
+    std_chest = StandardChest(owner_id="std_owner")
+    std_chest.paint_color = 1
+    std_chest.float_pos = [1.0, 2.0]
+    std_chest[0] = Slot([Item(ItemType.Apple)])
 
-    item_in_chest = Item(ItemType.Diamond)
-    item_in_chest.damage = 5
-    chest[7] = Slot([item_in_chest])
+    container1 = Item(ItemType.Chest, extra=std_chest)
+    assert type(container1.extra) is StandardChest
+    assert container1.extra.owner_id == "std_owner"
+    assert container1.extra.paint_color == 1
+    assert container1.extra[0][0].item_type == ItemType.Apple
 
-    # Wrap in Item
-    container = Item(ItemType.PortalChest, extra=chest)
+    # 2. SafeChest
+    safe_chest = SafeChest(owner_id="safe_owner")
+    safe_chest.paint_color = 2
+    safe_chest[15] = Slot([Item(ItemType.Mango)])
 
-    # We can test that the properties we set are stable in python.
-    assert type(container.extra) is ChestExtra
-    assert container.extra.unique_id == 0xDEADBEEFCAFEBABE
-    assert container.extra[7][0].item_type == ItemType.Diamond
-    assert container.extra[7][0].damage == 5
+    container2 = Item(ItemType.Safe, extra=safe_chest)
+    assert type(container2.extra) is SafeChest
+    assert container2.extra.owner_id == "safe_owner"
+    assert container2.extra.paint_color == 2
+    assert container2.extra[15][0].item_type == ItemType.Mango
+
+    # 3. GoldChest
+    gold_chest = GoldChest(owner_id="gold_owner")
+    gold_chest[5] = Slot([Item(ItemType.Diamond)])
+
+    container3 = Item(ItemType.GoldenChest, extra=gold_chest)
+    assert type(container3.extra) is GoldChest
+    assert container3.extra.owner_id == "gold_owner"
+    assert container3.extra[5][0].item_type == ItemType.Diamond
+
+    # 4. FeederChest
+    feeder_chest = FeederChest(owner_id="feeder_owner")
+    feeder_chest[8] = Slot([Item(ItemType.DodoEgg)])
+
+    container4 = Item(ItemType.FeederChest, extra=feeder_chest)
+    assert type(container4.extra) is FeederChest
+    assert container4.extra.owner_id == "feeder_owner"
+    assert container4.extra[8][0].item_type == ItemType.DodoEgg
+
+    # 5. ShelfChest
+    shelf_chest = ShelfChest()
+    shelf_chest.render_items = [ItemType.Apple, ItemType.Unknown, ItemType.Unknown, ItemType.Unknown]
+    shelf_chest.item_data_bs = [1, 2, 3, 4]
+    shelf_chest[0] = Slot([Item(ItemType.Apple)])
+
+    container5 = Item(ItemType.Shelf, extra=shelf_chest)
+    assert type(container5.extra) is ShelfChest
+    assert container5.extra.render_items is not None
+    assert container5.extra.render_items[0] == ItemType.Apple
+    assert container5.extra.item_data_bs == [1, 2, 3, 4]
+    assert container5.extra[0][0].item_type == ItemType.Apple
+
+    # 6. Cabinet
+    cabinet = Cabinet()
+    cabinet.render_items = [ItemType.Mango, ItemType.Unknown, ItemType.Unknown, ItemType.Unknown]
+    cabinet.item_data_bs = [10, 20, 30, 40]
+    cabinet[3] = Slot([Item(ItemType.Mango)])
+
+    container6 = Item(ItemType.DisplayCabinet, extra=cabinet)
+    assert type(container6.extra) is Cabinet
+    assert container6.extra.render_items is not None
+    assert container6.extra.render_items[0] == ItemType.Mango
+    assert container6.extra.item_data_bs == [10, 20, 30, 40]
+    assert container6.extra[3][0].item_type == ItemType.Mango
+
+    # 7. PortalChest
+    portal = PortalChest(owner_id="portal_master")
+    portal.flipped = True
+    portal.paint_color = 123
+    portal.pos_x = 987654
+    portal.pos_y = 512
+    portal.float_pos = [10.5, 20.5]
+    portal.unique_id = 0xDEADBEEFCAFEBABE
+
+    container7 = Item(ItemType.PortalChest, extra=portal)
+
+    assert type(container7.extra) is PortalChest
+    assert container7.extra.unique_id == 0xDEADBEEFCAFEBABE
+    assert container7.extra.owner_id == "portal_master"
 
 
 def test_workbench_basic():

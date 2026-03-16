@@ -38,26 +38,6 @@ impl From<BindingError> for PyErr {
     }
 }
 
-// pub fn into_py_err(err: lib::BhError) -> PyErr {
-//     let error_message = err.to_string();
-
-//     match err {
-//         lib::BhError::LmdbError(_)
-//         | lib::BhError::PlistError(_)
-//         | lib::BhError::GzipError(_)
-//         | lib::BhError::MissingKey(_) => PyException::new_err(error_message),
-
-//         lib::BhError::CoordError { .. }
-//         | lib::BhError::ParseError(_)
-//         | lib::BhError::InvalidBlockIdError(_)
-//         | lib::BhError::InvalidBlockContentIdError(_)
-//         | lib::BhError::InvalidDynamicOjectId(_)
-//         | lib::BhError::InvalidItemTypeId(_)
-//         | lib::BhError::InvalidColorId(_)
-//         | lib::BhError::InvalidChunkSize(_) => PyValueError::new_err(error_message),
-//     }
-// }
-
 // For accessors, they might point to no-longer valid resources.
 // ```py
 // world_db = WorldDb.open("save_file")
@@ -101,7 +81,14 @@ fn the_blockheads_tools_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<item::SlotPy>()?;
     m.add_class::<item::BasketExtraPy>()?;
     m.add_class::<item::InventoryPy>()?;
-    m.add_class::<item::ChestExtraPy>()?;
+    m.add_class::<item::ChestPy>()?;
+    m.add_class::<item::StandardChestPy>()?;
+    m.add_class::<item::SafeChestPy>()?;
+    m.add_class::<item::GoldChestPy>()?;
+    m.add_class::<item::FeederChestPy>()?;
+    m.add_class::<item::ShelfChestPy>()?;
+    m.add_class::<item::CabinetPy>()?;
+    m.add_class::<item::PortalChestPy>()?;
     m.add_class::<item::WorkbenchExtraPy>()?;
 
     m.add_class::<world_db::WorldDbMainPy>()?;

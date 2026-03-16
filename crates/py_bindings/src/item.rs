@@ -2,13 +2,13 @@ use super::{lib, ItemSnafu};
 use lib::game::{
     dynamic_object::{
         blockhead::Inventory,
-        chest::{Chest, ChestSlots, ChestType},
+        chest::{Chest, ChestSlots, ChestType, NUM_SHELF_SLOTS, NUM_STANDARD_SLOTS},
         workbench::{Workbench, WorkbenchType},
         DynamicObject, InteractionObject, InteractionObjectType, UniqueID,
     },
     item::{
-        fmt_item_display, fmt_slot_display, Extra, Item, ItemError, ItemType, ItemView,
-        PigmentColor, Slot, SlotView,
+        fmt_item_display, fmt_slot_display, Extra, Item, ItemType, ItemView, PigmentColor, Slot,
+        SlotView,
     },
 };
 use num_enum::TryFromPrimitive;
@@ -17,7 +17,7 @@ use pyo3::prelude::*;
 use snafu::ResultExt;
 
 #[pyclass(eq, eq_int, name = "ItemType")]
-#[derive(Clone, Copy, PartialEq, TryFromPrimitive)]
+#[derive(Debug, Clone, Copy, PartialEq, TryFromPrimitive)]
 #[repr(u16)]
 pub enum ItemTypePy {
     Unknown = 0,
@@ -659,10 +659,8 @@ impl BasketExtraPy {
     }
 }
 
-#[pyclass(name = "ChestExtra")]
-pub struct ChestExtraPy {
-    #[pyo3(get, set)]
-    pub chest_type: ChestTypePy,
+#[pyclass(subclass, name = "Chest")]
+pub struct ChestPy {
     #[pyo3(get, set)]
     pub owner_id: Option<String>,
     #[pyo3(get, set)]
@@ -679,200 +677,382 @@ pub struct ChestExtraPy {
     pub float_pos: [f32; 2],
     #[pyo3(get, set)]
     pub unique_id: u64,
-    items: Vec<Py<SlotPy>>,
 }
 
-impl std::fmt::Debug for ChestExtraPy {
+#[pymethods]
+impl ChestPy {
+    fn __repr__(&self) -> String {
+        format!(
+            "Chest(owner_id={:?}, pos_x={}, pos_y={})",
+            self.owner_id, self.pos_x, self.pos_y
+        )
+    }
+
+    fn __str__(&self) -> String {
+        format!("{:?}", self)
+    }
+}
+
+impl std::fmt::Debug for ChestPy {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ChestExtraPy")
-            .field("chest_type", &self.chest_type)
-            .field("items", &"<items>")
+        f.debug_struct("Chest")
             .field("owner_id", &self.owner_id)
+            .field("unique_id", &self.unique_id)
             .finish()
     }
 }
 
-impl ChestExtraPy {
-    pub fn inflate(py: Python<'_>, chest: Chest) -> PyResult<Py<Self>> {
-        Py::new(
-            py,
-            Self {
-                chest_type: chest.slots.chest_type().into(),
-                owner_id: chest.owner_id.clone(),
-                is_in_use: chest.is_in_use,
-                flipped: chest.flipped,
-                paint_color: chest.paint_color,
-                pos_x: chest.pos_x,
-                pos_y: chest.pos_y,
-                float_pos: [chest.float_pos[0], chest.float_pos[1]],
-                unique_id: *chest.unique_id.inner(),
-                items: {
-                    let items = Vec::with_capacity(16);
-                    // TODO
-                    // for slot in chest.save_item_slots {
-                    //     items.push(SlotPy::inflate(py, slot)?);
-                    // }
-                    items
-                },
-            },
-        )
-    }
+macro_rules! define_standard_chest {
+    ($name:ident, $py_name:expr) => {
+        #[pyclass(extends=ChestPy, name = $py_name)]
+        pub struct $name {
+            pub slots: [Py<SlotPy>; NUM_STANDARD_SLOTS],
+        }
 
-    pub fn deflate(&self, py: Python<'_>) -> Chest {
-        // let mut save_item_slots = [const { Slot(vec![]) }; 16];
-        // for (i, si_py) in self.items.iter().enumerate() {
-        //     if i < ChestData::NUM_SLOTS {
-        //         save_item_slots[i] = si_py.bind(py).borrow().deflate(py);
-        //     }
-        // }
-        Chest::new(
-            InteractionObject::new(
-                DynamicObject {
-                    float_pos: [self.float_pos[0], self.float_pos[1]],
-                    pos_x: self.pos_x,
-                    pos_y: self.pos_y,
-                    unique_id: UniqueID::new(self.unique_id),
-                    owner_id: self.owner_id.clone(),
-                },
-                InteractionObjectType::Chest,
-                self.is_in_use,
-                self.flipped,
-                self.paint_color,
-            ),
-            // TODO fix these
-            0.0,
-            ChestSlots::Portal,
-        )
-    }
+        #[pymethods]
+        impl $name {
+            #[new]
+            #[pyo3(signature = (slots=None, owner_id=None))]
+            fn new(
+                py: Python<'_>,
+                slots: Option<Vec<Py<SlotPy>>>,
+                owner_id: Option<String>,
+            ) -> PyResult<(Self, ChestPy)> {
+                let slots = if let Some(s) = slots {
+                    if s.len() != NUM_STANDARD_SLOTS {
+                        return Err(pyo3::exceptions::PyValueError::new_err(
+                            "slots must have exactly 16 elements",
+                        ));
+                    }
+                    s.try_into().unwrap()
+                } else {
+                    std::array::from_fn(|_| Py::new(py, SlotPy::default()).unwrap())
+                };
 
-    pub fn clone_ref(&self, py: Python<'_>) -> Py<Self> {
-        Py::new(
-            py,
-            Self {
-                chest_type: self.chest_type,
-                items: self.items.iter().map(|i| i.clone_ref(py)).collect(),
-                owner_id: self.owner_id.clone(),
-                is_in_use: self.is_in_use,
-                flipped: self.flipped,
-                paint_color: self.paint_color,
-                pos_x: self.pos_x,
-                pos_y: self.pos_y,
-                float_pos: self.float_pos,
-                unique_id: self.unique_id,
-            },
-        )
-        .unwrap()
+                let base = ChestPy {
+                    owner_id,
+                    is_in_use: false,
+                    flipped: false,
+                    paint_color: 0,
+                    pos_x: 0,
+                    pos_y: 0,
+                    float_pos: [0.0, 0.0],
+                    unique_id: 0,
+                };
+
+                Ok((Self { slots }, base))
+            }
+
+            fn __len__(&self) -> usize {
+                16
+            }
+
+            fn __getitem__(&self, index: isize, py: Python<'_>) -> PyResult<Py<SlotPy>> {
+                let len = NUM_STANDARD_SLOTS as isize;
+                let idx = if index < 0 { index + len } else { index };
+                if idx < 0 || idx >= len {
+                    return Err(pyo3::exceptions::PyIndexError::new_err(
+                        "index out of range",
+                    ));
+                }
+                Ok(self.slots[idx as usize].clone_ref(py))
+            }
+
+            fn __setitem__(&mut self, index: isize, item: Py<SlotPy>) -> PyResult<()> {
+                let len = NUM_STANDARD_SLOTS as isize;
+                let idx = if index < 0 { index + len } else { index };
+                if idx < 0 || idx >= len {
+                    return Err(pyo3::exceptions::PyIndexError::new_err(
+                        "index out of range",
+                    ));
+                }
+                self.slots[idx as usize] = item;
+                Ok(())
+            }
+        }
+    };
+}
+
+define_standard_chest!(StandardChestPy, "StandardChest");
+define_standard_chest!(SafeChestPy, "SafeChest");
+define_standard_chest!(GoldChestPy, "GoldChest");
+define_standard_chest!(FeederChestPy, "FeederChest");
+
+macro_rules! define_shelf_chest {
+    ($name:ident, $py_name:expr) => {
+        #[pyclass(extends=ChestPy, name = $py_name)]
+        pub struct $name {
+            pub slots: [Py<SlotPy>; NUM_SHELF_SLOTS],
+            #[pyo3(get, set)]
+            pub render_items: Option<[ItemTypePy; NUM_SHELF_SLOTS]>,
+            #[pyo3(get, set)]
+            pub item_data_bs: Option<[u16; NUM_SHELF_SLOTS]>,
+        }
+
+        #[pymethods]
+        impl $name {
+            #[new]
+            #[pyo3(signature = (slots=None, render_items=None, item_data_bs=None, owner_id=None))]
+            fn new(
+                py: Python<'_>,
+                slots: Option<Vec<Py<SlotPy>>>,
+                render_items: Option<Vec<ItemTypePy>>,
+                item_data_bs: Option<Vec<u16>>,
+                owner_id: Option<String>,
+            ) -> PyResult<(Self, ChestPy)> {
+                let slots = if let Some(s) = slots {
+                    if s.len() != NUM_SHELF_SLOTS {
+                        return Err(pyo3::exceptions::PyValueError::new_err(
+                            "slots must have exactly 4 elements",
+                        ));
+                    }
+                    s.try_into().unwrap()
+                } else {
+                    std::array::from_fn(|_| Py::new(py, SlotPy::default()).unwrap())
+                };
+
+                let render_items = if let Some(r) = render_items {
+                    if r.len() != 4 {
+                        return Err(pyo3::exceptions::PyValueError::new_err(
+                            "render_items must have exactly 4 elements",
+                        ));
+                    }
+                    Some(r.try_into().unwrap())
+                } else {
+                    None
+                };
+
+                let item_data_bs = if let Some(i) = item_data_bs {
+                    if i.len() != NUM_SHELF_SLOTS {
+                        return Err(pyo3::exceptions::PyValueError::new_err(
+                            "item_data_bs must have exactly 4 elements",
+                        ));
+                    }
+                    Some(i.try_into().unwrap())
+                } else {
+                    None
+                };
+
+                let base = ChestPy {
+                    owner_id,
+                    is_in_use: false,
+                    flipped: false,
+                    paint_color: 0,
+                    pos_x: 0,
+                    pos_y: 0,
+                    float_pos: [0.0, 0.0],
+                    unique_id: 0,
+                };
+
+                Ok((
+                    Self {
+                        slots,
+                        render_items,
+                        item_data_bs,
+                    },
+                    base,
+                ))
+            }
+
+            fn __len__(&self) -> usize {
+                NUM_SHELF_SLOTS
+            }
+
+            fn __getitem__(&self, index: isize, py: Python<'_>) -> PyResult<Py<SlotPy>> {
+                let len = NUM_SHELF_SLOTS as isize;
+                let idx = if index < 0 { index + len } else { index };
+                if idx < 0 || idx >= len {
+                    return Err(pyo3::exceptions::PyIndexError::new_err(
+                        "index out of range",
+                    ));
+                }
+                Ok(self.slots[idx as usize].clone_ref(py))
+            }
+
+            fn __setitem__(&mut self, index: isize, item: Py<SlotPy>) -> PyResult<()> {
+                let len = NUM_SHELF_SLOTS as isize;
+                let idx = if index < 0 { index + len } else { index };
+                if idx < 0 || idx >= len {
+                    return Err(pyo3::exceptions::PyIndexError::new_err(
+                        "index out of range",
+                    ));
+                }
+                self.slots[idx as usize] = item;
+                Ok(())
+            }
+        }
+    };
+}
+
+define_shelf_chest!(ShelfChestPy, "ShelfChest");
+define_shelf_chest!(CabinetPy, "Cabinet");
+
+#[pyclass(extends=ChestPy, name = "PortalChest")]
+pub struct PortalChestPy {}
+
+#[pymethods]
+impl PortalChestPy {
+    #[new]
+    #[pyo3(signature = (owner_id=None))]
+    fn new(owner_id: Option<String>) -> PyResult<(Self, ChestPy)> {
+        let base = ChestPy {
+            owner_id,
+            is_in_use: false,
+            flipped: false,
+            paint_color: 0,
+            pos_x: 0,
+            pos_y: 0,
+            float_pos: [0.0, 0.0],
+            unique_id: 0,
+        };
+        Ok((Self {}, base))
     }
 }
 
-#[pymethods]
-impl ChestExtraPy {
-    #[new]
-    #[pyo3(signature = (items=None, chest_type=ChestTypePy::Standard, owner_id=None))]
-    fn new(
-        py: Python<'_>,
-        items: Option<Vec<Py<SlotPy>>>,
-        chest_type: ChestTypePy,
-        owner_id: Option<String>,
-    ) -> PyResult<Py<Self>> {
-        // let items = match items {
-        //     Some(items) => {
-        //         if items.len() != ChestData::NUM_SLOTS {
-        //             return Err(PyValueError::new_err(format!(
-        //                 "ChestExtra must have exactly {} slots",
-        //                 ChestData::NUM_SLOTS
-        //             )));
-        //         }
-        //         items
-        //     }
-        //     None => {
-        //         let mut items = Vec::with_capacity(ChestData::NUM_SLOTS);
-        //         for _ in 0..ChestData::NUM_SLOTS {
-        //             items.push(Py::new(py, SlotPy::default())?);
-        //         }
-        //         items
-        //     }
-        // };
-        let items = vec![];
-        Py::new(
-            py,
-            Self {
-                chest_type,
-                owner_id,
-                is_in_use: false,
-                flipped: false,
-                paint_color: 0,
-                pos_x: 0,
-                pos_y: 0,
-                float_pos: [0.0, 0.0],
-                unique_id: 0,
-                items,
-            },
-        )
-    }
+impl ChestPy {
+    pub fn inflate(py: Python<'_>, chest: Chest) -> PyResult<Py<PyAny>> {
+        let base = ChestPy {
+            owner_id: chest.owner_id.clone(),
+            is_in_use: chest.is_in_use,
+            flipped: chest.flipped,
+            paint_color: chest.paint_color,
+            pos_x: chest.pos_x,
+            pos_y: chest.pos_y,
+            float_pos: [chest.float_pos[0], chest.float_pos[1]],
+            unique_id: *chest.unique_id.inner(),
+        };
 
-    fn __len__(&self) -> usize {
-        self.items.len()
-    }
-
-    fn __getitem__(&self, index: isize, py: Python<'_>) -> PyResult<Py<SlotPy>> {
-        let len = self.items.len() as isize;
-        let idx = if index < 0 { index + len } else { index };
-        if idx < 0 || idx >= len {
-            return Err(pyo3::exceptions::PyIndexError::new_err(
-                "index out of range",
-            ));
+        match chest.slots {
+            ChestSlots::Standard(slots) => {
+                let slots = Self::inflate_standard(py, slots)?;
+                let init =
+                    pyo3::PyClassInitializer::from(base).add_subclass(StandardChestPy { slots });
+                Ok(Py::new(py, init)?.into_any())
+            }
+            ChestSlots::Safe(slots) => {
+                let slots = Self::inflate_standard(py, slots)?;
+                let init = pyo3::PyClassInitializer::from(base).add_subclass(SafeChestPy { slots });
+                Ok(Py::new(py, init)?.into_any())
+            }
+            ChestSlots::Gold(slots) => {
+                let slots = Self::inflate_standard(py, slots)?;
+                let init = pyo3::PyClassInitializer::from(base).add_subclass(GoldChestPy { slots });
+                Ok(Py::new(py, init)?.into_any())
+            }
+            ChestSlots::Feeder(slots) => {
+                let slots = Self::inflate_standard(py, slots)?;
+                let init =
+                    pyo3::PyClassInitializer::from(base).add_subclass(FeederChestPy { slots });
+                Ok(Py::new(py, init)?.into_any())
+            }
+            ChestSlots::Shelf {
+                slots,
+                render_items,
+                item_data_bs,
+            } => {
+                let slots = Self::inflate_shelf(py, slots)?;
+                let init = pyo3::PyClassInitializer::from(base).add_subclass(ShelfChestPy {
+                    slots,
+                    render_items: render_items.map(|ri| ri.map(|i| i.into())),
+                    item_data_bs,
+                });
+                Ok(Py::new(py, init)?.into_any())
+            }
+            ChestSlots::Cabinet {
+                slots,
+                render_items,
+                item_data_bs,
+            } => {
+                let slots = Self::inflate_shelf(py, slots)?;
+                let init = pyo3::PyClassInitializer::from(base).add_subclass(CabinetPy {
+                    slots,
+                    render_items: render_items.map(|ri| ri.map(|i| i.into())),
+                    item_data_bs,
+                });
+                Ok(Py::new(py, init)?.into_any())
+            }
+            ChestSlots::Portal => {
+                let init = pyo3::PyClassInitializer::from(base).add_subclass(PortalChestPy {});
+                Ok(Py::new(py, init)?.into_any())
+            }
         }
-        Ok(self.items[idx as usize].clone_ref(py))
     }
 
-    fn __setitem__(&mut self, index: isize, item: Py<SlotPy>) -> PyResult<()> {
-        let len = self.items.len() as isize;
-        let idx = if index < 0 { index + len } else { index };
-        if idx < 0 || idx >= len {
-            return Err(pyo3::exceptions::PyIndexError::new_err(
-                "index out of range",
-            ));
+    fn inflate_standard(py: Python<'_>, slots: [Slot; 16]) -> PyResult<[Py<SlotPy>; 16]> {
+        let mut py_slots: [Py<SlotPy>; 16] =
+            std::array::from_fn(|_| Py::new(py, SlotPy::default()).unwrap());
+        for (i, slot) in slots.into_iter().enumerate() {
+            py_slots[i] = SlotPy::inflate(py, slot)?;
         }
-        self.items[idx as usize] = item;
-        Ok(())
+        Ok(py_slots)
     }
 
-    fn __repr__(&self, py: Python<'_>) -> String {
-        let items_repr: Vec<String> = self
-            .items
-            .iter()
-            .map(|item| {
-                item.bind(py)
-                    .repr()
-                    .map(|s| s.to_string())
-                    .unwrap_or_else(|_| "<repr error>".to_string())
-            })
-            .collect();
-        format!(
-            "ChestExtra(type={:?}, owner_id={:?}, items=[{}])",
-            self.chest_type,
-            self.owner_id,
-            items_repr.join(", ")
-        )
+    fn inflate_shelf(py: Python<'_>, slots: [Slot; 4]) -> PyResult<[Py<SlotPy>; 4]> {
+        let mut py_slots: [Py<SlotPy>; 4] =
+            std::array::from_fn(|_| Py::new(py, SlotPy::default()).unwrap());
+        for (i, slot) in slots.into_iter().enumerate() {
+            py_slots[i] = SlotPy::inflate(py, slot)?;
+        }
+        Ok(py_slots)
     }
 
-    fn __str__(&self, py: Python<'_>) -> String {
-        let items_str: Vec<String> = self
-            .items
-            .iter()
-            .map(|item| {
-                item.bind(py)
-                    .str()
-                    .map(|s| s.to_string())
-                    .unwrap_or_else(|_| "<str error>".to_string())
-            })
-            .collect();
-        format!(
-            "Chest {{ type: {:?}, items: [{}] }}",
-            self.chest_type,
-            items_str.join(", ")
-        )
+    pub fn deflate(py: Python<'_>, py_obj: Py<PyAny>) -> PyResult<Chest> {
+        let any = py_obj.bind(py);
+        let base_ref = any.extract::<pyo3::PyRef<ChestPy>>()?;
+
+        let slots = if let Ok(c) = any.extract::<pyo3::PyRef<StandardChestPy>>() {
+            ChestSlots::Standard(Self::deflate_standard(py, &c.slots))
+        } else if let Ok(c) = any.extract::<pyo3::PyRef<SafeChestPy>>() {
+            ChestSlots::Safe(Self::deflate_standard(py, &c.slots))
+        } else if let Ok(c) = any.extract::<pyo3::PyRef<GoldChestPy>>() {
+            ChestSlots::Gold(Self::deflate_standard(py, &c.slots))
+        } else if let Ok(c) = any.extract::<pyo3::PyRef<FeederChestPy>>() {
+            ChestSlots::Feeder(Self::deflate_standard(py, &c.slots))
+        } else if let Ok(c) = any.extract::<pyo3::PyRef<ShelfChestPy>>() {
+            ChestSlots::Shelf {
+                slots: Self::deflate_shelf(py, &c.slots),
+                render_items: c.render_items.map(|ri| ri.map(|i| i.into())),
+                item_data_bs: c.item_data_bs,
+            }
+        } else if let Ok(c) = any.extract::<pyo3::PyRef<CabinetPy>>() {
+            ChestSlots::Cabinet {
+                slots: Self::deflate_shelf(py, &c.slots),
+                render_items: c.render_items.map(|ri| ri.map(|i| i.into())),
+                item_data_bs: c.item_data_bs,
+            }
+        } else if any.extract::<pyo3::PyRef<PortalChestPy>>().is_ok() {
+            ChestSlots::Portal
+        } else {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "Invalid chest subclass",
+            ));
+        };
+
+        Ok(Chest::new(
+            InteractionObject::new(
+                DynamicObject {
+                    float_pos: [base_ref.float_pos[0], base_ref.float_pos[1]],
+                    pos_x: base_ref.pos_x,
+                    pos_y: base_ref.pos_y,
+                    unique_id: UniqueID::new(base_ref.unique_id),
+                    owner_id: base_ref.owner_id.clone(),
+                },
+                InteractionObjectType::Chest,
+                base_ref.is_in_use,
+                base_ref.flipped,
+                base_ref.paint_color,
+            ),
+            0.0, // dummy save_time
+            slots,
+        ))
+    }
+
+    fn deflate_standard(py: Python<'_>, slots: &[Py<SlotPy>; 16]) -> [Slot; 16] {
+        std::array::from_fn(|i| slots[i].bind(py).borrow().deflate(py))
+    }
+
+    fn deflate_shelf(py: Python<'_>, slots: &[Py<SlotPy>; 4]) -> [Slot; 4] {
+        std::array::from_fn(|i| slots[i].bind(py).borrow().deflate(py))
     }
 }
 
@@ -1086,7 +1266,7 @@ pub enum ItemExtraPy {
     #[pyo3(transparent)]
     Basket(Py<BasketExtraPy>),
     #[pyo3(transparent)]
-    Chest(Py<ChestExtraPy>),
+    Chest(Py<PyAny>),
     #[pyo3(transparent)]
     Workbench(Py<WorkbenchExtraPy>),
 }
@@ -1109,8 +1289,15 @@ impl std::fmt::Debug for ItemExtraPy {
                 .field(&basket_py.bind(py).borrow())
                 .finish(),
             Self::Chest(chest_py) => f
-                .debug_tuple("ChestExtra")
-                .field(&chest_py.bind(py).borrow())
+                .debug_tuple("Chest")
+                // Cannot easily borrow Chest subclasses here, just print repr
+                .field(
+                    &chest_py
+                        .bind(py)
+                        .repr()
+                        .map(|s| s.to_string())
+                        .unwrap_or_default(),
+                )
                 .finish(),
             Self::Workbench(bench_py) => f
                 .debug_tuple("WorkbenchExtra")
@@ -1133,7 +1320,7 @@ impl ItemExtraPy {
                     BasketExtraPy { items: py_items },
                 )?))
             }
-            Extra::Chest(chest) => Ok(Self::Chest(ChestExtraPy::inflate(py, *chest)?)),
+            Extra::Chest(chest) => Ok(Self::Chest(ChestPy::inflate(py, *chest)?)),
             Extra::Workbench(bench) => Ok(Self::Workbench(WorkbenchExtraPy::inflate(py, *bench)?)),
         }
     }
@@ -1149,8 +1336,10 @@ impl ItemExtraPy {
                 Extra::Basket(items)
             }
             Self::Chest(chest_py) => {
-                let chest = chest_py.bind(py).borrow();
-                Extra::Chest(Box::new(chest.deflate(py)))
+                // Call ChestPy::deflate
+                Extra::Chest(Box::new(
+                    ChestPy::deflate(py, chest_py.clone_ref(py)).expect("Failed to deflate chest"),
+                ))
             }
             Self::Workbench(bench_py) => {
                 let bench = bench_py.bind(py).borrow();

@@ -4,7 +4,7 @@ from the_blockheads_tools_py import (
     BasketExtra,
     Item,
     ItemType,
-    ChestExtra,
+    StandardChest,
     Arch,
     BlockCoord,
     ChunkCoord,
@@ -34,7 +34,7 @@ slots = [
                             [
                                 Item(
                                     ItemType.Chest,
-                                    ChestExtra(
+                                    StandardChest(
                                         [
                                             Slot([Item(ItemType.Campfire)] * 99),
                                             Slot([Item(ItemType.ToolBench)]),
@@ -61,7 +61,7 @@ slots = [
                             [
                                 Item(
                                     ItemType.Chest,
-                                    ChestExtra(
+                                    StandardChest(
                                         [
                                             Slot([Item(ItemType.TrainYard)]),
                                             Slot([Item(ItemType.MixingBench)]),
@@ -90,7 +90,7 @@ slots = [
                             [
                                 Item(
                                     ItemType.Chest,
-                                    ChestExtra(
+                                    StandardChest(
                                         [
                                             Slot([Item(ItemType.Chest)]),
                                             Slot([Item(ItemType.Safe)]),
@@ -204,7 +204,7 @@ slots = [
                             [
                                 Item(
                                     ItemType.Chest,
-                                    ChestExtra(
+                                    StandardChest(
                                         [
                                             Slot([Item(ItemType.TradePortal)]),
                                             Slot([Item(ItemType.BrickColumn)] * 10),
