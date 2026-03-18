@@ -1,9 +1,7 @@
-use crate::gpu::dw::DwChunkBuf;
-
 use super::{
     gpu::{
         RgbaTexture, VoxelType,
-        dw::{DwIconInstanceRaw, DwIconVertex},
+        dw::{DwChunkBuf, DwIconInstanceRaw, DwIconVertex, DwVertex},
     },
     image_type::ImageType,
 };
@@ -495,6 +493,126 @@ impl DwIconRenderer {
     }
 }
 
+pub struct DwSpriteRenderer {
+    pipeline: wgpu::RenderPipeline,
+    bind_group: wgpu::BindGroup,
+}
+
+impl DwSpriteRenderer {
+    pub fn new(
+        device: &wgpu::Device,
+        camera_buf: &wgpu::Buffer,
+        tile_map_texture: &RgbaTexture,
+        target_format: wgpu::TextureFormat,
+    ) -> Self {
+        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("DW Sprite Shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("dw_sprite.wgsl").into()),
+        });
+
+        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("dw_bind_group_layout"),
+            entries: &[
+                // Camera
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                // Tilemap Texture
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                // Tilemap Sampler
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+            ],
+        });
+
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: camera_buf.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::TextureView(&tile_map_texture.view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::Sampler(&tile_map_texture.sampler),
+                },
+            ],
+            label: Some("dw_bind_group"),
+        });
+
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("DW Pipeline Layout"),
+            bind_group_layouts: &[&bind_group_layout],
+            push_constant_ranges: &[],
+        });
+
+        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("DW Pipeline"),
+            layout: Some(&pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: Some("vs_main"),
+                buffers: &[DwVertex::desc()],
+                compilation_options: Default::default(),
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: Some("fs_main"),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: target_format,
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+                compilation_options: Default::default(),
+            }),
+            primitive: wgpu::PrimitiveState::default(),
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState::default(),
+            multiview: None,
+            cache: None,
+        });
+
+        Self {
+            pipeline,
+            bind_group,
+        }
+    }
+
+    pub fn render(&self, rpass: &mut wgpu::RenderPass<'_>, dw_buf: &[DwChunkBuf]) {
+        rpass.set_pipeline(&self.pipeline);
+        rpass.set_bind_group(0, &self.bind_group, &[]);
+        for dw_chunk_buf in dw_buf {
+            rpass.set_vertex_buffer(0, dw_chunk_buf.vertex_buf.slice(..));
+            rpass.set_index_buffer(dw_chunk_buf.index_buf.slice(..), wgpu::IndexFormat::Uint32);
+            rpass.draw_indexed(0..dw_chunk_buf.num_indices, 0, 0..1);
+        }
+    }
+}
+
 pub struct GridRenderer {
     pipeline: wgpu::RenderPipeline,
     bind_group: wgpu::BindGroup,
@@ -592,7 +710,8 @@ pub struct RenderResources {
     hover_on_block_buf: wgpu::Buffer,
 
     voxel: VoxelRenderer,
-    dw: DwIconRenderer,
+    dw_icon: DwIconRenderer,
+    dw_sprite: DwSpriteRenderer,
     grid: GridRenderer,
 }
 
@@ -631,13 +750,14 @@ impl RenderResources {
                 &tile_map_texture,
                 target_format,
             ),
-            dw: DwIconRenderer::new(
+            dw_icon: DwIconRenderer::new(
                 device,
                 &camera_buf,
                 &items_texture,
                 &tile_map_texture,
                 target_format,
             ),
+            dw_sprite: DwSpriteRenderer::new(device, &camera_buf, &tile_map_texture, target_format),
             grid: GridRenderer::new(device, &camera_buf, target_format),
             camera_buf,
             selected_block_buf,
@@ -668,7 +788,8 @@ impl RenderResources {
         show_grid: bool,
     ) {
         self.voxel.render(render_pass);
-        self.dw.render(render_pass, dw_buf);
+        self.dw_icon.render(render_pass, dw_buf);
+        self.dw_sprite.render(render_pass, dw_buf);
         if show_grid {
             self.grid.render(render_pass);
         }

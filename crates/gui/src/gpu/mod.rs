@@ -1,6 +1,7 @@
 mod block;
 mod camera;
 pub mod dw;
+pub mod sprite;
 mod texture;
 mod voxel;
 
