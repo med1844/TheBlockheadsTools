@@ -1,11 +1,7 @@
 use super::{
     fps_counter::FpsCounter,
-    gpu::{
-        Camera, CameraUniform, GpuBlockCoord, GpuBlockCoordUniform,
-        dw::{DwBuf, DwChunkBuf},
-        voxel_util,
-    },
-    renderer::RenderResources,
+    gpu::{Camera, GpuBlockCoord, dw::DwBuf, voxel_util},
+    renderer::{GeometryBuffer, Render3dCallback, RenderResources},
 };
 use eframe::{egui, egui_wgpu, emath::Rect, wgpu};
 use glam::Vec3Swizzles;
@@ -23,53 +19,6 @@ use the_blockheads_tools_lib::{
         db::world_db::{WorldDb, WorldDbError},
     },
 };
-
-struct Render3dCallback {
-    camera_uniform: CameraUniform,
-    dw_chunks: Vec<DwChunkBuf>,
-    show_grid: bool,
-    selected_block_coord_uniform: GpuBlockCoordUniform,
-    hover_on_block_coord_uniform: GpuBlockCoordUniform,
-}
-
-impl egui_wgpu::CallbackTrait for Render3dCallback {
-    fn prepare(
-        &self,
-        _device: &eframe::wgpu::Device,
-        queue: &eframe::wgpu::Queue,
-        _screen_descriptor: &egui_wgpu::ScreenDescriptor,
-        _egui_encoder: &mut eframe::wgpu::CommandEncoder,
-        callback_resources: &mut egui_wgpu::CallbackResources,
-    ) -> Vec<eframe::wgpu::CommandBuffer> {
-        let r: &RenderResources = callback_resources.get().unwrap();
-        queue.write_buffer(
-            r.camera_buf(),
-            0,
-            bytemuck::cast_slice(&[self.camera_uniform]),
-        );
-        queue.write_buffer(
-            r.selected_block_buf(),
-            0,
-            bytemuck::cast_slice(&[self.selected_block_coord_uniform]),
-        );
-        queue.write_buffer(
-            r.hover_on_block_buf(),
-            0,
-            bytemuck::cast_slice(&[self.hover_on_block_coord_uniform]),
-        );
-        Vec::new()
-    }
-
-    fn paint(
-        &self,
-        _info: egui::PaintCallbackInfo,
-        render_pass: &mut eframe::wgpu::RenderPass<'static>,
-        callback_resources: &egui_wgpu::CallbackResources,
-    ) {
-        let r: &RenderResources = callback_resources.get().unwrap();
-        r.render(render_pass, &self.dw_chunks, self.show_grid);
-    }
-}
 
 enum ReaderState {
     #[cfg(not(target_arch = "wasm32"))]
@@ -205,7 +154,10 @@ impl EditorApp {
             load_err: None,
             save_err: None,
 
-            world_viewport_rect: Rect::from_x_y_ranges(0.0..=1920.0, 0.0..=1080.0),
+            world_viewport_rect: Rect::from_x_y_ranges(
+                0.0..=GeometryBuffer::DEFAULT_WIDTH as f32,
+                0.0..=GeometryBuffer::DEFAULT_HEIGHT as f32,
+            ),
         }
     }
 

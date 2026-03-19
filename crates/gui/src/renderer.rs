@@ -1,11 +1,12 @@
 use super::{
     gpu::{
-        RgbaTexture, VoxelType,
+        CameraUniform, GpuBlockCoordUniform, RgbaTexture, VoxelType,
         dw::{DwChunkBuf, DwIconInstanceRaw, DwIconVertex, DwVertex},
     },
     image_type::ImageType,
 };
 use eframe::{
+    egui::{self, Rgba},
     egui_wgpu,
     wgpu::{self, util::DeviceExt},
 };
@@ -305,7 +306,7 @@ impl DwIconRenderer {
         device: &wgpu::Device,
         camera_buf: &wgpu::Buffer,
         items_texture: &RgbaTexture,
-        tilemap_texture: &RgbaTexture,
+        tile_map_texture: &RgbaTexture,
         target_format: wgpu::TextureFormat,
     ) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -417,11 +418,11 @@ impl DwIconRenderer {
                 },
                 wgpu::BindGroupEntry {
                     binding: 3,
-                    resource: wgpu::BindingResource::TextureView(&tilemap_texture.view),
+                    resource: wgpu::BindingResource::TextureView(&tile_map_texture.view),
                 },
                 wgpu::BindGroupEntry {
                     binding: 4,
-                    resource: wgpu::BindingResource::Sampler(&tilemap_texture.sampler),
+                    resource: wgpu::BindingResource::Sampler(&tile_map_texture.sampler),
                 },
                 wgpu::BindGroupEntry {
                     binding: 5,
@@ -704,15 +705,175 @@ impl GridRenderer {
     }
 }
 
+pub struct BlitRenderer {
+    pipeline: wgpu::RenderPipeline,
+    bind_group_layout: wgpu::BindGroupLayout,
+    bind_group: wgpu::BindGroup,
+}
+
+impl BlitRenderer {
+    pub fn new(
+        device: &wgpu::Device,
+        g_buffer: &GeometryBuffer,
+        target_format: wgpu::TextureFormat,
+    ) -> Self {
+        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("Blit Shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("blit.wgsl").into()),
+        });
+        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("Blit Bind Group Layout"),
+            entries: &[
+                // Color Texture
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                // Color Texture sampler
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+            ],
+        });
+
+        let bind_group = Self::create_bind_group(&bind_group_layout, g_buffer, device);
+
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("Blit Render Pipeline Layout"),
+            bind_group_layouts: &[&bind_group_layout], // Use the new layout
+            push_constant_ranges: &[],
+        });
+
+        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Blit Render Pipeline"),
+            layout: Some(&pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: Some("vs_blit"),
+                buffers: &[],
+                compilation_options: Default::default(),
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: Some("fs_blit"),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: target_format,
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+                compilation_options: Default::default(),
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                cull_mode: None,
+                ..Default::default()
+            },
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState::default(),
+            multiview: None,
+            cache: None,
+        });
+        Self {
+            pipeline,
+            bind_group_layout,
+            bind_group,
+        }
+    }
+
+    fn create_bind_group(
+        bind_group_layout: &wgpu::BindGroupLayout,
+        g_buffer: &GeometryBuffer,
+        device: &wgpu::Device,
+    ) -> wgpu::BindGroup {
+        device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&g_buffer.color_texture.view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&g_buffer.color_texture.sampler),
+                },
+            ],
+            label: Some("Blit Bind Group"),
+        })
+    }
+
+    pub fn resize(&mut self, g_buffer: &GeometryBuffer, device: &wgpu::Device) {
+        self.bind_group = Self::create_bind_group(&self.bind_group_layout, g_buffer, device);
+    }
+
+    pub fn render(&self, render_pass: &mut wgpu::RenderPass<'_>) {
+        render_pass.set_pipeline(&self.pipeline);
+        render_pass.set_bind_group(0, &self.bind_group, &[]);
+        render_pass.draw(0..3, 0..1);
+    }
+}
+
+pub(crate) enum ResizeOutcome {
+    Unchanged,
+    Resized,
+}
+
+pub(crate) struct GeometryBuffer {
+    size: (u32, u32),
+    color_texture: RgbaTexture,
+}
+
+impl GeometryBuffer {
+    pub const DEFAULT_WIDTH: u32 = 1920;
+    pub const DEFAULT_HEIGHT: u32 = 1080;
+
+    pub fn new(size: (u32, u32), device: &wgpu::Device) -> Self {
+        let color_texture = RgbaTexture::new(
+            size,
+            device,
+            wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            wgpu::TextureFormat::Bgra8Unorm,
+        );
+        Self {
+            size,
+            color_texture,
+        }
+    }
+
+    pub fn default(device: &wgpu::Device) -> Self {
+        Self::new((Self::DEFAULT_WIDTH, Self::DEFAULT_HEIGHT), device)
+    }
+
+    pub fn resize(&mut self, size: (u32, u32), device: &wgpu::Device) -> ResizeOutcome {
+        if self.size != size {
+            *self = Self::new(size, device);
+            ResizeOutcome::Resized
+        } else {
+            ResizeOutcome::Unchanged
+        }
+    }
+}
+
 pub struct RenderResources {
     camera_buf: wgpu::Buffer,
     selected_block_buf: wgpu::Buffer,
     hover_on_block_buf: wgpu::Buffer,
 
+    g_buffer: GeometryBuffer,
+
     voxel: VoxelRenderer,
     dw_icon: DwIconRenderer,
     dw_sprite: DwSpriteRenderer,
     grid: GridRenderer,
+    blit: BlitRenderer,
 }
 
 impl RenderResources {
@@ -731,14 +892,16 @@ impl RenderResources {
             let bytes = include_bytes!("../resources/TileMap.png");
             let mut decoder = PngDecoder::new(bytes);
             let img = decoder.decode().unwrap().u8().unwrap();
-            RgbaTexture::new(img.as_slice(), (512, 512), device, queue)
+            RgbaTexture::from_img(img.as_slice(), (512, 512), device, queue)
         };
         let items_texture = {
             let bytes = include_bytes!("../resources/Items.png");
             let mut decoder = PngDecoder::new(bytes);
             let img = decoder.decode().unwrap().u8().unwrap();
-            RgbaTexture::new(img.as_slice(), (512, 256), device, queue)
+            RgbaTexture::from_img(img.as_slice(), (512, 256), device, queue)
         };
+        let g_buffer = GeometryBuffer::default(device);
+        let blit = BlitRenderer::new(device, &g_buffer, target_format);
 
         Self {
             voxel: VoxelRenderer::new(
@@ -759,9 +922,12 @@ impl RenderResources {
             ),
             dw_sprite: DwSpriteRenderer::new(device, &camera_buf, &tile_map_texture, target_format),
             grid: GridRenderer::new(device, &camera_buf, target_format),
+            blit,
+
             camera_buf,
             selected_block_buf,
             hover_on_block_buf,
+            g_buffer,
         }
     }
 
@@ -781,6 +947,12 @@ impl RenderResources {
         &self.voxel.voxel_buf
     }
 
+    pub fn resize(&mut self, size: (u32, u32), device: &wgpu::Device) {
+        if let ResizeOutcome::Resized = self.g_buffer.resize(size, device) {
+            self.blit.resize(&self.g_buffer, device);
+        }
+    }
+
     pub fn render(
         &self,
         render_pass: &mut wgpu::RenderPass<'_>,
@@ -793,5 +965,75 @@ impl RenderResources {
         if show_grid {
             self.grid.render(render_pass);
         }
+    }
+
+    pub fn blit(&self, render_pass: &mut wgpu::RenderPass<'_>) {
+        self.blit.render(render_pass);
+    }
+}
+
+pub struct Render3dCallback {
+    pub camera_uniform: CameraUniform,
+    pub dw_chunks: Vec<DwChunkBuf>,
+    pub show_grid: bool,
+    pub selected_block_coord_uniform: GpuBlockCoordUniform,
+    pub hover_on_block_coord_uniform: GpuBlockCoordUniform,
+}
+
+impl egui_wgpu::CallbackTrait for Render3dCallback {
+    fn prepare(
+        &self,
+        device: &eframe::wgpu::Device,
+        queue: &eframe::wgpu::Queue,
+        screen_descriptor: &egui_wgpu::ScreenDescriptor,
+        egui_encoder: &mut eframe::wgpu::CommandEncoder,
+        callback_resources: &mut egui_wgpu::CallbackResources,
+    ) -> Vec<eframe::wgpu::CommandBuffer> {
+        let r: &mut RenderResources = callback_resources.get_mut().unwrap();
+        r.resize(screen_descriptor.size_in_pixels.into(), device);
+        queue.write_buffer(
+            r.camera_buf(),
+            0,
+            bytemuck::cast_slice(&[self.camera_uniform]),
+        );
+        queue.write_buffer(
+            r.selected_block_buf(),
+            0,
+            bytemuck::cast_slice(&[self.selected_block_coord_uniform]),
+        );
+        queue.write_buffer(
+            r.hover_on_block_buf(),
+            0,
+            bytemuck::cast_slice(&[self.hover_on_block_coord_uniform]),
+        );
+        let mut render_pass = egui_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("custom render pass"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: &r.g_buffer.color_texture.view,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                    store: wgpu::StoreOp::Store,
+                },
+                depth_slice: None,
+            })],
+
+            depth_stencil_attachment: None,
+            timestamp_writes: None,
+            occlusion_query_set: None,
+        });
+        r.render(&mut render_pass, &self.dw_chunks, self.show_grid);
+
+        Vec::new()
+    }
+
+    fn paint(
+        &self,
+        _info: egui::PaintCallbackInfo,
+        render_pass: &mut eframe::wgpu::RenderPass<'static>,
+        callback_resources: &egui_wgpu::CallbackResources,
+    ) {
+        let r: &RenderResources = callback_resources.get().unwrap();
+        r.blit(render_pass);
     }
 }

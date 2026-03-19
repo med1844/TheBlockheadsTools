@@ -1,13 +1,19 @@
 use eframe::wgpu;
 
 pub struct RgbaTexture {
-    // pub texture: wgpu::Texture,
+    pub texture_size: wgpu::Extent3d,
+    pub texture: wgpu::Texture,
     pub view: wgpu::TextureView,
     pub sampler: wgpu::Sampler,
 }
 
 impl RgbaTexture {
-    pub fn new(img: &[u8], size: (u32, u32), device: &wgpu::Device, queue: &wgpu::Queue) -> Self {
+    pub fn new(
+        size: (u32, u32),
+        device: &wgpu::Device,
+        usage: wgpu::TextureUsages,
+        format: wgpu::TextureFormat,
+    ) -> Self {
         let (w, h) = size;
 
         let texture_size = wgpu::Extent3d {
@@ -21,27 +27,11 @@ impl RgbaTexture {
             mip_level_count: 1, // No mipmaps for nearest neighbor
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8UnormSrgb, // Standard format for images
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            format,
+            usage,
             label: Some("Texture Atlas"),
             view_formats: &[],
         });
-
-        queue.write_texture(
-            wgpu::TexelCopyTextureInfo {
-                texture: &texture,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
-            img,
-            wgpu::TexelCopyBufferLayout {
-                offset: 0,
-                bytes_per_row: Some(w * 4), // 4 bytes per pixel (RGBA)
-                rows_per_image: Some(h),
-            },
-            texture_size,
-        );
 
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 
@@ -57,9 +47,41 @@ impl RgbaTexture {
         });
 
         Self {
-            // texture,
+            texture_size,
+            texture,
             view,
             sampler,
         }
+    }
+
+    pub fn from_img(
+        img: &[u8],
+        size: (u32, u32),
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+    ) -> Self {
+        let texture = Self::new(
+            size,
+            device,
+            wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            wgpu::TextureFormat::Rgba8UnormSrgb, // Standard format for images
+        );
+        let (w, h) = size;
+        queue.write_texture(
+            wgpu::TexelCopyTextureInfo {
+                texture: &texture.texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            img,
+            wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(w * 4), // 4 bytes per pixel (RGBA)
+                rows_per_image: Some(h),
+            },
+            texture.texture_size,
+        );
+        texture
     }
 }
