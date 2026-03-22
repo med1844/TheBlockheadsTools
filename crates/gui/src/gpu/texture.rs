@@ -1,13 +1,13 @@
 use eframe::wgpu;
 
-pub struct RgbaTexture {
+pub struct Texture {
     pub texture_size: wgpu::Extent3d,
     pub texture: wgpu::Texture,
     pub view: wgpu::TextureView,
     pub sampler: wgpu::Sampler,
 }
 
-impl RgbaTexture {
+impl Texture {
     pub fn new(
         size: (u32, u32),
         device: &wgpu::Device,

@@ -5,9 +5,7 @@ use glam::{Mat4, Vec3, Vec3Swizzles, Vec4Swizzles};
 // Define how to connect the vertices to form triangles.
 pub struct Camera {
     // we always look at (0, 0)
-    fovy: f32,   // Field of view in radians
-    z_near: f32, // Near clipping plane
-    z_far: f32,  // Far clipping plane
+    fovy: f32, // Field of view in radians
     world_offset: Vec3,
     aspect: f32,
 }
@@ -17,8 +15,6 @@ impl Default for Camera {
         Self {
             world_offset: Vec3::new(0.0, 0.0, 5.0),
             fovy: 45.0_f32.to_radians(),
-            z_near: 0.01,
-            z_far: 10000.0,
             aspect: 1.0,
         }
     }
@@ -45,9 +41,21 @@ impl Camera {
         Vec3::ZERO
     }
 
+    fn view_dist(&self) -> f32 {
+        (self.eye() - self.target()).z
+    }
+
+    fn z_near(&self) -> f32 {
+        (self.world_offset.z - Self::MAX_BLOCK_Z + self.view_dist()).max(0.01)
+    }
+
+    fn z_far(&self) -> f32 {
+        self.world_offset.z + self.view_dist()
+    }
+
     fn view_proj(&self) -> Mat4 {
         let view = Mat4::look_at_rh(self.eye(), self.target(), Vec3::Y);
-        let proj = Mat4::perspective_rh(self.fovy, self.aspect, self.z_near, self.z_far);
+        let proj = Mat4::perspective_rh(self.fovy, self.aspect, self.z_near(), self.z_far());
         proj * view
     }
 

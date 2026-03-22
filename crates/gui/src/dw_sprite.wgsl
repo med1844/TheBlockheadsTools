@@ -20,6 +20,11 @@ struct VertexOutput {
     @location(0) tex_coords: vec2<f32>,
 };
 
+struct FragmentOutput {
+    @location(0) color: vec4<f32>,
+    @builtin(frag_depth) depth: f32,
+}
+
 @vertex
 fn vs_main(model: VertexInput) -> VertexOutput {
     var out: VertexOutput;
@@ -30,10 +35,19 @@ fn vs_main(model: VertexInput) -> VertexOutput {
 }
 
 @fragment
-fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+fn fs_main(in: VertexOutput) -> FragmentOutput {
     let color = textureSample(tilemap_texture, tilemap_sampler, in.tex_coords);
+
+    if (color.a != 1.0) {
+        discard;
+    }
 
     let gamma = 2.2;
     let corrected_color = pow(color.rgb, vec3<f32>(1.0 / gamma));
-    return vec4<f32>(corrected_color, color.a);
+
+    var output: FragmentOutput;
+    let depth = in.clip_position.z;
+    output.depth = depth;
+    output.color = vec4<f32>(corrected_color, 1.0);
+    return output;
 }

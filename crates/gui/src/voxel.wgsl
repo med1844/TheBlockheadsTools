@@ -179,8 +179,13 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
     return out;
 }
 
+struct FragmentOutput {
+    @location(0) color: vec4<f32>,
+    @builtin(frag_depth) depth: f32,
+}
+
 @fragment
-fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+fn fs_main(in: VertexOutput) -> FragmentOutput {
     let frag_coord = in.uv;
     let ndc_coords = vec2<f32>(frag_coord.x*2.0-1.0, (1.0-frag_coord.y)*2.0 - 1.0);
 
@@ -207,7 +212,10 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let t_max_intersect = min(t_max_v.x, min(t_max_v.y, t_max_v.z));
 
     if (t_min_intersect > t_max_intersect) {
-        return vec4<f32>(0.0);
+        var output: FragmentOutput;
+        output.color = vec4<f32>(0.0);
+        output.depth = 1.0;
+        return output;
     }
 
     var initial_normal = vec3<i32>(0);
@@ -321,5 +329,18 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     // eframe uses Bgra8Unorm so we have to manually do gamma correction
     let gamma = 2.2;
     let corrected_color = pow(accumulated_color.rgb, vec3<f32>(1.0 / gamma));
-    return vec4<f32>(corrected_color, accumulated_color.a);
+
+    var output: FragmentOutput;
+    output.color = vec4<f32>(corrected_color, accumulated_color.a);
+
+    if (t_first_hit >= 0.0) {
+        // Project the hit point into clip space to get its depth
+        let hit_point = ray_origin_local + ray_dir_local * t_first_hit;
+        let clip_pos = camera.view_proj * vec4<f32>(hit_point, 1.0);
+        output.depth = clip_pos.z / clip_pos.w;
+    } else {
+        output.depth = 1.0;  // far plane, nothing hit
+    }
+
+    return output;
 }

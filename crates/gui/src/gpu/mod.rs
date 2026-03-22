@@ -7,5 +7,5 @@ mod voxel;
 
 pub use block::{GpuBlockCoord, GpuBlockCoordUniform};
 pub use camera::{Camera, CameraUniform};
-pub use texture::RgbaTexture;
+pub use texture::Texture;
 pub use voxel::{VoxelType, voxel_util};

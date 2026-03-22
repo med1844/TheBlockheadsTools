@@ -43,6 +43,11 @@ struct DynObjVSOutput {
     @location(1) @interpolate(flat) item_type: u32,
 };
 
+struct FragmentOutput {
+    @location(0) color: vec4<f32>,
+    @builtin(frag_depth) depth: f32,
+}
+
 @vertex
 fn vs_dynamic_object_icon(model: DynObjVertexInput, instance: DynObjInstanceInput) -> DynObjVSOutput {
     var out: DynObjVSOutput;
@@ -142,7 +147,7 @@ fn render_block_icon(uv: vec2<f32>, block_type_id: u32) -> vec4<f32> {
 }
 
 @fragment
-fn fs_dynamic_object_icon(in: DynObjVSOutput) -> @location(0) vec4<f32> {
+fn fs_dynamic_object_icon(in: DynObjVSOutput) -> FragmentOutput {
     var final_color: vec4<f32>;
 
     if (in.item_type >= 1024u) {
@@ -177,7 +182,8 @@ fn fs_dynamic_object_icon(in: DynObjVSOutput) -> @location(0) vec4<f32> {
 
     let gamma = 2.2;
     let corrected_color = pow(final_color.rgb, vec3<f32>(1.0 / gamma));
-    return vec4<f32>(corrected_color, final_color.a);
+
+    var output: FragmentOutput;
+    output.color = vec4<f32>(corrected_color, final_color.a);
+    return output;
 }
-
-

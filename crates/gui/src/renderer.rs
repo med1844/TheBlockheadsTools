@@ -1,12 +1,12 @@
 use super::{
     gpu::{
-        CameraUniform, GpuBlockCoordUniform, RgbaTexture, VoxelType,
+        CameraUniform, GpuBlockCoordUniform, Texture, VoxelType,
         dw::{DwChunkBuf, DwIconInstanceRaw, DwIconVertex, DwVertex},
     },
     image_type::ImageType,
 };
 use eframe::{
-    egui::{self, Rgba},
+    egui::{self},
     egui_wgpu,
     wgpu::{self, util::DeviceExt},
 };
@@ -26,11 +26,11 @@ impl VoxelRenderer {
         camera_buf: &wgpu::Buffer,
         selected_block_buf: &wgpu::Buffer,
         hover_on_block_buf: &wgpu::Buffer,
-        texture: &RgbaTexture,
+        texture: &Texture,
         target_format: wgpu::TextureFormat,
     ) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("Shader"),
+            label: Some("Voxel Shader"),
             source: wgpu::ShaderSource::Wgsl(include_str!("voxel.wgsl").into()),
         });
 
@@ -187,7 +187,13 @@ impl VoxelRenderer {
                 cull_mode: Some(wgpu::Face::Back), // Prevent rendering the inside of the cube
                 ..Default::default()
             },
-            depth_stencil: None,
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: wgpu::TextureFormat::Depth32Float,
+                depth_write_enabled: true,
+                depth_compare: wgpu::CompareFunction::LessEqual,
+                stencil: wgpu::StencilState::default(),
+                bias: wgpu::DepthBiasState::default(),
+            }),
             multisample: wgpu::MultisampleState::default(),
             multiview: None,
             cache: None,
@@ -305,8 +311,8 @@ impl DwIconRenderer {
     pub fn new(
         device: &wgpu::Device,
         camera_buf: &wgpu::Buffer,
-        items_texture: &RgbaTexture,
-        tile_map_texture: &RgbaTexture,
+        items_texture: &Texture,
+        tile_map_texture: &Texture,
         target_format: wgpu::TextureFormat,
     ) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -463,8 +469,13 @@ impl DwIconRenderer {
                 cull_mode: None,
                 ..Default::default()
             },
-
-            depth_stencil: None,
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: wgpu::TextureFormat::Depth32Float,
+                depth_write_enabled: false,
+                depth_compare: wgpu::CompareFunction::Always,
+                stencil: wgpu::StencilState::default(),
+                bias: wgpu::DepthBiasState::default(),
+            }),
             multisample: wgpu::MultisampleState::default(),
             multiview: None,
             cache: None,
@@ -503,7 +514,7 @@ impl DwSpriteRenderer {
     pub fn new(
         device: &wgpu::Device,
         camera_buf: &wgpu::Buffer,
-        tile_map_texture: &RgbaTexture,
+        tile_map_texture: &Texture,
         target_format: wgpu::TextureFormat,
     ) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -591,7 +602,13 @@ impl DwSpriteRenderer {
                 compilation_options: Default::default(),
             }),
             primitive: wgpu::PrimitiveState::default(),
-            depth_stencil: None,
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: wgpu::TextureFormat::Depth32Float,
+                depth_write_enabled: true,
+                depth_compare: wgpu::CompareFunction::Always,
+                stencil: wgpu::StencilState::default(),
+                bias: wgpu::DepthBiasState::default(),
+            }),
             multisample: wgpu::MultisampleState::default(),
             multiview: None,
             cache: None,
@@ -686,7 +703,13 @@ impl GridRenderer {
                 cull_mode: None,
                 ..Default::default()
             },
-            depth_stencil: None,
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: wgpu::TextureFormat::Depth32Float,
+                depth_write_enabled: false,
+                depth_compare: wgpu::CompareFunction::Always,
+                stencil: wgpu::StencilState::default(),
+                bias: wgpu::DepthBiasState::default(),
+            }),
             multisample: wgpu::MultisampleState::default(),
             multiview: None,
             cache: None,
@@ -799,11 +822,11 @@ impl BlitRenderer {
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&g_buffer.color_texture.view),
+                    resource: wgpu::BindingResource::TextureView(&g_buffer.albedo.view),
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
-                    resource: wgpu::BindingResource::Sampler(&g_buffer.color_texture.sampler),
+                    resource: wgpu::BindingResource::Sampler(&g_buffer.albedo.sampler),
                 },
             ],
             label: Some("Blit Bind Group"),
@@ -828,7 +851,8 @@ pub(crate) enum ResizeOutcome {
 
 pub(crate) struct GeometryBuffer {
     size: (u32, u32),
-    color_texture: RgbaTexture,
+    albedo: Texture,
+    depth: Texture,
 }
 
 impl GeometryBuffer {
@@ -836,15 +860,22 @@ impl GeometryBuffer {
     pub const DEFAULT_HEIGHT: u32 = 1080;
 
     pub fn new(size: (u32, u32), device: &wgpu::Device) -> Self {
-        let color_texture = RgbaTexture::new(
+        let color_texture = Texture::new(
             size,
             device,
             wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
             wgpu::TextureFormat::Bgra8Unorm,
         );
+        let depth_texture = Texture::new(
+            size,
+            device,
+            wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            wgpu::TextureFormat::Depth32Float,
+        );
         Self {
             size,
-            color_texture,
+            albedo: color_texture,
+            depth: depth_texture,
         }
     }
 
@@ -892,13 +923,13 @@ impl RenderResources {
             let bytes = include_bytes!("../resources/TileMap.png");
             let mut decoder = PngDecoder::new(bytes);
             let img = decoder.decode().unwrap().u8().unwrap();
-            RgbaTexture::from_img(img.as_slice(), (512, 512), device, queue)
+            Texture::from_img(img.as_slice(), (512, 512), device, queue)
         };
         let items_texture = {
             let bytes = include_bytes!("../resources/Items.png");
             let mut decoder = PngDecoder::new(bytes);
             let img = decoder.decode().unwrap().u8().unwrap();
-            RgbaTexture::from_img(img.as_slice(), (512, 256), device, queue)
+            Texture::from_img(img.as_slice(), (512, 256), device, queue)
         };
         let g_buffer = GeometryBuffer::default(device);
         let blit = BlitRenderer::new(device, &g_buffer, target_format);
@@ -959,9 +990,9 @@ impl RenderResources {
         dw_buf: &[DwChunkBuf],
         show_grid: bool,
     ) {
+        self.dw_sprite.render(render_pass, dw_buf);
         self.voxel.render(render_pass);
         self.dw_icon.render(render_pass, dw_buf);
-        self.dw_sprite.render(render_pass, dw_buf);
         if show_grid {
             self.grid.render(render_pass);
         }
@@ -1009,16 +1040,22 @@ impl egui_wgpu::CallbackTrait for Render3dCallback {
         let mut render_pass = egui_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("custom render pass"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: &r.g_buffer.color_texture.view,
+                view: &r.g_buffer.albedo.view,
+                depth_slice: None,
                 resolve_target: None,
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
                     store: wgpu::StoreOp::Store,
                 },
-                depth_slice: None,
             })],
-
-            depth_stencil_attachment: None,
+            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                view: &r.g_buffer.depth.view,
+                depth_ops: Some(wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(1.0),
+                    store: wgpu::StoreOp::Store,
+                }),
+                stencil_ops: None,
+            }),
             timestamp_writes: None,
             occlusion_query_set: None,
         });
