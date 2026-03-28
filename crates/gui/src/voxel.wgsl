@@ -181,6 +181,7 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
 
 struct FragmentOutput {
     @location(0) color: vec4<f32>,
+    @location(1) translucency: vec4<f32>,
     @builtin(frag_depth) depth: f32,
 }
 
@@ -331,15 +332,16 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     let corrected_color = pow(accumulated_color.rgb, vec3<f32>(1.0 / gamma));
 
     var output: FragmentOutput;
-    output.color = vec4<f32>(corrected_color, accumulated_color.a);
 
     if (t_first_hit >= 0.0) {
         // Project the hit point into clip space to get its depth
         let hit_point = ray_origin_local + ray_dir_local * t_first_hit;
         let clip_pos = camera.view_proj * vec4<f32>(hit_point, 1.0);
         output.depth = clip_pos.z / clip_pos.w;
+        output.color = vec4<f32>(corrected_color, accumulated_color.a);
     } else {
         output.depth = 1.0;  // far plane, nothing hit
+        output.translucency = vec4<f32>(corrected_color, accumulated_color.a);
     }
 
     return output;
