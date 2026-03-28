@@ -33,6 +33,41 @@ const TILE_SIZE_UV: f32 = TILE_DIM_PX / TEXTURE_ATLAS_DIM_PX; // Normalized UV s
 
 const AIR_TYPE: u32 = 2u;
 
+struct Ray {
+    origin: vec3<f32>,
+    direction: vec3<f32>,
+    inv_direction: vec3<f32>,
+}
+
+struct BoundingBoxIntersection {
+    hit: bool,
+    t_min: f32,
+    t_max: f32,
+}
+
+struct DDAState {
+    current_voxel: vec3<i32>,
+    step_dir: vec3<f32>,
+    t_max: vec3<f32>,
+    t_delta: vec3<f32>,
+    face_normal: vec3<i32>,
+}
+
+struct VoxelSurface {
+    voxel_type: u32,
+    hit_point: vec3<f32>,
+    normal: vec3<i32>,
+    distance: f32,
+}
+
+struct TraversalResult {
+    hit_solid: bool,
+    solid_surface: VoxelSurface,
+    accumulated_transparent_color: vec4<f32>,
+    hit_selected_block: bool,
+    hit_hovered_block: bool,
+}
+
 struct CameraUniform {
     view_proj: mat4x4<f32>,
     inv_view_proj: mat4x4<f32>,
@@ -108,6 +143,71 @@ fn blend_colors(current_color: vec4<f32>, new_color: vec4<f32>) -> vec4<f32> {
     return vec4<f32>(new_accumulated_rgb, new_accumulated_alpha);
 }
 
+fn sample_surface_texture(surface: VoxelSurface) -> vec4<f32> {
+    var hit_face_id: u32;
+    if (surface.normal.x != 0) {
+        hit_face_id = select(FACE_NX, FACE_PX, surface.normal.x > 0);
+    } else if (surface.normal.y != 0) {
+        hit_face_id = select(FACE_NY, FACE_PY, surface.normal.y > 0);
+    } else {
+        hit_face_id = select(FACE_NZ, FACE_PZ, surface.normal.z > 0);
+    }
+
+    var uv: vec2<f32>;
+    let fractional_pos = surface.hit_point / VOXEL_SIZE;
+    if (surface.normal.x != 0) { // Hit an X face
+        uv = vec2<f32>(fract(fractional_pos.z), 1.0 - fract(fractional_pos.y));
+    } else if (surface.normal.y != 0) { // Hit a Y face
+        uv = vec2<f32>(fract(fractional_pos.x), fract(fractional_pos.z));
+    } else { // Hit a Z face
+        uv = vec2<f32>(fract(fractional_pos.x), 1.0 - fract(fractional_pos.y));
+    }
+    uv = clamp(uv, vec2<f32>(0.0), vec2<f32>(1.0 - 1e-6));
+
+    return sample_texture_by_face(surface.voxel_type, hit_face_id, uv);
+}
+
+fn calculate_lighting(surface: VoxelSurface, base_color: vec4<f32>) -> vec3<f32> {
+    let face_normal_f32 = vec3<f32>(surface.normal);
+    let light_direction = normalize(vec3<f32>(-1.0, 1.0, 0.5));
+    let ambient_light = 0.2;
+    let diffuse_factor = max(dot(face_normal_f32, light_direction), 0.0);
+    let final_light_factor = ambient_light + (1.0 - ambient_light) * diffuse_factor;
+
+    let lit_rgb = base_color.rgb * final_light_factor;
+
+    let min_depth_factor = 0.85;
+    let depth_multiplier = (surface.hit_point.z / 3.0) * (1.0 - min_depth_factor) + min_depth_factor;
+    return lit_rgb * depth_multiplier;
+}
+
+fn apply_block_highlights(base_color: vec4<f32>, is_selected: bool, is_hovered: bool) -> vec4<f32> {
+    var final_color = base_color;
+
+    if (is_selected) {
+        let highlight_color = vec4<f32>(1.0, 1.0, 1.0, 0.1);
+        let final_rgb = mix(final_color.rgb, highlight_color.rgb, highlight_color.a);
+        let final_a = highlight_color.a + final_color.a * (1.0 - highlight_color.a);
+        final_color = vec4<f32>(final_rgb, final_a);
+    }
+
+    if (is_hovered) {
+        let highlight_color = vec4<f32>(0.0, 0.0, 1.0, 0.1);
+        let final_rgb = mix(final_color.rgb, highlight_color.rgb, highlight_color.a);
+        let final_a = highlight_color.a + final_color.a * (1.0 - highlight_color.a);
+        final_color = vec4<f32>(final_rgb, final_a);
+    }
+
+    return final_color;
+}
+
+fn calculate_depth(hit_distance: f32, ray: Ray) -> f32 {
+    let hit_point_world = ray.origin + ray.direction * hit_distance;
+    let hit_point_local = hit_point_world - camera.world_offset.xyz;
+    let clip_pos = camera.view_proj * vec4<f32>(hit_point_local, 1.0);
+    return clip_pos.z / clip_pos.w;
+}
+
 // helper function to render a surface and blend its color.
 fn render_and_blend(
     voxel_type: u32,
@@ -120,43 +220,12 @@ fn render_and_blend(
         return;
     }
 
-    var hit_face_id: u32;
-    if (face_normal.x != 0) {
-        hit_face_id = select(FACE_NX, FACE_PX, face_normal.x > 0);
-    } else if (face_normal.y != 0) {
-        hit_face_id = select(FACE_NY, FACE_PY, face_normal.y > 0);
-    } else {
-        hit_face_id = select(FACE_NZ, FACE_PZ, face_normal.z > 0);
-    }
-
-    var uv: vec2<f32>;
-    let fractional_pos = hit_point / VOXEL_SIZE;
-    if (face_normal.x != 0) { // Hit an X face
-        uv = vec2<f32>(fract(fractional_pos.z), 1.0 - fract(fractional_pos.y));
-    } else if (face_normal.y != 0) { // Hit a Y face
-        uv = vec2<f32>(fract(fractional_pos.x), fract(fractional_pos.z));
-    } else { // Hit a Z face
-        uv = vec2<f32>(fract(fractional_pos.x), 1.0 - fract(fractional_pos.y));
-    }
-    uv = clamp(uv, vec2<f32>(0.0), vec2<f32>(1.0 - 1e-6));
-
-    var surface_color = sample_texture_by_face(voxel_type, hit_face_id, uv);
+    let surface = VoxelSurface(voxel_type, hit_point, face_normal, 0.0);
+    let surface_color = sample_surface_texture(surface);
 
     if (surface_color.a > 0.0) {
-        let face_normal_f32 = vec3<f32>(face_normal);
-        let light_direction = normalize(vec3<f32>(-1.0, 1.0, 0.5));
-        let ambient_light = 0.2;
-        let diffuse_factor = max(dot(face_normal_f32, light_direction), 0.0);
-        let final_light_factor = ambient_light + (1.0 - ambient_light) * diffuse_factor;
-
-        let lit_rgb = surface_color.rgb * final_light_factor;
-
-        let min_depth_factor = 0.85;
-        let depth_multiplier = (hit_point.z / 3.0) * (1.0 - min_depth_factor) + min_depth_factor;
-        let final_rgb = lit_rgb * depth_multiplier;
-
-        let new_color_to_blend = vec4<f32>(final_rgb, surface_color.a);
-
+        let lit_rgb = calculate_lighting(surface, surface_color);
+        let new_color_to_blend = vec4<f32>(lit_rgb, surface_color.a);
         *accumulated_color = blend_colors(*accumulated_color, new_color_to_blend);
     }
 }
@@ -185,163 +254,177 @@ struct FragmentOutput {
     @builtin(frag_depth) depth: f32,
 }
 
-@fragment
-fn fs_main(in: VertexOutput) -> FragmentOutput {
-    let frag_coord = in.uv;
-    let ndc_coords = vec2<f32>(frag_coord.x*2.0-1.0, (1.0-frag_coord.y)*2.0 - 1.0);
-
-    let inv_view_proj = camera.inv_view_proj;
-    let clip_pos_near = vec4<f32>(ndc_coords.x, ndc_coords.y, 0.0, 1.0);
-    let clip_pos_far = vec4<f32>(ndc_coords.x, ndc_coords.y, 1.0, 1.0);
-    let world_pos_near = inv_view_proj * clip_pos_near;
-    let world_pos_far = inv_view_proj * clip_pos_far;
+fn create_camera_ray(ndc: vec2<f32>) -> Ray {
+    let clip_pos_far = vec4<f32>(ndc.x, ndc.y, 1.0, 1.0);
+    let world_pos_far = camera.inv_view_proj * clip_pos_far;
 
     let ray_origin_local = camera.camera_pos.xyz;
-    let ray_dir_local = normalize((world_pos_far.xyz/world_pos_far.w) - ray_origin_local);
+    let ray_dir_local = normalize((world_pos_far.xyz / world_pos_far.w) - ray_origin_local);
     let ray_origin_world = ray_origin_local + camera.world_offset.xyz;
-    let ray_dir_world = ray_dir_local;
 
+    let inv_direction = 1.0 / ray_dir_local;
+
+    return Ray(ray_origin_world, ray_dir_local, inv_direction);
+}
+
+fn intersect_world_bounds(ray: Ray) -> BoundingBoxIntersection {
     let world_min_bound = vec3<f32>(0.0, 0.0, 0.0);
     let world_max_bound = vec3<f32>(f32(WORLD_DIM_X), f32(WORLD_DIM_Y), f32(WORLD_DIM_Z)) * VOXEL_SIZE;
 
-    let inv_dir = 1.0 / ray_dir_world;
-    let t_bottom = (world_min_bound - ray_origin_world) * inv_dir;
-    let t_top = (world_max_bound - ray_origin_world) * inv_dir;
+    let t_bottom = (world_min_bound - ray.origin) * ray.inv_direction;
+    let t_top = (world_max_bound - ray.origin) * ray.inv_direction;
     let t_min_v = min(t_bottom, t_top);
     let t_max_v = max(t_bottom, t_top);
+
     let t_min_intersect = max(t_min_v.x, max(t_min_v.y, t_min_v.z));
     let t_max_intersect = min(t_max_v.x, min(t_max_v.y, t_max_v.z));
 
-    if (t_min_intersect > t_max_intersect) {
+    return BoundingBoxIntersection(t_min_intersect <= t_max_intersect, t_min_intersect, t_max_intersect);
+}
+
+fn initialize_dda(ray: Ray, start_t: f32) -> DDAState {
+    var state: DDAState;
+
+    let current_ray_pos = ray.origin + ray.direction * start_t;
+    state.current_voxel = vec3<i32>(floor(current_ray_pos / VOXEL_SIZE));
+    state.current_voxel = clamp(state.current_voxel, vec3<i32>(0), vec3<i32>(i32(WORLD_DIM_X)-1, i32(WORLD_DIM_Y)-1, i32(WORLD_DIM_Z)-1));
+
+    state.step_dir = sign(ray.direction);
+    if (ray.direction.x == 0.0) { state.step_dir.x = 0.0; }
+    if (ray.direction.y == 0.0) { state.step_dir.y = 0.0; }
+    if (ray.direction.z == 0.0) { state.step_dir.z = 0.0; }
+
+    let next_voxel_boundary = (vec3<f32>(state.current_voxel) + max(vec3<f32>(0.0), state.step_dir)) * VOXEL_SIZE;
+
+    if (ray.direction.x == 0.0) { state.t_max.x = 1e9; } else { state.t_max.x = (next_voxel_boundary.x - ray.origin.x) * ray.inv_direction.x; }
+    if (ray.direction.y == 0.0) { state.t_max.y = 1e9; } else { state.t_max.y = (next_voxel_boundary.y - ray.origin.y) * ray.inv_direction.y; }
+    if (ray.direction.z == 0.0) { state.t_max.z = 1e9; } else { state.t_max.z = (next_voxel_boundary.z - ray.origin.z) * ray.inv_direction.z; }
+
+    state.t_delta = VOXEL_SIZE * abs(ray.inv_direction);
+    if (ray.direction.x == 0.0) { state.t_delta.x = 1e9; }
+    if (ray.direction.y == 0.0) { state.t_delta.y = 1e9; }
+    if (ray.direction.z == 0.0) { state.t_delta.z = 1e9; }
+
+    let world_min_bound = vec3<f32>(0.0, 0.0, 0.0);
+    let world_max_bound = vec3<f32>(f32(WORLD_DIM_X), f32(WORLD_DIM_Y), f32(WORLD_DIM_Z)) * VOXEL_SIZE;
+    let t_bottom = (world_min_bound - ray.origin) * ray.inv_direction;
+    let t_top = (world_max_bound - ray.origin) * ray.inv_direction;
+    let t_min_v = min(t_bottom, t_top);
+
+    state.face_normal = vec3<i32>(0);
+    if (t_min_v.x > t_min_v.y && t_min_v.x > t_min_v.z) { state.face_normal.x = -i32(sign(ray.direction.x)); }
+    else if (t_min_v.y > t_min_v.z) { state.face_normal.y = -i32(sign(ray.direction.y)); }
+    else { state.face_normal.z = -i32(sign(ray.direction.z)); }
+
+    return state;
+}
+
+fn step_dda(dda: ptr<function, DDAState>) -> f32 {
+    var next_t: f32;
+    if ((*dda).t_max.x < (*dda).t_max.y && (*dda).t_max.x < (*dda).t_max.z) {
+        next_t = (*dda).t_max.x;
+        (*dda).current_voxel.x += i32((*dda).step_dir.x);
+        (*dda).t_max.x += (*dda).t_delta.x;
+        (*dda).face_normal = vec3<i32>(-i32((*dda).step_dir.x), 0, 0);
+    } else if ((*dda).t_max.y < (*dda).t_max.z) {
+        next_t = (*dda).t_max.y;
+        (*dda).current_voxel.y += i32((*dda).step_dir.y);
+        (*dda).t_max.y += (*dda).t_delta.y;
+        (*dda).face_normal = vec3<i32>(0, -i32((*dda).step_dir.y), 0);
+    } else {
+        next_t = (*dda).t_max.z;
+        (*dda).current_voxel.z += i32((*dda).step_dir.z);
+        (*dda).t_max.z += (*dda).t_delta.z;
+        (*dda).face_normal = vec3<i32>(0, 0, -i32((*dda).step_dir.z));
+    }
+    return next_t;
+}
+
+fn traverse_world(ray: Ray, bounds: BoundingBoxIntersection) -> TraversalResult {
+    var hit_solid = false;
+    var solid_surface = VoxelSurface(0u, vec3<f32>(0.0), vec3<i32>(0), 0.0);
+    var accumulated_color = vec4<f32>(0.0);
+    var hit_selected_block = false;
+    var hit_hovered_block = false;
+
+    var dda = initialize_dda(ray, bounds.t_min);
+    var t_hit = bounds.t_min;
+    var prev_voxel_type = AIR_TYPE;
+    var t_first_hit = -1.0;
+
+    for (var i: u32 = 0u; i < MAX_VOXEL_TRAVERSAL_STEPS; i = i + 1u) {
+        if (t_hit > bounds.t_max || accumulated_color.a == 1.0) {
+            break;
+        }
+
+        hit_selected_block |= selected_block.x == 1 && all(vec3<u32>(dda.current_voxel).xy == selected_block.yz);
+        hit_hovered_block |= hover_on_block.x == 1 && all(vec3<u32>(dda.current_voxel).xy == hover_on_block.yz);
+
+        let current_voxel_type = get_voxel_type(dda.current_voxel);
+        if (current_voxel_type != prev_voxel_type) {
+            let hit_point = ray.origin + ray.direction * t_hit;
+            // Render the back-face of the block we are EXITING
+            render_and_blend(prev_voxel_type, hit_point, dda.face_normal, &accumulated_color);
+            // Render the front-face of the block we are ENTERING
+            render_and_blend(current_voxel_type, hit_point, dda.face_normal, &accumulated_color);
+            if (t_first_hit < 0.0 && accumulated_color.a == 1.0) {
+                t_first_hit = t_hit;
+                hit_solid = true;
+                solid_surface = VoxelSurface(current_voxel_type, hit_point, dda.face_normal, t_first_hit);
+            }
+        }
+
+        prev_voxel_type = current_voxel_type;
+
+        t_hit = step_dda(&dda);
+    }
+
+    // After the loop, if the ray exited the world from a transparent block, render its final exit surface.
+    if (t_hit >= bounds.t_max && prev_voxel_type != AIR_TYPE && accumulated_color.a != 1.0) {
+        let hit_point = ray.origin + ray.direction * bounds.t_max;
+        let clamped_hit_point = clamp(hit_point, vec3<f32>(0.0), vec3<f32>(f32(WORLD_DIM_X), f32(WORLD_DIM_Y), f32(WORLD_DIM_Z)));
+        render_and_blend(prev_voxel_type, clamped_hit_point, dda.face_normal, &accumulated_color);
+    }
+
+    return TraversalResult(
+        hit_solid,
+        solid_surface,
+        accumulated_color,
+        hit_selected_block,
+        hit_hovered_block
+    );
+}
+
+@fragment
+fn fs_main(in: VertexOutput) -> FragmentOutput {
+    let ndc_coords = vec2<f32>(in.uv.x * 2.0 - 1.0, (1.0 - in.uv.y) * 2.0 - 1.0);
+    let ray = create_camera_ray(ndc_coords);
+    let bounds_intersect = intersect_world_bounds(ray);
+
+    if (!bounds_intersect.hit) {
         var output: FragmentOutput;
         output.color = vec4<f32>(0.0);
         output.depth = 1.0;
         return output;
     }
 
-    var initial_normal = vec3<i32>(0);
-    if (t_min_v.x > t_min_v.y && t_min_v.x > t_min_v.z) { initial_normal.x = -i32(sign(ray_dir_world.x)); }
-    else if (t_min_v.y > t_min_v.z) { initial_normal.y = -i32(sign(ray_dir_world.y)); }
-    else { initial_normal.z = -i32(sign(ray_dir_world.z)); }
+    let traversal = traverse_world(ray, bounds_intersect);
 
-    var current_ray_pos = ray_origin_world + ray_dir_world * t_min_intersect;
-    var current_voxel_coords = vec3<i32>(floor(current_ray_pos / VOXEL_SIZE));
-    current_voxel_coords = clamp(current_voxel_coords, vec3<i32>(0), vec3<i32>(i32(WORLD_DIM_X)-1, i32(WORLD_DIM_Y)-1, i32(WORLD_DIM_Z)-1));
-
-    var step_dir = sign(ray_dir_world);
-    if (ray_dir_world.x == 0.0) { step_dir.x = 0.0; }
-    if (ray_dir_world.y == 0.0) { step_dir.y = 0.0; }
-    if (ray_dir_world.z == 0.0) { step_dir.z = 0.0; }
-
-    let next_voxel_boundary = (vec3<f32>(current_voxel_coords) + max(vec3<f32>(0.0), step_dir)) * VOXEL_SIZE;
-    var t_max_axis: vec3<f32>;
-    if (ray_dir_world.x==0.0) {t_max_axis.x=1e9;} else {t_max_axis.x=(next_voxel_boundary.x-ray_origin_world.x)/ray_dir_world.x;}
-    if (ray_dir_world.y==0.0) {t_max_axis.y=1e9;} else {t_max_axis.y=(next_voxel_boundary.y-ray_origin_world.y)/ray_dir_world.y;}
-    if (ray_dir_world.z==0.0) {t_max_axis.z=1e9;} else {t_max_axis.z=(next_voxel_boundary.z-ray_origin_world.z)/ray_dir_world.z;}
-
-    var t_delta_axis = VOXEL_SIZE / abs(ray_dir_world);
-    if (ray_dir_world.x == 0.0) { t_delta_axis.x=1e9; }
-    if (ray_dir_world.y == 0.0) { t_delta_axis.y=1e9; }
-    if (ray_dir_world.z == 0.0) { t_delta_axis.z=1e9; }
-
-    var normal_of_entry_face = initial_normal;
-    var t_hit = t_min_intersect;
-    var accumulated_color = vec4<f32>(0.0);
-    var prev_voxel_type = AIR_TYPE;
-    var ever_hit_selected_block = false;
-    var ever_hit_hover_on_block = false;
-    var t_first_hit = -1.0;
-
-    for (var i: u32 = 0u; i < MAX_VOXEL_TRAVERSAL_STEPS; i = i + 1u) {
-        if (t_hit > t_max_intersect || accumulated_color.a == 1.0) {
-            break;
-        }
-
-        ever_hit_selected_block |= selected_block.x == 1 && all(vec3<u32>(current_voxel_coords).xy == selected_block.yz);
-        ever_hit_hover_on_block |= hover_on_block.x == 1 && all(vec3<u32>(current_voxel_coords).xy == hover_on_block.yz);
-
-        let current_voxel_type = get_voxel_type(current_voxel_coords);
-        if (current_voxel_type != prev_voxel_type) {
-            let hit_point = ray_origin_world + ray_dir_world * t_hit;
-            // Render the back-face of the block we are EXITING
-            render_and_blend(prev_voxel_type, hit_point, normal_of_entry_face, &accumulated_color);
-            // Render the front-face of the block we are ENTERING
-            render_and_blend(current_voxel_type, hit_point, normal_of_entry_face, &accumulated_color);
-            if (t_first_hit < 0.0 && accumulated_color.a == 1.0) {
-                t_first_hit = t_hit;
-            }
-        }
-
-        prev_voxel_type = current_voxel_type;
-
-        if (t_max_axis.x < t_max_axis.y && t_max_axis.x < t_max_axis.z) {
-            t_hit = t_max_axis.x;
-            current_voxel_coords.x += i32(step_dir.x);
-            t_max_axis.x += t_delta_axis.x;
-            normal_of_entry_face = vec3<i32>(-i32(step_dir.x), 0, 0);
-        } else if (t_max_axis.y < t_max_axis.z) {
-            t_hit = t_max_axis.y;
-            current_voxel_coords.y += i32(step_dir.y);
-            t_max_axis.y += t_delta_axis.y;
-            normal_of_entry_face = vec3<i32>(0, -i32(step_dir.y), 0);
-        } else {
-            t_hit = t_max_axis.z;
-            current_voxel_coords.z += i32(step_dir.z);
-            t_max_axis.z += t_delta_axis.z;
-            normal_of_entry_face = vec3<i32>(0, 0, -i32(step_dir.z));
-        }
-    }
-
-    // After the loop, if the ray exited the world from a transparent block, render its final exit surface.
-    if (t_hit >= t_max_intersect && prev_voxel_type != AIR_TYPE && accumulated_color.a != 1.0) {
-        let hit_point = ray_origin_world + ray_dir_world * t_max_intersect;
-        let clamped_hit_point = clamp(hit_point, vec3<f32>(0.0), vec3<f32>(f32(WORLD_DIM_X), f32(WORLD_DIM_Y), f32(WORLD_DIM_Z)));
-        render_and_blend(prev_voxel_type, clamped_hit_point, normal_of_entry_face, &accumulated_color);
-    }
-
-    if (ever_hit_selected_block) {
-        let highlight_color = vec4<f32>(1.0, 1.0, 1.0, 0.1);
-
-        // Blend the semi-transparent highlight color ON TOP of the accumulated scene color.
-        // This is the standard "over" alpha blending operation.
-        // Final RGB = Highlight RGB + Scene RGB * (1 - Highlight Alpha)
-        let final_rgb = mix(accumulated_color.rgb, highlight_color.rgb, highlight_color.a);
-
-        // The final alpha is also a combination of the highlight and scene alphas.
-        let final_a = highlight_color.a + accumulated_color.a * (1.0 - highlight_color.a);
-
-        accumulated_color = vec4<f32>(final_rgb, final_a);
-    }
-
-    if (ever_hit_hover_on_block) {
-        let highlight_color = vec4<f32>(0.0, 0.0, 1.0, 0.1);
-
-        // Blend the semi-transparent highlight color ON TOP of the accumulated scene color.
-        // This is the standard "over" alpha blending operation.
-        // Final RGB = Highlight RGB + Scene RGB * (1 - Highlight Alpha)
-        let final_rgb = mix(accumulated_color.rgb, highlight_color.rgb, highlight_color.a);
-
-        // The final alpha is also a combination of the highlight and scene alphas.
-        let final_a = highlight_color.a + accumulated_color.a * (1.0 - highlight_color.a);
-
-        accumulated_color = vec4<f32>(final_rgb, final_a);
-    }
+    var final_color = traversal.accumulated_transparent_color;
+    final_color = apply_block_highlights(final_color, traversal.hit_selected_block, traversal.hit_hovered_block);
 
     // eframe uses Bgra8Unorm so we have to manually do gamma correction
     let gamma = 2.2;
-    let corrected_color = pow(accumulated_color.rgb, vec3<f32>(1.0 / gamma));
+    let corrected_color = pow(final_color.rgb, vec3<f32>(1.0 / gamma));
 
     var output: FragmentOutput;
 
-    if (t_first_hit >= 0.0) {
-        // Project the hit point into clip space to get its depth
-        let hit_point = ray_origin_local + ray_dir_local * t_first_hit;
-        let clip_pos = camera.view_proj * vec4<f32>(hit_point, 1.0);
-        output.depth = clip_pos.z / clip_pos.w;
-        output.color = vec4<f32>(corrected_color, accumulated_color.a);
+    if (traversal.hit_solid) {
+        output.color = vec4<f32>(corrected_color, final_color.a);
+        output.depth = calculate_depth(traversal.solid_surface.distance, ray);
     } else {
-        output.depth = 1.0;  // far plane, nothing hit
-        output.translucency = vec4<f32>(corrected_color, accumulated_color.a);
+        output.translucency = vec4<f32>(corrected_color, final_color.a);
+        output.depth = 1.0;
     }
 
     return output;
