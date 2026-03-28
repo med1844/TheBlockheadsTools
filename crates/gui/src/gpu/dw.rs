@@ -226,6 +226,7 @@ impl DwChunkBuf {
             &mut icons,
             &mut builder,
         );
+        add(chunk.kelp_plant.iter(), KelpPlant, &mut icons, &mut builder);
         add(
             chunk.tomato_plant.iter(),
             TomatoPlant,

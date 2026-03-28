@@ -38,7 +38,7 @@ fn vs_main(model: VertexInput) -> VertexOutput {
 fn fs_main(in: VertexOutput) -> FragmentOutput {
     let color = textureSample(tilemap_texture, tilemap_sampler, in.tex_coords);
 
-    if (color.a != 1.0) {
+    if (color.a == 0.0) {
         discard;
     }
 
