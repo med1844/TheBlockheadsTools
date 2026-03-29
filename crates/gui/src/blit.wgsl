@@ -1,5 +1,7 @@
 @group(0) @binding(0) var color_texture: texture_2d<f32>;
 @group(0) @binding(1) var color_sampler: sampler;
+@group(0) @binding(2) var translucency_texture: texture_2d<f32>;
+@group(0) @binding(3) var translucency_sampler: sampler;
 
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
@@ -21,5 +23,11 @@ fn vs_blit(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
 
 @fragment
 fn fs_blit(in: VertexOutput) -> @location(0) vec4<f32> {
-    return textureSample(color_texture, color_sampler, in.uv);
+    let base_color = textureSample(color_texture, color_sampler, in.uv);
+    let trans_color = textureSample(translucency_texture, translucency_sampler, in.uv);
+    
+    let final_rgb = trans_color.rgb + base_color.rgb * (1.0 - trans_color.a);
+    let final_a = trans_color.a + base_color.a * (1.0 - trans_color.a);
+    
+    return vec4<f32>(final_rgb, final_a);
 }

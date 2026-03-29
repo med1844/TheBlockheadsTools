@@ -340,6 +340,11 @@ fn step_dda(dda: ptr<function, DDAState>) -> f32 {
     return next_t;
 }
 
+// This will be refactored later
+fn is_transparent(voxel_type: u32) -> bool {
+    return voxel_type == 3u || voxel_type == 4u;
+}
+
 fn traverse_world(ray: Ray, bounds: BoundingBoxIntersection) -> TraversalResult {
     var hit_solid = false;
     var solid_surface = VoxelSurface(0u, vec3<f32>(0.0), vec3<i32>(0), 0.0);
@@ -350,10 +355,9 @@ fn traverse_world(ray: Ray, bounds: BoundingBoxIntersection) -> TraversalResult 
     var dda = initialize_dda(ray, bounds.t_min);
     var t_hit = bounds.t_min;
     var prev_voxel_type = AIR_TYPE;
-    var t_first_hit = -1.0;
 
     for (var i: u32 = 0u; i < MAX_VOXEL_TRAVERSAL_STEPS; i = i + 1u) {
-        if (t_hit > bounds.t_max || accumulated_color.a == 1.0) {
+        if (t_hit > bounds.t_max || hit_solid) {
             break;
         }
 
@@ -363,14 +367,20 @@ fn traverse_world(ray: Ray, bounds: BoundingBoxIntersection) -> TraversalResult 
         let current_voxel_type = get_voxel_type(dda.current_voxel);
         if (current_voxel_type != prev_voxel_type) {
             let hit_point = ray.origin + ray.direction * t_hit;
-            // Render the back-face of the block we are EXITING
-            render_and_blend(prev_voxel_type, hit_point, dda.face_normal, &accumulated_color);
-            // Render the front-face of the block we are ENTERING
-            render_and_blend(current_voxel_type, hit_point, dda.face_normal, &accumulated_color);
-            if (t_first_hit < 0.0 && accumulated_color.a == 1.0) {
-                t_first_hit = t_hit;
+            
+            if (is_transparent(prev_voxel_type)) {
+                // Render the back-face of the transparent block we are EXITING
+                render_and_blend(prev_voxel_type, hit_point, dda.face_normal, &accumulated_color);
+            }
+            
+            if (is_transparent(current_voxel_type)) {
+                // Render the front-face of the transparent block we are ENTERING
+                render_and_blend(current_voxel_type, hit_point, dda.face_normal, &accumulated_color);
+            } else if (current_voxel_type != AIR_TYPE) {
+                // We reached a solid block
                 hit_solid = true;
-                solid_surface = VoxelSurface(current_voxel_type, hit_point, dda.face_normal, t_first_hit);
+                solid_surface = VoxelSurface(current_voxel_type, hit_point, dda.face_normal, t_hit);
+                break;
             }
         }
 
@@ -380,7 +390,7 @@ fn traverse_world(ray: Ray, bounds: BoundingBoxIntersection) -> TraversalResult 
     }
 
     // After the loop, if the ray exited the world from a transparent block, render its final exit surface.
-    if (t_hit >= bounds.t_max && prev_voxel_type != AIR_TYPE && accumulated_color.a != 1.0) {
+    if (!hit_solid && t_hit >= bounds.t_max && prev_voxel_type != AIR_TYPE && is_transparent(prev_voxel_type)) {
         let hit_point = ray.origin + ray.direction * bounds.t_max;
         let clamped_hit_point = clamp(hit_point, vec3<f32>(0.0), vec3<f32>(f32(WORLD_DIM_X), f32(WORLD_DIM_Y), f32(WORLD_DIM_Z)));
         render_and_blend(prev_voxel_type, clamped_hit_point, dda.face_normal, &accumulated_color);
@@ -404,26 +414,33 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     if (!bounds_intersect.hit) {
         var output: FragmentOutput;
         output.color = vec4<f32>(0.0);
+        output.translucency = vec4<f32>(0.0);
         output.depth = 1.0;
         return output;
     }
 
     let traversal = traverse_world(ray, bounds_intersect);
 
-    var final_color = traversal.accumulated_transparent_color;
-    final_color = apply_block_highlights(final_color, traversal.hit_selected_block, traversal.hit_hovered_block);
+    var final_transparent_color = traversal.accumulated_transparent_color;
+    final_transparent_color = apply_block_highlights(final_transparent_color, traversal.hit_selected_block, traversal.hit_hovered_block);
 
     // eframe uses Bgra8Unorm so we have to manually do gamma correction
     let gamma = 2.2;
-    let corrected_color = pow(final_color.rgb, vec3<f32>(1.0 / gamma));
+    let corrected_translucency = pow(final_transparent_color.rgb, vec3<f32>(1.0 / gamma));
 
     var output: FragmentOutput;
 
     if (traversal.hit_solid) {
-        output.color = vec4<f32>(corrected_color, final_color.a);
+        let base_color = sample_surface_texture(traversal.solid_surface);
+        let lit_color = calculate_lighting(traversal.solid_surface, base_color);
+        let corrected_solid = pow(lit_color, vec3<f32>(1.0 / gamma));
+        
+        output.color = vec4<f32>(corrected_solid, 1.0);
+        output.translucency = vec4<f32>(corrected_translucency, final_transparent_color.a);
         output.depth = calculate_depth(traversal.solid_surface.distance, ray);
     } else {
-        output.translucency = vec4<f32>(corrected_color, final_color.a);
+        output.color = vec4<f32>(0.0);
+        output.translucency = vec4<f32>(corrected_translucency, final_transparent_color.a);
         output.depth = 1.0;
     }
 
