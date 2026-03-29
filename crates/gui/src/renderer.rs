@@ -34,7 +34,7 @@ impl VoxelRenderer {
             source: wgpu::ShaderSource::Wgsl(include_str!("voxel.wgsl").into()),
         });
 
-        let uv_face_u32 = VoxelType::UV_AT_FACE
+        let uv_face_u32 = VoxelType::uv_at_face()
             .iter()
             .flat_map(|v| v.map(|v| v as u32))
             .collect::<Vec<_>>();
@@ -44,7 +44,10 @@ impl VoxelRenderer {
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
         });
 
-        let is_transparent_u32 = VoxelType::transparency();
+        let is_transparent_u32 = VoxelType::transparency()
+            .into_iter()
+            .map(|b| b as u32)
+            .collect::<Vec<_>>();
         let is_transparent_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Is Transparent Buffer"),
             contents: bytemuck::cast_slice(&is_transparent_u32),

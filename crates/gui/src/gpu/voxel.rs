@@ -1,419 +1,534 @@
 use crate::image_type::ImageType;
+use num_enum::TryFromPrimitive;
 use the_blockheads_tools_lib::game::block::{
     Block, BlockContentType, BlockError, BlockType, BlockView,
 };
-// use snafu::prelude::*;
-
-type BlockIdType = u16;
 
 // Basically the same as BlockType, but treats block with tile content as separate type
-#[repr(C)]
-#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable, PartialEq, Eq)]
-pub struct VoxelType(BlockIdType);
+#[repr(u16)]
+#[derive(
+    Debug, Copy, Clone, bytemuck::Zeroable, bytemuck::NoUninit, PartialEq, Eq, TryFromPrimitive,
+)]
+pub enum VoxelType {
+    Unknown = 0,
+    Stone = 1,
+    Air = 2,
+    Water = 3,
+    Ice = 4,
+    Snow = 5,
+    Dirt = 6,
+    Sand = 7,
+    MinedSand = 8,
+    Wood = 9,
+    MinedStone = 10,
+    RedBrick = 11,
+    Limestone = 12,
+    MinedLimestone = 13,
+    Marble = 14,
+    MinedMarble = 15,
+    TimeCrystal = 16,
+    SandStone = 17,
+    MinedSandStone = 18,
+    RedMarble = 19,
+    MinedRedMarble = 20,
+    Glass = 24,
+    SpawnPortalBase = 25,
+    GoldBlock = 26,
+    GrassDirt = 27,
+    SnowDirt = 28,
+    LapisLazuli = 29,
+    MinedLapisLazuli = 30,
+    Lava = 31,
+    ReinforcedPlatform = 32,
+    SpawnPortalBaseAmethyst = 33,
+    SpawnPortalBaseSapphire = 34,
+    SpawnPortalBaseEmerald = 35,
+    SpawnPortalBaseRuby = 36,
+    SpawnPortalBaseDiamond = 37,
+    NorthPole = 38,
+    SouthPole = 39,
+    WestPole = 40,
+    EastPole = 41,
+    PortalBase = 42,
+    PortalBaseAmethyst = 43,
+    PortalBaseSapphire = 44,
+    PortalBaseEmerald = 45,
+    PortalBaseRuby = 46,
+    PortalBaseDiamond = 47,
+    Compost = 48,
+    GrassCompost = 49,
+    SnowCompost = 50,
+    Basalt = 51,
+    MinedBasalt = 52,
+    CopperBlock = 53,
+    TinBlock = 54,
+    BronzeBlock = 55,
+    IronBlock = 56,
+    SteelBlock = 57,
+    BlackSand = 58,
+    BlackGlass = 59,
+    TradePortalBase = 60,
+    TradePortalBaseAmethyst = 61,
+    TradePortalBaseSapphire = 62,
+    TradePortalBaseEmerald = 63,
+    TradePortalBaseRuby = 64,
+    TradePortalBaseDiamond = 65,
+    PlatinumBlock = 67,
+    TitaniumBlock = 68,
+    CarbonFiberBlock = 69,
+    Gravel = 70,
+    AmethystBlock = 71,
+    SapphireBlock = 72,
+    EmeraldBlock = 73,
+    RubyBlock = 74,
+    DiamondBlock = 75,
+    Plaster = 76,
+    LuminousPlaster = 77,
+    DirtClay = 78,
+    DirtFlint = 79,
+    GrassDirtClay = 80,
+    GrassDirtFlint = 81,
+    SnowDirtClay = 82,
+    SnowDirtFlint = 83,
+    StoneCopperOre = 84,
+    StoneTinOre = 85,
+    StoneIronOre = 86,
+    StoneCoal = 87,
+    StoneGoldNuggets = 88,
+    StonePlatinumOre = 89,
+    StoneTitaniumOre = 90,
+    LimestoneOil = 91,
+    AppleTreeLeaf = 92,
+    AppleTreeTrunk = 93,
+    AppleTreeTrunkLeaf = 94,
+    PineTreeLeaf = 95,
+    PineTreeTrunk = 96,
+    PineTreeTrunkLeaf = 97,
+    MapleTreeLeaf = 98,
+    MapleTreeTrunk = 99,
+    MapleTreeTrunkLeaf = 100,
+    MangoTreeLeaf = 101,
+    MangoTreeTrunk = 102,
+    MangoTreeTrunkLeaf = 103,
+    CoconutTreeLeaf = 104,
+    CoconutTreeTrunk = 105,
+    OrangeTreeLeaf = 106,
+    OrangeTreeTrunk = 107,
+    OrangeTreeTrunkLeaf = 108,
+    CherryTreeLeaf = 109,
+    CherryTreeTrunk = 110,
+    CherryTreeTrunkLeaf = 111,
+    CoffeeTreeLeaf = 112,
+    CoffeeTreeTrunk = 113,
+    CoffeeTreeTrunkLeaf = 114,
+    Cactus = 115,
+    DeadCactus = 116,
+    LimeTreeLeaf = 117,
+    LimeTreeTrunk = 118,
+    LimeTreeTrunkLeaf = 119,
+    AmethystTreeTrunk = 120,
+    AmethystTreeLeaf = 121,
+    AmethystTreeTrunkLeaf = 122,
+    SapphireTreeTrunk = 123,
+    SapphireTreeLeaf = 124,
+    SapphireTreeTrunkLeaf = 125,
+    EmeraldTreeTrunk = 126,
+    EmeraldTreeLeaf = 127,
+    EmeraldTreeTrunkLeaf = 128,
+    RubyTreeTrunk = 129,
+    RubyTreeLeaf = 130,
+    RubyTreeTrunkLeaf = 131,
+    DiamondTreeTrunk = 132,
+    DiamondTreeLeaf = 133,
+    DiamondTreeTrunkLeaf = 134,
+    AnyDeadTreeLeaf = 135,
+    AnyDeadTreeTrunk = 136,
+    GoldChest = 137,
+}
 
-impl From<BlockIdType> for VoxelType {
-    fn from(value: BlockIdType) -> Self {
-        Self(value)
+impl VoxelType {
+    pub const MAX_VALUE: u16 = 138;
+}
+
+pub(crate) enum VoxelUv {
+    All(ImageType),
+    TopSide {
+        top: ImageType,
+        side: ImageType,
+    },
+    TopBottomSide {
+        top: ImageType,
+        bottom: ImageType,
+        side: ImageType,
+    },
+}
+
+impl VoxelUv {
+    pub(crate) fn to_faces(&self) -> [ImageType; 6] {
+        // [PX, NX, PY, NY, PZ, NZ]
+        match self {
+            VoxelUv::All(image_type) => [*image_type; 6],
+            VoxelUv::TopSide { top, side } => [*side, *side, *top, *top, *side, *side],
+            VoxelUv::TopBottomSide { top, bottom, side } => {
+                [*side, *side, *top, *bottom, *side, *side]
+            }
+        }
+    }
+}
+
+impl From<BlockType> for VoxelType {
+    fn from(value: BlockType) -> Self {
+        Self::try_from(value as u16).expect("all block types should be able to map to voxel type")
     }
 }
 
 impl VoxelType {
-    pub const AIR: Self = Self(2);
-    pub const UNKNOWN: Self = Self(0);
-
-    // [PX, NX, PY, NY, PZ, NZ]
-    pub(crate) const UV_AT_FACE: &[[ImageType; 6]] = {
+    pub(crate) fn uv(&self) -> VoxelUv {
         use ImageType::*;
-        &[
-            [WorkbenchTool5Top; 6],                                    // Unknown
-            [Stone; 6],                                                // Stone
-            [Air; 6],                                                  // Air
-            [Water0; 6],                                               // Water
-            [Ice; 6],                                                  // Ice
-            [Snow; 6],                                                 // Snow
-            [Dirt; 6],                                                 // Dirt
-            [Sand; 6],                                                 // Sand
-            [Sand; 6],                                                 // MinedSand
-            [Wood; 6],                                                 // Wood
-            [MinedStone; 6],                                           // MinedStone
-            [RedBrick; 6],                                             // RedBrick
-            [Limestone; 6],                                            // Limestone
-            [MinedLimestone; 6],                                       // MinedLimestone
-            [Marble; 6],                                               // Marble
-            [MinedMarble; 6],                                          // MinedMarble
-            [TimeCrystal; 6],                                          // TimeCrystal
-            [SandStone; 6],                                            // SandStone
-            [MinedSandStone; 6],                                       // MinedSandStone
-            [RedMarble; 6],                                            // RedMarble
-            [MinedRedMarble; 6],                                       // MinedRedMarble
-            [Air; 6],                                                  // Missing id 21
-            [Air; 6],                                                  // Missing id 22
-            [Air; 6],                                                  // Missing id 23
-            [Glass; 6],                                                // Glass
-            [SpawnPortalBase; 6],                                      // SpawnPortalBase
-            [GoldBlock; 6],                                            // GoldBlock
-            [GrassDirt, GrassDirt, Grass, Dirt, GrassDirt, GrassDirt], // GrassDirt
-            [
-                SnowGrassDirt,
-                SnowGrassDirt,
-                SnowGrass,
-                Dirt,
-                SnowGrassDirt,
-                SnowGrassDirt,
-            ], // SnowDirt
-            [LapisLazuli; 6],                                          // LapisLazuli
-            [MinedLapisLazuli; 6],                                     // MinedLapisLazuli
-            [Lava0; 6],                                                // Lava
-            [ReinforcedPlatform; 6],                                   // ReinforcedPlatform
-            [SpawnPortalBaseAmethyst; 6],                              // SpawnPortalBaseAmethyst
-            [SpawnPortalBaseSapphire; 6],                              // SpawnPortalBaseSapphire
-            [SpawnPortalBaseEmerald; 6],                               // SpawnPortalBaseEmerald
-            [SpawnPortalBaseRuby; 6],                                  // SpawnPortalBaseRuby
-            [SpawnPortalBaseDiamond; 6],                               // SpawnPortalBaseDiamond
-            [NorthPole; 6],                                            // NorthPole
-            [SouthPole; 6],                                            // SouthPole
-            [EquatorPole; 6],                                          // WestPole
-            [EquatorPole; 6],                                          // EastPole
-            [PortalBase; 6],                                           // PortalBase
-            [PortalBaseAmethyst; 6],                                   // PortalBaseAmethyst
-            [PortalBaseSapphire; 6],                                   // PortalBaseSapphire
-            [PortalBaseEmerald; 6],                                    // PortalBaseEmerald
-            [PortalBaseRuby; 6],                                       // PortalBaseRuby
-            [PortalBaseDiamond; 6],                                    // PortalBaseDiamond
-            [Compost; 6],                                              // Compost
-            [
-                CompostSide,
-                CompostSide,
-                CompostGrass,
-                Compost,
-                CompostSide,
-                CompostSide,
-            ], // GrassCompost
-            [
-                SnowCompostSide,
-                SnowCompostSide,
-                SnowGrass,
-                Compost,
-                SnowCompostSide,
-                SnowCompostSide,
-            ], // SnowCompost
-            [Basalt; 6],                                               // Basalt
-            [Basalt; 6],                                               // MinedBasalt
-            [CopperBlock; 6],                                          // CopperBlock
-            [TinBlock; 6],                                             // TinBlock
-            [BronzeBlock; 6],                                          // BronzeBlock
-            [IronBlock; 6],                                            // IronBlock
-            [SteelBlock; 6],                                           // SteelBlock
-            [BlackSand; 6],                                            // BlackSand
-            [BlackGlass; 6],                                           // BlackGlass
-            [PortalBase; 6],                                           // TradePortalBase
-            [PortalBaseAmethyst; 6],                                   // TradePortalBaseAmethyst
-            [PortalBaseSapphire; 6],                                   // TradePortalBaseSapphire
-            [PortalBaseEmerald; 6],                                    // TradePortalBaseEmerald
-            [PortalBaseRuby; 6],                                       // TradePortalBaseRuby
-            [PortalBaseDiamond; 6],                                    // TradePortalBaseDiamond
-            [Air; 6],                                                  // Missing id 66
-            [PlatinumBlock0; 6],                                       // PlatinumBlock
-            [TitaniumBlock; 6],                                        // TitaniumBlock
-            [CarbonFiberBlock; 6],                                     // CarbonFiberBlock
-            [Gravel; 6],                                               // Gravel
-            [AmethystBlock; 6],                                        // AmethystBlock
-            [SapphireBlock; 6],                                        // SapphireBlock
-            [EmeraldBlock; 6],                                         // EmeraldBlock
-            [RubyBlock; 6],                                            // RubyBlock
-            [DiamondBlock; 6],                                         // DiamondBlock
-            [Plaster; 6],                                              // Plaster
-            [LuminousPlaster; 6],                                      // LuminousPlaster
-            [DirtClay; 6],                                             // Dirt + Clay
-            [DirtFlint; 6],                                            // Dirt + Flint
-            [
-                GrassDirtClay,
-                GrassDirtClay,
-                Grass,
-                Dirt,
-                GrassDirtClay,
-                GrassDirtClay,
-            ], // GrassDirt + Clay
-            [
-                GrassDirtFlint,
-                GrassDirtFlint,
-                Grass,
-                Dirt,
-                GrassDirtFlint,
-                GrassDirtFlint,
-            ], // GrassDirt + Flint
-            [
-                SnowGrassDirtClay,
-                SnowGrassDirtClay,
-                SnowGrass,
-                Dirt,
-                SnowGrassDirtClay,
-                SnowGrassDirtClay,
-            ], // SnowDirt + Clay
-            [
-                SnowGrassDirtFlint,
-                SnowGrassDirtFlint,
-                SnowGrass,
-                Dirt,
-                SnowGrassDirtFlint,
-                SnowGrassDirtFlint,
-            ], // SnowDirt + Flint
-            [StoneCopper; 6],                                          // Stone + CopperOre
-            [StoneTin; 6],                                             // Stone + TinOre
-            [StoneIron; 6],                                            // Stone + IronOre
-            [StoneCoal; 6],                                            // Stone + Coal
-            [StoneGold; 6],                                            // Stone + GoldNuggets
-            [StonePlatinum; 6],                                        // Stone + PlatinumOre
-            [StoneTitanium; 6],                                        // Stone + TitaniumOre
-            [LimestoneOil; 6],                                         // Limestone + Oil
-            [AppleTreeLeaf; 6],                                        // AppleTreeLeaf
-            [
-                AppleTreeTrunk,
-                AppleTreeTrunk,
-                TrunkTop,
-                TrunkTop,
-                AppleTreeTrunk,
-                AppleTreeTrunk,
-            ], // AppleTreeTrunk
-            [AppleTreeTrunkLeaf; 6],                                   // AppleTreeTrunkLeaf
-            [PineTreeLeaf; 6],                                         // PineTreeLeaf
-            [Trunk, Trunk, TrunkTop, TrunkTop, Trunk, Trunk],          // PineTreeTrunk,
-            [PineTreeTrunkLeaf; 6],                                    // PineTreeTrunkLeaf
-            [MapleTreeLeaf; 6],                                        // MapleTreeLeaf
-            [
-                MapleTreeTrunk,
-                MapleTreeTrunk,
-                TrunkTop,
-                TrunkTop,
-                MapleTreeTrunk,
-                MapleTreeTrunk,
-            ], // MapleTreeTrunk
-            [MapleTreeTrunkLeaf; 6],                                   // MapleTreeTrunkLeaf
-            [MangoTreeLeaf; 6],                                        // MangoTreeLeaf
-            [Trunk, Trunk, TrunkTop, TrunkTop, Trunk, Trunk],          // MangoTreeTrunk
-            [MangoTreeTrunkLeaf; 6],                                   // MangoTreeTrunkLeaf
-            [CoconutTreeLeaf; 6],                                      // CoconutTreeLeaf
-            [CoconutTreeTrunk; 6],                                     // CoconutTreeTrunk
-            [OrangeTreeLeaf; 6],                                       // OrangeTreeLeaf
-            [
-                OrangeTreeTrunk,
-                OrangeTreeTrunk,
-                TrunkTop,
-                TrunkTop,
-                OrangeTreeTrunk,
-                OrangeTreeTrunk,
-            ], // OrangeTreeTrunk
-            [OrangeTreeTrunkLeaf; 6],                                  // OrangeTreeTrunkLeaf
-            [CherryTreeLeaf; 6],                                       // CherryTreeLeaf
-            [
-                CherryTreeTrunk,
-                CherryTreeTrunk,
-                TrunkTop,
-                TrunkTop,
-                CherryTreeTrunk,
-                CherryTreeTrunk,
-            ], // CherryTreeTrunk
-            [CherryTreeTrunkLeaf; 6],                                  // CherryTreeTrunkLeaf
-            [CoffeeTreeLeaf; 6],                                       // CoffeeTreeLeaf
-            [
-                CoffeeTreeTrunk,
-                CoffeeTreeTrunk,
-                TrunkTop,
-                TrunkTop,
-                CoffeeTreeTrunk,
-                CoffeeTreeTrunk,
-            ], // CoffeeTreeTrunk
-            [CoffeeTreeTrunkLeaf; 6],                                  // CoffeeTreeTrunkLeaf
-            [Cactus; 6],                                               // Cactus
-            [DeadCactus; 6],                                           // DeadCactus
-            [LimeTreeLeaf; 6],                                         // LimeTreeLeaf
-            [
-                LimeTreeTrunk,
-                LimeTreeTrunk,
-                TrunkTop,
-                TrunkTop,
-                LimeTreeTrunk,
-                LimeTreeTrunk,
-            ], // LimeTreeTrunk
-            [LimeTreeTrunkLeaf; 6],                                    // LimeTreeTrunkLeaf
-            [
-                AmethystTreeTrunk,
-                AmethystTreeTrunk,
-                TrunkTop,
-                TrunkTop,
-                AmethystTreeTrunk,
-                AmethystTreeTrunk,
-            ], // AmethystTreeTrunk
-            [AmethystTreeLeaf; 6],                                     // AmethystTreeLeaf
-            [AmethystTreeTrunkLeaf; 6],                                // AmethystTreeTrunkLeaf
-            [
-                SapphireTreeTrunk,
-                SapphireTreeTrunk,
-                TrunkTop,
-                TrunkTop,
-                SapphireTreeTrunk,
-                SapphireTreeTrunk,
-            ], // SapphireTreeTrunk
-            [SapphireTreeLeaf; 6],                                     // SapphireTreeLeaf
-            [SapphireTreeTrunkLeaf; 6],                                // SapphireTreeTrunkLeaf
-            [
-                EmeraldTreeTrunk,
-                EmeraldTreeTrunk,
-                TrunkTop,
-                TrunkTop,
-                EmeraldTreeTrunk,
-                EmeraldTreeTrunk,
-            ], // EmeraldTreeTrunk
-            [EmeraldTreeLeaf; 6],                                      // EmeraldTreeLeaf
-            [EmeraldTreeTrunkLeaf; 6],                                 // EmeraldTreeTrunkLeaf
-            [
-                RubyTreeTrunk,
-                RubyTreeTrunk,
-                TrunkTop,
-                TrunkTop,
-                RubyTreeTrunk,
-                RubyTreeTrunk,
-            ], // RubyTreeTrunk
-            [RubyTreeLeaf; 6],                                         // RubyTreeLeaf
-            [RubyTreeTrunkLeaf; 6],                                    // RubyTreeTrunkLeaf
-            [
-                DiamondTreeTrunk,
-                DiamondTreeTrunk,
-                TrunkTop,
-                TrunkTop,
-                DiamondTreeTrunk,
-                DiamondTreeTrunk,
-            ], // DiamondTreeTrunk
-            [DiamondTreeLeaf; 6],                                      // DiamondTreeLeaf
-            [DiamondTreeTrunkLeaf; 6],                                 // DiamondTreeTrunkLeaf
-            [DeadTreeLeaf; 6],                                         // Any dead tree leaf
-            [
-                DeadTrunk,
-                DeadTrunk,
-                DeadTrunkTop,
-                DeadTrunkTop,
-                DeadTrunk,
-                DeadTrunk,
-            ], // Any dead tree trunk
-            [
-                ChestGold,
-                ChestGold,
-                ChestGoldTop,
-                ChestGoldTop,
-                ChestGold,
-                ChestGold,
-            ], // GoldChest
-        ]
-    };
+        use VoxelUv::*;
+        match self {
+            Self::Unknown => All(WorkbenchTool5Top),
+            Self::Stone => All(Stone),
+            Self::Air => All(Air),
+            Self::Water => All(Water0),
+            Self::Ice => All(Ice),
+            Self::Snow => All(Snow),
+            Self::Dirt => All(Dirt),
+            Self::Sand => All(Sand),
+            Self::MinedSand => All(Sand),
+            Self::Wood => All(Wood),
+            Self::MinedStone => All(MinedStone),
+            Self::RedBrick => All(RedBrick),
+            Self::Limestone => All(Limestone),
+            Self::MinedLimestone => All(MinedLimestone),
+            Self::Marble => All(Marble),
+            Self::MinedMarble => All(MinedMarble),
+            Self::TimeCrystal => All(TimeCrystal),
+            Self::SandStone => All(SandStone),
+            Self::MinedSandStone => All(MinedSandStone),
+            Self::RedMarble => All(RedMarble),
+            Self::MinedRedMarble => All(MinedRedMarble),
+            Self::Glass => All(Glass),
+            Self::SpawnPortalBase => All(SpawnPortalBase),
+            Self::GoldBlock => All(GoldBlock),
+            Self::GrassDirt => TopBottomSide {
+                top: Grass,
+                bottom: Dirt,
+                side: GrassDirt,
+            },
+            Self::SnowDirt => TopBottomSide {
+                top: SnowGrass,
+                bottom: Dirt,
+                side: SnowGrassDirt,
+            },
+            Self::LapisLazuli => All(LapisLazuli),
+            Self::MinedLapisLazuli => All(MinedLapisLazuli),
+            Self::Lava => All(Lava0),
+            Self::ReinforcedPlatform => All(ReinforcedPlatform),
+            Self::SpawnPortalBaseAmethyst => All(SpawnPortalBaseAmethyst),
+            Self::SpawnPortalBaseSapphire => All(SpawnPortalBaseSapphire),
+            Self::SpawnPortalBaseEmerald => All(SpawnPortalBaseEmerald),
+            Self::SpawnPortalBaseRuby => All(SpawnPortalBaseRuby),
+            Self::SpawnPortalBaseDiamond => All(SpawnPortalBaseDiamond),
+            Self::NorthPole => All(NorthPole),
+            Self::SouthPole => All(SouthPole),
+            Self::WestPole => All(EquatorPole),
+            Self::EastPole => All(EquatorPole),
+            Self::PortalBase => All(PortalBase),
+            Self::PortalBaseAmethyst => All(PortalBaseAmethyst),
+            Self::PortalBaseSapphire => All(PortalBaseSapphire),
+            Self::PortalBaseEmerald => All(PortalBaseEmerald),
+            Self::PortalBaseRuby => All(PortalBaseRuby),
+            Self::PortalBaseDiamond => All(PortalBaseDiamond),
+            Self::Compost => All(Compost),
+            Self::GrassCompost => TopBottomSide {
+                top: CompostGrass,
+                bottom: Compost,
+                side: CompostSide,
+            },
+            Self::SnowCompost => TopBottomSide {
+                top: SnowGrass,
+                bottom: Compost,
+                side: SnowCompostSide,
+            },
+            Self::Basalt => All(Basalt),
+            Self::MinedBasalt => All(Basalt),
+            Self::CopperBlock => All(CopperBlock),
+            Self::TinBlock => All(TinBlock),
+            Self::BronzeBlock => All(BronzeBlock),
+            Self::IronBlock => All(IronBlock),
+            Self::SteelBlock => All(SteelBlock),
+            Self::BlackSand => All(BlackSand),
+            Self::BlackGlass => All(BlackGlass),
+            Self::TradePortalBase => All(PortalBase),
+            Self::TradePortalBaseAmethyst => All(PortalBaseAmethyst),
+            Self::TradePortalBaseSapphire => All(PortalBaseSapphire),
+            Self::TradePortalBaseEmerald => All(PortalBaseEmerald),
+            Self::TradePortalBaseRuby => All(PortalBaseRuby),
+            Self::TradePortalBaseDiamond => All(PortalBaseDiamond),
+            Self::PlatinumBlock => All(PlatinumBlock0),
+            Self::TitaniumBlock => All(TitaniumBlock),
+            Self::CarbonFiberBlock => All(CarbonFiberBlock),
+            Self::Gravel => All(Gravel),
+            Self::AmethystBlock => All(AmethystBlock),
+            Self::SapphireBlock => All(SapphireBlock),
+            Self::EmeraldBlock => All(EmeraldBlock),
+            Self::RubyBlock => All(RubyBlock),
+            Self::DiamondBlock => All(DiamondBlock),
+            Self::Plaster => All(Plaster),
+            Self::LuminousPlaster => All(LuminousPlaster),
+            Self::DirtClay => All(DirtClay),
+            Self::DirtFlint => All(DirtFlint),
+            Self::GrassDirtClay => TopBottomSide {
+                top: Grass,
+                bottom: Dirt,
+                side: GrassDirtClay,
+            },
+            Self::GrassDirtFlint => TopBottomSide {
+                top: Grass,
+                bottom: Dirt,
+                side: GrassDirtFlint,
+            },
+            Self::SnowDirtClay => TopBottomSide {
+                top: SnowGrass,
+                bottom: Dirt,
+                side: SnowGrassDirtClay,
+            },
+            Self::SnowDirtFlint => TopBottomSide {
+                top: SnowGrass,
+                bottom: Dirt,
+                side: SnowGrassDirtFlint,
+            },
+            Self::StoneCopperOre => All(StoneCopper),
+            Self::StoneTinOre => All(StoneTin),
+            Self::StoneIronOre => All(StoneIron),
+            Self::StoneCoal => All(StoneCoal),
+            Self::StoneGoldNuggets => All(StoneGold),
+            Self::StonePlatinumOre => All(StonePlatinum),
+            Self::StoneTitaniumOre => All(StoneTitanium),
+            Self::LimestoneOil => All(LimestoneOil),
+            Self::AppleTreeLeaf => All(AppleTreeLeaf),
+            Self::AppleTreeTrunk => TopSide {
+                top: TrunkTop,
+                side: AppleTreeLeaf,
+            },
+            Self::AppleTreeTrunkLeaf => All(AppleTreeTrunkLeaf),
+            Self::PineTreeLeaf => All(PineTreeLeaf),
+            Self::PineTreeTrunk => TopSide {
+                top: TrunkTop,
+                side: Trunk,
+            },
+            Self::PineTreeTrunkLeaf => All(PineTreeTrunkLeaf),
+            Self::MapleTreeLeaf => All(MapleTreeLeaf),
+            Self::MapleTreeTrunk => TopSide {
+                top: TrunkTop,
+                side: MapleTreeTrunk,
+            },
+            Self::MapleTreeTrunkLeaf => All(MapleTreeTrunkLeaf),
+            Self::MangoTreeLeaf => All(MangoTreeLeaf),
+            Self::MangoTreeTrunk => TopSide {
+                top: TrunkTop,
+                side: Trunk,
+            },
+            Self::MangoTreeTrunkLeaf => All(MangoTreeTrunkLeaf),
+            Self::CoconutTreeLeaf => All(CoconutTreeLeaf),
+            Self::CoconutTreeTrunk => All(CoconutTreeTrunk),
+            Self::OrangeTreeLeaf => All(OrangeTreeLeaf),
+            Self::OrangeTreeTrunk => TopSide {
+                top: TrunkTop,
+                side: OrangeTreeTrunk,
+            },
+            Self::OrangeTreeTrunkLeaf => All(OrangeTreeTrunkLeaf),
+            Self::CherryTreeLeaf => All(CherryTreeLeaf),
+            Self::CherryTreeTrunk => TopSide {
+                top: TrunkTop,
+                side: CherryTreeTrunk,
+            },
+            Self::CherryTreeTrunkLeaf => All(CherryTreeTrunkLeaf),
+            Self::CoffeeTreeLeaf => All(CoffeeTreeLeaf),
+            Self::CoffeeTreeTrunk => TopSide {
+                top: TrunkTop,
+                side: CoffeeTreeTrunk,
+            },
+            Self::CoffeeTreeTrunkLeaf => All(CoffeeTreeTrunkLeaf),
+            Self::Cactus => All(Cactus),
+            Self::DeadCactus => All(DeadCactus),
+            Self::LimeTreeLeaf => All(LimeTreeLeaf),
+            Self::LimeTreeTrunk => TopSide {
+                top: TrunkTop,
+                side: LimeTreeTrunk,
+            },
+            Self::LimeTreeTrunkLeaf => All(LimeTreeTrunkLeaf),
+            Self::AmethystTreeTrunk => TopSide {
+                top: TrunkTop,
+                side: AmethystTreeTrunk,
+            },
+            Self::AmethystTreeLeaf => All(AmethystTreeLeaf),
+            Self::AmethystTreeTrunkLeaf => All(AmethystTreeTrunkLeaf),
+            Self::SapphireTreeTrunk => TopSide {
+                top: TrunkTop,
+                side: SapphireTreeTrunk,
+            },
+            Self::SapphireTreeLeaf => All(SapphireTreeLeaf),
+            Self::SapphireTreeTrunkLeaf => All(SapphireTreeTrunkLeaf),
+            Self::EmeraldTreeTrunk => TopSide {
+                top: TrunkTop,
+                side: EmeraldTreeTrunk,
+            },
+            Self::EmeraldTreeLeaf => All(EmeraldTreeLeaf),
+            Self::EmeraldTreeTrunkLeaf => All(EmeraldTreeTrunkLeaf),
+            Self::RubyTreeTrunk => TopSide {
+                top: TrunkTop,
+                side: RubyTreeTrunk,
+            },
+            Self::RubyTreeLeaf => All(RubyTreeLeaf),
+            Self::RubyTreeTrunkLeaf => All(RubyTreeTrunkLeaf),
+            Self::DiamondTreeTrunk => TopSide {
+                top: TrunkTop,
+                side: DiamondTreeTrunk,
+            },
+            Self::DiamondTreeLeaf => All(DiamondTreeLeaf),
+            Self::DiamondTreeTrunkLeaf => All(DiamondTreeTrunkLeaf),
+            Self::AnyDeadTreeLeaf => All(DeadTreeLeaf),
+            Self::AnyDeadTreeTrunk => TopSide {
+                top: DeadTrunkTop,
+                side: DeadTrunk,
+            },
+            Self::GoldChest => TopSide {
+                top: ChestGoldTop,
+                side: ChestGold,
+            },
+        }
+    }
 }
 
 impl VoxelType {
     fn fg_from_block_inner<'b>(block: BlockView<'b>) -> Result<Self, BlockError> {
-        Ok(Self(match (block.fg()?, block.content()?) {
-            (BlockType::Air, _) => 2,
-            (BlockType::Snow, _) => 5,
-            (block_type, BlockContentType::Nothing) => block_type as u16,
-            (BlockType::Dirt, BlockContentType::Clay) => 78,
-            (BlockType::Dirt, BlockContentType::Flint) => 79,
-            (BlockType::GrassDirt, BlockContentType::Clay) => 80,
-            (BlockType::GrassDirt, BlockContentType::Flint) => 81,
-            (BlockType::SnowDirt, BlockContentType::Clay) => 82,
-            (BlockType::SnowDirt, BlockContentType::Flint) => 83,
-            (BlockType::Stone, BlockContentType::CopperOre) => 84,
-            (BlockType::Stone, BlockContentType::TinOre) => 85,
-            (BlockType::Stone, BlockContentType::IronOre) => 86,
-            (BlockType::Stone, BlockContentType::Coal) => 87,
-            (BlockType::Stone, BlockContentType::GoldNuggets) => 88,
-            (BlockType::Stone, BlockContentType::PlatinumOre) => 89,
-            (BlockType::Stone, BlockContentType::TitaniumOre) => 90,
-            (BlockType::Limestone, BlockContentType::Oil) => 91,
-            _ => 0,
-        }))
+        Ok(match (block.fg()?, block.content()?) {
+            (BlockType::Air, _) => Self::Air,
+            (BlockType::Snow, _) => Self::Snow,
+            (block_type, BlockContentType::Nothing) => block_type.into(),
+            (BlockType::Dirt, BlockContentType::Clay) => Self::DirtClay,
+            (BlockType::Dirt, BlockContentType::Flint) => Self::DirtFlint,
+            (BlockType::GrassDirt, BlockContentType::Clay) => Self::GrassDirtClay,
+            (BlockType::GrassDirt, BlockContentType::Flint) => Self::GrassDirtFlint,
+            (BlockType::SnowDirt, BlockContentType::Clay) => Self::SnowDirtClay,
+            (BlockType::SnowDirt, BlockContentType::Flint) => Self::SnowDirtFlint,
+            (BlockType::Stone, BlockContentType::CopperOre) => Self::StoneCopperOre,
+            (BlockType::Stone, BlockContentType::TinOre) => Self::StoneTinOre,
+            (BlockType::Stone, BlockContentType::IronOre) => Self::StoneIronOre,
+            (BlockType::Stone, BlockContentType::Coal) => Self::StoneCoal,
+            (BlockType::Stone, BlockContentType::GoldNuggets) => Self::StoneGoldNuggets,
+            (BlockType::Stone, BlockContentType::PlatinumOre) => Self::StonePlatinumOre,
+            (BlockType::Stone, BlockContentType::TitaniumOre) => Self::StoneTitaniumOre,
+            (BlockType::Limestone, BlockContentType::Oil) => Self::LimestoneOil,
+            _ => Self::Unknown,
+        })
     }
 
     pub fn fg_from_block<'b>(block: BlockView<'b>) -> Self {
-        Self::fg_from_block_inner(block).unwrap_or(Self::UNKNOWN)
+        Self::fg_from_block_inner(block).unwrap_or(Self::Unknown)
     }
 
     fn mg_from_block_inner<'b>(block: BlockView<'b>) -> Result<Self, BlockError> {
-        Ok(Self(match block.content()? {
-            BlockContentType::Nothing => 2,
-            BlockContentType::AppleTreeLeaf => 92,
-            BlockContentType::AppleTreeTrunk => 93,
-            BlockContentType::AppleTreeTrunkLeaf => 94,
-            BlockContentType::PineTreeLeaf => 95,
-            BlockContentType::PineTreeTrunk => 96,
-            BlockContentType::PineTreeTrunkLeaf => 97,
-            BlockContentType::MapleTreeLeaf => 98,
-            BlockContentType::MapleTreeTrunk => 99,
-            BlockContentType::MapleTreeTrunkLeaf => 100,
-            BlockContentType::MangoTreeLeaf => 101,
-            BlockContentType::MangoTreeTrunk => 102,
-            BlockContentType::MangoTreeTrunkLeaf => 103,
-            BlockContentType::CoconutTreeLeaf => 104,
-            BlockContentType::CoconutTreeTrunk => 105,
-            BlockContentType::OrangeTreeLeaf => 106,
-            BlockContentType::OrangeTreeTrunk => 107,
-            BlockContentType::OrangeTreeTrunkLeaf => 108,
-            BlockContentType::CherryTreeLeaf => 109,
-            BlockContentType::CherryTreeTrunk => 110,
-            BlockContentType::CherryTreeTrunkLeaf => 111,
-            BlockContentType::CoffeeTreeLeaf => 112,
-            BlockContentType::CoffeeTreeTrunk => 113,
-            BlockContentType::CoffeeTreeTrunkLeaf => 114,
-            BlockContentType::Cactus => 115,
-            BlockContentType::DeadCactus => 116,
-            BlockContentType::LimeTreeLeaf => 117,
-            BlockContentType::LimeTreeTrunk => 118,
-            BlockContentType::LimeTreeTrunkLeaf => 119,
-            BlockContentType::AmethystTreeTrunk => 120,
-            BlockContentType::AmethystTreeLeaf => 121,
-            BlockContentType::AmethystTreeTrunkLeaf => 122,
-            BlockContentType::SapphireTreeTrunk => 123,
-            BlockContentType::SapphireTreeLeaf => 124,
-            BlockContentType::SapphireTreeTrunkLeaf => 125,
-            BlockContentType::EmeraldTreeTrunk => 126,
-            BlockContentType::EmeraldTreeLeaf => 127,
-            BlockContentType::EmeraldTreeTrunkLeaf => 128,
-            BlockContentType::RubyTreeTrunk => 129,
-            BlockContentType::RubyTreeLeaf => 130,
-            BlockContentType::RubyTreeTrunkLeaf => 131,
-            BlockContentType::DiamondTreeTrunk => 132,
-            BlockContentType::DiamondTreeLeaf => 133,
-            BlockContentType::DiamondTreeTrunkLeaf => 134,
+        Ok(match block.content()? {
+            BlockContentType::Nothing => Self::Air,
+            BlockContentType::AppleTreeLeaf => Self::AppleTreeLeaf,
+            BlockContentType::AppleTreeTrunk => Self::AppleTreeTrunk,
+            BlockContentType::AppleTreeTrunkLeaf => Self::AppleTreeTrunkLeaf,
+            BlockContentType::PineTreeLeaf => Self::PineTreeLeaf,
+            BlockContentType::PineTreeTrunk => Self::PineTreeTrunk,
+            BlockContentType::PineTreeTrunkLeaf => Self::PineTreeTrunkLeaf,
+            BlockContentType::MapleTreeLeaf => Self::MapleTreeLeaf,
+            BlockContentType::MapleTreeTrunk => Self::MapleTreeTrunk,
+            BlockContentType::MapleTreeTrunkLeaf => Self::MapleTreeTrunkLeaf,
+            BlockContentType::MangoTreeLeaf => Self::MangoTreeLeaf,
+            BlockContentType::MangoTreeTrunk => Self::MangoTreeTrunk,
+            BlockContentType::MangoTreeTrunkLeaf => Self::MangoTreeTrunkLeaf,
+            BlockContentType::CoconutTreeLeaf => Self::CoconutTreeLeaf,
+            BlockContentType::CoconutTreeTrunk => Self::CoconutTreeTrunk,
+            BlockContentType::OrangeTreeLeaf => Self::OrangeTreeLeaf,
+            BlockContentType::OrangeTreeTrunk => Self::OrangeTreeTrunk,
+            BlockContentType::OrangeTreeTrunkLeaf => Self::OrangeTreeTrunkLeaf,
+            BlockContentType::CherryTreeLeaf => Self::CherryTreeLeaf,
+            BlockContentType::CherryTreeTrunk => Self::CherryTreeTrunk,
+            BlockContentType::CherryTreeTrunkLeaf => Self::CherryTreeTrunkLeaf,
+            BlockContentType::CoffeeTreeLeaf => Self::CoffeeTreeLeaf,
+            BlockContentType::CoffeeTreeTrunk => Self::CoffeeTreeTrunk,
+            BlockContentType::CoffeeTreeTrunkLeaf => Self::CoffeeTreeTrunkLeaf,
+            BlockContentType::Cactus => Self::Cactus,
+            BlockContentType::DeadCactus => Self::DeadCactus,
+            BlockContentType::LimeTreeLeaf => Self::LimeTreeLeaf,
+            BlockContentType::LimeTreeTrunk => Self::LimeTreeTrunk,
+            BlockContentType::LimeTreeTrunkLeaf => Self::LimeTreeTrunkLeaf,
+            BlockContentType::AmethystTreeTrunk => Self::AmethystTreeTrunk,
+            BlockContentType::AmethystTreeLeaf => Self::AmethystTreeLeaf,
+            BlockContentType::AmethystTreeTrunkLeaf => Self::AmethystTreeTrunkLeaf,
+            BlockContentType::SapphireTreeTrunk => Self::SapphireTreeTrunk,
+            BlockContentType::SapphireTreeLeaf => Self::SapphireTreeLeaf,
+            BlockContentType::SapphireTreeTrunkLeaf => Self::SapphireTreeTrunkLeaf,
+            BlockContentType::EmeraldTreeTrunk => Self::EmeraldTreeTrunk,
+            BlockContentType::EmeraldTreeLeaf => Self::EmeraldTreeLeaf,
+            BlockContentType::EmeraldTreeTrunkLeaf => Self::EmeraldTreeTrunkLeaf,
+            BlockContentType::RubyTreeTrunk => Self::RubyTreeTrunk,
+            BlockContentType::RubyTreeLeaf => Self::RubyTreeLeaf,
+            BlockContentType::RubyTreeTrunkLeaf => Self::RubyTreeTrunkLeaf,
+            BlockContentType::DiamondTreeTrunk => Self::DiamondTreeTrunk,
+            BlockContentType::DiamondTreeLeaf => Self::DiamondTreeLeaf,
+            BlockContentType::DiamondTreeTrunkLeaf => Self::DiamondTreeTrunkLeaf,
             BlockContentType::DeadPineTreeLeaf
             | BlockContentType::DeadOrangeTreeLeaf
             | BlockContentType::DeadCherryTreeLeaf
-            | BlockContentType::DeadLimeTreeLeaf => 135,
+            | BlockContentType::DeadLimeTreeLeaf => Self::AnyDeadTreeLeaf,
             BlockContentType::DeadPineTreeTrunk
             | BlockContentType::DeadOrangeTreeTrunk
             | BlockContentType::DeadCherryTreeTrunk
-            | BlockContentType::DeadLimeTreeTrunk => 136,
-            BlockContentType::GoldChest => 137,
-            _ => 0,
-        }))
+            | BlockContentType::DeadLimeTreeTrunk => Self::AnyDeadTreeTrunk,
+            BlockContentType::GoldChest => Self::GoldChest,
+            _ => Self::Unknown,
+        })
     }
 
     pub fn mg_from_block<'b>(block: BlockView<'b>) -> Self {
-        Self::mg_from_block_inner(block).unwrap_or(Self::UNKNOWN)
+        Self::mg_from_block_inner(block).unwrap_or(Self::Unknown)
     }
 
     fn bg_from_block_inner<'b>(block: BlockView<'b>) -> Result<Self, BlockError> {
-        Ok(Self(block.bg()? as u16))
+        Ok(block.bg()?.into())
     }
 
     pub fn bg_from_block<'b>(block: BlockView<'b>) -> Self {
-        Self::bg_from_block_inner(block).unwrap_or(Self::UNKNOWN)
+        Self::bg_from_block_inner(block).unwrap_or(Self::Unknown)
     }
 
-    pub(crate) fn transparency() -> Vec<u32> {
-        let mut is_transparent_u32 = vec![0u32; VoxelType::UV_AT_FACE.len()];
-        for idx in [3, 4] {
-            if idx < is_transparent_u32.len() {
-                is_transparent_u32[idx] = 1;
-            }
+    pub fn is_transparent(&self) -> bool {
+        match self {
+            Self::Water | Self::Ice => true,
+            _ => false,
         }
-        is_transparent_u32
+    }
+
+    pub(crate) fn transparency() -> Vec<bool> {
+        (0..VoxelType::MAX_VALUE)
+            .map(|voxel_type_id| {
+                if let Ok(voxel_type) = VoxelType::try_from(voxel_type_id) {
+                    voxel_type.is_transparent()
+                } else {
+                    false
+                }
+            })
+            .collect()
+    }
+
+    pub(crate) fn uv_at_face() -> Vec<[ImageType; 6]> {
+        (0..VoxelType::MAX_VALUE)
+            .map(|voxel_type_id| {
+                VoxelType::try_from(voxel_type_id)
+                    .unwrap_or(VoxelType::Unknown)
+                    .uv()
+                    .to_faces()
+            })
+            .collect()
     }
 }
 
@@ -438,7 +553,7 @@ pub mod voxel_util {
     }
 
     fn new_world_voxel(world_width_macro: usize) -> Vec<VoxelType> {
-        vec![VoxelType::AIR; NUM_BLOCK_PER_CHUNK * Chunks::NUM_CHUNK_PER_COL * world_width_macro]
+        vec![VoxelType::Air; NUM_BLOCK_PER_CHUNK * Chunks::NUM_CHUNK_PER_COL * world_width_macro]
     }
 
     fn fill_chunk_voxel(chunk: ChunkView<'_>, chunk_voxel: &mut [VoxelType]) {
@@ -448,13 +563,13 @@ pub mod voxel_util {
                     ChunkBlockCoord::new(x as u8, y as u8).expect("x and y must be within limit"),
                 );
                 let fg_type = VoxelType::fg_from_block(block);
-                let mg_type = if fg_type == VoxelType::AIR {
+                let mg_type = if fg_type == VoxelType::Air {
                     VoxelType::mg_from_block(block)
                 } else {
                     fg_type
                 };
                 let mut bg_type = VoxelType::bg_from_block(block);
-                if bg_type == VoxelType::AIR && fg_type != VoxelType::AIR {
+                if bg_type == VoxelType::Air && fg_type != VoxelType::Air {
                     bg_type = fg_type;
                 }
                 let index = (y * Chunk::NUM_BLOCK_PER_ROW + x) * 3;
@@ -503,7 +618,7 @@ pub mod voxel_util {
         coord: I,
         chunk: &Chunk,
     ) {
-        let mut blocks = [VoxelType(0); NUM_BLOCK_PER_CHUNK];
+        let mut blocks = [VoxelType::Unknown; NUM_BLOCK_PER_CHUNK];
         fill_chunk_voxel(chunk.view(), &mut blocks);
 
         let chunk_coord: ChunkCoord = coord.into();
