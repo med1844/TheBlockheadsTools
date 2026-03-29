@@ -96,6 +96,9 @@ var<uniform> selected_block: vec4<u32>;
 @group(0) @binding(6)
 var<uniform> hover_on_block: vec4<u32>;
 
+@group(0) @binding(7)
+var<storage, read> is_transparent_buffer: array<u32>;
+
 fn get_voxel_type(global_voxel_coords: vec3<i32>) -> u32 {
     if global_voxel_coords.x < 0 || global_voxel_coords.x >= i32(WORLD_DIM_X) ||
        global_voxel_coords.y < 0 || global_voxel_coords.y >= i32(WORLD_DIM_Y) ||
@@ -340,9 +343,11 @@ fn step_dda(dda: ptr<function, DDAState>) -> f32 {
     return next_t;
 }
 
-// This will be refactored later
 fn is_transparent(voxel_type: u32) -> bool {
-    return voxel_type == 3u || voxel_type == 4u;
+    if (voxel_type >= arrayLength(&is_transparent_buffer)) {
+        return false;
+    }
+    return is_transparent_buffer[voxel_type] != 0u;
 }
 
 fn traverse_world(ray: Ray, bounds: BoundingBoxIntersection) -> TraversalResult {

@@ -44,6 +44,13 @@ impl VoxelRenderer {
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
         });
 
+        let is_transparent_u32 = VoxelType::transparency();
+        let is_transparent_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Is Transparent Buffer"),
+            contents: bytemuck::cast_slice(&is_transparent_u32),
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+        });
+
         // Create a bind group layout and bind group to link the uniform buffer to the shader.
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             entries: &[
@@ -107,12 +114,22 @@ impl VoxelRenderer {
                     },
                     count: None,
                 },
-                // hover on block
                 wgpu::BindGroupLayoutEntry {
                     binding: 6,
                     visibility: wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                // is_transparent array
+                wgpu::BindGroupLayoutEntry {
+                    binding: 7,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: true },
                         has_dynamic_offset: false,
                         min_binding_size: None,
                     },
@@ -152,6 +169,10 @@ impl VoxelRenderer {
                 wgpu::BindGroupEntry {
                     binding: 6,
                     resource: hover_on_block_buf.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 7,
+                    resource: is_transparent_buf.as_entire_binding(),
                 },
             ],
             label: Some("bind_group"),

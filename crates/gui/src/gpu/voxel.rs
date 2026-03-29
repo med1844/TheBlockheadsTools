@@ -405,6 +405,16 @@ impl VoxelType {
     pub fn bg_from_block<'b>(block: BlockView<'b>) -> Self {
         Self::bg_from_block_inner(block).unwrap_or(Self::UNKNOWN)
     }
+
+    pub(crate) fn transparency() -> Vec<u32> {
+        let mut is_transparent_u32 = vec![0u32; VoxelType::UV_AT_FACE.len()];
+        for idx in [3, 4] {
+            if idx < is_transparent_u32.len() {
+                is_transparent_u32[idx] = 1;
+            }
+        }
+        is_transparent_u32
+    }
 }
 
 pub mod voxel_util {
