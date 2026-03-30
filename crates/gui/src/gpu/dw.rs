@@ -155,8 +155,38 @@ impl<V, I> MeshAggregator<V, I> {
 pub struct DwChunkObjId(u32);
 
 impl DwChunkObjId {
+    const MAX_INDEX_BITS: usize = 24;
+    const MAX_INDEX: usize = (1 << Self::MAX_INDEX_BITS); // valid range: 0..MAX_INDEX
+    const INDEX_MASK: usize = Self::MAX_INDEX - 1;
+
+    fn obj_type_from_raw(raw_id: u32) -> Option<DynamicObjectType> {
+        DynamicObjectType::try_from((raw_id >> Self::MAX_INDEX_BITS) as u16).ok()
+    }
+
+    fn index_from_raw(raw_id: u32) -> usize {
+        (raw_id & ((1 << Self::MAX_INDEX_BITS) - 1)) as usize
+    }
+
+    pub fn try_from_u32(raw_id: u32) -> Option<Self> {
+        Self::obj_type_from_raw(raw_id)
+            .map(|obj_type| Self::from_obj_type_and_index(obj_type, Self::index_from_raw(raw_id)))
+    }
+
     pub fn from_obj_type_and_index(obj_type: DynamicObjectType, index: usize) -> Self {
-        Self(((obj_type as u32) << 24) | (index as u32))
+        if index > Self::INDEX_MASK {
+            // should be very rare or nearly impossible to happen; should be warning
+            println!("index {} interferes with obj_type {:?}", index, obj_type);
+        }
+        Self(((obj_type as u32) << Self::MAX_INDEX_BITS) | (index as u32))
+    }
+
+    // SAFETY: all public constructors return None if the object type is invalid
+    pub fn obj_type(&self) -> DynamicObjectType {
+        Self::obj_type_from_raw(self.0).expect("type invariance violated")
+    }
+
+    pub fn index(&self) -> usize {
+        Self::index_from_raw(self.0)
     }
 }
 

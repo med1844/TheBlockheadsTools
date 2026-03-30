@@ -10,7 +10,7 @@ struct CameraUniform {
 @group(0) @binding(2) var tilemap_sampler: sampler;
 
 struct VertexInput {
-    @location(0) id: u32,
+    @location(0) @interpolate(flat) id: u32,
     @location(1) position: vec3<f32>,
     @location(2) tex_coords: vec2<f32>,
 };
@@ -18,10 +18,12 @@ struct VertexInput {
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) tex_coords: vec2<f32>,
+    @location(1) @interpolate(flat) id: u32,
 };
 
 struct FragmentOutput {
     @location(0) color: vec4<f32>,
+    @location(2) id: u32,
     @builtin(frag_depth) depth: f32,
 }
 
@@ -31,6 +33,7 @@ fn vs_main(model: VertexInput) -> VertexOutput {
     let pos_in_view = model.position - camera.world_offset.xyz;
     out.clip_position = camera.view_proj * vec4<f32>(pos_in_view, 1.0);
     out.tex_coords = model.tex_coords;
+    out.id = model.id;
     return out;
 }
 
@@ -49,5 +52,6 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     let depth = in.clip_position.z;
     output.depth = depth;
     output.color = vec4<f32>(corrected_color, 1.0);
+    output.id = in.id;
     return output;
 }

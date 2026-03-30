@@ -1,7 +1,7 @@
 use super::{
     gpu::{
         CameraUniform, GpuBlockCoordUniform, Texture, VoxelType,
-        dw::{DwChunkBuf, DwIconInstanceRaw, DwIconVertex, DwVertex},
+        dw::{DwChunkBuf, DwChunkObjId, DwIconInstanceRaw, DwIconVertex, DwVertex},
     },
     image_type::ImageType,
 };
@@ -10,7 +10,10 @@ use eframe::{
     egui_wgpu,
     wgpu::{self, util::DeviceExt},
 };
+use std::sync::{Arc, Mutex};
 use zune_png::PngDecoder;
+
+const ID_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::R32Uint;
 
 // Raymarch voxel renderer
 pub struct VoxelRenderer {
@@ -209,6 +212,11 @@ impl VoxelRenderer {
                         format: target_format,
                         blend: Some(wgpu::BlendState::ALPHA_BLENDING),
                         write_mask: wgpu::ColorWrites::ALL,
+                    }),
+                    Some(wgpu::ColorTargetState {
+                        format: ID_TEXTURE_FORMAT,
+                        blend: None,
+                        write_mask: wgpu::ColorWrites::empty(),
                     }),
                 ],
                 compilation_options: Default::default(),
@@ -499,6 +507,11 @@ impl DwIconRenderer {
                         blend: None,
                         write_mask: wgpu::ColorWrites::empty(),
                     }),
+                    Some(wgpu::ColorTargetState {
+                        format: ID_TEXTURE_FORMAT,
+                        blend: None,
+                        write_mask: wgpu::ColorWrites::empty(),
+                    }),
                 ],
                 compilation_options: Default::default(),
             }),
@@ -643,6 +656,11 @@ impl DwSpriteRenderer {
                         blend: None,
                         write_mask: wgpu::ColorWrites::empty(),
                     }),
+                    Some(wgpu::ColorTargetState {
+                        format: ID_TEXTURE_FORMAT,
+                        blend: None,
+                        write_mask: wgpu::ColorWrites::RED,
+                    }),
                 ],
                 compilation_options: Default::default(),
             }),
@@ -744,6 +762,11 @@ impl GridRenderer {
                     }),
                     Some(wgpu::ColorTargetState {
                         format: target_format,
+                        blend: None,
+                        write_mask: wgpu::ColorWrites::empty(),
+                    }),
+                    Some(wgpu::ColorTargetState {
+                        format: ID_TEXTURE_FORMAT,
                         blend: None,
                         write_mask: wgpu::ColorWrites::empty(),
                     }),
@@ -932,6 +955,7 @@ pub(crate) struct GeometryBuffer {
     albedo: Texture,
     translucency: Texture,
     depth: Texture,
+    dyn_obj_id: Texture,
 }
 
 impl GeometryBuffer {
@@ -957,11 +981,18 @@ impl GeometryBuffer {
             wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
             wgpu::TextureFormat::Depth32Float,
         );
+        let dyn_obj_id_texture = Texture::new(
+            size,
+            device,
+            wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+            wgpu::TextureFormat::R32Uint,
+        );
         Self {
             size,
             albedo: color_texture,
             translucency: translucency_texture,
             depth: depth_texture,
+            dyn_obj_id: dyn_obj_id_texture,
         }
     }
 
@@ -986,6 +1017,10 @@ pub struct RenderResources {
 
     g_buffer: GeometryBuffer,
 
+    // Stores the object ID of the pixel under cursor from g_buffer.dyn_obj_id
+    staging_buffer: wgpu::Buffer,
+    hover_on_dyn_obj_id: Arc<Mutex<Option<DwChunkObjId>>>,
+
     voxel: VoxelRenderer,
     dw_icon: DwIconRenderer,
     dw_sprite: DwSpriteRenderer,
@@ -994,12 +1029,15 @@ pub struct RenderResources {
 }
 
 impl RenderResources {
+    const STAGING_BUFFER_SIZE: u64 = std::mem::size_of::<u32>() as u64; // only read single pixel
+
     pub fn new(
         state: &egui_wgpu::RenderState,
         camera_buf: wgpu::Buffer,
         voxel_buf: wgpu::Buffer,
         selected_block_buf: wgpu::Buffer,
         hover_on_block_buf: wgpu::Buffer,
+        hover_on_dyn_obj_id: Arc<Mutex<Option<DwChunkObjId>>>,
     ) -> Self {
         let device = &state.device;
         let queue = &state.queue;
@@ -1018,6 +1056,12 @@ impl RenderResources {
             Texture::from_img(img.as_slice(), (512, 256), device, queue)
         };
         let g_buffer = GeometryBuffer::default(device);
+        let staging_buffer = device.create_buffer(&wgpu::wgt::BufferDescriptor {
+            label: Some("staging buffer"),
+            size: Self::STAGING_BUFFER_SIZE,
+            usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
         let blit = BlitRenderer::new(device, &g_buffer, target_format);
 
         Self {
@@ -1045,6 +1089,9 @@ impl RenderResources {
             selected_block_buf,
             hover_on_block_buf,
             g_buffer,
+
+            staging_buffer,
+            hover_on_dyn_obj_id,
         }
     }
 
@@ -1087,6 +1134,65 @@ impl RenderResources {
     pub fn blit(&self, render_pass: &mut wgpu::RenderPass<'_>) {
         self.blit.render(render_pass);
     }
+
+    pub fn read_hover_id(
+        &self,
+        pos: (u32, u32),
+        device: &wgpu::Device,
+        encoder: &mut wgpu::CommandEncoder,
+    ) {
+        let (x, y) = pos;
+        let (sx, sy) = self.g_buffer.size;
+        if x < sx && y < sy {
+            encoder.copy_texture_to_buffer(
+                wgpu::TexelCopyTextureInfoBase {
+                    texture: &self.g_buffer.dyn_obj_id.texture,
+                    mip_level: 0,
+                    origin: wgpu::Origin3d { x, y, z: 0 },
+                    aspect: wgpu::TextureAspect::All,
+                },
+                wgpu::TexelCopyBufferInfoBase {
+                    buffer: &self.staging_buffer,
+                    layout: wgpu::TexelCopyBufferLayout {
+                        offset: 0,
+                        bytes_per_row: None,
+                        rows_per_image: None,
+                    },
+                },
+                wgpu::Extent3d {
+                    width: 1,
+                    height: 1,
+                    depth_or_array_layers: 1,
+                },
+            );
+
+            // On WASM, device.poll is no-op, and the callback never finishes before queue.submit.
+            // This will cause rendering issue. Thus reading from GPU is disabled on WASM.
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                let bounds = 0..RenderResources::STAGING_BUFFER_SIZE;
+                let staging_buffer = self.staging_buffer.clone();
+                let hover_on_dyn_obj_id = self.hover_on_dyn_obj_id.clone();
+                self.staging_buffer
+                    .map_async(wgpu::MapMode::Read, bounds.clone(), move |result| {
+                        if result.is_ok() {
+                            let buffer_view = staging_buffer.get_mapped_range(bounds);
+                            let raw_id = u32::from_ne_bytes(
+                                buffer_view[..]
+                                    .try_into()
+                                    .expect("array size should be exactly 4"),
+                            );
+                            let mut guard = hover_on_dyn_obj_id.lock().expect("should lock mutex");
+                            *guard = DwChunkObjId::try_from_u32(raw_id);
+                        }
+                        staging_buffer.unmap();
+                    });
+                device
+                    .poll(wgpu::wgt::PollType::wait_indefinitely())
+                    .expect("should poll");
+            }
+        }
+    }
 }
 
 pub struct Render3dCallback {
@@ -1095,6 +1201,8 @@ pub struct Render3dCallback {
     pub show_grid: bool,
     pub selected_block_coord_uniform: GpuBlockCoordUniform,
     pub hover_on_block_coord_uniform: GpuBlockCoordUniform,
+    pub mouse_physical_pos: Option<(f32, f32)>,
+    pub world_viewport_rect: egui::Rect,
 }
 
 impl egui_wgpu::CallbackTrait for Render3dCallback {
@@ -1107,7 +1215,10 @@ impl egui_wgpu::CallbackTrait for Render3dCallback {
         callback_resources: &mut egui_wgpu::CallbackResources,
     ) -> Vec<eframe::wgpu::CommandBuffer> {
         let r: &mut RenderResources = callback_resources.get_mut().unwrap();
-        r.resize(screen_descriptor.size_in_pixels.into(), device);
+        let (vp_w, vp_h) = (self.world_viewport_rect.size() * screen_descriptor.pixels_per_point)
+            .round()
+            .into();
+        r.resize((vp_w as u32, vp_h as u32), device);
         queue.write_buffer(
             r.camera_buf(),
             0,
@@ -1123,40 +1234,57 @@ impl egui_wgpu::CallbackTrait for Render3dCallback {
             0,
             bytemuck::cast_slice(&[self.hover_on_block_coord_uniform]),
         );
-        let mut render_pass = egui_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("custom render pass"),
-            color_attachments: &[
-                Some(wgpu::RenderPassColorAttachment {
-                    view: &r.g_buffer.albedo.view,
-                    depth_slice: None,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+        {
+            let mut render_pass = egui_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("custom render pass"),
+                color_attachments: &[
+                    Some(wgpu::RenderPassColorAttachment {
+                        view: &r.g_buffer.albedo.view,
+                        depth_slice: None,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                            store: wgpu::StoreOp::Store,
+                        },
+                    }),
+                    Some(wgpu::RenderPassColorAttachment {
+                        view: &r.g_buffer.translucency.view,
+                        depth_slice: None,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                            store: wgpu::StoreOp::Store,
+                        },
+                    }),
+                    Some(wgpu::RenderPassColorAttachment {
+                        view: &r.g_buffer.dyn_obj_id.view,
+                        depth_slice: None,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                            store: wgpu::StoreOp::Store,
+                        },
+                    }),
+                ],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: &r.g_buffer.depth.view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(1.0),
                         store: wgpu::StoreOp::Store,
-                    },
+                    }),
+                    stencil_ops: None,
                 }),
-                Some(wgpu::RenderPassColorAttachment {
-                    view: &r.g_buffer.translucency.view,
-                    depth_slice: None,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
-                        store: wgpu::StoreOp::Store,
-                    },
-                }),
-            ],
-            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                view: &r.g_buffer.depth.view,
-                depth_ops: Some(wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(1.0),
-                    store: wgpu::StoreOp::Store,
-                }),
-                stencil_ops: None,
-            }),
-            timestamp_writes: None,
-            occlusion_query_set: None,
-        });
-        r.render(&mut render_pass, &self.dw_chunks, self.show_grid);
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            });
+            r.render(&mut render_pass, &self.dw_chunks, self.show_grid);
+        }
+
+        if let Some((x, y)) = self.mouse_physical_pos {
+            let x = x.round() as u32;
+            let y = y.round() as u32;
+            r.read_hover_id((x, y), device, egui_encoder);
+        }
 
         Vec::new()
     }

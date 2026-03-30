@@ -1,3 +1,5 @@
+use crate::gpu::dw::DwChunkObjId;
+
 use super::{
     fps_counter::FpsCounter,
     gpu::{Camera, GpuBlockCoord, dw::DwBuf, voxel_util},
@@ -10,6 +12,7 @@ use snafu::prelude::*;
 use std::path::PathBuf;
 #[cfg(target_arch = "wasm32")]
 use std::sync::mpsc::{Receiver, Sender, channel};
+use std::sync::{Arc, Mutex};
 use the_blockheads_tools_lib::{
     DynArch,
     game::{
@@ -103,12 +106,15 @@ pub struct EditorApp {
     selected_block_coord: GpuBlockCoord,
     hover_on_block_coord: GpuBlockCoord,
     selected_chunk: Option<Chunk>,
+    hover_on_dyn_obj_id: Arc<Mutex<Option<DwChunkObjId>>>,
+    hover_on_chunk: Option<ChunkCoord>,
 
     file_reader: FileReader,
     load_err: Option<EditorAppError>,
     save_err: Option<EditorAppError>,
 
     world_viewport_rect: Rect,
+    mouse_pos: Option<(f32, f32)>,
 }
 
 impl EditorApp {
@@ -123,12 +129,14 @@ impl EditorApp {
         let selected_block_coord = GpuBlockCoord::default();
         let hover_on_block_coord = GpuBlockCoord::default();
         let voxel_buf = voxel_util::create_buffer(device, 512);
+        let hover_on_dyn_obj_id = Arc::new(Mutex::new(None));
         let render_resources = RenderResources::new(
             state,
             camera.to_buf(device),
             voxel_buf,
             selected_block_coord.to_buf(device),
             hover_on_block_coord.to_buf(device),
+            hover_on_dyn_obj_id.clone(),
         );
 
         state
@@ -149,6 +157,8 @@ impl EditorApp {
             selected_block_coord,
             hover_on_block_coord,
             selected_chunk: None,
+            hover_on_dyn_obj_id,
+            hover_on_chunk: None,
 
             file_reader: FileReader::new(),
             load_err: None,
@@ -158,6 +168,7 @@ impl EditorApp {
                 0.0..=GeometryBuffer::DEFAULT_WIDTH as f32,
                 0.0..=GeometryBuffer::DEFAULT_HEIGHT as f32,
             ),
+            mouse_pos: None,
         }
     }
 
@@ -269,6 +280,25 @@ impl EditorApp {
                     }
                 }
             });
+            let hover_on_dyn_obj_id = {
+                let guard = self.hover_on_dyn_obj_id.lock().expect("should lock mutex");
+                guard.clone()
+            };
+            // info here can be replaced with some function to render internal of the dynamic object
+            // NOTE: `self.hover_on_chunk` must be from last frame, i.e. it must not be updated in this frame before here
+            let info = match (self.hover_on_chunk, hover_on_dyn_obj_id) {
+                (Some(hover_on_chunk), Some(hover_on_dyn_obj_id)) => Some(format!(
+                    "type: {:?}, i-th: {} in chunk: {}",
+                    hover_on_dyn_obj_id.obj_type(),
+                    hover_on_dyn_obj_id.index(),
+                    hover_on_chunk
+                )),
+                _ => None,
+            };
+            if let Some(info) = info {
+                ui.separator();
+                ui.label(info);
+            }
         });
 
         if let Some(state) = frame.wgpu_render_state()
@@ -425,9 +455,14 @@ impl EditorApp {
                 )
                 .floor()
                 .to_array();
-            self.hover_on_block_coord
-                .update(BlockCoord::new(x as u32, y as u16).ok());
+            let hover_on_block_coord = BlockCoord::new(x as u32, y as u16).ok();
+            self.hover_on_block_coord.update(hover_on_block_coord);
+            self.hover_on_chunk = hover_on_block_coord.map(|block_coord| block_coord.into())
         }
+
+        self.mouse_pos = response.hover_pos().map(|pos| {
+            ((pos - self.world_viewport_rect.min) * response.ctx.pixels_per_point()).into()
+        });
     }
 
     fn render_3d_viewport(&mut self, ui: &mut egui::Ui) {
@@ -474,6 +509,8 @@ impl EditorApp {
                 show_grid: self.show_grid,
                 selected_block_coord_uniform: self.selected_block_coord.to_uniform(),
                 hover_on_block_coord_uniform: self.hover_on_block_coord.to_uniform(),
+                mouse_physical_pos: self.mouse_pos,
+                world_viewport_rect: self.world_viewport_rect,
             },
         ));
     }
