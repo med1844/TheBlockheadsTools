@@ -310,7 +310,7 @@ impl VoxelType {
             Self::AppleTreeLeaf => All(AppleTreeLeaf),
             Self::AppleTreeTrunk => TopSide {
                 top: TrunkTop,
-                side: AppleTreeLeaf,
+                side: AppleTreeTrunk,
             },
             Self::AppleTreeTrunkLeaf => All(AppleTreeTrunkLeaf),
             Self::PineTreeLeaf => All(PineTreeLeaf),
@@ -503,7 +503,30 @@ impl VoxelType {
 
     pub fn is_transparent(&self) -> bool {
         match self {
-            Self::Water | Self::Ice => true,
+            Self::Water
+            | Self::Ice
+            | Self::Glass
+            | Self::BlackGlass
+            | Self::AmethystBlock
+            | Self::SapphireBlock
+            | Self::EmeraldBlock
+            | Self::RubyBlock
+            | Self::DiamondBlock
+            | Self::AppleTreeLeaf
+            | Self::PineTreeLeaf
+            | Self::MapleTreeLeaf
+            | Self::MangoTreeLeaf
+            | Self::CoconutTreeLeaf
+            | Self::OrangeTreeLeaf
+            | Self::CherryTreeLeaf
+            | Self::CoffeeTreeLeaf
+            | Self::LimeTreeLeaf
+            | Self::AmethystTreeLeaf
+            | Self::SapphireTreeLeaf
+            | Self::EmeraldTreeLeaf
+            | Self::RubyTreeLeaf
+            | Self::DiamondTreeLeaf
+            | Self::AnyDeadTreeLeaf => true,
             _ => false,
         }
     }
