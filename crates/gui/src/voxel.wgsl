@@ -99,6 +99,9 @@ var<uniform> hover_on_block: vec4<u32>;
 @group(0) @binding(7)
 var<storage, read> is_transparent_buffer: array<u32>;
 
+@group(1) @binding(0) var mesh_depth_texture: texture_depth_2d;
+@group(1) @binding(1) var mesh_depth_sampler: sampler;
+
 fn get_voxel_type(global_voxel_coords: vec3<i32>) -> u32 {
     if global_voxel_coords.x < 0 || global_voxel_coords.x >= i32(WORLD_DIM_X) ||
        global_voxel_coords.y < 0 || global_voxel_coords.y >= i32(WORLD_DIM_Y) ||
@@ -253,7 +256,6 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
 
 struct FragmentOutput {
     @location(0) color: vec4<f32>,
-    @location(1) translucency: vec4<f32>,
     @builtin(frag_depth) depth: f32,
 }
 
@@ -372,12 +374,12 @@ fn traverse_world(ray: Ray, bounds: BoundingBoxIntersection) -> TraversalResult 
         let current_voxel_type = get_voxel_type(dda.current_voxel);
         if (current_voxel_type != prev_voxel_type) {
             let hit_point = ray.origin + ray.direction * t_hit;
-            
+
             if (is_transparent(prev_voxel_type)) {
                 // Render the back-face of the transparent block we are EXITING
                 render_and_blend(prev_voxel_type, hit_point, dda.face_normal, &accumulated_color);
             }
-            
+
             if (is_transparent(current_voxel_type)) {
                 // Render the front-face of the transparent block we are ENTERING
                 render_and_blend(current_voxel_type, hit_point, dda.face_normal, &accumulated_color);
@@ -410,16 +412,32 @@ fn traverse_world(ray: Ray, bounds: BoundingBoxIntersection) -> TraversalResult 
     );
 }
 
+fn get_t_mesh(uv: vec2<f32>, raw_depth: f32, ray: Ray) -> f32 {
+    if (raw_depth >= 1.0) {
+        return 1e9;
+    }
+    let ndc = vec2<f32>(uv.x * 2.0 - 1.0, (1.0 - uv.y) * 2.0 - 1.0);
+    let clip_pos = vec4<f32>(ndc, raw_depth, 1.0);
+    let pos_homo = camera.inv_view_proj * clip_pos;
+    let pos_local = pos_homo.xyz / pos_homo.w;
+    let pos_world = pos_local + camera.world_offset.xyz;
+    return length(pos_world - ray.origin);
+}
+
 @fragment
 fn fs_main(in: VertexOutput) -> FragmentOutput {
+    let raw_mesh_depth = textureSampleLevel(mesh_depth_texture, mesh_depth_sampler, in.uv, 0);
+
     let ndc_coords = vec2<f32>(in.uv.x * 2.0 - 1.0, (1.0 - in.uv.y) * 2.0 - 1.0);
     let ray = create_camera_ray(ndc_coords);
-    let bounds_intersect = intersect_world_bounds(ray);
+    var bounds_intersect = intersect_world_bounds(ray);
 
-    if (!bounds_intersect.hit) {
+    let t_mesh = get_t_mesh(in.uv, raw_mesh_depth, ray);
+    bounds_intersect.t_max = min(bounds_intersect.t_max, t_mesh);
+
+    if (!bounds_intersect.hit || bounds_intersect.t_min > bounds_intersect.t_max) {
         var output: FragmentOutput;
         output.color = vec4<f32>(0.0);
-        output.translucency = vec4<f32>(0.0);
         output.depth = 1.0;
         return output;
     }
@@ -439,13 +457,13 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
         let base_color = sample_surface_texture(traversal.solid_surface);
         let lit_color = calculate_lighting(traversal.solid_surface, base_color);
         let corrected_solid = pow(lit_color, vec3<f32>(1.0 / gamma));
-        
-        output.color = vec4<f32>(corrected_solid, 1.0);
-        output.translucency = vec4<f32>(corrected_translucency, final_transparent_color.a);
+
+        let final_rgb = corrected_translucency + corrected_solid * (1.0 - final_transparent_color.a);
+
+        output.color = vec4<f32>(final_rgb, 1.0);
         output.depth = calculate_depth(traversal.solid_surface.distance, ray);
     } else {
-        output.color = vec4<f32>(0.0);
-        output.translucency = vec4<f32>(corrected_translucency, final_transparent_color.a);
+        output.color = vec4<f32>(corrected_translucency, final_transparent_color.a);
         output.depth = 1.0;
     }
 

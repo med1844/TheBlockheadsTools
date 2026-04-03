@@ -23,7 +23,7 @@ struct VertexOutput {
 
 struct FragmentOutput {
     @location(0) color: vec4<f32>,
-    @location(2) id: u32,
+    @location(1) id: u32,
     @builtin(frag_depth) depth: f32,
 }
 

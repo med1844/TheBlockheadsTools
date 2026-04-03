@@ -15,11 +15,79 @@ use zune_png::PngDecoder;
 
 const ID_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::R32Uint;
 
+pub(crate) enum ResizeOutcome {
+    Unchanged,
+    Resized,
+}
+
+pub(crate) struct GeometryBuffer {
+    size: (u32, u32),
+    albedo: Texture,
+    // transparent voxels needs depth texture of meshes to be obscured correctly during ray marching
+    mesh_depth: Texture,
+    voxel_depth: Texture,
+    dyn_obj_id: Texture,
+}
+
+impl GeometryBuffer {
+    pub const DEFAULT_WIDTH: u32 = 1920;
+    pub const DEFAULT_HEIGHT: u32 = 1080;
+
+    pub fn new(size: (u32, u32), device: &wgpu::Device) -> Self {
+        let color_texture = Texture::new(
+            size,
+            device,
+            wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            wgpu::TextureFormat::Bgra8Unorm,
+        );
+        let voxel_depth = Texture::new(
+            size,
+            device,
+            wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            wgpu::TextureFormat::Depth32Float,
+        );
+        let depth_texture = Texture::new(
+            size,
+            device,
+            wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            wgpu::TextureFormat::Depth32Float,
+        );
+        let dyn_obj_id_texture = Texture::new(
+            size,
+            device,
+            wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+            wgpu::TextureFormat::R32Uint,
+        );
+        Self {
+            size,
+            albedo: color_texture,
+            voxel_depth,
+            mesh_depth: depth_texture,
+            dyn_obj_id: dyn_obj_id_texture,
+        }
+    }
+
+    pub fn default(device: &wgpu::Device) -> Self {
+        Self::new((Self::DEFAULT_WIDTH, Self::DEFAULT_HEIGHT), device)
+    }
+
+    pub fn resize(&mut self, size: (u32, u32), device: &wgpu::Device) -> ResizeOutcome {
+        if self.size != size {
+            *self = Self::new(size, device);
+            ResizeOutcome::Resized
+        } else {
+            ResizeOutcome::Unchanged
+        }
+    }
+}
+
 // Raymarch voxel renderer
 pub struct VoxelRenderer {
     voxel_buf: wgpu::Buffer,
     pipeline: wgpu::RenderPipeline,
     bind_group: wgpu::BindGroup,
+    depth_bind_group_layout: wgpu::BindGroupLayout,
+    depth_bind_group: wgpu::BindGroup,
 }
 
 impl VoxelRenderer {
@@ -31,6 +99,7 @@ impl VoxelRenderer {
         hover_on_block_buf: &wgpu::Buffer,
         texture: &Texture,
         target_format: wgpu::TextureFormat,
+        g_buffer: &GeometryBuffer,
     ) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Voxel Shader"),
@@ -184,9 +253,35 @@ impl VoxelRenderer {
             label: Some("bind_group"),
         });
 
+        let depth_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("Voxel Depth Bind Group Layout"),
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            sample_type: wgpu::TextureSampleType::Depth,
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
+                        count: None,
+                    },
+                ],
+            });
+
+        let depth_bind_group =
+            Self::create_depth_bind_group(device, &depth_bind_group_layout, g_buffer);
+
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Render Pipeline Layout"),
-            bind_group_layouts: &[&bind_group_layout], // Use the new layout
+            bind_group_layouts: &[&bind_group_layout, &depth_bind_group_layout],
             push_constant_ranges: &[],
         });
 
@@ -209,11 +304,6 @@ impl VoxelRenderer {
                         write_mask: wgpu::ColorWrites::ALL,
                     }),
                     Some(wgpu::ColorTargetState {
-                        format: target_format,
-                        blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-                        write_mask: wgpu::ColorWrites::ALL,
-                    }),
-                    Some(wgpu::ColorTargetState {
                         format: ID_TEXTURE_FORMAT,
                         blend: None,
                         write_mask: wgpu::ColorWrites::empty(),
@@ -229,7 +319,7 @@ impl VoxelRenderer {
             depth_stencil: Some(wgpu::DepthStencilState {
                 format: wgpu::TextureFormat::Depth32Float,
                 depth_write_enabled: true,
-                depth_compare: wgpu::CompareFunction::LessEqual,
+                depth_compare: wgpu::CompareFunction::Always,
                 stencil: wgpu::StencilState::default(),
                 bias: wgpu::DepthBiasState::default(),
             }),
@@ -241,12 +331,41 @@ impl VoxelRenderer {
             voxel_buf,
             pipeline,
             bind_group,
+            depth_bind_group_layout,
+            depth_bind_group,
         }
+    }
+
+    fn create_depth_bind_group(
+        device: &wgpu::Device,
+        layout: &wgpu::BindGroupLayout,
+        g_buffer: &GeometryBuffer,
+    ) -> wgpu::BindGroup {
+        device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&g_buffer.mesh_depth.view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&g_buffer.mesh_depth.sampler),
+                },
+            ],
+            label: Some("Voxel Depth Bind Group"),
+        })
+    }
+
+    pub fn resize(&mut self, g_buffer: &GeometryBuffer, device: &wgpu::Device) {
+        self.depth_bind_group =
+            Self::create_depth_bind_group(device, &self.depth_bind_group_layout, g_buffer);
     }
 
     pub fn render(&self, render_pass: &mut wgpu::RenderPass<'_>) {
         render_pass.set_pipeline(&self.pipeline);
         render_pass.set_bind_group(0, &self.bind_group, &[]);
+        render_pass.set_bind_group(1, &self.depth_bind_group, &[]);
         render_pass.draw(0..3, 0..1);
     }
 }
@@ -503,11 +622,6 @@ impl DwIconRenderer {
                         write_mask: wgpu::ColorWrites::ALL,
                     }),
                     Some(wgpu::ColorTargetState {
-                        format: target_format,
-                        blend: None,
-                        write_mask: wgpu::ColorWrites::empty(),
-                    }),
-                    Some(wgpu::ColorTargetState {
                         format: ID_TEXTURE_FORMAT,
                         blend: None,
                         write_mask: wgpu::ColorWrites::empty(),
@@ -652,11 +766,6 @@ impl DwSpriteRenderer {
                         write_mask: wgpu::ColorWrites::ALL,
                     }),
                     Some(wgpu::ColorTargetState {
-                        format: target_format,
-                        blend: None,
-                        write_mask: wgpu::ColorWrites::empty(),
-                    }),
-                    Some(wgpu::ColorTargetState {
                         format: ID_TEXTURE_FORMAT,
                         blend: None,
                         write_mask: wgpu::ColorWrites::RED,
@@ -761,11 +870,6 @@ impl GridRenderer {
                         write_mask: wgpu::ColorWrites::ALL,
                     }),
                     Some(wgpu::ColorTargetState {
-                        format: target_format,
-                        blend: None,
-                        write_mask: wgpu::ColorWrites::empty(),
-                    }),
-                    Some(wgpu::ColorTargetState {
                         format: ID_TEXTURE_FORMAT,
                         blend: None,
                         write_mask: wgpu::ColorWrites::empty(),
@@ -840,24 +944,6 @@ impl BlitRenderer {
                     ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                     count: None,
                 },
-                // Translucency Texture
-                wgpu::BindGroupLayoutEntry {
-                    binding: 2,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        multisampled: false,
-                    },
-                    count: None,
-                },
-                // Translucency sampler
-                wgpu::BindGroupLayoutEntry {
-                    binding: 3,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                    count: None,
-                },
             ],
         });
 
@@ -921,14 +1007,6 @@ impl BlitRenderer {
                     binding: 1,
                     resource: wgpu::BindingResource::Sampler(&g_buffer.albedo.sampler),
                 },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: wgpu::BindingResource::TextureView(&g_buffer.translucency.view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 3,
-                    resource: wgpu::BindingResource::Sampler(&g_buffer.translucency.sampler),
-                },
             ],
             label: Some("Blit Bind Group"),
         })
@@ -942,71 +1020,6 @@ impl BlitRenderer {
         render_pass.set_pipeline(&self.pipeline);
         render_pass.set_bind_group(0, &self.bind_group, &[]);
         render_pass.draw(0..3, 0..1);
-    }
-}
-
-pub(crate) enum ResizeOutcome {
-    Unchanged,
-    Resized,
-}
-
-pub(crate) struct GeometryBuffer {
-    size: (u32, u32),
-    albedo: Texture,
-    translucency: Texture,
-    depth: Texture,
-    dyn_obj_id: Texture,
-}
-
-impl GeometryBuffer {
-    pub const DEFAULT_WIDTH: u32 = 1920;
-    pub const DEFAULT_HEIGHT: u32 = 1080;
-
-    pub fn new(size: (u32, u32), device: &wgpu::Device) -> Self {
-        let color_texture = Texture::new(
-            size,
-            device,
-            wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
-            wgpu::TextureFormat::Bgra8Unorm,
-        );
-        let translucency_texture = Texture::new(
-            size,
-            device,
-            wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
-            wgpu::TextureFormat::Bgra8Unorm,
-        );
-        let depth_texture = Texture::new(
-            size,
-            device,
-            wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
-            wgpu::TextureFormat::Depth32Float,
-        );
-        let dyn_obj_id_texture = Texture::new(
-            size,
-            device,
-            wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
-            wgpu::TextureFormat::R32Uint,
-        );
-        Self {
-            size,
-            albedo: color_texture,
-            translucency: translucency_texture,
-            depth: depth_texture,
-            dyn_obj_id: dyn_obj_id_texture,
-        }
-    }
-
-    pub fn default(device: &wgpu::Device) -> Self {
-        Self::new((Self::DEFAULT_WIDTH, Self::DEFAULT_HEIGHT), device)
-    }
-
-    pub fn resize(&mut self, size: (u32, u32), device: &wgpu::Device) -> ResizeOutcome {
-        if self.size != size {
-            *self = Self::new(size, device);
-            ResizeOutcome::Resized
-        } else {
-            ResizeOutcome::Unchanged
-        }
     }
 }
 
@@ -1073,6 +1086,7 @@ impl RenderResources {
                 &hover_on_block_buf,
                 &tile_map_texture,
                 target_format,
+                &g_buffer,
             ),
             dw_icon: DwIconRenderer::new(
                 device,
@@ -1114,17 +1128,16 @@ impl RenderResources {
     pub fn resize(&mut self, size: (u32, u32), device: &wgpu::Device) {
         if let ResizeOutcome::Resized = self.g_buffer.resize(size, device) {
             self.blit.resize(&self.g_buffer, device);
+            self.voxel.resize(&self.g_buffer, device);
         }
     }
 
-    pub fn render(
-        &self,
-        render_pass: &mut wgpu::RenderPass<'_>,
-        dw_buf: &[DwChunkBuf],
-        show_grid: bool,
-    ) {
-        self.voxel.render(render_pass);
+    pub fn render_mesh_pass(&self, render_pass: &mut wgpu::RenderPass<'_>, dw_buf: &[DwChunkBuf]) {
         self.dw_sprite.render(render_pass, dw_buf);
+    }
+
+    pub fn render_voxel_pass(&self, render_pass: &mut wgpu::RenderPass<'_>, show_grid: bool) {
+        self.voxel.render(render_pass);
         // self.dw_icon.render(render_pass, dw_buf);
         if show_grid {
             self.grid.render(render_pass);
@@ -1236,7 +1249,7 @@ impl egui_wgpu::CallbackTrait for Render3dCallback {
         );
         {
             let mut render_pass = egui_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("custom render pass"),
+                label: Some("mesh pass"),
                 color_attachments: &[
                     Some(wgpu::RenderPassColorAttachment {
                         view: &r.g_buffer.albedo.view,
@@ -1244,15 +1257,6 @@ impl egui_wgpu::CallbackTrait for Render3dCallback {
                         resolve_target: None,
                         ops: wgpu::Operations {
                             load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                            store: wgpu::StoreOp::Store,
-                        },
-                    }),
-                    Some(wgpu::RenderPassColorAttachment {
-                        view: &r.g_buffer.translucency.view,
-                        depth_slice: None,
-                        resolve_target: None,
-                        ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
                             store: wgpu::StoreOp::Store,
                         },
                     }),
@@ -1267,7 +1271,7 @@ impl egui_wgpu::CallbackTrait for Render3dCallback {
                     }),
                 ],
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: &r.g_buffer.depth.view,
+                    view: &r.g_buffer.mesh_depth.view,
                     depth_ops: Some(wgpu::Operations {
                         load: wgpu::LoadOp::Clear(1.0),
                         store: wgpu::StoreOp::Store,
@@ -1277,7 +1281,44 @@ impl egui_wgpu::CallbackTrait for Render3dCallback {
                 timestamp_writes: None,
                 occlusion_query_set: None,
             });
-            r.render(&mut render_pass, &self.dw_chunks, self.show_grid);
+            r.render_mesh_pass(&mut render_pass, &self.dw_chunks);
+        }
+
+        {
+            let mut render_pass = egui_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("voxel pass"),
+                color_attachments: &[
+                    Some(wgpu::RenderPassColorAttachment {
+                        view: &r.g_buffer.albedo.view,
+                        depth_slice: None,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Load,
+                            store: wgpu::StoreOp::Store,
+                        },
+                    }),
+                    Some(wgpu::RenderPassColorAttachment {
+                        view: &r.g_buffer.dyn_obj_id.view,
+                        depth_slice: None,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Load,
+                            store: wgpu::StoreOp::Store,
+                        },
+                    }),
+                ],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: &r.g_buffer.voxel_depth.view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(1.0),
+                        store: wgpu::StoreOp::Store,
+                    }),
+                    stencil_ops: None,
+                }),
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            });
+            r.render_voxel_pass(&mut render_pass, self.show_grid);
         }
 
         if let Some((x, y)) = self.mouse_physical_pos {
