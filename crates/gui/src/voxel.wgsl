@@ -99,6 +99,28 @@ var<uniform> hover_on_block: vec4<u32>;
 @group(0) @binding(7)
 var<storage, read> is_transparent_buffer: array<u32>;
 
+struct RenderSettings {
+    light_dir: vec3<f32>,
+    enable_reflect: u32,
+    enable_destruct: u32,
+    ambient_light: f32,
+    shininess: f32,
+    specular_intensity: f32,
+    min_depth_factor: f32,
+    _padding0: u32,
+    _padding1: u32,
+    _padding2: u32,
+};
+
+@group(0) @binding(8)
+var<uniform> render_settings: RenderSettings;
+
+@group(0) @binding(9) var texture_reflect: texture_2d<f32>;
+@group(0) @binding(10) var sampler_reflect: sampler;
+
+@group(0) @binding(11) var texture_destruct: texture_2d<f32>;
+@group(0) @binding(12) var sampler_destruct: sampler;
+
 @group(1) @binding(0) var mesh_depth_texture: texture_depth_2d;
 @group(1) @binding(1) var mesh_depth_sampler: sampler;
 
@@ -132,14 +154,28 @@ fn get_voxel_type(global_voxel_coords: vec3<i32>) -> u32 {
     }
 }
 
-fn sample_texture_by_face(voxel_type: u32, hit_face_id: u32, uv_on_face: vec2<f32>) -> vec4<f32> {
+fn get_atlas_uv(voxel_type: u32, hit_face_id: u32, uv_on_face: vec2<f32>) -> vec2<f32> {
     let atlas_index_lookup = voxel_type * 6u + hit_face_id;
     let tile_index = texture_uv_atlas_indices[atlas_index_lookup];
     let tile_x = f32(tile_index % TILES_PER_ROW);
     let tile_y = f32(tile_index / TILES_PER_ROW);
     let uv_min_tile = vec2<f32>(tile_x * TILE_SIZE_UV, tile_y * TILE_SIZE_UV);
-    let final_atlas_uv = uv_min_tile + uv_on_face * TILE_SIZE_UV;
+    return uv_min_tile + uv_on_face * TILE_SIZE_UV;
+}
+
+fn sample_texture_by_face(voxel_type: u32, hit_face_id: u32, uv_on_face: vec2<f32>) -> vec4<f32> {
+    let final_atlas_uv = get_atlas_uv(voxel_type, hit_face_id, uv_on_face);
     return textureSampleLevel(texture_atlas, texture_sampler, final_atlas_uv, 0.0);
+}
+
+fn sample_reflect_texture(voxel_type: u32, hit_face_id: u32, uv_on_face: vec2<f32>) -> vec4<f32> {
+    let final_atlas_uv = get_atlas_uv(voxel_type, hit_face_id, uv_on_face);
+    return textureSampleLevel(texture_reflect, sampler_reflect, final_atlas_uv, 0.0);
+}
+
+fn sample_destruct_texture(voxel_type: u32, hit_face_id: u32, uv_on_face: vec2<f32>) -> vec4<f32> {
+    let final_atlas_uv = get_atlas_uv(voxel_type, hit_face_id, uv_on_face);
+    return textureSampleLevel(texture_destruct, sampler_destruct, final_atlas_uv, 0.0);
 }
 
 fn blend_colors(current_color: vec4<f32>, new_color: vec4<f32>) -> vec4<f32> {
@@ -149,7 +185,13 @@ fn blend_colors(current_color: vec4<f32>, new_color: vec4<f32>) -> vec4<f32> {
     return vec4<f32>(new_accumulated_rgb, new_accumulated_alpha);
 }
 
-fn sample_surface_texture(surface: VoxelSurface) -> vec4<f32> {
+struct MaterialData {
+    base_color: vec4<f32>,
+    reflect_intensity: f32,
+    normal: vec3<f32>,
+}
+
+fn sample_material(surface: VoxelSurface) -> MaterialData {
     var hit_face_id: u32;
     if (surface.normal.x != 0) {
         hit_face_id = select(FACE_NX, FACE_PX, surface.normal.x > 0);
@@ -170,19 +212,77 @@ fn sample_surface_texture(surface: VoxelSurface) -> vec4<f32> {
     }
     uv = clamp(uv, vec2<f32>(0.0), vec2<f32>(1.0 - 1e-6));
 
-    return sample_texture_by_face(surface.voxel_type, hit_face_id, uv);
+    let base_color = sample_texture_by_face(surface.voxel_type, hit_face_id, uv);
+    var perturbed_normal = vec3<f32>(surface.normal);
+
+    if (render_settings.enable_destruct == 1u) {
+        let destruct_color = sample_destruct_texture(surface.voxel_type, hit_face_id, uv);
+
+        var tangent: vec3<f32>;
+        var bitangent: vec3<f32>;
+        if (surface.normal.x != 0) {
+            tangent = vec3<f32>(0.0, 0.0, 1.0);
+            bitangent = vec3<f32>(0.0, -1.0, 0.0);
+        } else if (surface.normal.y != 0) {
+            tangent = vec3<f32>(1.0, 0.0, 0.0);
+            bitangent = vec3<f32>(0.0, 0.0, 1.0);
+        } else {
+            tangent = vec3<f32>(1.0, 0.0, 0.0);
+            bitangent = vec3<f32>(0.0, -1.0, 0.0);
+        }
+
+        // In the original game, normal perturbation is calculated as:
+        // vec3((-destruct.r + 0.5) * 0.5, (destruct.g - 0.5) * 0.5, 0.0)
+        // It hardcodes Z to 0.0 (ignoring the noisy blue channel) and flips X.
+        // It also applies it universally without any alpha masking.
+        // We replicate that mathematical behavior here but map it properly into our 3D Tangent Space.
+        let local_normal = vec3<f32>(
+            (destruct_color.r - 0.5) * 0.5,
+            (destruct_color.g - 0.5) * 0.5,
+            1.0 // Z acts as the unperturbed outward strength base
+        );
+
+        perturbed_normal = normalize(
+            tangent * local_normal.x +
+            bitangent * local_normal.y +
+            vec3<f32>(surface.normal) * local_normal.z
+        );
+    }
+
+    var reflect_intensity = 0.0;
+    if (render_settings.enable_reflect == 1u) {
+        let reflect_color = sample_reflect_texture(surface.voxel_type, hit_face_id, uv);
+        reflect_intensity = reflect_color.r * reflect_color.a * base_color.a;
+    }
+    return MaterialData(base_color, reflect_intensity, perturbed_normal);
 }
 
-fn calculate_lighting(surface: VoxelSurface, base_color: vec4<f32>) -> vec3<f32> {
-    let face_normal_f32 = vec3<f32>(surface.normal);
-    let light_direction = normalize(vec3<f32>(-1.0, 1.0, 0.5));
-    let ambient_light = 0.2;
+fn calculate_lighting(surface: VoxelSurface, material: MaterialData, ray_dir: vec3<f32>) -> vec3<f32> {
+    let face_normal_f32 = material.normal;
+    let light_direction = normalize(render_settings.light_dir);
+    let ambient_light = render_settings.ambient_light;
     let diffuse_factor = max(dot(face_normal_f32, light_direction), 0.0);
+
+    // NOTE: The original game used a heavily modified diffuse calculation to boost lighting on reflective surfaces:
+    // diffuse = max(((lightDP + 0.2 * (2.0 - reflect))), 0.2) * (1.0 + reflect * 0.2);
+    // Here we use standard linear interpolation for a cleaner, universal material look.
     let final_light_factor = ambient_light + (1.0 - ambient_light) * diffuse_factor;
 
-    let lit_rgb = base_color.rgb * final_light_factor;
+    let view_dir = -ray_dir;
+    let half_vector = normalize(light_direction + view_dir);
+    let spec_angle = max(dot(face_normal_f32, half_vector), 0.0);
+    let shininess = render_settings.shininess;
 
-    let min_depth_factor = 0.85;
+    // NOTE: The original game FAKED specular physically disconnected from the camera view angle,
+    // using purely the diffuse dot product to drive the shine based on the destruct mask:
+    // specular = reflect * 2.0 * (pow(diffuse, 8.0 * reflect) * 0.15 + diffuse * 0.2);
+    // We are deliberately preserving a physically-accurate Blinn-Phong specular view angle here.
+    let specular_factor = pow(spec_angle, shininess);
+    let specular_color = vec3<f32>(1.0) * specular_factor * material.reflect_intensity * render_settings.specular_intensity;
+
+    let lit_rgb = material.base_color.rgb * final_light_factor + specular_color;
+
+    let min_depth_factor = render_settings.min_depth_factor;
     let depth_multiplier = (surface.hit_point.z / 3.0) * (1.0 - min_depth_factor) + min_depth_factor;
     return lit_rgb * depth_multiplier;
 }
@@ -219,6 +319,7 @@ fn render_and_blend(
     voxel_type: u32,
     hit_point: vec3<f32>,
     face_normal: vec3<i32>,
+    ray_dir: vec3<f32>,
     accumulated_color: ptr<function, vec4<f32>>
 ) {
     // Skip rendering surfaces of air blocks.
@@ -227,11 +328,11 @@ fn render_and_blend(
     }
 
     let surface = VoxelSurface(voxel_type, hit_point, face_normal, 0.0);
-    let surface_color = sample_surface_texture(surface);
+    let material = sample_material(surface);
 
-    if (surface_color.a > 0.0) {
-        let lit_rgb = calculate_lighting(surface, surface_color);
-        let new_color_to_blend = vec4<f32>(lit_rgb, surface_color.a);
+    if (material.base_color.a > 0.0) {
+        let lit_rgb = calculate_lighting(surface, material, ray_dir);
+        let new_color_to_blend = vec4<f32>(lit_rgb, material.base_color.a);
         *accumulated_color = blend_colors(*accumulated_color, new_color_to_blend);
     }
 }
@@ -377,12 +478,12 @@ fn traverse_world(ray: Ray, bounds: BoundingBoxIntersection) -> TraversalResult 
 
             if (is_transparent(prev_voxel_type)) {
                 // Render the back-face of the transparent block we are EXITING
-                render_and_blend(prev_voxel_type, hit_point, dda.face_normal, &accumulated_color);
+                render_and_blend(prev_voxel_type, hit_point, dda.face_normal, ray.direction, &accumulated_color);
             }
 
             if (is_transparent(current_voxel_type)) {
                 // Render the front-face of the transparent block we are ENTERING
-                render_and_blend(current_voxel_type, hit_point, dda.face_normal, &accumulated_color);
+                render_and_blend(current_voxel_type, hit_point, dda.face_normal, ray.direction, &accumulated_color);
             } else if (current_voxel_type != AIR_TYPE) {
                 // We reached a solid block
                 hit_solid = true;
@@ -400,7 +501,7 @@ fn traverse_world(ray: Ray, bounds: BoundingBoxIntersection) -> TraversalResult 
     if (!hit_solid && t_hit >= bounds.t_max && prev_voxel_type != AIR_TYPE && is_transparent(prev_voxel_type)) {
         let hit_point = ray.origin + ray.direction * bounds.t_max;
         let clamped_hit_point = clamp(hit_point, vec3<f32>(0.0), vec3<f32>(f32(WORLD_DIM_X), f32(WORLD_DIM_Y), f32(WORLD_DIM_Z)));
-        render_and_blend(prev_voxel_type, clamped_hit_point, dda.face_normal, &accumulated_color);
+        render_and_blend(prev_voxel_type, clamped_hit_point, dda.face_normal, ray.direction, &accumulated_color);
     }
 
     return TraversalResult(
@@ -454,8 +555,8 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     var output: FragmentOutput;
 
     if (traversal.hit_solid) {
-        let base_color = sample_surface_texture(traversal.solid_surface);
-        let lit_color = calculate_lighting(traversal.solid_surface, base_color);
+        let material = sample_material(traversal.solid_surface);
+        let lit_color = calculate_lighting(traversal.solid_surface, material, ray.direction);
         let corrected_solid = pow(lit_color, vec3<f32>(1.0 / gamma));
 
         let final_rgb = corrected_translucency + corrected_solid * (1.0 - final_transparent_color.a);

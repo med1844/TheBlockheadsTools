@@ -1,8 +1,10 @@
-use crate::gpu::dw::DwChunkObjId;
-
 use super::{
     fps_counter::FpsCounter,
-    gpu::{Camera, GpuBlockCoord, dw::DwBuf, voxel_util},
+    gpu::{
+        Camera, GpuBlockCoord, RenderSettings,
+        dw::{DwBuf, DwChunkObjId},
+        voxel_util,
+    },
     renderer::{GeometryBuffer, Render3dCallback, RenderResources},
 };
 use eframe::{egui, egui_wgpu, emath::Rect, wgpu};
@@ -115,6 +117,7 @@ pub struct EditorApp {
 
     world_viewport_rect: Rect,
     mouse_pos: Option<(f32, f32)>,
+    render_settings: RenderSettings,
 }
 
 impl EditorApp {
@@ -169,6 +172,7 @@ impl EditorApp {
                 0.0..=GeometryBuffer::DEFAULT_HEIGHT as f32,
             ),
             mouse_pos: None,
+            render_settings: RenderSettings::default(),
         }
     }
 
@@ -354,6 +358,31 @@ impl EditorApp {
         ui.label(format!("fps: {:.1}", self.fps_counter.fps()));
         ui.separator();
         ui.add(
+            egui::DragValue::new(&mut self.render_settings.light_dir.x)
+                .speed(0.1)
+                .prefix("Light Dir X: "),
+        );
+        ui.add(
+            egui::DragValue::new(&mut self.render_settings.light_dir.y)
+                .speed(0.1)
+                .prefix("Light Dir Y: "),
+        );
+        ui.add(
+            egui::DragValue::new(&mut self.render_settings.light_dir.z)
+                .speed(0.1)
+                .prefix("Light Dir Z: "),
+        );
+        ui.checkbox(&mut self.render_settings.enable_reflect, "Enable Reflect");
+        ui.checkbox(&mut self.render_settings.enable_destruct, "Enable Destruct");
+        
+        ui.separator();
+        ui.add(egui::Slider::new(&mut self.render_settings.ambient_light, 0.0..=1.0).text("Ambient Light"));
+        ui.add(egui::Slider::new(&mut self.render_settings.shininess, 1.0..=256.0).text("Shininess"));
+        ui.add(egui::Slider::new(&mut self.render_settings.specular_intensity, 0.0..=5.0).text("Specular Intensity"));
+        ui.add(egui::Slider::new(&mut self.render_settings.min_depth_factor, 0.0..=1.0).text("Min Depth Factor"));
+        
+        ui.separator();
+        ui.add(
             egui::DragValue::new(&mut self.camera.world_offset_mut().x)
                 .speed(0.1)
                 .prefix("Viewport Center X: "),
@@ -511,6 +540,7 @@ impl EditorApp {
                 hover_on_block_coord_uniform: self.hover_on_block_coord.to_uniform(),
                 mouse_physical_pos: self.mouse_pos,
                 world_viewport_rect: self.world_viewport_rect,
+                render_settings: self.render_settings,
             },
         ));
     }

@@ -1,6 +1,6 @@
 use super::{
     gpu::{
-        CameraUniform, GpuBlockCoordUniform, Texture, VoxelType,
+        CameraUniform, GpuBlockCoordUniform, RenderSettings, Texture, VoxelType,
         dw::{DwChunkBuf, DwChunkObjId, DwIconInstanceRaw, DwIconVertex, DwVertex},
     },
     image_type::ImageType,
@@ -103,6 +103,9 @@ impl VoxelRenderer {
         texture: &Texture,
         target_format: wgpu::TextureFormat,
         g_buffer: &GeometryBuffer,
+        render_settings_buf: &wgpu::Buffer,
+        reflect_texture: &Texture,
+        destruct_texture: &Texture,
     ) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Voxel Shader"),
@@ -213,6 +216,49 @@ impl VoxelRenderer {
                     },
                     count: None,
                 },
+                // render_settings uniform
+                wgpu::BindGroupLayoutEntry {
+                    binding: 8,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 9,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 10,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 11,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 12,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
             ],
             label: Some("bind_group_layout"),
         });
@@ -251,6 +297,26 @@ impl VoxelRenderer {
                 wgpu::BindGroupEntry {
                     binding: 7,
                     resource: is_transparent_buf.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 8,
+                    resource: render_settings_buf.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 9,
+                    resource: wgpu::BindingResource::TextureView(&reflect_texture.view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 10,
+                    resource: wgpu::BindingResource::Sampler(&reflect_texture.sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 11,
+                    resource: wgpu::BindingResource::TextureView(&destruct_texture.view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 12,
+                    resource: wgpu::BindingResource::Sampler(&destruct_texture.sampler),
                 },
             ],
             label: Some("bind_group"),
@@ -1045,10 +1111,16 @@ pub struct RenderResources {
     dw_sprite: DwSpriteRenderer,
     grid: GridRenderer,
     composite: CompositeRenderer,
+
+    render_settings_buf: wgpu::Buffer,
 }
 
 impl RenderResources {
     const STAGING_BUFFER_SIZE: u64 = std::mem::size_of::<u32>() as u64; // only read single pixel
+
+    pub fn render_settings_buf(&self) -> &wgpu::Buffer {
+        &self.render_settings_buf
+    }
 
     pub fn new(
         state: &egui_wgpu::RenderState,
@@ -1074,6 +1146,18 @@ impl RenderResources {
             let img = decoder.decode().unwrap().u8().unwrap();
             Texture::from_img(img.as_slice(), (512, 256), device, queue)
         };
+        let reflect_texture = {
+            let bytes = include_bytes!("../resources/TileReflect.png");
+            let mut decoder = PngDecoder::new(bytes);
+            let img = decoder.decode().unwrap().u8().unwrap();
+            Texture::from_img(img.as_slice(), (512, 512), device, queue)
+        };
+        let destruct_texture = {
+            let bytes = include_bytes!("../resources/TileDestruct.png");
+            let mut decoder = PngDecoder::new(bytes);
+            let img = decoder.decode().unwrap().u8().unwrap();
+            Texture::from_img(img.as_slice(), (512, 512), device, queue)
+        };
         let g_buffer = GeometryBuffer::default(device);
         let staging_buffer = device.create_buffer(&wgpu::wgt::BufferDescriptor {
             label: Some("staging buffer"),
@@ -1082,6 +1166,7 @@ impl RenderResources {
             mapped_at_creation: false,
         });
         let composite = CompositeRenderer::new(device, &g_buffer, target_format);
+        let render_settings_buf = RenderSettings::default().to_buf(device);
 
         Self {
             voxel: VoxelRenderer::new(
@@ -1093,6 +1178,9 @@ impl RenderResources {
                 &tile_map_texture,
                 target_format,
                 &g_buffer,
+                &render_settings_buf,
+                &reflect_texture,
+                &destruct_texture,
             ),
             dw_icon: DwIconRenderer::new(
                 device,
@@ -1114,6 +1202,7 @@ impl RenderResources {
             hover_on_dyn_obj_id,
             is_mapping: Arc::new(AtomicBool::new(false)),
             has_new_copy: Arc::new(AtomicBool::new(false)),
+            render_settings_buf,
         }
     }
 
@@ -1229,6 +1318,7 @@ pub struct Render3dCallback {
     pub hover_on_block_coord_uniform: GpuBlockCoordUniform,
     pub mouse_physical_pos: Option<(f32, f32)>,
     pub world_viewport_rect: egui::Rect,
+    pub render_settings: RenderSettings,
 }
 
 impl egui_wgpu::CallbackTrait for Render3dCallback {
@@ -1259,6 +1349,11 @@ impl egui_wgpu::CallbackTrait for Render3dCallback {
             r.hover_on_block_buf(),
             0,
             bytemuck::cast_slice(&[self.hover_on_block_coord_uniform]),
+        );
+        queue.write_buffer(
+            r.render_settings_buf(),
+            0,
+            bytemuck::cast_slice(&[self.render_settings.to_uniform()]),
         );
         {
             let mut render_pass = egui_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
