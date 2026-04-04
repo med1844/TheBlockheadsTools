@@ -7,7 +7,7 @@ struct VertexOutput {
 };
 
 @vertex
-fn vs_blit(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
+fn vs_composite(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
     var positions = array<vec2<f32>, 3>(
         vec2<f32>(-1.0, -1.0),
         vec2<f32>( 3.0, -1.0),
@@ -20,7 +20,7 @@ fn vs_blit(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
 }
 
 @fragment
-fn fs_blit(in: VertexOutput) -> @location(0) vec4<f32> {
+fn fs_composite(in: VertexOutput) -> @location(0) vec4<f32> {
     let base_color = textureSample(color_texture, color_sampler, in.uv);
     return base_color;
 }

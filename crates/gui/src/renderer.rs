@@ -907,24 +907,25 @@ impl GridRenderer {
     }
 }
 
-pub struct BlitRenderer {
+// Composite data from multiple textures (albedo, normal, depth) and do deferred rendering
+pub struct CompositeRenderer {
     pipeline: wgpu::RenderPipeline,
     bind_group_layout: wgpu::BindGroupLayout,
     bind_group: wgpu::BindGroup,
 }
 
-impl BlitRenderer {
+impl CompositeRenderer {
     pub fn new(
         device: &wgpu::Device,
         g_buffer: &GeometryBuffer,
         target_format: wgpu::TextureFormat,
     ) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("Blit Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("blit.wgsl").into()),
+            label: Some("Composite Shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("composite.wgsl").into()),
         });
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("Blit Bind Group Layout"),
+            label: Some("Composite Bind Group Layout"),
             entries: &[
                 // Color Texture
                 wgpu::BindGroupLayoutEntry {
@@ -950,23 +951,23 @@ impl BlitRenderer {
         let bind_group = Self::create_bind_group(&bind_group_layout, g_buffer, device);
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("Blit Render Pipeline Layout"),
+            label: Some("Composite Render Pipeline Layout"),
             bind_group_layouts: &[&bind_group_layout], // Use the new layout
             push_constant_ranges: &[],
         });
 
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Blit Render Pipeline"),
+            label: Some("Composite Render Pipeline"),
             layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &shader,
-                entry_point: Some("vs_blit"),
+                entry_point: Some("vs_composite"),
                 buffers: &[],
                 compilation_options: Default::default(),
             },
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
-                entry_point: Some("fs_blit"),
+                entry_point: Some("fs_composite"),
                 targets: &[Some(wgpu::ColorTargetState {
                     format: target_format,
                     blend: Some(wgpu::BlendState::ALPHA_BLENDING),
@@ -1038,7 +1039,7 @@ pub struct RenderResources {
     dw_icon: DwIconRenderer,
     dw_sprite: DwSpriteRenderer,
     grid: GridRenderer,
-    blit: BlitRenderer,
+    composite: CompositeRenderer,
 }
 
 impl RenderResources {
@@ -1075,7 +1076,7 @@ impl RenderResources {
             usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
-        let blit = BlitRenderer::new(device, &g_buffer, target_format);
+        let composite = CompositeRenderer::new(device, &g_buffer, target_format);
 
         Self {
             voxel: VoxelRenderer::new(
@@ -1097,7 +1098,7 @@ impl RenderResources {
             ),
             dw_sprite: DwSpriteRenderer::new(device, &camera_buf, &tile_map_texture, target_format),
             grid: GridRenderer::new(device, &camera_buf, target_format),
-            blit,
+            composite,
 
             camera_buf,
             selected_block_buf,
@@ -1127,7 +1128,7 @@ impl RenderResources {
 
     pub fn resize(&mut self, size: (u32, u32), device: &wgpu::Device) {
         if let ResizeOutcome::Resized = self.g_buffer.resize(size, device) {
-            self.blit.resize(&self.g_buffer, device);
+            self.composite.resize(&self.g_buffer, device);
             self.voxel.resize(&self.g_buffer, device);
         }
     }
@@ -1144,8 +1145,8 @@ impl RenderResources {
         }
     }
 
-    pub fn blit(&self, render_pass: &mut wgpu::RenderPass<'_>) {
-        self.blit.render(render_pass);
+    pub fn composite(&self, render_pass: &mut wgpu::RenderPass<'_>) {
+        self.composite.render(render_pass);
     }
 
     pub fn read_hover_id(
@@ -1337,6 +1338,6 @@ impl egui_wgpu::CallbackTrait for Render3dCallback {
         callback_resources: &egui_wgpu::CallbackResources,
     ) {
         let r: &RenderResources = callback_resources.get().unwrap();
-        r.blit(render_pass);
+        r.composite(render_pass);
     }
 }
