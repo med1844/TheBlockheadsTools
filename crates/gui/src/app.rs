@@ -544,10 +544,20 @@ impl EditorApp {
             }
         }
     }
+
+    fn try_read_id(&self, frame: &eframe::Frame) {
+        if let Some(state) = frame.wgpu_render_state() {
+            let read_renderer = state.renderer.read();
+            if let Some(r) = read_renderer.callback_resources.get::<RenderResources>() {
+                r.try_read_id();
+            }
+        }
+    }
 }
 
 impl eframe::App for EditorApp {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+        self.try_read_id(frame);
         self.fps_counter.update(ctx.input(|i| i.time));
 
         egui::TopBottomPanel::new(egui::panel::TopBottomSide::Top, "menu").show(ctx, |ui| {

@@ -10,7 +10,10 @@ use eframe::{
     egui_wgpu,
     wgpu::{self, util::DeviceExt},
 };
-use std::sync::{Arc, Mutex};
+use std::sync::{
+    Arc, Mutex,
+    atomic::{AtomicBool, Ordering},
+};
 use zune_png::PngDecoder;
 
 const ID_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::R32Uint;
@@ -1034,6 +1037,8 @@ pub struct RenderResources {
     // Stores the object ID of the pixel under cursor from g_buffer.dyn_obj_id
     staging_buffer: wgpu::Buffer,
     hover_on_dyn_obj_id: Arc<Mutex<Option<DwChunkObjId>>>,
+    is_mapping: Arc<AtomicBool>,
+    has_new_copy: Arc<AtomicBool>,
 
     voxel: VoxelRenderer,
     dw_icon: DwIconRenderer,
@@ -1107,6 +1112,8 @@ impl RenderResources {
 
             staging_buffer,
             hover_on_dyn_obj_id,
+            is_mapping: Arc::new(AtomicBool::new(false)),
+            has_new_copy: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -1149,12 +1156,12 @@ impl RenderResources {
         self.composite.render(render_pass);
     }
 
-    pub fn read_hover_id(
-        &self,
-        pos: (u32, u32),
-        device: &wgpu::Device,
-        encoder: &mut wgpu::CommandEncoder,
-    ) {
+    pub fn copy_hover_id(&self, pos: (u32, u32), encoder: &mut wgpu::CommandEncoder) {
+        // Don't copy if the buffer is being mapped; or if the previous copy has not been consumed yet
+        if self.is_mapping.load(Ordering::SeqCst) || self.has_new_copy.load(Ordering::SeqCst) {
+            return;
+        }
+
         let (x, y) = pos;
         let (sx, sy) = self.g_buffer.size;
         if x < sx && y < sy {
@@ -1179,33 +1186,38 @@ impl RenderResources {
                     depth_or_array_layers: 1,
                 },
             );
-
-            // On WASM, device.poll is no-op, and the callback never finishes before queue.submit.
-            // This will cause rendering issue. Thus reading from GPU is disabled on WASM.
-            #[cfg(not(target_arch = "wasm32"))]
-            {
-                let bounds = 0..RenderResources::STAGING_BUFFER_SIZE;
-                let staging_buffer = self.staging_buffer.clone();
-                let hover_on_dyn_obj_id = self.hover_on_dyn_obj_id.clone();
-                self.staging_buffer
-                    .map_async(wgpu::MapMode::Read, bounds.clone(), move |result| {
-                        if result.is_ok() {
-                            let buffer_view = staging_buffer.get_mapped_range(bounds);
-                            let raw_id = u32::from_ne_bytes(
-                                buffer_view[..]
-                                    .try_into()
-                                    .expect("array size should be exactly 4"),
-                            );
-                            let mut guard = hover_on_dyn_obj_id.lock().expect("should lock mutex");
-                            *guard = DwChunkObjId::try_from_u32(raw_id);
-                        }
-                        staging_buffer.unmap();
-                    });
-                device
-                    .poll(wgpu::wgt::PollType::wait_indefinitely())
-                    .expect("should poll");
-            }
+            self.has_new_copy.store(true, Ordering::SeqCst);
         }
+    }
+
+    pub fn try_read_id(&self) {
+        // Don't map when there's no new copy; or if there's an ongoing mapping
+        if !self.has_new_copy.load(Ordering::SeqCst) || self.is_mapping.load(Ordering::SeqCst) {
+            return;
+        }
+
+        self.is_mapping.store(true, Ordering::SeqCst);
+        self.has_new_copy.store(false, Ordering::SeqCst);
+        let is_mapping = self.is_mapping.clone();
+        let hover_on_dyn_obj_id = self.hover_on_dyn_obj_id.clone();
+        let staging_buffer = self.staging_buffer.clone();
+
+        let bounds = 0..RenderResources::STAGING_BUFFER_SIZE;
+        self.staging_buffer
+            .map_async(wgpu::MapMode::Read, bounds.clone(), move |result| {
+                if result.is_ok() {
+                    let buffer_view = staging_buffer.get_mapped_range(bounds);
+                    let raw_id = u32::from_ne_bytes(
+                        buffer_view[..]
+                            .try_into()
+                            .expect("array size should be exactly 4"),
+                    );
+                    let mut guard = hover_on_dyn_obj_id.lock().expect("should lock mutex");
+                    *guard = DwChunkObjId::try_from_u32(raw_id);
+                }
+                staging_buffer.unmap();
+                is_mapping.store(false, Ordering::SeqCst);
+            });
     }
 }
 
@@ -1325,7 +1337,7 @@ impl egui_wgpu::CallbackTrait for Render3dCallback {
         if let Some((x, y)) = self.mouse_physical_pos {
             let x = x.round() as u32;
             let y = y.round() as u32;
-            r.read_hover_id((x, y), device, egui_encoder);
+            r.copy_hover_id((x, y), egui_encoder);
         }
 
         Vec::new()
