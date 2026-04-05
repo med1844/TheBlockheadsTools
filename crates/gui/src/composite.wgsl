@@ -1,6 +1,9 @@
 @group(0) @binding(0) var color_texture: texture_2d<f32>;
 @group(0) @binding(1) var color_sampler: sampler;
 
+@group(0) @binding(2) var normal_spec_texture: texture_2d<f32>;
+@group(0) @binding(3) var normal_spec_sampler: sampler;
+
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
     @location(0) uv: vec2<f32>,
@@ -22,5 +25,11 @@ fn vs_composite(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
 @fragment
 fn fs_composite(in: VertexOutput) -> @location(0) vec4<f32> {
     let base_color = textureSample(color_texture, color_sampler, in.uv);
-    return base_color;
+    let normal_spec = textureSample(normal_spec_texture, normal_spec_sampler, in.uv);
+    
+    // Unpack the specular highlight scalar from the normal map's alpha channel
+    let specular_color = vec3<f32>(1.0) * normal_spec.a;
+    let final_color_rgb = base_color.rgb + specular_color;
+
+    return vec4<f32>(final_color_rgb, base_color.a);
 }

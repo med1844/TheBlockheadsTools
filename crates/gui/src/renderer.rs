@@ -26,6 +26,7 @@ pub(crate) enum ResizeOutcome {
 pub(crate) struct GeometryBuffer {
     size: (u32, u32),
     albedo: Texture,
+    normal_spec: Texture,
     // transparent voxels needs depth texture of meshes to be obscured correctly during ray marching
     mesh_depth: Texture,
     voxel_depth: Texture,
@@ -42,6 +43,12 @@ impl GeometryBuffer {
             device,
             wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
             wgpu::TextureFormat::Bgra8Unorm,
+        );
+        let normal_spec_texture = Texture::new(
+            size,
+            device,
+            wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            wgpu::TextureFormat::Rgba16Float,
         );
         let voxel_depth = Texture::new(
             size,
@@ -64,6 +71,7 @@ impl GeometryBuffer {
         Self {
             size,
             albedo: color_texture,
+            normal_spec: normal_spec_texture,
             voxel_depth,
             mesh_depth: depth_texture,
             dyn_obj_id: dyn_obj_id_texture,
@@ -370,6 +378,11 @@ impl VoxelRenderer {
                     Some(wgpu::ColorTargetState {
                         format: target_format,
                         blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    }),
+                    Some(wgpu::ColorTargetState {
+                        format: wgpu::TextureFormat::Rgba16Float,
+                        blend: None,
                         write_mask: wgpu::ColorWrites::ALL,
                     }),
                     Some(wgpu::ColorTargetState {
@@ -835,6 +848,11 @@ impl DwSpriteRenderer {
                         write_mask: wgpu::ColorWrites::ALL,
                     }),
                     Some(wgpu::ColorTargetState {
+                        format: wgpu::TextureFormat::Rgba16Float,
+                        blend: None,
+                        write_mask: wgpu::ColorWrites::ALL,
+                    }),
+                    Some(wgpu::ColorTargetState {
                         format: ID_TEXTURE_FORMAT,
                         blend: None,
                         write_mask: wgpu::ColorWrites::RED,
@@ -1007,9 +1025,24 @@ impl CompositeRenderer {
                     },
                     count: None,
                 },
-                // Color Texture sampler
                 wgpu::BindGroupLayoutEntry {
                     binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 3,
                     visibility: wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                     count: None,
@@ -1076,6 +1109,14 @@ impl CompositeRenderer {
                 wgpu::BindGroupEntry {
                     binding: 1,
                     resource: wgpu::BindingResource::Sampler(&g_buffer.albedo.sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::TextureView(&g_buffer.normal_spec.view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::Sampler(&g_buffer.normal_spec.sampler),
                 },
             ],
             label: Some("Blit Bind Group"),
@@ -1369,6 +1410,15 @@ impl egui_wgpu::CallbackTrait for Render3dCallback {
                         },
                     }),
                     Some(wgpu::RenderPassColorAttachment {
+                        view: &r.g_buffer.normal_spec.view,
+                        depth_slice: None,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                            store: wgpu::StoreOp::Store,
+                        },
+                    }),
+                    Some(wgpu::RenderPassColorAttachment {
                         view: &r.g_buffer.dyn_obj_id.view,
                         depth_slice: None,
                         resolve_target: None,
@@ -1398,6 +1448,15 @@ impl egui_wgpu::CallbackTrait for Render3dCallback {
                 color_attachments: &[
                     Some(wgpu::RenderPassColorAttachment {
                         view: &r.g_buffer.albedo.view,
+                        depth_slice: None,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Load,
+                            store: wgpu::StoreOp::Store,
+                        },
+                    }),
+                    Some(wgpu::RenderPassColorAttachment {
+                        view: &r.g_buffer.normal_spec.view,
                         depth_slice: None,
                         resolve_target: None,
                         ops: wgpu::Operations {

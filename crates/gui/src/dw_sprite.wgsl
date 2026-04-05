@@ -23,7 +23,8 @@ struct VertexOutput {
 
 struct FragmentOutput {
     @location(0) color: vec4<f32>,
-    @location(1) id: u32,
+    @location(1) normal_spec: vec4<f32>,
+    @location(2) id: u32,
     @builtin(frag_depth) depth: f32,
 }
 
@@ -52,6 +53,8 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     let depth = in.clip_position.z;
     output.depth = depth;
     output.color = vec4<f32>(corrected_color, 1.0);
+    // World-space forward normal (Z is 1.0), with 0.0 specular intensity.
+    output.normal_spec = vec4<f32>(0.0, 0.0, 1.0, 0.0);
     output.id = in.id;
     return output;
 }

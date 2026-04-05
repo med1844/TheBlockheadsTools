@@ -257,7 +257,12 @@ fn sample_material(surface: VoxelSurface) -> MaterialData {
     return MaterialData(base_color, reflect_intensity, perturbed_normal);
 }
 
-fn calculate_lighting(surface: VoxelSurface, material: MaterialData, ray_dir: vec3<f32>) -> vec3<f32> {
+struct LightingOutput {
+    lit_color: vec3<f32>,
+    specular_scalar: f32,
+}
+
+fn calculate_lighting(surface: VoxelSurface, material: MaterialData, ray_dir: vec3<f32>) -> LightingOutput {
     let face_normal_f32 = material.normal;
     let light_direction = normalize(render_settings.light_dir);
     let ambient_light = render_settings.ambient_light;
@@ -278,13 +283,18 @@ fn calculate_lighting(surface: VoxelSurface, material: MaterialData, ray_dir: ve
     // specular = reflect * 2.0 * (pow(diffuse, 8.0 * reflect) * 0.15 + diffuse * 0.2);
     // We are deliberately preserving a physically-accurate Blinn-Phong specular view angle here.
     let specular_factor = pow(spec_angle, shininess);
-    let specular_color = vec3<f32>(1.0) * specular_factor * material.reflect_intensity * render_settings.specular_intensity;
+    let spec_scalar = specular_factor * material.reflect_intensity * render_settings.specular_intensity;
 
-    let lit_rgb = material.base_color.rgb * final_light_factor + specular_color;
+    let lit_rgb = material.base_color.rgb * final_light_factor;
 
     let min_depth_factor = render_settings.min_depth_factor;
     let depth_multiplier = (surface.hit_point.z / 3.0) * (1.0 - min_depth_factor) + min_depth_factor;
-    return lit_rgb * depth_multiplier;
+    
+    var out_lighting: LightingOutput;
+    out_lighting.lit_color = lit_rgb * depth_multiplier;
+    out_lighting.specular_scalar = spec_scalar;
+    
+    return out_lighting;
 }
 
 fn apply_block_highlights(base_color: vec4<f32>, is_selected: bool, is_hovered: bool) -> vec4<f32> {
@@ -331,8 +341,8 @@ fn render_and_blend(
     let material = sample_material(surface);
 
     if (material.base_color.a > 0.0) {
-        let lit_rgb = calculate_lighting(surface, material, ray_dir);
-        let new_color_to_blend = vec4<f32>(lit_rgb, material.base_color.a);
+        let lighting = calculate_lighting(surface, material, ray_dir);
+        let new_color_to_blend = vec4<f32>(lighting.lit_color, material.base_color.a);
         *accumulated_color = blend_colors(*accumulated_color, new_color_to_blend);
     }
 }
@@ -357,6 +367,7 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
 
 struct FragmentOutput {
     @location(0) color: vec4<f32>,
+    @location(1) normal_spec: vec4<f32>,
     @builtin(frag_depth) depth: f32,
 }
 
@@ -553,15 +564,17 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     let corrected_translucency = pow(final_transparent_color.rgb, vec3<f32>(1.0 / gamma));
 
     var output: FragmentOutput;
+    output.normal_spec = vec4<f32>(0.0, 0.0, 1.0, 0.0);
 
     if (traversal.hit_solid) {
         let material = sample_material(traversal.solid_surface);
-        let lit_color = calculate_lighting(traversal.solid_surface, material, ray.direction);
-        let corrected_solid = pow(lit_color, vec3<f32>(1.0 / gamma));
+        let lighting = calculate_lighting(traversal.solid_surface, material, ray.direction);
+        let corrected_solid = pow(lighting.lit_color, vec3<f32>(1.0 / gamma));
 
         let final_rgb = corrected_translucency + corrected_solid * (1.0 - final_transparent_color.a);
 
         output.color = vec4<f32>(final_rgb, 1.0);
+        output.normal_spec = vec4<f32>(material.normal, lighting.specular_scalar);
         output.depth = calculate_depth(traversal.solid_surface.distance, ray);
     } else {
         output.color = vec4<f32>(corrected_translucency, final_transparent_color.a);
