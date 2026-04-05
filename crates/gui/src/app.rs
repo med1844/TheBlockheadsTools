@@ -374,6 +374,7 @@ impl EditorApp {
         );
         ui.checkbox(&mut self.render_settings.enable_reflect, "Enable Reflect");
         ui.checkbox(&mut self.render_settings.enable_destruct, "Enable Destruct");
+        ui.checkbox(&mut self.render_settings.enable_ssao, "Enable SSAO");
         
         ui.separator();
         ui.add(egui::Slider::new(&mut self.render_settings.ambient_light, 0.0..=1.0).text("Ambient Light"));

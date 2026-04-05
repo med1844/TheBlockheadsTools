@@ -103,13 +103,13 @@ struct RenderSettings {
     light_dir: vec3<f32>,
     enable_reflect: u32,
     enable_destruct: u32,
+    enable_ssao: u32,
     ambient_light: f32,
     shininess: f32,
     specular_intensity: f32,
     min_depth_factor: f32,
     _padding0: u32,
     _padding1: u32,
-    _padding2: u32,
 };
 
 @group(0) @binding(8)

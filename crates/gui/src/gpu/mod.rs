@@ -5,6 +5,7 @@ mod render_settings;
 pub mod sprite;
 mod texture;
 mod voxel;
+pub mod ssao;
 
 pub use block::{GpuBlockCoord, GpuBlockCoordUniform};
 pub use camera::{Camera, CameraUniform};
