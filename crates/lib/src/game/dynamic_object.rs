@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use snafu::prelude::*;
 use std::ops::{Deref, DerefMut};
+use strum_macros::IntoStaticStr;
 
 #[derive(Debug, Snafu)]
 pub enum DynamicObjectError {
@@ -26,7 +27,7 @@ pub enum DynamicObjectError {
 
 type Result<T> = std::result::Result<T, DynamicObjectError>;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, TryFromPrimitive)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, TryFromPrimitive, IntoStaticStr)]
 #[repr(u16)]
 pub enum DynamicObjectType {
     AppleTree = 1,
@@ -180,7 +181,7 @@ impl<T> FromIterator<T> for DynamicObjectList<T> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, Hash)]
 #[serde(transparent)]
 pub struct UniqueID(u64);
 inherit!(UniqueID -> u64);
@@ -202,7 +203,7 @@ impl UniqueID {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct DynamicObject {
     #[serde(rename = "floatPos")]
     pub float_pos: [f32; 2],
@@ -265,7 +266,7 @@ impl InteractionObject {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ArtificialLight {
     #[serde(flatten)]
@@ -283,9 +284,10 @@ pub struct ArtificialLight {
 }
 inherit!(ArtificialLight -> DynamicObject, obj);
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize_repr, Deserialize_repr)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize_repr, Deserialize_repr)]
 #[repr(u8)]
 pub enum LightDirection {
+    #[default]
     All = 0,
     Down = 1,
     Up = 2,

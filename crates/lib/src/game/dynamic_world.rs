@@ -249,6 +249,13 @@ impl DynamicWorld {
         self.0.get(&coord.into())
     }
 
+    pub fn chunk_at_mut<I: Into<ChunkCoord>>(
+        &mut self,
+        coord: I,
+    ) -> Option<&mut ChunkDynamicObjects> {
+        self.0.get_mut(&coord.into())
+    }
+
     pub fn iter(&self) -> impl Iterator<Item = (&ChunkCoord, &ChunkDynamicObjects)> {
         self.0.iter()
     }

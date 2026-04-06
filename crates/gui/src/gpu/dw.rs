@@ -386,8 +386,6 @@ impl DwChunkBuf {
             obj_type: DynamicObjectType,
             coord: ChunkCoord,
             builder: &mut DwChunkBufBuilder<'_>,
-            // icon_instances: &mut Vec<DwIconInstanceRaw>,
-            // sprite_builder: &mut MeshAggregator<[DwVertex; 4], [u32; 6]>,
         ) {
             for (index, obj) in i.enumerate() {
                 match obj.to_dw_obj() {

@@ -1,4 +1,5 @@
 use super::{
+    dw_impl::InfoUi,
     fps_counter::FpsCounter,
     gpu::{
         Camera, GpuCoord, RenderSettings,
@@ -16,7 +17,7 @@ use std::path::PathBuf;
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::sync::{Arc, Mutex};
 use the_blockheads_tools_lib::{
-    DynArch,
+    self as lib, DynArch,
     game::{
         block::{Block, BlockView},
         chunk::Chunk,
@@ -109,6 +110,7 @@ pub struct EditorApp {
     hover_on_block_coord: GpuCoord<BlockCoord>,
     selected_chunk: Option<Chunk>,
     hover_on_dyn_obj_id: Arc<Mutex<Option<DwChunkObjId>>>,
+    selected_dyn_obj: Option<(ChunkCoord, DwChunkObjId)>,
     hover_on_chunk_coord: GpuCoord<ChunkCoord>,
 
     file_reader: FileReader,
@@ -163,6 +165,7 @@ impl EditorApp {
             hover_on_block_coord,
             selected_chunk: None,
             hover_on_dyn_obj_id,
+            selected_dyn_obj: None,
             hover_on_chunk_coord,
 
             file_reader: FileReader::new(),
@@ -460,8 +463,9 @@ impl EditorApp {
         }
     }
 
-    fn update_gpu_block_coords(&mut self, response: &egui::Response) {
+    fn update_gpu_block_coords(&mut self, dyn_obj_id_updated: bool, response: &egui::Response) {
         if response.clicked_by(egui::PointerButton::Primary)
+            && !dyn_obj_id_updated
             && let Some(pos) = response.interact_pointer_pos()
         {
             let [x, y] = self
@@ -507,6 +511,19 @@ impl EditorApp {
         });
     }
 
+    fn update_selected_dyn_obj_id(&mut self, response: &egui::Response) -> bool {
+        if response.clicked_by(egui::PointerButton::Primary)
+            && let Some(hover_on_chunk_coord) = self.hover_on_chunk_coord.into()
+        {
+            let selected_dyn_obj_id = {
+                let guard = self.hover_on_dyn_obj_id.lock().expect("should lock");
+                guard.clone()
+            };
+            self.selected_dyn_obj = selected_dyn_obj_id.map(|id| (hover_on_chunk_coord, id));
+        }
+        self.selected_dyn_obj.is_some()
+    }
+
     fn render_3d_viewport(&mut self, ui: &mut egui::Ui) {
         let available_size = ui.available_size();
         let (rect, response) =
@@ -516,7 +533,8 @@ impl EditorApp {
         self.camera.set_aspect(rect.aspect_ratio());
 
         self.update_camera_pos(ui, &response);
-        self.update_gpu_block_coords(&response);
+        let dyn_obj_id_updated = self.update_selected_dyn_obj_id(&response);
+        self.update_gpu_block_coords(dyn_obj_id_updated, &response);
 
         let [min_coords, max_coords] = self.camera.visible_world_region_2d(rect.size().into());
         let center = self.camera.world_offset().xy();
@@ -603,6 +621,86 @@ impl EditorApp {
             }
         }
     }
+
+    fn render_selected_dyn_obj_info_window(&mut self, ctx: &egui::Context) {
+        if let Some((chunk_coord, id)) = self.selected_dyn_obj
+            && let Some(world_db) = self.world_db.as_mut()
+            && let Some(dw_chunk) = world_db.dw.chunk_at_mut(chunk_coord)
+        {
+            use lib::game::dynamic_object::DynamicObjectType::*;
+            fn draw_window<T: InfoUi>(title: &str, t: Option<&mut T>, ctx: &egui::Context) {
+                if let Some(t) = t {
+                    egui::Window::new(title).show(ctx, |ui| {
+                        t.info(ui);
+                    });
+                }
+            }
+
+            let title: &'static str = id.obj_type.into();
+            match id.obj_type {
+                AppleTree => draw_window(title, dw_chunk.apple_tree.get_mut(id.index), ctx),
+                MapleTree => draw_window(title, dw_chunk.maple_tree.get_mut(id.index), ctx),
+                MangoTree => draw_window(title, dw_chunk.mango_tree.get_mut(id.index), ctx),
+                PineTree => draw_window(title, dw_chunk.pine_tree.get_mut(id.index), ctx),
+                CactusTree => draw_window(title, dw_chunk.cactus_tree.get_mut(id.index), ctx),
+                CoconutTree => draw_window(title, dw_chunk.coconut_tree.get_mut(id.index), ctx),
+                OrangeTree => draw_window(title, dw_chunk.orange_tree.get_mut(id.index), ctx),
+                CherryTree => draw_window(title, dw_chunk.cherry_tree.get_mut(id.index), ctx),
+                CoffeeTree => draw_window(title, dw_chunk.coffee_tree.get_mut(id.index), ctx),
+                FlaxPlant => {}
+                SunflowerPlant => {}
+                CornPlant => draw_window(title, dw_chunk.corn_plant.get_mut(id.index), ctx),
+                Dodo => {}
+                DroppedItem => {}
+                Fire => {}
+                Torch => {}
+                GlowBlock => {}
+                Ladder => {}
+                Door => {}
+                ArtificialLight => {}
+                Bed => {}
+                DropBear => {}
+                GatherBlock => {}
+                CarrotPlant => draw_window(title, dw_chunk.carrot_plant.get_mut(id.index), ctx),
+                Donkey => {}
+                Egg => {}
+                Window => {}
+                Boat => {}
+                ChilliPlant => {}
+                KelpPlant => draw_window(title, dw_chunk.kelp_plant.get_mut(id.index), ctx),
+                ClownFish => {}
+                Shark => {}
+                LimeTree => draw_window(title, dw_chunk.lime_tree.get_mut(id.index), ctx),
+                Wire => {}
+                CaveTroll => {}
+                Rail => {}
+                HandCar => {}
+                SteamLocomotive => {}
+                FreightCar => {}
+                PassengerCar => {}
+                Workbench => {}
+                Chest => {}
+                Sign => {}
+                TradingPost => {}
+                TrainStation => {}
+                TradePortal => {}
+                Scorpion => {}
+                Painting => {}
+                Column => {}
+                Stairs => {}
+                ElevatorMotor => {}
+                ElevatorShaft => {}
+                GemTree => draw_window(title, dw_chunk.gem_tree.get_mut(id.index), ctx),
+                VinePlant => {}
+                TulipPlant => {}
+                OwnershipSign => {}
+                WheatPlant => {}
+                TomatoPlant => draw_window(title, dw_chunk.tomato_plant.get_mut(id.index), ctx),
+                Yak => {}
+                Mirror => {}
+            }
+        }
+    }
 }
 
 impl eframe::App for EditorApp {
@@ -627,5 +725,6 @@ impl eframe::App for EditorApp {
             });
 
         self.render_error_windows(ctx);
+        self.render_selected_dyn_obj_info_window(ctx);
     }
 }

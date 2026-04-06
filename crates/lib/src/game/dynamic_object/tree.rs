@@ -25,7 +25,7 @@ pub enum TreeType {
     Diamond = 15,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TreeFruit {
     pub has_created_free_block_this_season: bool,

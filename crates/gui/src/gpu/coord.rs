@@ -26,6 +26,7 @@ impl Coord for ChunkCoord {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
 pub struct GpuCoord<T> {
     coord: Option<T>,
 }
@@ -33,6 +34,12 @@ pub struct GpuCoord<T> {
 impl<T> Default for GpuCoord<T> {
     fn default() -> Self {
         Self { coord: None }
+    }
+}
+
+impl<T> From<GpuCoord<T>> for Option<T> {
+    fn from(value: GpuCoord<T>) -> Self {
+        value.coord
     }
 }
 
