@@ -70,8 +70,11 @@ struct DepthHit {
 }
 
 struct TraversalResult {
-    depth_hit:         DepthHit,
-    accumulated_color: vec4<f32>,
+    depth_hit:          DepthHit,
+    /// Fully-opaque (alpha = 1.0) solid surface color — goes to albedo target.
+    solid_color:        vec4<f32>,
+    /// Accumulated semi-transparent (0 < alpha < 1.0) colors — goes to translucency target.
+    translucency_color: vec4<f32>,
     hit_selected_block: bool,
     hit_hovered_block:  bool,
 }
@@ -329,16 +332,17 @@ fn calculate_depth(hit_distance: f32, ray: Ray) -> f32 {
     return clip_pos.z / clip_pos.w;
 }
 
-// Renders a voxel surface, blends its color into accumulated_color, and —
-// on the first fully-opaque hit (alpha = 1.0) — records it in depth_hit.
+// Renders a voxel surface, routes its lit color into either solid_color (alpha=1.0)
+// or translucency_color (0 < alpha < 1.0), and records depth_hit on first opaque hit.
 fn render_and_blend(
     voxel_type: u32,
     hit_point:  vec3<f32>,
     face_normal: vec3<i32>,
     t_hit:      f32,
     ray_dir:    vec3<f32>,
-    accumulated_color: ptr<function, vec4<f32>>,
-    depth_hit:         ptr<function, DepthHit>,
+    solid_color:        ptr<function, vec4<f32>>,
+    translucency_color: ptr<function, vec4<f32>>,
+    depth_hit:          ptr<function, DepthHit>,
 ) {
     if (voxel_type == AIR_TYPE) {
         return;
@@ -349,14 +353,21 @@ fn render_and_blend(
 
     if (material.base_color.a > 0.0) {
         let lighting = calculate_lighting(surface, material, ray_dir);
-        let new_color_to_blend = vec4<f32>(lighting.lit_color, material.base_color.a);
-        *accumulated_color = blend_colors(*accumulated_color, new_color_to_blend);
+        let lit = vec4<f32>(lighting.lit_color, material.base_color.a);
 
-        if (!(*depth_hit).is_set && material.base_color.a >= 1.0) {
-            (*depth_hit).surface  = surface;
-            (*depth_hit).normal   = material.normal;
-            (*depth_hit).specular = lighting.specular_scalar;
-            (*depth_hit).is_set   = true;
+        if (material.base_color.a >= 1.0) {
+            // Fully opaque — goes to the solid albedo buffer
+            *solid_color = blend_colors(*solid_color, lit);
+
+            if (!(*depth_hit).is_set) {
+                (*depth_hit).surface  = surface;
+                (*depth_hit).normal   = material.normal;
+                (*depth_hit).specular = lighting.specular_scalar;
+                (*depth_hit).is_set   = true;
+            }
+        } else {
+            // Semi-transparent — goes to the translucency buffer
+            *translucency_color = blend_colors(*translucency_color, lit);
         }
     }
 }
@@ -380,9 +391,11 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
 }
 
 struct FragmentOutput {
-    @location(0) color: vec4<f32>,
-    @location(1) normal_spec: vec4<f32>,
+    @location(0) albedo:       vec4<f32>,
+    @location(1) normal_spec:  vec4<f32>,
     @builtin(frag_depth) depth: f32,
+    // @location(2) is dyn_obj_id — written by dw_sprite, not voxel
+    @location(3) translucency: vec4<f32>,
 }
 
 fn create_camera_ray(ndc: vec2<f32>) -> Ray {
@@ -473,7 +486,8 @@ fn step_dda(dda: ptr<function, DDAState>) -> f32 {
 
 fn traverse_world(ray: Ray, bounds: BoundingBoxIntersection) -> TraversalResult {
     var depth_hit: DepthHit;
-    var accumulated_color = vec4<f32>(0.0);
+    var solid_color        = vec4<f32>(0.0);
+    var translucency_color = vec4<f32>(0.0);
     var hit_selected_block = false;
     var hit_hovered_block = false;
 
@@ -482,8 +496,8 @@ fn traverse_world(ray: Ray, bounds: BoundingBoxIntersection) -> TraversalResult 
     var prev_voxel_type = AIR_TYPE;
 
     for (var i: u32 = 0u; i < MAX_VOXEL_TRAVERSAL_STEPS; i = i + 1u) {
-        // Stop if we've left the world or accumulated color is fully opaque
-        if (t_hit > bounds.t_max || accumulated_color.a >= 1.0) {
+        // Stop once the solid surface is hit (solid_color is opaque)
+        if (t_hit > bounds.t_max || solid_color.a >= 1.0) {
             break;
         }
 
@@ -498,7 +512,7 @@ fn traverse_world(ray: Ray, bounds: BoundingBoxIntersection) -> TraversalResult 
             if (prev_voxel_type != AIR_TYPE) {
                 render_and_blend(
                     prev_voxel_type, hit_point, dda.face_normal, t_hit, ray.direction,
-                    &accumulated_color, &depth_hit
+                    &solid_color, &translucency_color, &depth_hit
                 );
             }
 
@@ -506,7 +520,7 @@ fn traverse_world(ray: Ray, bounds: BoundingBoxIntersection) -> TraversalResult 
             if (current_voxel_type != AIR_TYPE) {
                 render_and_blend(
                     current_voxel_type, hit_point, dda.face_normal, t_hit, ray.direction,
-                    &accumulated_color, &depth_hit
+                    &solid_color, &translucency_color, &depth_hit
                 );
             }
         }
@@ -516,16 +530,16 @@ fn traverse_world(ray: Ray, bounds: BoundingBoxIntersection) -> TraversalResult 
     }
 
     // After the loop, render exit face if we left the world from within a non-air block
-    if (accumulated_color.a < 1.0 && t_hit >= bounds.t_max && prev_voxel_type != AIR_TYPE) {
+    if (solid_color.a < 1.0 && t_hit >= bounds.t_max && prev_voxel_type != AIR_TYPE) {
         let hit_point = ray.origin + ray.direction * bounds.t_max;
         let clamped_hit_point = clamp(hit_point, vec3<f32>(0.0), vec3<f32>(f32(WORLD_DIM_X), f32(WORLD_DIM_Y), f32(WORLD_DIM_Z)));
         render_and_blend(
             prev_voxel_type, clamped_hit_point, dda.face_normal, bounds.t_max, ray.direction,
-            &accumulated_color, &depth_hit
+            &solid_color, &translucency_color, &depth_hit
         );
     }
 
-    return TraversalResult(depth_hit, accumulated_color, hit_selected_block, hit_hovered_block);
+    return TraversalResult(depth_hit, solid_color, translucency_color, hit_selected_block, hit_hovered_block);
 }
 
 fn get_t_mesh(uv: vec2<f32>, raw_depth: f32, ray: Ray) -> f32 {
@@ -553,30 +567,34 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
 
     if (!bounds_intersect.hit || bounds_intersect.t_min > bounds_intersect.t_max) {
         var output: FragmentOutput;
-        output.color = vec4<f32>(0.0);
-        output.depth = 1.0;
+        output.albedo       = vec4<f32>(0.0);
+        output.translucency = vec4<f32>(0.0);
+        output.depth        = 1.0;
         return output;
     }
 
     let traversal = traverse_world(ray, bounds_intersect);
 
-    var final_color = traversal.accumulated_color;
-    final_color = apply_block_highlights(final_color, traversal.hit_selected_block, traversal.hit_hovered_block);
+    // Apply block highlights to solid surface only
+    var solid = traversal.solid_color;
+    solid = apply_block_highlights(solid, traversal.hit_selected_block, traversal.hit_hovered_block);
 
     // eframe uses Bgra8Unorm so we have to manually do gamma correction
     let gamma = 2.2;
-    let corrected_rgb = pow(final_color.rgb, vec3<f32>(1.0 / gamma));
+    let corrected_solid        = pow(solid.rgb, vec3<f32>(1.0 / gamma));
+    let corrected_translucency = pow(traversal.translucency_color.rgb, vec3<f32>(1.0 / gamma));
 
     var output: FragmentOutput;
+    output.translucency = vec4<f32>(corrected_translucency, traversal.translucency_color.a);
 
     if (traversal.depth_hit.is_set) {
-        output.color = vec4<f32>(corrected_rgb, final_color.a);
+        output.albedo      = vec4<f32>(corrected_solid, 1.0);
         output.normal_spec = vec4<f32>(traversal.depth_hit.normal, traversal.depth_hit.specular);
-        output.depth = calculate_depth(traversal.depth_hit.surface.distance, ray);
+        output.depth       = calculate_depth(traversal.depth_hit.surface.distance, ray);
     } else {
-        output.color = vec4<f32>(corrected_rgb, final_color.a);
+        output.albedo      = vec4<f32>(0.0);
         output.normal_spec = vec4<f32>(0.0, 0.0, 1.0, 0.0);
-        output.depth = 1.0;
+        output.depth       = 1.0;
     }
 
     return output;

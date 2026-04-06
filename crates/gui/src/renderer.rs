@@ -26,6 +26,8 @@ pub(crate) enum ResizeOutcome {
 pub(crate) struct GeometryBuffer {
     size: (u32, u32),
     albedo: Texture,
+    /// Semi-transparent voxel pixels (alpha < 1.0) accumulated during ray marching.
+    translucency: Texture,
     normal_spec: Texture,
     ssao_raw: Texture,
     ssao_blur: Texture,
@@ -84,6 +86,12 @@ impl GeometryBuffer {
             wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
             wgpu::TextureFormat::R32Uint,
         );
+        let translucency_texture = Texture::new(
+            size,
+            device,
+            wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            wgpu::TextureFormat::Bgra8Unorm,
+        );
         let voxel_depth_float_view =
             voxel_depth
                 .texture
@@ -94,6 +102,7 @@ impl GeometryBuffer {
         Self {
             size,
             albedo: color_texture,
+            translucency: translucency_texture,
             normal_spec: normal_spec_texture,
             ssao_raw: ssao_raw_texture,
             ssao_blur: ssao_blur_texture,
@@ -391,6 +400,12 @@ impl VoxelRenderer {
                         format: ID_TEXTURE_FORMAT,
                         blend: None,
                         write_mask: wgpu::ColorWrites::empty(),
+                    }),
+                    // slot 3: translucency — semi-transparent voxels (alpha < 1.0)
+                    Some(wgpu::ColorTargetState {
+                        format: wgpu::TextureFormat::Bgra8Unorm,
+                        blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                        write_mask: wgpu::ColorWrites::ALL,
                     }),
                 ],
                 compilation_options: Default::default(),
@@ -1444,6 +1459,23 @@ impl CompositeRenderer {
                     },
                     count: None,
                 },
+                // Translucency (semi-transparent voxels, alpha < 1.0)
+                wgpu::BindGroupLayoutEntry {
+                    binding: 7,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 8,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
             ],
         });
 
@@ -1528,6 +1560,14 @@ impl CompositeRenderer {
                 wgpu::BindGroupEntry {
                     binding: 6,
                     resource: render_settings_buf.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 7,
+                    resource: wgpu::BindingResource::TextureView(&g_buffer.translucency.view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 8,
+                    resource: wgpu::BindingResource::Sampler(&g_buffer.translucency.sampler),
                 },
             ],
             label: Some("Composite Bind Group"),
@@ -1899,6 +1939,16 @@ impl egui_wgpu::CallbackTrait for Render3dCallback {
                         resolve_target: None,
                         ops: wgpu::Operations {
                             load: wgpu::LoadOp::Load,
+                            store: wgpu::StoreOp::Store,
+                        },
+                    }),
+                    // slot 3: translucency — cleared each voxel pass
+                    Some(wgpu::RenderPassColorAttachment {
+                        view: &r.g_buffer.translucency.view,
+                        depth_slice: None,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
                             store: wgpu::StoreOp::Store,
                         },
                     }),
