@@ -289,11 +289,11 @@ fn calculate_lighting(surface: VoxelSurface, material: MaterialData, ray_dir: ve
 
     let min_depth_factor = render_settings.min_depth_factor;
     let depth_multiplier = (surface.hit_point.z / 3.0) * (1.0 - min_depth_factor) + min_depth_factor;
-    
+
     var out_lighting: LightingOutput;
     out_lighting.lit_color = lit_rgb * depth_multiplier;
     out_lighting.specular_scalar = spec_scalar;
-    
+
     return out_lighting;
 }
 

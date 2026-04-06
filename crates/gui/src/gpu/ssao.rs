@@ -1,7 +1,7 @@
+use super::texture::Texture;
+use bytemuck::{Pod, Zeroable};
 use eframe::wgpu;
 use glam::Vec3;
-use bytemuck::{Pod, Zeroable};
-use super::texture::Texture;
 
 pub const SSAO_KERNEL_SIZE: u32 = 64;
 pub const SSAO_MAX_KERNEL_SIZE: usize = 256;
@@ -24,7 +24,10 @@ impl SimpleRng {
     }
 
     fn next_f32(&mut self) -> f32 {
-        self.state = self.state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        self.state = self
+            .state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         let val = (self.state >> 32) as u32;
         (val as f32) / (u32::MAX as f32)
     }
@@ -37,19 +40,19 @@ impl SimpleRng {
 pub fn build_ssao_kernel() -> SsaoUniform {
     let mut rng = SimpleRng::new(12345);
     let mut kernel = [[0.0; 4]; SSAO_MAX_KERNEL_SIZE];
-    for i in 0..(SSAO_KERNEL_SIZE as usize) {
+    for (i, kernel_i) in kernel.iter_mut().enumerate() {
         let mut sample = Vec3::new(
             rng.next_f32_range(-1.0, 1.0),
             rng.next_f32_range(-1.0, 1.0),
             rng.next_f32_range(0.0, 1.0), // Hemisphere pointing towards +Z
         );
         sample = sample.normalize();
-        
+
         let mut scale = i as f32 / SSAO_KERNEL_SIZE as f32;
         scale = 0.1 + scale * scale * (1.0 - 0.1);
         sample *= scale;
-        
-        kernel[i] = [sample.x, sample.y, sample.z, 0.0];
+
+        *kernel_i = [sample.x, sample.y, sample.z, 0.0];
     }
     SsaoUniform {
         kernel_size: SSAO_KERNEL_SIZE,
@@ -65,16 +68,21 @@ pub fn build_ssao_noise_texture(device: &wgpu::Device, queue: &wgpu::Queue) -> T
         let noise = Vec3::new(
             rng.next_f32_range(-1.0, 1.0),
             rng.next_f32_range(-1.0, 1.0),
-            0.0
-        ).normalize();
-        
-        noise_data[i * 4 + 0] = ((noise.x * 0.5 + 0.5) * 255.0) as u8;
+            0.0,
+        )
+        .normalize();
+
+        noise_data[i * 4] = ((noise.x * 0.5 + 0.5) * 255.0) as u8;
         noise_data[i * 4 + 1] = ((noise.y * 0.5 + 0.5) * 255.0) as u8;
         noise_data[i * 4 + 2] = 0;
         noise_data[i * 4 + 3] = 255;
     }
-    
-    let size = wgpu::Extent3d { width: 4, height: 4, depth_or_array_layers: 1 };
+
+    let size = wgpu::Extent3d {
+        width: 4,
+        height: 4,
+        depth_or_array_layers: 1,
+    };
     let texture = device.create_texture(&wgpu::TextureDescriptor {
         label: Some("SSAO Noise Texture"),
         size,
@@ -85,7 +93,7 @@ pub fn build_ssao_noise_texture(device: &wgpu::Device, queue: &wgpu::Queue) -> T
         usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
         view_formats: &[],
     });
-    
+
     queue.write_texture(
         wgpu::TexelCopyTextureInfo {
             texture: &texture,
@@ -101,7 +109,7 @@ pub fn build_ssao_noise_texture(device: &wgpu::Device, queue: &wgpu::Queue) -> T
         },
         size,
     );
-    
+
     let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
     let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
         label: Some("SSAO Noise Sampler"),
@@ -113,6 +121,11 @@ pub fn build_ssao_noise_texture(device: &wgpu::Device, queue: &wgpu::Queue) -> T
         mipmap_filter: wgpu::FilterMode::Nearest,
         ..Default::default()
     });
-    
-    Texture { texture, view, sampler, texture_size: size }
+
+    Texture {
+        texture,
+        view,
+        sampler,
+        texture_size: size,
+    }
 }

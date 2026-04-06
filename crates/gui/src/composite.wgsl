@@ -45,12 +45,12 @@ fn fs_composite(in: VertexOutput) -> @location(0) vec4<f32> {
     let base_color = textureSample(color_texture, color_sampler, in.uv);
     let normal_spec = textureSample(normal_spec_texture, normal_spec_sampler, in.uv);
     let ssao_val = textureSample(ssao_texture, ssao_sampler, in.uv).r;
-    
+
     var occlusion = 1.0;
     if (render_settings.enable_ssao != 0u) {
         occlusion = ssao_val;
     }
-    
+
     // Unpack the specular highlight scalar from the normal map's alpha channel
     let specular_color = vec3<f32>(1.0) * normal_spec.a;
     let final_color_rgb = (base_color.rgb * occlusion) + specular_color;

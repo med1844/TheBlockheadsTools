@@ -286,7 +286,7 @@ impl EditorApp {
             });
             let hover_on_dyn_obj_id = {
                 let guard = self.hover_on_dyn_obj_id.lock().expect("should lock mutex");
-                guard.clone()
+                *guard
             };
             // info here can be replaced with some function to render internal of the dynamic object
             // NOTE: `self.hover_on_chunk` must be from last frame, i.e. it must not be updated in this frame before here
@@ -375,13 +375,24 @@ impl EditorApp {
         ui.checkbox(&mut self.render_settings.enable_reflect, "Enable Reflect");
         ui.checkbox(&mut self.render_settings.enable_destruct, "Enable Destruct");
         ui.checkbox(&mut self.render_settings.enable_ssao, "Enable SSAO");
-        
+
         ui.separator();
-        ui.add(egui::Slider::new(&mut self.render_settings.ambient_light, 0.0..=1.0).text("Ambient Light"));
-        ui.add(egui::Slider::new(&mut self.render_settings.shininess, 1.0..=256.0).text("Shininess"));
-        ui.add(egui::Slider::new(&mut self.render_settings.specular_intensity, 0.0..=5.0).text("Specular Intensity"));
-        ui.add(egui::Slider::new(&mut self.render_settings.min_depth_factor, 0.0..=1.0).text("Min Depth Factor"));
-        
+        ui.add(
+            egui::Slider::new(&mut self.render_settings.ambient_light, 0.0..=1.0)
+                .text("Ambient Light"),
+        );
+        ui.add(
+            egui::Slider::new(&mut self.render_settings.shininess, 1.0..=256.0).text("Shininess"),
+        );
+        ui.add(
+            egui::Slider::new(&mut self.render_settings.specular_intensity, 0.0..=5.0)
+                .text("Specular Intensity"),
+        );
+        ui.add(
+            egui::Slider::new(&mut self.render_settings.min_depth_factor, 0.0..=1.0)
+                .text("Min Depth Factor"),
+        );
+
         ui.separator();
         ui.add(
             egui::DragValue::new(&mut self.camera.world_offset_mut().x)

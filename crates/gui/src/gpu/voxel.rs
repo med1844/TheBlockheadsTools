@@ -502,33 +502,33 @@ impl VoxelType {
     }
 
     pub fn is_transparent(&self) -> bool {
-        match self {
+        matches!(
+            self,
             Self::Water
-            | Self::Ice
-            | Self::Glass
-            | Self::BlackGlass
-            | Self::AmethystBlock
-            | Self::SapphireBlock
-            | Self::EmeraldBlock
-            | Self::RubyBlock
-            | Self::DiamondBlock
-            | Self::AppleTreeLeaf
-            | Self::PineTreeLeaf
-            | Self::MapleTreeLeaf
-            | Self::MangoTreeLeaf
-            | Self::CoconutTreeLeaf
-            | Self::OrangeTreeLeaf
-            | Self::CherryTreeLeaf
-            | Self::CoffeeTreeLeaf
-            | Self::LimeTreeLeaf
-            | Self::AmethystTreeLeaf
-            | Self::SapphireTreeLeaf
-            | Self::EmeraldTreeLeaf
-            | Self::RubyTreeLeaf
-            | Self::DiamondTreeLeaf
-            | Self::AnyDeadTreeLeaf => true,
-            _ => false,
-        }
+                | Self::Ice
+                | Self::Glass
+                | Self::BlackGlass
+                | Self::AmethystBlock
+                | Self::SapphireBlock
+                | Self::EmeraldBlock
+                | Self::RubyBlock
+                | Self::DiamondBlock
+                | Self::AppleTreeLeaf
+                | Self::PineTreeLeaf
+                | Self::MapleTreeLeaf
+                | Self::MangoTreeLeaf
+                | Self::CoconutTreeLeaf
+                | Self::OrangeTreeLeaf
+                | Self::CherryTreeLeaf
+                | Self::CoffeeTreeLeaf
+                | Self::LimeTreeLeaf
+                | Self::AmethystTreeLeaf
+                | Self::SapphireTreeLeaf
+                | Self::EmeraldTreeLeaf
+                | Self::RubyTreeLeaf
+                | Self::DiamondTreeLeaf
+                | Self::AnyDeadTreeLeaf
+        )
     }
 
     pub(crate) fn transparency() -> Vec<bool> {

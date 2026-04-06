@@ -43,7 +43,7 @@ pub struct RenderSettingsUniform {
 }
 
 impl RenderSettings {
-    pub fn to_uniform(&self) -> RenderSettingsUniform {
+    pub fn uniform(&self) -> RenderSettingsUniform {
         RenderSettingsUniform {
             light_dir: [self.light_dir.x, self.light_dir.y, self.light_dir.z],
             enable_reflect: self.enable_reflect as u32,
@@ -57,8 +57,8 @@ impl RenderSettings {
         }
     }
 
-    pub fn to_buf(&self, device: &wgpu::Device) -> wgpu::Buffer {
-        let uniform = self.to_uniform();
+    pub fn buffer(&self, device: &wgpu::Device) -> wgpu::Buffer {
+        let uniform = self.uniform();
         device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Render Settings Buffer"),
             contents: bytemuck::cast_slice(&[uniform]),

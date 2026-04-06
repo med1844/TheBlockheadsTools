@@ -3,9 +3,9 @@ mod camera;
 pub mod dw;
 mod render_settings;
 pub mod sprite;
+pub mod ssao;
 mod texture;
 mod voxel;
-pub mod ssao;
 
 pub use block::{GpuBlockCoord, GpuBlockCoordUniform};
 pub use camera::{Camera, CameraUniform};

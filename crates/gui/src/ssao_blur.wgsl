@@ -24,24 +24,24 @@ fn fs_ssao_blur(in: VertexOutput) -> @location(0) f32 {
     let tex_dim = vec2<f32>(textureDimensions(ssao_texture, 0));
     let texel_size = 1.0 / tex_dim;
     var result: f32 = 0.0;
-    
-    // Hardcoded simple cross bilateral box-blur 
+
+    // Hardcoded simple cross bilateral box-blur
     let blur_radius = 2; // Fixed radius for SSAO noise
-    
+
     let center_depth = textureSampleLevel(depth_texture, depth_sampler, in.uv, 0.0).r;
     if (center_depth >= 1.0) {
         return 1.0; // Fast exit void pixels without blur bleeding
     }
 
     var weight_sum: f32 = 0.0;
-    
+
     for (var x = -blur_radius; x <= blur_radius; x = x + 1) {
         for (var y = -blur_radius; y <= blur_radius; y = y + 1) {
             let offset = vec2<f32>(f32(x), f32(y)) * texel_size;
             let sample_uv = in.uv + offset;
-            
+
             let sample_depth = textureSampleLevel(depth_texture, depth_sampler, sample_uv, 0.0).r;
-            
+
             // Edge preservation mapping
             // Only aggregate neighbors loosely matching the same z depth
             let depth_diff = abs(center_depth - sample_depth);
@@ -52,6 +52,6 @@ fn fs_ssao_blur(in: VertexOutput) -> @location(0) f32 {
             weight_sum += weight;
         }
     }
-    
+
     return result / max(weight_sum, 1.0);
 }

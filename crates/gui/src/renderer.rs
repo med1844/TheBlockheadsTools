@@ -84,10 +84,13 @@ impl GeometryBuffer {
             wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
             wgpu::TextureFormat::R32Uint,
         );
-        let voxel_depth_float_view = voxel_depth.texture.create_view(&wgpu::TextureViewDescriptor {
-            aspect: wgpu::TextureAspect::DepthOnly,
-            ..Default::default()
-        });
+        let voxel_depth_float_view =
+            voxel_depth
+                .texture
+                .create_view(&wgpu::TextureViewDescriptor {
+                    aspect: wgpu::TextureAspect::DepthOnly,
+                    ..Default::default()
+                });
         Self {
             size,
             albedo: color_texture,
@@ -125,6 +128,7 @@ pub struct VoxelRenderer {
 }
 
 impl VoxelRenderer {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         device: &wgpu::Device,
         voxel_buf: wgpu::Buffer,
@@ -1027,7 +1031,12 @@ pub struct SsaoRenderer {
 }
 
 impl SsaoRenderer {
-    pub fn new(device: &wgpu::Device, queue: &wgpu::Queue, camera_buf: &wgpu::Buffer, g_buffer: &GeometryBuffer) -> Self {
+    pub fn new(
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        camera_buf: &wgpu::Buffer,
+        g_buffer: &GeometryBuffer,
+    ) -> Self {
         use super::gpu::ssao::{build_ssao_kernel, build_ssao_noise_texture};
 
         let kernel_uniform = build_ssao_kernel();
@@ -1047,18 +1056,85 @@ impl SsaoRenderer {
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("SSAO Bind Group Layout"),
             entries: &[
-                wgpu::BindGroupLayoutEntry { binding: 0, visibility: wgpu::ShaderStages::FRAGMENT | wgpu::ShaderStages::VERTEX, ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: false, min_binding_size: None }, count: None },
-                wgpu::BindGroupLayoutEntry { binding: 1, visibility: wgpu::ShaderStages::FRAGMENT, ty: wgpu::BindingType::Texture { sample_type: wgpu::TextureSampleType::Float { filterable: true }, view_dimension: wgpu::TextureViewDimension::D2, multisampled: false }, count: None },
-                wgpu::BindGroupLayoutEntry { binding: 2, visibility: wgpu::ShaderStages::FRAGMENT, ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering), count: None },
-                wgpu::BindGroupLayoutEntry { binding: 3, visibility: wgpu::ShaderStages::FRAGMENT, ty: wgpu::BindingType::Texture { sample_type: wgpu::TextureSampleType::Depth, view_dimension: wgpu::TextureViewDimension::D2, multisampled: false }, count: None },
-                wgpu::BindGroupLayoutEntry { binding: 4, visibility: wgpu::ShaderStages::FRAGMENT, ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering), count: None },
-                wgpu::BindGroupLayoutEntry { binding: 5, visibility: wgpu::ShaderStages::FRAGMENT, ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: false, min_binding_size: None }, count: None },
-                wgpu::BindGroupLayoutEntry { binding: 6, visibility: wgpu::ShaderStages::FRAGMENT, ty: wgpu::BindingType::Texture { sample_type: wgpu::TextureSampleType::Float { filterable: true }, view_dimension: wgpu::TextureViewDimension::D2, multisampled: false }, count: None },
-                wgpu::BindGroupLayoutEntry { binding: 7, visibility: wgpu::ShaderStages::FRAGMENT, ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering), count: None },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT | wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 3,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Depth,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 4,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 5,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 6,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 7,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
             ],
         });
 
-        let bind_group = Self::create_bind_group(&bind_group_layout, camera_buf, g_buffer, &kernel_buf, &noise_texture, device);
+        let bind_group = Self::create_bind_group(
+            &bind_group_layout,
+            camera_buf,
+            g_buffer,
+            &kernel_buf,
+            &noise_texture,
+            device,
+        );
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("SSAO Render Pipeline Layout"),
@@ -1069,7 +1145,12 @@ impl SsaoRenderer {
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("SSAO Render Pipeline"),
             layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState { module: &shader, entry_point: Some("vs_ssao"), buffers: &[], compilation_options: Default::default() },
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: Some("vs_ssao"),
+                buffers: &[],
+                compilation_options: Default::default(),
+            },
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
                 entry_point: Some("fs_ssao"),
@@ -1078,16 +1159,26 @@ impl SsaoRenderer {
                     blend: None,
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
-                compilation_options: Default::default()
+                compilation_options: Default::default(),
             }),
-            primitive: wgpu::PrimitiveState { topology: wgpu::PrimitiveTopology::TriangleList, cull_mode: None, ..Default::default() },
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                cull_mode: None,
+                ..Default::default()
+            },
             depth_stencil: None,
             multisample: wgpu::MultisampleState::default(),
             multiview: None,
             cache: None,
         });
 
-        Self { pipeline, bind_group_layout, kernel_buf, noise_texture, bind_group }
+        Self {
+            pipeline,
+            bind_group_layout,
+            kernel_buf,
+            noise_texture,
+            bind_group,
+        }
     }
 
     fn create_bind_group(
@@ -1099,23 +1190,59 @@ impl SsaoRenderer {
         device: &wgpu::Device,
     ) -> wgpu::BindGroup {
         device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &bind_group_layout,
+            layout: bind_group_layout,
             entries: &[
-                wgpu::BindGroupEntry { binding: 0, resource: camera_buf.as_entire_binding() },
-                wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(&g_buffer.normal_spec.view) },
-                wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::Sampler(&g_buffer.normal_spec.sampler) },
-                wgpu::BindGroupEntry { binding: 3, resource: wgpu::BindingResource::TextureView(&g_buffer.voxel_depth.view) },
-                wgpu::BindGroupEntry { binding: 4, resource: wgpu::BindingResource::Sampler(&g_buffer.voxel_depth.sampler) },
-                wgpu::BindGroupEntry { binding: 5, resource: kernel_buf.as_entire_binding() },
-                wgpu::BindGroupEntry { binding: 6, resource: wgpu::BindingResource::TextureView(&noise_texture.view) },
-                wgpu::BindGroupEntry { binding: 7, resource: wgpu::BindingResource::Sampler(&noise_texture.sampler) },
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: camera_buf.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::TextureView(&g_buffer.normal_spec.view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::Sampler(&g_buffer.normal_spec.sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::TextureView(&g_buffer.voxel_depth.view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 4,
+                    resource: wgpu::BindingResource::Sampler(&g_buffer.voxel_depth.sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 5,
+                    resource: kernel_buf.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 6,
+                    resource: wgpu::BindingResource::TextureView(&noise_texture.view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 7,
+                    resource: wgpu::BindingResource::Sampler(&noise_texture.sampler),
+                },
             ],
             label: Some("SSAO Bind Group"),
         })
     }
 
-    pub fn resize(&mut self, camera_buf: &wgpu::Buffer, g_buffer: &GeometryBuffer, device: &wgpu::Device) {
-        self.bind_group = Self::create_bind_group(&self.bind_group_layout, camera_buf, g_buffer, &self.kernel_buf, &self.noise_texture, device);
+    pub fn resize(
+        &mut self,
+        camera_buf: &wgpu::Buffer,
+        g_buffer: &GeometryBuffer,
+        device: &wgpu::Device,
+    ) {
+        self.bind_group = Self::create_bind_group(
+            &self.bind_group_layout,
+            camera_buf,
+            g_buffer,
+            &self.kernel_buf,
+            &self.noise_texture,
+            device,
+        );
     }
 
     pub fn render(&self, render_pass: &mut wgpu::RenderPass<'_>) {
@@ -1142,10 +1269,38 @@ impl SsaoBlurRenderer {
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("SSAO Blur Bind Group Layout"),
             entries: &[
-                wgpu::BindGroupLayoutEntry { binding: 0, visibility: wgpu::ShaderStages::FRAGMENT, ty: wgpu::BindingType::Texture { sample_type: wgpu::TextureSampleType::Float { filterable: true }, view_dimension: wgpu::TextureViewDimension::D2, multisampled: false }, count: None },
-                wgpu::BindGroupLayoutEntry { binding: 1, visibility: wgpu::ShaderStages::FRAGMENT, ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering), count: None },
-                wgpu::BindGroupLayoutEntry { binding: 2, visibility: wgpu::ShaderStages::FRAGMENT, ty: wgpu::BindingType::Texture { sample_type: wgpu::TextureSampleType::Float { filterable: false }, view_dimension: wgpu::TextureViewDimension::D2, multisampled: false }, count: None },
-                wgpu::BindGroupLayoutEntry { binding: 3, visibility: wgpu::ShaderStages::FRAGMENT, ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering), count: None },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 3,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
+                    count: None,
+                },
             ],
         });
 
@@ -1160,7 +1315,12 @@ impl SsaoBlurRenderer {
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("SSAO Blur Render Pipeline"),
             layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState { module: &shader, entry_point: Some("vs_ssao_blur"), buffers: &[], compilation_options: Default::default() },
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: Some("vs_ssao_blur"),
+                buffers: &[],
+                compilation_options: Default::default(),
+            },
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
                 entry_point: Some("fs_ssao_blur"),
@@ -1169,16 +1329,24 @@ impl SsaoBlurRenderer {
                     blend: None,
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
-                compilation_options: Default::default()
+                compilation_options: Default::default(),
             }),
-            primitive: wgpu::PrimitiveState { topology: wgpu::PrimitiveTopology::TriangleList, cull_mode: None, ..Default::default() },
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                cull_mode: None,
+                ..Default::default()
+            },
             depth_stencil: None,
             multisample: wgpu::MultisampleState::default(),
             multiview: None,
             cache: None,
         });
 
-        Self { pipeline, bind_group_layout, bind_group }
+        Self {
+            pipeline,
+            bind_group_layout,
+            bind_group,
+        }
     }
 
     fn create_bind_group(
@@ -1187,12 +1355,24 @@ impl SsaoBlurRenderer {
         device: &wgpu::Device,
     ) -> wgpu::BindGroup {
         device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &bind_group_layout,
+            layout: bind_group_layout,
             entries: &[
-                wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(&g_buffer.ssao_raw.view) },
-                wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::Sampler(&g_buffer.ssao_raw.sampler) },
-                wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::TextureView(&g_buffer.voxel_depth_float_view) },
-                wgpu::BindGroupEntry { binding: 3, resource: wgpu::BindingResource::Sampler(&g_buffer.voxel_depth.sampler) },
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&g_buffer.ssao_raw.view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&g_buffer.ssao_raw.sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::TextureView(&g_buffer.voxel_depth_float_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::Sampler(&g_buffer.voxel_depth.sampler),
+                },
             ],
             label: Some("SSAO Blur Bind Group"),
         })
@@ -1292,7 +1472,8 @@ impl CompositeRenderer {
             ],
         });
 
-        let bind_group = Self::create_bind_group(&bind_group_layout, g_buffer, render_settings_buf, device);
+        let bind_group =
+            Self::create_bind_group(&bind_group_layout, g_buffer, render_settings_buf, device);
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Composite Render Pipeline Layout"),
@@ -1343,22 +1524,53 @@ impl CompositeRenderer {
         device: &wgpu::Device,
     ) -> wgpu::BindGroup {
         device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &bind_group_layout,
+            layout: bind_group_layout,
             entries: &[
-                wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(&g_buffer.albedo.view) },
-                wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::Sampler(&g_buffer.albedo.sampler) },
-                wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::TextureView(&g_buffer.normal_spec.view) },
-                wgpu::BindGroupEntry { binding: 3, resource: wgpu::BindingResource::Sampler(&g_buffer.normal_spec.sampler) },
-                wgpu::BindGroupEntry { binding: 4, resource: wgpu::BindingResource::TextureView(&g_buffer.ssao_blur.view) },
-                wgpu::BindGroupEntry { binding: 5, resource: wgpu::BindingResource::Sampler(&g_buffer.ssao_blur.sampler) },
-                wgpu::BindGroupEntry { binding: 6, resource: render_settings_buf.as_entire_binding() },
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&g_buffer.albedo.view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&g_buffer.albedo.sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::TextureView(&g_buffer.normal_spec.view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::Sampler(&g_buffer.normal_spec.sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 4,
+                    resource: wgpu::BindingResource::TextureView(&g_buffer.ssao_blur.view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 5,
+                    resource: wgpu::BindingResource::Sampler(&g_buffer.ssao_blur.sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 6,
+                    resource: render_settings_buf.as_entire_binding(),
+                },
             ],
             label: Some("Composite Bind Group"),
         })
     }
 
-    pub fn resize(&mut self, g_buffer: &GeometryBuffer, render_settings_buf: &wgpu::Buffer, device: &wgpu::Device) {
-        self.bind_group = Self::create_bind_group(&self.bind_group_layout, g_buffer, render_settings_buf, device);
+    pub fn resize(
+        &mut self,
+        g_buffer: &GeometryBuffer,
+        render_settings_buf: &wgpu::Buffer,
+        device: &wgpu::Device,
+    ) {
+        self.bind_group = Self::create_bind_group(
+            &self.bind_group_layout,
+            g_buffer,
+            render_settings_buf,
+            device,
+        );
     }
 
     pub fn render(&self, render_pass: &mut wgpu::RenderPass<'_>) {
@@ -1442,8 +1654,9 @@ impl RenderResources {
             usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
-        let render_settings_buf = RenderSettings::default().to_buf(device);
-        let composite = CompositeRenderer::new(device, &g_buffer, target_format, &render_settings_buf);
+        let render_settings_buf = RenderSettings::default().buffer(device);
+        let composite =
+            CompositeRenderer::new(device, &g_buffer, target_format, &render_settings_buf);
 
         Self {
             voxel: VoxelRenderer::new(
@@ -1503,7 +1716,8 @@ impl RenderResources {
 
     pub fn resize(&mut self, size: (u32, u32), device: &wgpu::Device) {
         if let ResizeOutcome::Resized = self.g_buffer.resize(size, device) {
-            self.composite.resize(&self.g_buffer, &self.render_settings_buf, device);
+            self.composite
+                .resize(&self.g_buffer, &self.render_settings_buf, device);
             self.ssao.resize(&self.camera_buf, &self.g_buffer, device);
             self.ssao_blur.resize(&self.g_buffer, device);
             self.voxel.resize(&self.g_buffer, device);
@@ -1634,7 +1848,7 @@ impl egui_wgpu::CallbackTrait for Render3dCallback {
         queue.write_buffer(
             r.render_settings_buf(),
             0,
-            bytemuck::cast_slice(&[self.render_settings.to_uniform()]),
+            bytemuck::cast_slice(&[self.render_settings.uniform()]),
         );
         {
             let mut render_pass = egui_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -1731,17 +1945,15 @@ impl egui_wgpu::CallbackTrait for Render3dCallback {
         {
             let mut render_pass = egui_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("ssao pass"),
-                color_attachments: &[
-                    Some(wgpu::RenderPassColorAttachment {
-                        view: &r.g_buffer.ssao_raw.view,
-                        depth_slice: None,
-                        resolve_target: None,
-                        ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
-                            store: wgpu::StoreOp::Store,
-                        },
-                    }),
-                ],
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &r.g_buffer.ssao_raw.view,
+                    depth_slice: None,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
                 depth_stencil_attachment: None,
                 timestamp_writes: None,
                 occlusion_query_set: None,
@@ -1752,17 +1964,15 @@ impl egui_wgpu::CallbackTrait for Render3dCallback {
         {
             let mut render_pass = egui_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("ssao blur pass"),
-                color_attachments: &[
-                    Some(wgpu::RenderPassColorAttachment {
-                        view: &r.g_buffer.ssao_blur.view,
-                        depth_slice: None,
-                        resolve_target: None,
-                        ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
-                            store: wgpu::StoreOp::Store,
-                        },
-                    }),
-                ],
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &r.g_buffer.ssao_blur.view,
+                    depth_slice: None,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
                 depth_stencil_attachment: None,
                 timestamp_writes: None,
                 occlusion_query_set: None,
