@@ -207,7 +207,7 @@ impl UniqueID {
 pub struct DynamicObject {
     #[serde(rename = "floatPos")]
     pub float_pos: [f32; 2],
-    pub pos_x: u64,
+    pub pos_x: u32,
     pub pos_y: u16,
     #[serde(rename = "uniqueID")]
     pub unique_id: UniqueID,

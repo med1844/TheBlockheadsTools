@@ -22,17 +22,18 @@ struct VertexInput {
     @location(0) @interpolate(flat) id: u32,
     @location(1) @interpolate(flat) chunk_x: u32,
     @location(2) @interpolate(flat) chunk_y: u32,
-    // location(3) is _padding, not passed to shader
     @location(3) position: vec3<f32>,
-    @location(4) tex_coords: vec2<f32>,
+    @location(4) normal: vec3<f32>,
+    @location(5) tex_coords: vec2<f32>,
 };
 
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) tex_coords: vec2<f32>,
-    @location(1) @interpolate(flat) id: u32,
-    @location(2) @interpolate(flat) chunk_x: u32,
-    @location(3) @interpolate(flat) chunk_y: u32,
+    @location(1) normal: vec3<f32>,
+    @location(2) @interpolate(flat) id: u32,
+    @location(3) @interpolate(flat) chunk_x: u32,
+    @location(4) @interpolate(flat) chunk_y: u32,
 };
 
 struct FragmentOutput {
@@ -51,6 +52,7 @@ fn vs_main(model: VertexInput) -> VertexOutput {
     out.id = model.id;
     out.chunk_x = model.chunk_x;
     out.chunk_y = model.chunk_y;
+    out.normal = model.normal;
     return out;
 }
 
@@ -87,8 +89,7 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     let depth = in.clip_position.z;
     output.depth = depth;
     output.color = vec4<f32>(final_color, color.a);
-    // World-space forward normal (Z is 1.0), with 0.0 specular intensity.
-    output.normal_spec = vec4<f32>(0.0, 0.0, 1.0, 0.0);
+    output.normal_spec = vec4<f32>(in.normal, 0.0);
     output.id = in.id;
     return output;
 }

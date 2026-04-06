@@ -136,7 +136,7 @@ impl GeometryBuffer {
 mod composite;
 mod grid;
 mod icon;
-mod sprite;
+mod mesh;
 mod ssao;
 mod voxel;
 
@@ -157,7 +157,7 @@ pub struct RenderResources {
 
     voxel: voxel::VoxelRenderer,
     dw_icon: icon::DwIconRenderer,
-    dw_sprite: sprite::DwSpriteRenderer,
+    dw_sprite: mesh::DwMeshRenderer,
     grid: grid::GridRenderer,
     composite: composite::CompositeRenderer,
     ssao: ssao::SsaoRenderer,
@@ -249,7 +249,7 @@ impl RenderResources {
                 &hover_on_id_buf,
                 &selected_id_buf,
             ),
-            dw_sprite: sprite::DwSpriteRenderer::new(
+            dw_sprite: mesh::DwMeshRenderer::new(
                 device,
                 &camera_buf,
                 &tile_map_texture,

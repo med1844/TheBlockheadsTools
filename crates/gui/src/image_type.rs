@@ -543,3 +543,20 @@ pub enum ImageType {
     WorkbenchExpert26 = 823,
     WorkbenchExpert27 = 824,
 }
+
+impl ImageType {
+    pub const PIXEL_PER_TILE: usize = 16;
+    pub const TILE_PER_ROW: usize = 32;
+    pub const PIXEL_PER_EDGE: usize = Self::PIXEL_PER_TILE * Self::TILE_PER_ROW;
+    pub const TILE_SIZE: f32 = Self::PIXEL_PER_TILE as f32 / Self::PIXEL_PER_EDGE as f32;
+
+    pub fn to_uv_min(self) -> [f32; 2] {
+        let tile_index = self as u32;
+        let tile_x = tile_index % Self::TILE_PER_ROW as u32;
+        let tile_y = tile_index / Self::TILE_PER_ROW as u32;
+        [
+            tile_x as f32 * Self::TILE_SIZE,
+            tile_y as f32 * Self::TILE_SIZE,
+        ]
+    }
+}

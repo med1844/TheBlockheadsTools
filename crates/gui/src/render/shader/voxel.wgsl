@@ -589,7 +589,7 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     } else {
         output.albedo      = vec4<f32>(0.0);
         output.normal_spec = vec4<f32>(0.0, 0.0, 1.0, 0.0);
-        output.depth       = 1.0;
+        output.depth       = raw_mesh_depth;
     }
 
     return output;

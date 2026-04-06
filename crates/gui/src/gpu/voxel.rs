@@ -144,12 +144,17 @@ pub enum VoxelType {
     AnyDeadTreeLeaf = 135,
     AnyDeadTreeTrunk = 136,
     GoldChest = 137,
+    StandardChest = 138,
+    Safe = 139,
+    PortalChest = 140,
+    FeederChest = 141,
 }
 
 impl VoxelType {
     pub const MAX_VALUE: u16 = 138;
 }
 
+#[derive(Debug, Clone, Copy)]
 pub(crate) enum VoxelUv {
     All(ImageType),
     TopSide {
@@ -172,6 +177,28 @@ impl VoxelUv {
             VoxelUv::TopBottomSide { top, bottom, side } => {
                 [*side, *side, *top, *bottom, *side, *side]
             }
+        }
+    }
+
+    pub(crate) fn up(&self) -> ImageType {
+        match self {
+            VoxelUv::All(image_type) => *image_type,
+            VoxelUv::TopSide { top, .. } | VoxelUv::TopBottomSide { top, .. } => *top,
+        }
+    }
+
+    pub(crate) fn down(&self) -> ImageType {
+        match self {
+            VoxelUv::All(image_type) => *image_type,
+            VoxelUv::TopSide { top, .. } => *top,
+            VoxelUv::TopBottomSide { bottom, .. } => *bottom,
+        }
+    }
+
+    pub(crate) fn side(&self) -> ImageType {
+        match self {
+            VoxelUv::All(image_type) => *image_type,
+            VoxelUv::TopSide { side, .. } | VoxelUv::TopBottomSide { side, .. } => *side,
         }
     }
 }
@@ -398,6 +425,22 @@ impl VoxelType {
                 top: ChestGoldTop,
                 side: ChestGold,
             },
+            Self::StandardChest => TopSide {
+                top: ChestTop,
+                side: Chest,
+            },
+            Self::Safe => TopSide {
+                top: SafeTop,
+                side: Safe,
+            },
+            Self::PortalChest => TopSide {
+                top: ChestPortalTop,
+                side: ChestPortal,
+            },
+            Self::FeederChest => TopSide {
+                top: ChestFeederTop,
+                side: ChestFeeder,
+            },
         }
     }
 }
@@ -405,7 +448,7 @@ impl VoxelType {
 impl VoxelType {
     fn fg_from_block_inner<'b>(block: BlockView<'b>) -> Result<Self, BlockError> {
         Ok(match (block.fg()?, block.content()?) {
-            (BlockType::Air, _) => Self::Air,
+            (BlockType::Air, _) | (_, BlockContentType::Sprite) => Self::Air,
             (BlockType::Snow, _) => Self::Snow,
             (block_type, BlockContentType::Nothing) => block_type.into(),
             (BlockType::Dirt, BlockContentType::Clay) => Self::DirtClay,
@@ -432,7 +475,7 @@ impl VoxelType {
 
     fn mg_from_block_inner<'b>(block: BlockView<'b>) -> Result<Self, BlockError> {
         Ok(match block.content()? {
-            BlockContentType::Nothing => Self::Air,
+            BlockContentType::Nothing | BlockContentType::Sprite => Self::Air,
             BlockContentType::AppleTreeLeaf => Self::AppleTreeLeaf,
             BlockContentType::AppleTreeTrunk => Self::AppleTreeTrunk,
             BlockContentType::AppleTreeTrunkLeaf => Self::AppleTreeTrunkLeaf,

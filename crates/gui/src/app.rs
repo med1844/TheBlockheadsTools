@@ -720,7 +720,7 @@ impl EditorApp {
                 FreightCar => {}
                 PassengerCar => {}
                 Workbench => {}
-                Chest => {}
+                Chest => draw_window(title, dw_chunk.chest.get_mut(id.index), ctx),
                 Sign => {}
                 TradingPost => {}
                 TrainStation => {}

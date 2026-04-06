@@ -159,6 +159,7 @@ pub enum BlockContentType {
     DeadCactus = 44,
     Workbench = 46,
     WorkbenchSprite = 47,
+    Sprite = 48,
     CopperOre = 61,
     TinOre = 62,
     IronOre = 63,

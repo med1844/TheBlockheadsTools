@@ -1,10 +1,16 @@
 // Implements traits for dynamic object types defined in lib
-use super::gpu::dw::{DwIcon, DwObj, DwSprite, ToDwObj};
+use super::gpu::{
+    VoxelType,
+    dw::{DwBlock, DwIcon, DwObj, DwSprite, ToDwObj},
+};
 use eframe::egui;
 use std::{hash::Hash, ops::DerefMut};
 use the_blockheads_tools_lib::game::{
+    coord::BlockCoord,
     dynamic_object::{
-        ArtificialLight, DynamicObject, LightDirection, UniqueID,
+        ArtificialLight, DynamicObject, InteractionObject, InteractionObjectType, LightDirection,
+        UniqueID,
+        chest::{Chest, ChestType},
         plant::{CarrotPlant, CornPlant, KelpPlant, NormalPlant, Plant, TomatoPlant},
         tree::{
             AppleTree, CactusTree, CherryTree, CoconutTree, CoffeeTree, GemTree, LimeTree,
@@ -538,6 +544,89 @@ impl InfoUi for LimeTree {
 impl ToDwObj for LimeTree {
     fn to_dw_obj(&self) -> DwObj {
         DwObj::Icon(DwIcon::new(self.float_pos, ItemType::Lime))
+    }
+}
+
+impl ToRow for InteractionObjectType {
+    fn to_row(&mut self, ui: &mut egui::Ui) {
+        egui::ComboBox::from_label("Select one")
+            .selected_text(format!("{:?}", self))
+            .show_ui(ui, |ui| {
+                ui.selectable_value(self, Self::InteractionObject, "InteractionObject");
+                ui.selectable_value(self, Self::Workbench, "Workbench");
+                ui.selectable_value(self, Self::Chest, "Chest");
+                ui.selectable_value(self, Self::Bed, "Bed");
+                ui.selectable_value(self, Self::Sign, "Sign");
+                ui.selectable_value(self, Self::TradingPost, "TradingPost");
+                ui.selectable_value(self, Self::TrainStation, "TrainStation");
+                ui.selectable_value(self, Self::TradePortal, "TradePortal");
+                ui.selectable_value(self, Self::OwnershipSign, "OwnershipSign");
+                ui.selectable_value(self, Self::Mirror, "Mirror");
+            });
+    }
+}
+
+impl ToGrid for InteractionObject {
+    fn to_grid(&mut self, ui: &mut egui::Ui) {
+        self.interaction_object_type
+            .add_row("interactionObjectType", ui);
+        self.is_in_use.add_row("isInUse", ui);
+        self.flipped.add_row("flipped", ui);
+        self.paint_color.add_row("paintColor", ui);
+    }
+}
+
+impl InfoUi for InteractionObject {
+    fn info(&mut self, ui: &mut egui::Ui) {
+        let obj = self.deref_mut();
+        obj.info(ui);
+
+        ui.vertical(|ui| {
+            ui.heading("InteractionObject");
+            ui.separator();
+            self.add_grid("interaction_object_grid", ui);
+        });
+    }
+}
+
+impl ToGrid for Chest {
+    fn to_grid(&mut self, ui: &mut egui::Ui) {
+        self.save_time.add_row("saveTime", ui);
+        // TODO find a proper way to display the items
+    }
+}
+
+impl InfoUi for Chest {
+    fn info(&mut self, ui: &mut egui::Ui) {
+        let obj = self.deref_mut();
+        obj.info(ui);
+
+        ui.vertical(|ui| {
+            ui.heading("Chest");
+            ui.separator();
+            self.add_grid("chest_grid", ui);
+        });
+    }
+}
+
+impl ToDwObj for Chest {
+    fn to_dw_obj(&self) -> DwObj {
+        // TODO: make this fallable
+        let block_coord = BlockCoord::new(self.pos_x as u32, self.pos_y)
+            .expect("dynamic object size out of world bound");
+        match self.slots.chest_type() {
+            ChestType::Standard => {
+                DwObj::Block(DwBlock::new(block_coord, VoxelType::StandardChest))
+            }
+            ChestType::Safe => DwObj::Block(DwBlock::new(block_coord, VoxelType::Safe)),
+            ChestType::Shelf => DwObj::Icon(DwIcon::new(self.float_pos, ItemType::Shelf)),
+            ChestType::Gold => DwObj::Block(DwBlock::new(block_coord, VoxelType::GoldChest)),
+            ChestType::Portal => DwObj::Block(DwBlock::new(block_coord, VoxelType::PortalChest)),
+            ChestType::Cabinet => {
+                DwObj::Icon(DwIcon::new(self.float_pos, ItemType::DisplayCabinet))
+            }
+            ChestType::Feeder => DwObj::Block(DwBlock::new(block_coord, VoxelType::FeederChest)),
+        }
     }
 }
 

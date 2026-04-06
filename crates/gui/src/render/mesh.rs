@@ -1,11 +1,11 @@
 use super::{DwChunkBuf, DwVertex, ID_TEXTURE_FORMAT, Texture};
 
-pub struct DwSpriteRenderer {
+pub struct DwMeshRenderer {
     pipeline: wgpu::RenderPipeline,
     bind_group: wgpu::BindGroup,
 }
 
-impl DwSpriteRenderer {
+impl DwMeshRenderer {
     pub fn new(
         device: &wgpu::Device,
         camera_buf: &wgpu::Buffer,
@@ -16,7 +16,7 @@ impl DwSpriteRenderer {
     ) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("DW Sprite Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("shader/dw_sprite.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(include_str!("shader/dw_mesh.wgsl").into()),
         });
 
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -163,10 +163,18 @@ impl DwSpriteRenderer {
         rpass.set_pipeline(&self.pipeline);
         rpass.set_bind_group(0, &self.bind_group, &[]);
         for dw_chunk_buf in dw_buf {
-            if dw_chunk_buf.num_indices > 0 {
-                rpass.set_vertex_buffer(0, dw_chunk_buf.vertex_buf.slice(..));
-                rpass.set_index_buffer(dw_chunk_buf.index_buf.slice(..), wgpu::IndexFormat::Uint32);
-                rpass.draw_indexed(0..dw_chunk_buf.num_indices, 0, 0..1);
+            if dw_chunk_buf.sprite_num_indices > 0 {
+                rpass.set_vertex_buffer(0, dw_chunk_buf.sprite_vertex_buf.slice(..));
+                rpass.set_index_buffer(
+                    dw_chunk_buf.sprite_index_buf.slice(..),
+                    wgpu::IndexFormat::Uint32,
+                );
+                rpass.draw_indexed(0..dw_chunk_buf.sprite_num_indices, 0, 0..1);
+            }
+            if let Some(blocks) = dw_chunk_buf.block_buf.as_ref() {
+                rpass.set_vertex_buffer(0, blocks.vertex_buf.slice(..));
+                rpass.set_index_buffer(blocks.index_buf.slice(..), wgpu::IndexFormat::Uint32);
+                rpass.draw_indexed(0..blocks.num_indices, 0, 0..1);
             }
         }
     }
