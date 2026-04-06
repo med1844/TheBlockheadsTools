@@ -162,10 +162,6 @@ pub struct RenderResources {
 impl RenderResources {
     const STAGING_BUFFER_SIZE: u64 = std::mem::size_of::<u32>() as u64; // only read single pixel
 
-    pub fn render_settings_buf(&self) -> &wgpu::Buffer {
-        &self.render_settings_buf
-    }
-
     pub fn new(
         state: &egui_wgpu::RenderState,
         camera_buf: wgpu::Buffer,
@@ -293,12 +289,12 @@ impl RenderResources {
         self.dw_sprite.render(render_pass, dw_buf);
     }
 
-    pub fn render_voxel_pass(&self, render_pass: &mut wgpu::RenderPass<'_>, show_grid: bool) {
+    pub fn render_voxel_pass(&self, render_pass: &mut wgpu::RenderPass<'_>) {
         self.voxel.render(render_pass);
         // self.dw_icon.render(render_pass, dw_buf);
-        if show_grid {
-            self.grid.render(render_pass);
-        }
+        // if show_grid {
+        //     self.grid.render(render_pass);
+        // }
     }
 
     pub fn composite(&self, render_pass: &mut wgpu::RenderPass<'_>) {
@@ -526,7 +522,7 @@ impl egui_wgpu::CallbackTrait for Render3dCallback {
                 timestamp_writes: None,
                 occlusion_query_set: None,
             });
-            r.render_voxel_pass(&mut render_pass, self.show_grid);
+            r.render_voxel_pass(&mut render_pass);
         }
 
         {

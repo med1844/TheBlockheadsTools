@@ -1,8 +1,8 @@
-use super::sprite::ToSprite;
 use eframe::wgpu::{self, util::DeviceExt};
-use std::{collections::HashMap, num::NonZero};
+use std::collections::HashMap;
 use the_blockheads_tools_lib::game::{
     coord::ChunkCoord, dynamic_object::DynamicObjectType, dynamic_world::ChunkDynamicObjects,
+    item::ItemType,
 };
 
 #[repr(C)]
@@ -40,6 +40,28 @@ impl DwIconVertex {
     pub const INDICES: &[u16] = &[0, 1, 2, 0, 2, 3];
 }
 
+#[derive(Clone, Copy)]
+pub struct DwIcon {
+    position: [f32; 2],
+    item_type: ItemType,
+}
+
+impl DwIcon {
+    pub fn new(position: [f32; 2], item_type: ItemType) -> Self {
+        Self {
+            position,
+            item_type: item_type,
+        }
+    }
+
+    pub fn instance(self) -> DwIconInstanceRaw {
+        DwIconInstanceRaw {
+            position: self.position,
+            item_type: self.item_type as u32,
+        }
+    }
+}
+
 #[repr(C)]
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct DwIconInstanceRaw {
@@ -60,8 +82,100 @@ impl DwIconInstanceRaw {
     }
 }
 
-pub trait ToIconInstance {
-    fn to_icon_instance(&self) -> DwIconInstanceRaw;
+pub struct DwSprite {
+    pub min: [f32; 2],
+    pub max: [f32; 2],
+    pub uv_min: [f32; 2],
+    pub uv_max: [f32; 2],
+    pub z: f32,
+}
+
+impl DwSprite {
+    pub const TILE_SIZE: f32 = 16.0 / 512.0;
+
+    pub(crate) fn new_from_parts(
+        uv_top_left: (u8, u8),
+        local_center_pos: [f32; 2],
+        global_center_pos: [f32; 2],
+        sprite_size: [f32; 2],
+        z: f32,
+    ) -> Self {
+        let (u_tile, v_tile) = uv_top_left;
+        let [local_center_x_offset, local_center_y_offset] = local_center_pos;
+        let [sprite_width, sprite_height] = sprite_size;
+        let [global_center_x, global_center_y] = global_center_pos;
+
+        let u_min = u_tile as f32 * DwSprite::TILE_SIZE;
+        let v_min = v_tile as f32 * DwSprite::TILE_SIZE;
+        let u_max = (u_tile as f32 + sprite_width) * DwSprite::TILE_SIZE;
+        let v_max = (v_tile as f32 + sprite_height) * DwSprite::TILE_SIZE;
+
+        let min_x = global_center_x - local_center_x_offset;
+        let min_y = global_center_y - local_center_y_offset;
+
+        let max_x = min_x + sprite_width;
+        let max_y = min_y + sprite_height;
+
+        DwSprite {
+            min: [min_x, min_y],
+            max: [max_x, max_y],
+            uv_min: [u_min, v_min],
+            uv_max: [u_max, v_max],
+            z,
+        }
+    }
+
+    pub fn to_vertices(&self, id: DwChunkObjId, coord: ChunkCoord) -> ([DwVertex; 4], [u32; 6]) {
+        let [min_x, min_y] = self.min;
+        let [max_x, max_y] = self.max;
+        let [u_min, v_min] = self.uv_min;
+        let [u_max, v_max] = self.uv_max;
+        let raw_id = id.to_raw_id();
+        let chunk_x = coord.x();
+        let chunk_y = coord.y() as u32;
+        (
+            [
+                DwVertex {
+                    raw_id,
+                    chunk_x,
+                    chunk_y,
+                    position: [min_x, min_y, self.z],
+                    tex_coords: [u_min, v_max],
+                }, // Bottom-left
+                DwVertex {
+                    raw_id,
+                    chunk_x,
+                    chunk_y,
+                    position: [max_x, min_y, self.z],
+                    tex_coords: [u_max, v_max],
+                }, // Bottom-right
+                DwVertex {
+                    raw_id,
+                    chunk_x,
+                    chunk_y,
+                    position: [max_x, max_y, self.z],
+                    tex_coords: [u_max, v_min],
+                }, // Top-right
+                DwVertex {
+                    raw_id,
+                    chunk_x,
+                    chunk_y,
+                    position: [min_x, max_y, self.z],
+                    tex_coords: [u_min, v_min],
+                }, // Top-left
+            ],
+            [0, 1, 2, 0, 2, 3],
+        )
+    }
+}
+
+pub enum DwObj {
+    Icon(DwIcon),
+    Sprite(DwSprite),
+}
+
+pub trait ToDwObj {
+    fn to_dw_obj(&self) -> DwObj;
 }
 
 struct MeshAggregator<V, I> {
@@ -233,6 +347,11 @@ impl DwVertex {
     }
 }
 
+struct DwChunkBufBuilder<'a> {
+    icon_instances: &'a mut Vec<DwIconInstanceRaw>,
+    sprite_builder: &'a mut MeshAggregator<[DwVertex; 4], [u32; 6]>,
+}
+
 #[derive(Clone)]
 pub struct DwChunkBuf {
     // icon instances
@@ -251,20 +370,25 @@ impl DwChunkBuf {
         coord: ChunkCoord,
         device: &wgpu::Device,
     ) -> Option<Self> {
-        fn add<'a, T: ToSprite + ToIconInstance + 'a, I: Iterator<Item = &'a T>>(
+        fn add<'a, T: ToDwObj + 'a, I: Iterator<Item = &'a T>>(
             i: I,
             obj_type: DynamicObjectType,
             coord: ChunkCoord,
-            icon_instances: &mut Vec<DwIconInstanceRaw>,
-            sprite_builder: &mut MeshAggregator<[DwVertex; 4], [u32; 6]>,
+            builder: &mut DwChunkBufBuilder<'_>,
+            // icon_instances: &mut Vec<DwIconInstanceRaw>,
+            // sprite_builder: &mut MeshAggregator<[DwVertex; 4], [u32; 6]>,
         ) {
             for (index, obj) in i.enumerate() {
-                if let Some(sprite) = obj.to_sprite() {
-                    let (vertices, indices) =
-                        sprite.to_vertices(DwChunkObjId::new(obj_type, index), coord);
-                    sprite_builder.add(vertices, indices);
+                match obj.to_dw_obj() {
+                    DwObj::Icon(dw_icon) => {
+                        builder.icon_instances.push(dw_icon.instance());
+                    }
+                    DwObj::Sprite(dw_sprite) => {
+                        let (vertices, indices) =
+                            dw_sprite.to_vertices(DwChunkObjId::new(obj_type, index), coord);
+                        builder.sprite_builder.add(vertices, indices);
+                    }
                 }
-                icon_instances.push(obj.to_icon_instance());
             }
         }
 
@@ -274,37 +398,27 @@ impl DwChunkBuf {
         }
 
         let mut icons = Vec::with_capacity(num_objs);
-        let mut builder = MeshAggregator::with_capacity(num_objs);
+        let mut sprite_builder = MeshAggregator::with_capacity(num_objs);
+        let mut builder = DwChunkBufBuilder {
+            icon_instances: &mut icons,
+            sprite_builder: &mut sprite_builder,
+        };
 
         use DynamicObjectType::*;
-        add(
-            chunk.corn_plant.iter(),
-            CornPlant,
-            coord,
-            &mut icons,
-            &mut builder,
-        );
-        add(
-            chunk.carrot_plant.iter(),
-            CarrotPlant,
-            coord,
-            &mut icons,
-            &mut builder,
-        );
-        add(
-            chunk.kelp_plant.iter(),
-            KelpPlant,
-            coord,
-            &mut icons,
-            &mut builder,
-        );
-        add(
-            chunk.tomato_plant.iter(),
-            TomatoPlant,
-            coord,
-            &mut icons,
-            &mut builder,
-        );
+        add(chunk.apple_tree.iter(), AppleTree, coord, &mut builder);
+        add(chunk.maple_tree.iter(), MapleTree, coord, &mut builder);
+        add(chunk.mango_tree.iter(), MangoTree, coord, &mut builder);
+        add(chunk.pine_tree.iter(), PineTree, coord, &mut builder);
+        add(chunk.cactus_tree.iter(), CactusTree, coord, &mut builder);
+        add(chunk.coconut_tree.iter(), CoconutTree, coord, &mut builder);
+        add(chunk.orange_tree.iter(), OrangeTree, coord, &mut builder);
+        add(chunk.cherry_tree.iter(), CherryTree, coord, &mut builder);
+        add(chunk.coffee_tree.iter(), CoffeeTree, coord, &mut builder);
+        add(chunk.corn_plant.iter(), CornPlant, coord, &mut builder);
+        add(chunk.carrot_plant.iter(), CarrotPlant, coord, &mut builder);
+        add(chunk.kelp_plant.iter(), KelpPlant, coord, &mut builder);
+        add(chunk.lime_tree.iter(), LimeTree, coord, &mut builder);
+        add(chunk.tomato_plant.iter(), TomatoPlant, coord, &mut builder);
 
         let instance_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Dynamic Object Icon Instance Buffer"),
@@ -312,7 +426,7 @@ impl DwChunkBuf {
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         });
 
-        let (vertex_buf, index_buf, num_indices) = builder.build_const(device);
+        let (vertex_buf, index_buf, num_indices) = sprite_builder.build_const(device);
 
         let num_instances = icons.len() as u32;
         if num_instances + num_indices == 0 {

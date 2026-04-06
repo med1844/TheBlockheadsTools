@@ -2,7 +2,6 @@ mod camera;
 mod coord;
 pub mod dw;
 mod render_settings;
-pub mod sprite;
 pub mod ssao;
 mod texture;
 mod voxel;

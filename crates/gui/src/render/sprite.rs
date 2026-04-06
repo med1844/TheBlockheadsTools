@@ -163,9 +163,11 @@ impl DwSpriteRenderer {
         rpass.set_pipeline(&self.pipeline);
         rpass.set_bind_group(0, &self.bind_group, &[]);
         for dw_chunk_buf in dw_buf {
-            rpass.set_vertex_buffer(0, dw_chunk_buf.vertex_buf.slice(..));
-            rpass.set_index_buffer(dw_chunk_buf.index_buf.slice(..), wgpu::IndexFormat::Uint32);
-            rpass.draw_indexed(0..dw_chunk_buf.num_indices, 0, 0..1);
+            if dw_chunk_buf.num_indices > 0 {
+                rpass.set_vertex_buffer(0, dw_chunk_buf.vertex_buf.slice(..));
+                rpass.set_index_buffer(dw_chunk_buf.index_buf.slice(..), wgpu::IndexFormat::Uint32);
+                rpass.draw_indexed(0..dw_chunk_buf.num_indices, 0, 0..1);
+            }
         }
     }
 }
