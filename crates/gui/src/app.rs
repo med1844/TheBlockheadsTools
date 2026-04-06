@@ -5,7 +5,7 @@ use super::{
         dw::{DwBuf, DwChunkObjId},
         voxel_util,
     },
-    renderer::{GeometryBuffer, Render3dCallback, RenderResources},
+    render::{GeometryBuffer, Render3dCallback, RenderResources},
 };
 use eframe::{egui, egui_wgpu, emath::Rect, wgpu};
 use glam::Vec3Swizzles;
