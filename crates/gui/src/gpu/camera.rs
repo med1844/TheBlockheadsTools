@@ -89,7 +89,7 @@ impl Camera {
         }
     }
 
-    pub fn to_buf(&self, device: &wgpu::Device) -> wgpu::Buffer {
+    pub fn create_buffer(&self, device: &wgpu::Device) -> wgpu::Buffer {
         let uniform = self.uniform();
         device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Camera Uniform Buffer"),

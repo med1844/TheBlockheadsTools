@@ -5,20 +5,39 @@ struct CameraUniform {
     world_offset: vec4<f32>,
 };
 
+struct CoordUniform {
+    is_some: u32,
+    x: u32,
+    y: u32,
+    _padding: u32,
+};
+
+struct IdUniform {
+    is_some: u32,
+    id: u32,
+};
+
 @group(0) @binding(0) var<uniform> camera: CameraUniform;
 @group(0) @binding(1) var tilemap_texture: texture_2d<f32>;
 @group(0) @binding(2) var tilemap_sampler: sampler;
+@group(0) @binding(3) var<uniform> hover_on_chunk: CoordUniform;
+@group(0) @binding(4) var<uniform> hover_on_id: IdUniform;
 
 struct VertexInput {
     @location(0) @interpolate(flat) id: u32,
-    @location(1) position: vec3<f32>,
-    @location(2) tex_coords: vec2<f32>,
+    @location(1) @interpolate(flat) chunk_x: u32,
+    @location(2) @interpolate(flat) chunk_y: u32,
+    // location(3) is _padding, not passed to shader
+    @location(3) position: vec3<f32>,
+    @location(4) tex_coords: vec2<f32>,
 };
 
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) tex_coords: vec2<f32>,
     @location(1) @interpolate(flat) id: u32,
+    @location(2) @interpolate(flat) chunk_x: u32,
+    @location(3) @interpolate(flat) chunk_y: u32,
 };
 
 struct FragmentOutput {
@@ -35,6 +54,8 @@ fn vs_main(model: VertexInput) -> VertexOutput {
     out.clip_position = camera.view_proj * vec4<f32>(pos_in_view, 1.0);
     out.tex_coords = model.tex_coords;
     out.id = model.id;
+    out.chunk_x = model.chunk_x;
+    out.chunk_y = model.chunk_y;
     return out;
 }
 
@@ -49,10 +70,26 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     let gamma = 2.2;
     let corrected_color = pow(color.rgb, vec3<f32>(1.0 / gamma));
 
+    // Highlight when both chunk coord and object id match the hovered target.
+    let chunk_matches = hover_on_chunk.is_some != 0u
+        && in.chunk_x == hover_on_chunk.x
+        && in.chunk_y == hover_on_chunk.y;
+    let id_matches = hover_on_id.is_some != 0u
+        && in.id == hover_on_id.id;
+    let highlighted = chunk_matches && id_matches;
+
+    var final_color: vec3<f32>;
+    if highlighted {
+        // Brighten and tint towards white to indicate hover.
+        final_color = mix(corrected_color, vec3<f32>(1.0), 0.35);
+    } else {
+        final_color = corrected_color;
+    }
+
     var output: FragmentOutput;
     let depth = in.clip_position.z;
     output.depth = depth;
-    output.color = vec4<f32>(corrected_color, 1.0);
+    output.color = vec4<f32>(final_color, 1.0);
     // World-space forward normal (Z is 1.0), with 0.0 specular intensity.
     output.normal_spec = vec4<f32>(0.0, 0.0, 1.0, 0.0);
     output.id = in.id;

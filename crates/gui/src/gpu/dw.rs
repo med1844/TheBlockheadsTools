@@ -1,6 +1,6 @@
 use super::sprite::ToSprite;
 use eframe::wgpu::{self, util::DeviceExt};
-use std::collections::HashMap;
+use std::{collections::HashMap, num::NonZero};
 use the_blockheads_tools_lib::game::{
     coord::ChunkCoord, dynamic_object::DynamicObjectType, dynamic_world::ChunkDynamicObjects,
 };
@@ -150,9 +150,15 @@ impl<V, I> MeshAggregator<V, I> {
     }
 }
 
+#[derive(Copy, Clone, Debug)]
+pub struct DwChunkObjId {
+    pub obj_type: DynamicObjectType,
+    pub index: usize,
+}
+
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct DwChunkObjId(u32);
+pub struct DwChunkObjIdUniform([u32; 4]);
 
 impl DwChunkObjId {
     const MAX_INDEX_BITS: usize = 24;
@@ -169,38 +175,55 @@ impl DwChunkObjId {
 
     pub fn try_from_u32(raw_id: u32) -> Option<Self> {
         Self::obj_type_from_raw(raw_id)
-            .map(|obj_type| Self::from_obj_type_and_index(obj_type, Self::index_from_raw(raw_id)))
+            .map(|obj_type| Self::new(obj_type, Self::index_from_raw(raw_id)))
     }
 
-    pub fn from_obj_type_and_index(obj_type: DynamicObjectType, index: usize) -> Self {
+    pub fn new(obj_type: DynamicObjectType, index: usize) -> Self {
         if index > Self::INDEX_MASK {
             // should be very rare or nearly impossible to happen; should be warning
             println!("index {} interferes with obj_type {:?}", index, obj_type);
         }
-        Self(((obj_type as u32) << Self::MAX_INDEX_BITS) | (index as u32))
+        Self { obj_type, index }
     }
 
-    // SAFETY: all public constructors return None if the object type is invalid
-    pub fn obj_type(&self) -> DynamicObjectType {
-        Self::obj_type_from_raw(self.0).expect("type invariance violated")
+    pub fn to_raw_id(&self) -> u32 {
+        (self.obj_type as u32) << Self::MAX_INDEX_BITS | self.index as u32
     }
+}
 
-    pub fn index(&self) -> usize {
-        Self::index_from_raw(self.0)
+impl From<Option<&DwChunkObjId>> for DwChunkObjIdUniform {
+    fn from(value: Option<&DwChunkObjId>) -> Self {
+        let mut uniform = [0; 4];
+        if let Some(id) = value {
+            uniform[0] = 1;
+            uniform[1] = id.to_raw_id();
+        }
+        Self(uniform)
+    }
+}
+
+impl DwChunkObjIdUniform {
+    pub fn create_buffer(self, device: &wgpu::Device) -> wgpu::Buffer {
+        device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Id of Object in Chunk Buffer"),
+            contents: bytemuck::cast_slice(&[self]),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        })
     }
 }
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct DwVertex {
-    pub id: DwChunkObjId,
+    pub raw_id: u32,
+    pub chunk_x: u32,
+    pub chunk_y: u32,
     pub position: [f32; 3],
     pub tex_coords: [f32; 2],
 }
 
 impl DwVertex {
-    const ATTRIBS: [wgpu::VertexAttribute; 3] =
-        wgpu::vertex_attr_array![0 => Uint32, 1 => Float32x3, 2 => Float32x2];
+    const ATTRIBS: [wgpu::VertexAttribute; 5] = wgpu::vertex_attr_array![0 => Uint32, 1 => Uint32, 2 => Uint32, 3 => Float32x3, 4 => Float32x2];
     pub fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
         wgpu::VertexBufferLayout {
             array_stride: std::mem::size_of::<DwVertex>() as wgpu::BufferAddress,
@@ -223,17 +246,22 @@ pub struct DwChunkBuf {
 }
 
 impl DwChunkBuf {
-    pub fn from_chunk(chunk: &ChunkDynamicObjects, device: &wgpu::Device) -> Option<Self> {
+    pub fn from_chunk(
+        chunk: &ChunkDynamicObjects,
+        coord: ChunkCoord,
+        device: &wgpu::Device,
+    ) -> Option<Self> {
         fn add<'a, T: ToSprite + ToIconInstance + 'a, I: Iterator<Item = &'a T>>(
             i: I,
             obj_type: DynamicObjectType,
+            coord: ChunkCoord,
             icon_instances: &mut Vec<DwIconInstanceRaw>,
             sprite_builder: &mut MeshAggregator<[DwVertex; 4], [u32; 6]>,
         ) {
             for (index, obj) in i.enumerate() {
                 if let Some(sprite) = obj.to_sprite() {
                     let (vertices, indices) =
-                        sprite.to_vertices(DwChunkObjId::from_obj_type_and_index(obj_type, index));
+                        sprite.to_vertices(DwChunkObjId::new(obj_type, index), coord);
                     sprite_builder.add(vertices, indices);
                 }
                 icon_instances.push(obj.to_icon_instance());
@@ -249,17 +277,31 @@ impl DwChunkBuf {
         let mut builder = MeshAggregator::with_capacity(num_objs);
 
         use DynamicObjectType::*;
-        add(chunk.corn_plant.iter(), CornPlant, &mut icons, &mut builder);
         add(
-            chunk.carrot_plant.iter(),
-            CarrotPlant,
+            chunk.corn_plant.iter(),
+            CornPlant,
+            coord,
             &mut icons,
             &mut builder,
         );
-        add(chunk.kelp_plant.iter(), KelpPlant, &mut icons, &mut builder);
+        add(
+            chunk.carrot_plant.iter(),
+            CarrotPlant,
+            coord,
+            &mut icons,
+            &mut builder,
+        );
+        add(
+            chunk.kelp_plant.iter(),
+            KelpPlant,
+            coord,
+            &mut icons,
+            &mut builder,
+        );
         add(
             chunk.tomato_plant.iter(),
             TomatoPlant,
+            coord,
             &mut icons,
             &mut builder,
         );
@@ -318,7 +360,8 @@ impl DwBuf {
         coord: I,
         chunk: &ChunkDynamicObjects,
     ) {
-        let buf = DwChunkBuf::from_chunk(chunk, device);
-        self.chunks.insert(coord.into(), buf);
+        let coord = coord.into();
+        let buf = DwChunkBuf::from_chunk(chunk, coord, device);
+        self.chunks.insert(coord, buf);
     }
 }

@@ -1,4 +1,5 @@
 use super::dw::{DwChunkObjId, DwVertex};
+use the_blockheads_tools_lib::game::coord::ChunkCoord;
 
 pub struct Sprite {
     pub min: [f32; 2],
@@ -43,30 +44,41 @@ impl Sprite {
         }
     }
 
-    pub fn to_vertices(&self, id: DwChunkObjId) -> ([DwVertex; 4], [u32; 6]) {
+    pub fn to_vertices(&self, id: DwChunkObjId, coord: ChunkCoord) -> ([DwVertex; 4], [u32; 6]) {
         let [min_x, min_y] = self.min;
         let [max_x, max_y] = self.max;
         let [u_min, v_min] = self.uv_min;
         let [u_max, v_max] = self.uv_max;
+        let raw_id = id.to_raw_id();
+        let chunk_x = coord.x();
+        let chunk_y = coord.y() as u32;
         (
             [
                 DwVertex {
-                    id,
+                    raw_id,
+                    chunk_x,
+                    chunk_y,
                     position: [min_x, min_y, self.z],
                     tex_coords: [u_min, v_max],
                 }, // Bottom-left
                 DwVertex {
-                    id,
+                    raw_id,
+                    chunk_x,
+                    chunk_y,
                     position: [max_x, min_y, self.z],
                     tex_coords: [u_max, v_max],
                 }, // Bottom-right
                 DwVertex {
-                    id,
+                    raw_id,
+                    chunk_x,
+                    chunk_y,
                     position: [max_x, max_y, self.z],
                     tex_coords: [u_max, v_min],
                 }, // Top-right
                 DwVertex {
-                    id,
+                    raw_id,
+                    chunk_x,
+                    chunk_y,
                     position: [min_x, max_y, self.z],
                     tex_coords: [u_min, v_min],
                 }, // Top-left

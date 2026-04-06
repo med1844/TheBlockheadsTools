@@ -1,15 +1,14 @@
 use super::{
     gpu::{
-        CameraUniform, GpuBlockCoordUniform, RenderSettings, Texture, VoxelType,
-        dw::{DwChunkBuf, DwChunkObjId, DwIconInstanceRaw, DwIconVertex, DwVertex},
+        CameraUniform, GpuCoordUniform, RenderSettings, Texture, VoxelType,
+        dw::{
+            DwChunkBuf, DwChunkObjId, DwChunkObjIdUniform, DwIconInstanceRaw, DwIconVertex,
+            DwVertex,
+        },
     },
     image_type::ImageType,
 };
-use eframe::{
-    egui::{self},
-    egui_wgpu,
-    wgpu::{self, util::DeviceExt},
-};
+use eframe::{egui, egui_wgpu, wgpu};
 use std::sync::{
     Arc, Mutex,
     atomic::{AtomicBool, Ordering},
@@ -138,6 +137,8 @@ pub struct RenderResources {
     camera_buf: wgpu::Buffer,
     selected_block_buf: wgpu::Buffer,
     hover_on_block_buf: wgpu::Buffer,
+    hover_on_chunk_buf: wgpu::Buffer, // for DW highlighting as the DwChunkObjId has no chunk coords
+    hover_on_id_buf: wgpu::Buffer,
 
     g_buffer: GeometryBuffer,
 
@@ -171,6 +172,7 @@ impl RenderResources {
         voxel_buf: wgpu::Buffer,
         selected_block_buf: wgpu::Buffer,
         hover_on_block_buf: wgpu::Buffer,
+        hover_on_chunk_buf: wgpu::Buffer,
         hover_on_dyn_obj_id: Arc<Mutex<Option<DwChunkObjId>>>,
     ) -> Self {
         let device = &state.device;
@@ -215,6 +217,13 @@ impl RenderResources {
             target_format,
             &render_settings_buf,
         );
+        let hover_on_id_buf = {
+            let hover_on_id_uniform: DwChunkObjIdUniform = {
+                let guard = hover_on_dyn_obj_id.lock().expect("should lock");
+                guard.as_ref().into()
+            };
+            hover_on_id_uniform.create_buffer(device)
+        };
 
         Self {
             voxel: voxel::VoxelRenderer::new(
@@ -241,6 +250,8 @@ impl RenderResources {
                 device,
                 &camera_buf,
                 &tile_map_texture,
+                &hover_on_chunk_buf,
+                &hover_on_id_buf,
                 target_format,
             ),
             grid: grid::GridRenderer::new(device, &camera_buf, target_format),
@@ -251,6 +262,9 @@ impl RenderResources {
             camera_buf,
             selected_block_buf,
             hover_on_block_buf,
+            hover_on_chunk_buf,
+            hover_on_id_buf,
+
             g_buffer,
 
             staging_buffer,
@@ -259,18 +273,6 @@ impl RenderResources {
             has_new_copy: Arc::new(AtomicBool::new(false)),
             render_settings_buf,
         }
-    }
-
-    pub fn camera_buf(&self) -> &wgpu::Buffer {
-        &self.camera_buf
-    }
-
-    pub fn selected_block_buf(&self) -> &wgpu::Buffer {
-        &self.selected_block_buf
-    }
-
-    pub fn hover_on_block_buf(&self) -> &wgpu::Buffer {
-        &self.hover_on_block_buf
     }
 
     pub fn voxel_buf(&self) -> &wgpu::Buffer {
@@ -372,8 +374,10 @@ pub struct Render3dCallback {
     pub camera_uniform: CameraUniform,
     pub dw_chunks: Vec<DwChunkBuf>,
     pub show_grid: bool,
-    pub selected_block_coord_uniform: GpuBlockCoordUniform,
-    pub hover_on_block_coord_uniform: GpuBlockCoordUniform,
+    pub selected_block_coord_uniform: GpuCoordUniform,
+    pub hover_on_block_coord_uniform: GpuCoordUniform,
+    pub hover_on_chunk_coord_uniform: GpuCoordUniform,
+    pub hover_on_id_uniform: DwChunkObjIdUniform,
     pub mouse_physical_pos: Option<(f32, f32)>,
     pub world_viewport_rect: egui::Rect,
     pub render_settings: RenderSettings,
@@ -394,22 +398,32 @@ impl egui_wgpu::CallbackTrait for Render3dCallback {
             .into();
         r.resize((vp_w as u32, vp_h as u32), device);
         queue.write_buffer(
-            r.camera_buf(),
+            &r.camera_buf,
             0,
             bytemuck::cast_slice(&[self.camera_uniform]),
         );
         queue.write_buffer(
-            r.selected_block_buf(),
+            &r.selected_block_buf,
             0,
             bytemuck::cast_slice(&[self.selected_block_coord_uniform]),
         );
         queue.write_buffer(
-            r.hover_on_block_buf(),
+            &r.hover_on_block_buf,
             0,
             bytemuck::cast_slice(&[self.hover_on_block_coord_uniform]),
         );
         queue.write_buffer(
-            r.render_settings_buf(),
+            &r.hover_on_chunk_buf,
+            0,
+            bytemuck::cast_slice(&[self.hover_on_chunk_coord_uniform]),
+        );
+        queue.write_buffer(
+            &r.hover_on_id_buf,
+            0,
+            bytemuck::cast_slice(&[self.hover_on_id_uniform]),
+        );
+        queue.write_buffer(
+            &r.render_settings_buf,
             0,
             bytemuck::cast_slice(&[self.render_settings.uniform()]),
         );

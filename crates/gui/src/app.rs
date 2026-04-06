@@ -1,7 +1,7 @@
 use super::{
     fps_counter::FpsCounter,
     gpu::{
-        Camera, GpuBlockCoord, RenderSettings,
+        Camera, GpuCoord, RenderSettings,
         dw::{DwBuf, DwChunkObjId},
         voxel_util,
     },
@@ -105,11 +105,11 @@ pub struct EditorApp {
     show_grid: bool,
     fps_counter: FpsCounter,
 
-    selected_block_coord: GpuBlockCoord,
-    hover_on_block_coord: GpuBlockCoord,
+    selected_block_coord: GpuCoord<BlockCoord>,
+    hover_on_block_coord: GpuCoord<BlockCoord>,
     selected_chunk: Option<Chunk>,
     hover_on_dyn_obj_id: Arc<Mutex<Option<DwChunkObjId>>>,
-    hover_on_chunk: Option<ChunkCoord>,
+    hover_on_chunk_coord: GpuCoord<ChunkCoord>,
 
     file_reader: FileReader,
     load_err: Option<EditorAppError>,
@@ -129,16 +129,18 @@ impl EditorApp {
         let device = &state.device;
 
         let camera = Camera::default();
-        let selected_block_coord = GpuBlockCoord::default();
-        let hover_on_block_coord = GpuBlockCoord::default();
+        let selected_block_coord = GpuCoord::default();
+        let hover_on_block_coord = GpuCoord::default();
+        let hover_on_chunk_coord = GpuCoord::default();
         let voxel_buf = voxel_util::create_buffer(device, 512);
         let hover_on_dyn_obj_id = Arc::new(Mutex::new(None));
         let render_resources = RenderResources::new(
             state,
-            camera.to_buf(device),
+            camera.create_buffer(device),
             voxel_buf,
-            selected_block_coord.to_buf(device),
-            hover_on_block_coord.to_buf(device),
+            selected_block_coord.uniform().create_buffer(device),
+            hover_on_block_coord.uniform().create_buffer(device),
+            hover_on_chunk_coord.uniform().create_buffer(device),
             hover_on_dyn_obj_id.clone(),
         );
 
@@ -161,7 +163,7 @@ impl EditorApp {
             hover_on_block_coord,
             selected_chunk: None,
             hover_on_dyn_obj_id,
-            hover_on_chunk: None,
+            hover_on_chunk_coord,
 
             file_reader: FileReader::new(),
             load_err: None,
@@ -290,12 +292,10 @@ impl EditorApp {
             };
             // info here can be replaced with some function to render internal of the dynamic object
             // NOTE: `self.hover_on_chunk` must be from last frame, i.e. it must not be updated in this frame before here
-            let info = match (self.hover_on_chunk, hover_on_dyn_obj_id) {
+            let info = match (self.hover_on_chunk_coord.coord(), hover_on_dyn_obj_id) {
                 (Some(hover_on_chunk), Some(hover_on_dyn_obj_id)) => Some(format!(
                     "type: {:?}, i-th: {} in chunk: {}",
-                    hover_on_dyn_obj_id.obj_type(),
-                    hover_on_dyn_obj_id.index(),
-                    hover_on_chunk
+                    hover_on_dyn_obj_id.obj_type, hover_on_dyn_obj_id.index, hover_on_chunk
                 )),
                 _ => None,
             };
@@ -498,7 +498,8 @@ impl EditorApp {
                 .to_array();
             let hover_on_block_coord = BlockCoord::new(x as u32, y as u16).ok();
             self.hover_on_block_coord.update(hover_on_block_coord);
-            self.hover_on_chunk = hover_on_block_coord.map(|block_coord| block_coord.into())
+            self.hover_on_chunk_coord
+                .update(hover_on_block_coord.map(|block_coord| block_coord.into()));
         }
 
         self.mouse_pos = response.hover_pos().map(|pos| {
@@ -542,14 +543,21 @@ impl EditorApp {
             }
         }
 
+        let hover_on_id_uniform = {
+            let guard = self.hover_on_dyn_obj_id.lock().expect("should lock");
+            guard.as_ref().into()
+        };
+
         ui.painter().add(egui_wgpu::Callback::new_paint_callback(
             rect,
             Render3dCallback {
                 camera_uniform: self.camera.uniform(),
                 dw_chunks,
                 show_grid: self.show_grid,
-                selected_block_coord_uniform: self.selected_block_coord.to_uniform(),
-                hover_on_block_coord_uniform: self.hover_on_block_coord.to_uniform(),
+                selected_block_coord_uniform: self.selected_block_coord.uniform(),
+                hover_on_block_coord_uniform: self.hover_on_block_coord.uniform(),
+                hover_on_chunk_coord_uniform: self.hover_on_chunk_coord.uniform(),
+                hover_on_id_uniform,
                 mouse_physical_pos: self.mouse_pos,
                 world_viewport_rect: self.world_viewport_rect,
                 render_settings: self.render_settings,
