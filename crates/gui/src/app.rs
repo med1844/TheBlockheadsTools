@@ -702,9 +702,11 @@ impl EditorApp {
             use lib::game::dynamic_object::DynamicObjectType::*;
             fn draw_window<T: InfoUi>(title: &str, t: Option<&mut T>, ctx: &egui::Context) {
                 if let Some(t) = t {
-                    egui::Window::new(title).show(ctx, |ui| {
-                        t.info(ui);
-                    });
+                    egui::Window::new(title)
+                        .id("selected_dynamic_obj_info".into())
+                        .show(ctx, |ui| {
+                            t.info(ui);
+                        });
                 }
             }
 
