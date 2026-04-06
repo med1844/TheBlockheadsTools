@@ -6,7 +6,7 @@ use super::{
         dw::{DwBuf, DwChunkObjId, DwChunkObjIdUniform},
         voxel_util,
     },
-    render::{GeometryBuffer, Render3dCallback, RenderResources},
+    render::{GeometryBuffer, Render3dCallback, RenderResources, voxel::VoxelRenderer},
 };
 use eframe::{egui, egui_wgpu, emath::Rect, wgpu};
 use glam::Vec3Swizzles;
@@ -212,7 +212,8 @@ impl EditorApp {
         let device = &state.device;
 
         let camera = Camera::default();
-        let voxel_buf = voxel_util::create_buffer(device, 512);
+        let voxel_buf =
+            voxel_util::create_buffer(device, VoxelRenderer::DEFAULT_WORLD_WIDTH_CHUNK as usize);
         let interaction_state = InteractionState::default();
         let render_resources = RenderResources::new(
             state,
@@ -264,23 +265,40 @@ impl EditorApp {
         data: Vec<u8>,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        voxel_buffer: &wgpu::Buffer,
+        render_resources: &mut RenderResources,
     ) -> Result<()> {
         let mut world_db = WorldDb::from_bytes(&data).context(OpenWorldDbSnafu)?;
         let spawn_x = world_db.main.world_v2.start_portal_pos_x;
         let spawn_y = world_db.main.world_v2.start_portal_pos_y - 1;
 
-        // By default we look at start portal
-        *self.camera.world_offset_mut() = glam::Vec3::new(spawn_x as f32, spawn_y as f32, 5.0);
+        let new_world_width_macro = world_db.main.world_v2.world_width_macro;
+        let world_dim_x = new_world_width_macro * Chunk::NUM_BLOCK_PER_ROW as u32;
+        let world_block_width = world_dim_x as f32;
 
-        let new_world_width_macro = world_db.main.world_v2.world_width_macro as usize;
+        // By default we look at start portal, wrapped into [0, world_width)
+        let wrapped_spawn_x = (spawn_x as f32).rem_euclid(world_block_width);
+        *self.camera.world_offset_mut() = glam::Vec3::new(wrapped_spawn_x, spawn_y as f32, 5.0);
 
-        // TODO: if width_macro doesn't match the old one, create new buffer and update voxel renderer bind group
+        // Only allocate a new voxel buffer when the new world is wider than the current one.
+        // Reusing the existing (larger) buffer avoids a VRAM allocation on every world load.
+        let old_world_width_macro = self
+            .world_db
+            .as_ref()
+            .map(|db| db.main.world_v2.world_width_macro)
+            .unwrap_or(0);
+        if new_world_width_macro > old_world_width_macro {
+            render_resources.replace_voxel_buf(
+                device,
+                queue,
+                voxel_util::create_buffer(device, new_world_width_macro as usize),
+                world_dim_x,
+            );
+        }
         voxel_util::set_chunks(
             queue,
-            voxel_buffer,
+            render_resources.voxel_buf(),
             &mut world_db.chunks,
-            new_world_width_macro,
+            new_world_width_macro as usize,
         );
 
         self.dw_buf.clear();
@@ -374,12 +392,12 @@ impl EditorApp {
             && let Err(e) = read_result
                 .context(ReadWorldDbBytesSnafu)
                 .and_then(|bytes| {
-                    let read_renderer = state.renderer.read();
-                    let r = read_renderer
+                    let mut write_renderer = state.renderer.write();
+                    let r = write_renderer
                         .callback_resources
-                        .get::<RenderResources>()
+                        .get_mut::<RenderResources>()
                         .expect("should have render resources");
-                    self.open_world_db(bytes, &state.device, &state.queue, r.voxel_buf())
+                    self.open_world_db(bytes, &state.device, &state.queue, r)
                 })
         {
             self.load_err = Some(e);
@@ -439,6 +457,10 @@ impl EditorApp {
         ui.checkbox(&mut self.render_settings.enable_reflect, "Enable Reflect");
         ui.checkbox(&mut self.render_settings.enable_destruct, "Enable Destruct");
         ui.checkbox(&mut self.render_settings.enable_ssao, "Enable SSAO");
+        ui.checkbox(
+            &mut self.render_settings.enable_cyclic,
+            "Enable Cyclic World",
+        );
 
         ui.separator();
         ui.add(
@@ -521,6 +543,18 @@ impl EditorApp {
                     viewport_size,
                     scroll_y,
                 );
+            }
+        }
+
+        // Wrap camera X cyclically when cyclic mode is enabled and a world is loaded
+        if self.render_settings.enable_cyclic {
+            if let Some(world_db) = self.world_db.as_ref() {
+                let world_block_width = (world_db.main.world_v2.world_width_macro as f32)
+                    * Chunk::NUM_BLOCK_PER_ROW as f32;
+                if world_block_width > 0.0 {
+                    let x = &mut self.camera.world_offset_mut().x;
+                    *x = x.rem_euclid(world_block_width);
+                }
             }
         }
     }

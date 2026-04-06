@@ -564,7 +564,9 @@ pub mod voxel_util {
         coord::{ChunkBlockCoord, ChunkCoord},
     };
 
-    const NUM_BLOCK_PER_CHUNK: usize = Chunk::NUM_BLOCK_PER_ROW * Chunk::NUM_BLOCK_PER_COL * 3; // 3 layers
+    const NUM_VOXEL_DEPTH: usize = 3;
+    const NUM_BLOCK_PER_CHUNK: usize =
+        Chunk::NUM_BLOCK_PER_ROW * Chunk::NUM_BLOCK_PER_COL * NUM_VOXEL_DEPTH; // 3 layers
 
     // Costly function - only call this once or VRAM nuked
     // Contains flattened block type, 512 * 32 * (32 * 32 * 3) blocks
@@ -596,7 +598,7 @@ pub mod voxel_util {
                 if bg_type == VoxelType::Air && fg_type != VoxelType::Air {
                     bg_type = fg_type;
                 }
-                let index = (y * Chunk::NUM_BLOCK_PER_ROW + x) * 3;
+                let index = (y * Chunk::NUM_BLOCK_PER_ROW + x) * NUM_VOXEL_DEPTH;
                 chunk_voxel[index] = bg_type;
                 chunk_voxel[index + 1] = mg_type;
                 chunk_voxel[index + 2] = fg_type;
@@ -646,7 +648,8 @@ pub mod voxel_util {
         fill_chunk_voxel(chunk.view(), &mut blocks);
 
         let chunk_coord: ChunkCoord = coord.into();
-        let offset = (chunk_coord.x() * 32 + chunk_coord.y() as u32) * NUM_BLOCK_PER_CHUNK as u32;
+        let offset = (chunk_coord.x() * Chunk::NUM_BLOCK_PER_COL as u32 + chunk_coord.y() as u32)
+            * NUM_BLOCK_PER_CHUNK as u32;
 
         queue.write_buffer(
             voxel_buffer,

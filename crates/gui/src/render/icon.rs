@@ -101,7 +101,7 @@ impl DwIconRenderer {
         device: &wgpu::Device,
         camera_buf: &wgpu::Buffer,
         items_texture: &Texture,
-        tile_map_texture: &Texture,
+        albedo_texture: &Texture,
         hover_on_id_buf: &wgpu::Buffer,
         selected_id_buf: &wgpu::Buffer,
     ) -> Self {
@@ -236,11 +236,11 @@ impl DwIconRenderer {
                 },
                 wgpu::BindGroupEntry {
                     binding: 3,
-                    resource: wgpu::BindingResource::TextureView(&tile_map_texture.view),
+                    resource: wgpu::BindingResource::TextureView(&albedo_texture.view),
                 },
                 wgpu::BindGroupEntry {
                     binding: 4,
-                    resource: wgpu::BindingResource::Sampler(&tile_map_texture.sampler),
+                    resource: wgpu::BindingResource::Sampler(&albedo_texture.sampler),
                 },
                 wgpu::BindGroupEntry {
                     binding: 5,

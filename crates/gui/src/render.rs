@@ -154,7 +154,7 @@ mod grid;
 mod icon;
 mod mesh;
 mod ssao;
-mod voxel;
+pub(crate) mod voxel;
 
 pub struct RenderResources {
     camera_buf: wgpu::Buffer,
@@ -197,7 +197,7 @@ impl RenderResources {
         let queue = &state.queue;
         let target_format = state.target_format;
 
-        let tile_map_texture = {
+        let albedo_texture = {
             let bytes = include_bytes!("../resources/TileMap.png");
             let mut decoder = PngDecoder::new(bytes);
             let img = decoder.decode().unwrap().u8().unwrap();
@@ -235,7 +235,7 @@ impl RenderResources {
             target_format,
             &render_settings_buf,
             &camera_buf,
-            &tile_map_texture,
+            &albedo_texture,
             &reflect_texture,
             &destruct_texture,
         );
@@ -254,10 +254,9 @@ impl RenderResources {
                 &camera_buf,
                 &selected_block_buf,
                 &hover_on_block_buf,
-                &tile_map_texture,
-                target_format,
                 &g_buffer,
                 &render_settings_buf,
+                &albedo_texture,
                 &reflect_texture,
                 &destruct_texture,
             ),
@@ -265,17 +264,16 @@ impl RenderResources {
                 device,
                 &camera_buf,
                 &items_texture,
-                &tile_map_texture,
+                &albedo_texture,
                 &hover_on_id_buf,
                 &selected_id_buf,
             ),
             dw_mesh: mesh::DwMeshRenderer::new(
                 device,
                 &camera_buf,
-                &tile_map_texture,
+                &albedo_texture,
                 &hover_on_id_buf,
                 &selected_id_buf,
-                target_format,
             ),
             grid: grid::GridRenderer::new(device, &camera_buf, target_format),
             ssao: ssao::SsaoRenderer::new(device, queue, &camera_buf, &g_buffer),
@@ -300,6 +298,17 @@ impl RenderResources {
 
     pub fn voxel_buf(&self) -> &wgpu::Buffer {
         &self.voxel.voxel_buf
+    }
+
+    pub fn replace_voxel_buf(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        new_voxel_buf: wgpu::Buffer,
+        world_dim_x: u32,
+    ) {
+        self.voxel
+            .replace_voxel_buf(device, queue, new_voxel_buf, world_dim_x);
     }
 
     pub fn resize(&mut self, size: (u32, u32), device: &wgpu::Device) {

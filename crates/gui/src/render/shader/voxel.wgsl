@@ -6,11 +6,9 @@ const CHUNK_VOXEL_COUNT: u32 = CHUNK_DIM_X * CHUNK_DIM_Y * CHUNK_DIM_Z;
 const VOXEL_SIZE: f32 = 1.0;
 
 // World dimensions in chunks
-const WORLD_CHUNKS_X: u32 = 512u;
 const WORLD_CHUNKS_Y: u32 = 32u;
 
-// The total number of voxels along each axis of the world
-const WORLD_DIM_X: u32 = CHUNK_DIM_X * WORLD_CHUNKS_X;
+// The total number of voxels along the Y axis
 const WORLD_DIM_Y: u32 = CHUNK_DIM_Y * WORLD_CHUNKS_Y;
 const WORLD_DIM_Z: u32 = CHUNK_DIM_Z; // World is flat, only one chunk deep in Z
 
@@ -86,64 +84,69 @@ struct CameraUniform {
     world_offset: vec4<f32>,
 };
 
-@group(0) @binding(0)
-var<uniform> camera: CameraUniform;
-
-@group(0) @binding(1)
-var<storage, read> voxel_data: array<u32>;
-
-@group(0) @binding(2)
-var texture_atlas: texture_2d<f32>;
-
-@group(0) @binding(3)
-var texture_sampler: sampler;
-
-@group(0) @binding(4)
-var<storage, read> texture_uv_atlas_indices: array<u32>; // UV atlas storing single u16 tile indices
-
-@group(0) @binding(5)
-var<uniform> selected_block: vec4<u32>;
-
-@group(0) @binding(6)
-var<uniform> hover_on_block: vec4<u32>;
+@group(0) @binding(0) var<uniform> camera: CameraUniform;
+@group(0) @binding(1) var texture_atlas: texture_2d<f32>;
+@group(0) @binding(2) var texture_sampler: sampler;
+@group(0) @binding(3) var<storage, read> texture_uv_atlas_indices: array<u32>; // UV atlas storing single u16 tile indices
+@group(0) @binding(4) var<uniform> selected_block: vec4<u32>;
+@group(0) @binding(5) var<uniform> hover_on_block: vec4<u32>;
 
 struct RenderSettings {
     light_dir: vec3<f32>,
     enable_reflect: u32,
     enable_destruct: u32,
     enable_ssao: u32,
+    enable_cyclic: u32,
     ambient_light: f32,
     shininess: f32,
     specular_intensity: f32,
     min_depth_factor: f32,
     _padding0: u32,
-    _padding1: u32,
 };
 
-@group(0) @binding(7)
-var<uniform> render_settings: RenderSettings;
-
-@group(0) @binding(8) var texture_reflect: texture_2d<f32>;
-@group(0) @binding(9) var sampler_reflect: sampler;
-
-@group(0) @binding(10) var texture_destruct: texture_2d<f32>;
-@group(0) @binding(11) var sampler_destruct: sampler;
+@group(0) @binding(6) var<uniform> render_settings: RenderSettings;
+@group(0) @binding(7) var texture_reflect: texture_2d<f32>;
+@group(0) @binding(8) var sampler_reflect: sampler;
+@group(0) @binding(9)  var texture_destruct: texture_2d<f32>;
+@group(0) @binding(10) var sampler_destruct: sampler;
 
 @group(1) @binding(0) var mesh_depth_texture: texture_depth_2d;
 @group(1) @binding(1) var mesh_depth_sampler: sampler;
 @group(1) @binding(2) var mesh_flags_texture: texture_2d<u32>;
 
+@group(2) @binding(0) var<storage, read> voxel_data: array<u32>;
+@group(2) @binding(1) var<uniform> world_dim_x: u32; // 1x world = 16384, 16x world = 262144
+
+fn wrap_voxel_x(x: i32) -> i32 {
+    if render_settings.enable_cyclic == 0u {
+        return x;
+    }
+    // Fast positive modulo for potentially-negative values
+    return ((x % i32(world_dim_x)) + i32(world_dim_x)) % i32(world_dim_x);
+}
+
 fn get_voxel_type(global_voxel_coords: vec3<i32>) -> u32 {
-    if global_voxel_coords.x < 0 || global_voxel_coords.x >= i32(WORLD_DIM_X) ||
-       global_voxel_coords.y < 0 || global_voxel_coords.y >= i32(WORLD_DIM_Y) ||
+    // Y and Z bounds are always hard clipped (world is not cyclic vertically)
+    if global_voxel_coords.y < 0 || global_voxel_coords.y >= i32(WORLD_DIM_Y) ||
        global_voxel_coords.z < 0 || global_voxel_coords.z >= i32(WORLD_DIM_Z) {
-        return AIR_TYPE; // everything outside of the world is air
+        return AIR_TYPE;
     }
 
-    let chunk_coord_x = u32(global_voxel_coords.x) / CHUNK_DIM_X;
+    // X: either cyclic wrap or hard clip
+    var voxel_x: i32;
+    if render_settings.enable_cyclic == 1u {
+        voxel_x = wrap_voxel_x(global_voxel_coords.x);
+    } else {
+        if global_voxel_coords.x < 0 || global_voxel_coords.x >= i32(world_dim_x) {
+            return AIR_TYPE;
+        }
+        voxel_x = global_voxel_coords.x;
+    }
+
+    let chunk_coord_x = u32(voxel_x) / CHUNK_DIM_X;
     let chunk_coord_y = u32(global_voxel_coords.y) / CHUNK_DIM_Y;
 
-    let local_voxel_coord_x = u32(global_voxel_coords.x) % CHUNK_DIM_X;
+    let local_voxel_coord_x = u32(voxel_x) % CHUNK_DIM_X;
     let local_voxel_coord_y = u32(global_voxel_coords.y) % CHUNK_DIM_Y;
     let local_voxel_coord_z = u32(global_voxel_coords.z);
 
@@ -371,19 +374,53 @@ fn create_camera_ray(ndc: vec2<f32>) -> Ray {
     return Ray(ray_origin_world, ray_dir_local, inv_direction);
 }
 
+// In cyclic mode we only bound-check Y and Z; X is infinite (repeating).
+// In non-cyclic mode we check all three axes.
 fn intersect_world_bounds(ray: Ray) -> BoundingBoxIntersection {
-    let world_min_bound = vec3<f32>(0.0, 0.0, 0.0);
-    let world_max_bound = vec3<f32>(f32(WORLD_DIM_X), f32(WORLD_DIM_Y), f32(WORLD_DIM_Z)) * VOXEL_SIZE;
+    let world_min_y = 0.0;
+    let world_max_y = f32(WORLD_DIM_Y) * VOXEL_SIZE;
+    let world_min_z = 0.0;
+    let world_max_z = f32(WORLD_DIM_Z) * VOXEL_SIZE;
 
-    let t_bottom = (world_min_bound - ray.origin) * ray.inv_direction;
-    let t_top = (world_max_bound - ray.origin) * ray.inv_direction;
-    let t_min_v = min(t_bottom, t_top);
-    let t_max_v = max(t_bottom, t_top);
+    if render_settings.enable_cyclic == 1u {
+        // Cyclic: only Y and Z constrain the ray extent
+        let t_bottom_y = (world_min_y - ray.origin.y) * ray.inv_direction.y;
+        let t_top_y    = (world_max_y - ray.origin.y) * ray.inv_direction.y;
+        let t_bottom_z = (world_min_z - ray.origin.z) * ray.inv_direction.z;
+        let t_top_z    = (world_max_z - ray.origin.z) * ray.inv_direction.z;
 
-    let t_min_intersect = max(t_min_v.x, max(t_min_v.y, t_min_v.z));
-    let t_max_intersect = min(t_max_v.x, min(t_max_v.y, t_max_v.z));
+        let t_min_y = min(t_bottom_y, t_top_y);
+        let t_max_y = max(t_bottom_y, t_top_y);
+        let t_min_z = min(t_bottom_z, t_top_z);
+        let t_max_z = max(t_bottom_z, t_top_z);
 
-    return BoundingBoxIntersection(t_min_intersect <= t_max_intersect, t_min_intersect, t_max_intersect);
+        let t_min_intersect = max(t_min_y, t_min_z);
+        let t_max_intersect = min(t_max_y, t_max_z);
+
+        return BoundingBoxIntersection(
+            t_min_intersect <= t_max_intersect,
+            t_min_intersect,
+            t_max_intersect,
+        );
+    } else {
+        // Non-cyclic: full AABB test
+        let world_min_bound = vec3<f32>(0.0, world_min_y, world_min_z);
+        let world_max_bound = vec3<f32>(f32(world_dim_x), world_max_y, world_max_z);
+
+        let t_bottom = (world_min_bound - ray.origin) * ray.inv_direction;
+        let t_top    = (world_max_bound - ray.origin) * ray.inv_direction;
+        let t_min_v  = min(t_bottom, t_top);
+        let t_max_v  = max(t_bottom, t_top);
+
+        let t_min_intersect = max(t_min_v.x, max(t_min_v.y, t_min_v.z));
+        let t_max_intersect = min(t_max_v.x, min(t_max_v.y, t_max_v.z));
+
+        return BoundingBoxIntersection(
+            t_min_intersect <= t_max_intersect,
+            t_min_intersect,
+            t_max_intersect,
+        );
+    }
 }
 
 fn initialize_dda(ray: Ray, start_t: f32) -> DDAState {
@@ -391,7 +428,13 @@ fn initialize_dda(ray: Ray, start_t: f32) -> DDAState {
 
     let current_ray_pos = ray.origin + ray.direction * start_t;
     state.current_voxel = vec3<i32>(floor(current_ray_pos / VOXEL_SIZE));
-    state.current_voxel = clamp(state.current_voxel, vec3<i32>(0), vec3<i32>(i32(WORLD_DIM_X)-1, i32(WORLD_DIM_Y)-1, i32(WORLD_DIM_Z)-1));
+
+    // Clamp Y and Z; X is cyclic so no clamp needed (wrap_voxel_x handles it)
+    state.current_voxel.y = clamp(state.current_voxel.y, 0, i32(WORLD_DIM_Y) - 1);
+    state.current_voxel.z = clamp(state.current_voxel.z, 0, i32(WORLD_DIM_Z) - 1);
+    if render_settings.enable_cyclic == 0u {
+        state.current_voxel.x = clamp(state.current_voxel.x, 0, i32(world_dim_x - 1));
+    }
 
     state.step_dir = sign(ray.direction);
     if (ray.direction.x == 0.0) { state.step_dir.x = 0.0; }
@@ -409,9 +452,8 @@ fn initialize_dda(ray: Ray, start_t: f32) -> DDAState {
     if (ray.direction.y == 0.0) { state.t_delta.y = 1e9; }
     if (ray.direction.z == 0.0) { state.t_delta.z = 1e9; }
 
-    let world_min_bound = vec3<f32>(0.0, 0.0, 0.0);
-    let world_max_bound = vec3<f32>(f32(WORLD_DIM_X), f32(WORLD_DIM_Y), f32(WORLD_DIM_Z)) * VOXEL_SIZE;
-    let t_bottom = (world_min_bound - ray.origin) * ray.inv_direction;
+    let world_max_bound = vec3<f32>(f32(world_dim_x), f32(WORLD_DIM_Y), f32(WORLD_DIM_Z)) * VOXEL_SIZE;
+    let t_bottom = (vec3<f32>(0.0) - ray.origin) * ray.inv_direction;
     let t_top = (world_max_bound - ray.origin) * ray.inv_direction;
     let t_min_v = min(t_bottom, t_top);
 
@@ -461,8 +503,10 @@ fn traverse_world(ray: Ray, bounds: BoundingBoxIntersection) -> TraversalResult 
             break;
         }
 
-        hit_selected_block |= selected_block.x == 1 && all(vec3<u32>(dda.current_voxel).xy == selected_block.yz);
-        hit_hovered_block |= hover_on_block.x == 1 && all(vec3<u32>(dda.current_voxel).xy == hover_on_block.yz);
+        // For hit detection, use the wrapped X coordinate
+        let wrapped_x = wrap_voxel_x(dda.current_voxel.x);
+        hit_selected_block |= selected_block.x == 1 && all(vec2<u32>(u32(wrapped_x), u32(dda.current_voxel.y)) == selected_block.yz);
+        hit_hovered_block  |= hover_on_block.x == 1 && all(vec2<u32>(u32(wrapped_x), u32(dda.current_voxel.y)) == hover_on_block.yz);
 
         let current_voxel_type = get_voxel_type(dda.current_voxel);
         if (current_voxel_type != prev_voxel_type) {
@@ -492,7 +536,7 @@ fn traverse_world(ray: Ray, bounds: BoundingBoxIntersection) -> TraversalResult 
     // After the loop, render exit face if we left the world from within a non-air block
     if (solid_color.a < 1.0 && t_hit >= bounds.t_max && prev_voxel_type != AIR_TYPE) {
         let hit_point = ray.origin + ray.direction * bounds.t_max;
-        let clamped_hit_point = clamp(hit_point, vec3<f32>(0.0), vec3<f32>(f32(WORLD_DIM_X), f32(WORLD_DIM_Y), f32(WORLD_DIM_Z)));
+        let clamped_hit_point = clamp(hit_point, vec3<f32>(0.0), vec3<f32>(f32(world_dim_x), f32(WORLD_DIM_Y), f32(WORLD_DIM_Z)));
         render_and_blend(
             prev_voxel_type, clamped_hit_point, dda.face_normal, bounds.t_max, ray.direction,
             &solid_color, &translucency_color, &depth_hit

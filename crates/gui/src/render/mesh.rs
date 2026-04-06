@@ -9,10 +9,9 @@ impl DwMeshRenderer {
     pub fn new(
         device: &wgpu::Device,
         camera_buf: &wgpu::Buffer,
-        tile_map_texture: &Texture,
+        albedo_texture: &Texture,
         hover_on_id_buf: &wgpu::Buffer,
         selected_id_buf: &wgpu::Buffer,
-        _target_format: wgpu::TextureFormat,
     ) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("DW Sprite Shader"),
@@ -85,11 +84,11 @@ impl DwMeshRenderer {
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
-                    resource: wgpu::BindingResource::TextureView(&tile_map_texture.view),
+                    resource: wgpu::BindingResource::TextureView(&albedo_texture.view),
                 },
                 wgpu::BindGroupEntry {
                     binding: 2,
-                    resource: wgpu::BindingResource::Sampler(&tile_map_texture.sampler),
+                    resource: wgpu::BindingResource::Sampler(&albedo_texture.sampler),
                 },
                 wgpu::BindGroupEntry {
                     binding: 3,
