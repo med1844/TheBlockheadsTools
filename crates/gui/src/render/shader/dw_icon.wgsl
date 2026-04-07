@@ -35,17 +35,19 @@ struct DynObjVertexInput {
 struct DynObjInstanceInput {
     @location(1) instance_pos: vec2<f32>,
     @location(2) item_type: u32,
+    @location(3) raw_id: u32,
 };
 
 struct DynObjVSOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) uv: vec2<f32>,
     @location(1) @interpolate(flat) item_type: u32,
+    @location(2) @interpolate(flat) raw_id: u32,
 };
 
 struct FragmentOutput {
     @location(0) color: vec4<f32>,
-    @builtin(frag_depth) depth: f32,
+    @location(1) id: u32,
 }
 
 @vertex
@@ -61,6 +63,7 @@ fn vs_dynamic_object_icon(model: DynObjVertexInput, instance: DynObjInstanceInpu
     out.uv = model.position + 0.5;
     out.uv.y = 1 - out.uv.y;
     out.item_type = instance.item_type;
+    out.raw_id = instance.raw_id;
 
     return out;
 }
@@ -185,5 +188,6 @@ fn fs_dynamic_object_icon(in: DynObjVSOutput) -> FragmentOutput {
 
     var output: FragmentOutput;
     output.color = vec4<f32>(corrected_color, final_color.a);
+    output.id = in.raw_id;
     return output;
 }

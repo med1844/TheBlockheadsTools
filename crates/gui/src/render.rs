@@ -36,6 +36,7 @@ pub(crate) struct GeometryBuffer {
     /// A DepthOnly-aspect view of voxel_depth, for binding as texture_2d<f32> (Float sample type).
     voxel_depth_float_view: wgpu::TextureView,
     dyn_obj_id: Texture,
+    overlay: Texture,
 }
 
 impl GeometryBuffer {
@@ -109,6 +110,12 @@ impl GeometryBuffer {
             voxel_depth_float_view,
             mesh_depth: depth_texture,
             dyn_obj_id: dyn_obj_id_texture,
+            overlay: Texture::new(
+                size,
+                device,
+                wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+                wgpu::TextureFormat::Bgra8Unorm,
+            ),
         }
     }
 
@@ -240,7 +247,6 @@ impl RenderResources {
                 &camera_buf,
                 &items_texture,
                 &tile_map_texture,
-                target_format,
             ),
             dw_sprite: sprite::DwSpriteRenderer::new(
                 device,
@@ -291,10 +297,18 @@ impl RenderResources {
 
     pub fn render_voxel_pass(&self, render_pass: &mut wgpu::RenderPass<'_>) {
         self.voxel.render(render_pass);
-        // self.dw_icon.render(render_pass, dw_buf);
-        // if show_grid {
-        //     self.grid.render(render_pass);
-        // }
+    }
+
+    pub fn render_annotation_pass(
+        &self,
+        render_pass: &mut wgpu::RenderPass<'_>,
+        dw_buf: &[DwChunkBuf],
+        show_grid: bool,
+    ) {
+        self.dw_icon.render(render_pass, dw_buf);
+        if show_grid {
+            self.grid.render(render_pass);
+        }
     }
 
     pub fn composite(&self, render_pass: &mut wgpu::RenderPass<'_>) {
@@ -561,6 +575,36 @@ impl egui_wgpu::CallbackTrait for Render3dCallback {
                 occlusion_query_set: None,
             });
             r.ssao_blur.render(&mut render_pass);
+        }
+
+        {
+            let mut render_pass = egui_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("annotation pass"),
+                color_attachments: &[
+                    Some(wgpu::RenderPassColorAttachment {
+                        view: &r.g_buffer.overlay.view,
+                        depth_slice: None,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                            store: wgpu::StoreOp::Store,
+                        },
+                    }),
+                    Some(wgpu::RenderPassColorAttachment {
+                        view: &r.g_buffer.dyn_obj_id.view,
+                        depth_slice: None,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Load,
+                            store: wgpu::StoreOp::Store,
+                        },
+                    }),
+                ],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            });
+            r.render_annotation_pass(&mut render_pass, &self.dw_chunks, self.show_grid);
         }
 
         if let Some((x, y)) = self.mouse_physical_pos {

@@ -102,7 +102,6 @@ impl DwIconRenderer {
         camera_buf: &wgpu::Buffer,
         items_texture: &Texture,
         tile_map_texture: &Texture,
-        target_format: wgpu::TextureFormat,
     ) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Dynamic Object Icon Shader"),
@@ -248,14 +247,14 @@ impl DwIconRenderer {
                 entry_point: Some("fs_dynamic_object_icon"),
                 targets: &[
                     Some(wgpu::ColorTargetState {
-                        format: target_format,
+                        format: wgpu::TextureFormat::Bgra8Unorm,
                         blend: Some(wgpu::BlendState::ALPHA_BLENDING),
                         write_mask: wgpu::ColorWrites::ALL,
                     }),
                     Some(wgpu::ColorTargetState {
                         format: ID_TEXTURE_FORMAT,
                         blend: None,
-                        write_mask: wgpu::ColorWrites::empty(),
+                        write_mask: wgpu::ColorWrites::ALL,
                     }),
                 ],
                 compilation_options: Default::default(),
@@ -265,13 +264,7 @@ impl DwIconRenderer {
                 cull_mode: None,
                 ..Default::default()
             },
-            depth_stencil: Some(wgpu::DepthStencilState {
-                format: wgpu::TextureFormat::Depth32Float,
-                depth_write_enabled: false,
-                depth_compare: wgpu::CompareFunction::Always,
-                stencil: wgpu::StencilState::default(),
-                bias: wgpu::DepthBiasState::default(),
-            }),
+            depth_stencil: None,
             multisample: wgpu::MultisampleState::default(),
             multiview: None,
             cache: None,
@@ -289,14 +282,16 @@ impl DwIconRenderer {
         render_pass.set_pipeline(&self.pipeline);
         render_pass.set_bind_group(0, &self.bind_group, &[]);
         for dw_chunk_buf in dw_buf {
-            render_pass.set_vertex_buffer(0, self.vertex_buf.slice(..));
-            render_pass.set_vertex_buffer(1, dw_chunk_buf.instance_buf.slice(..));
-            render_pass.set_index_buffer(self.index_buf.slice(..), wgpu::IndexFormat::Uint16);
-            render_pass.draw_indexed(
-                0..DwIconVertex::INDICES.len() as u32,
-                0,
-                0..dw_chunk_buf.num_instances,
-            );
+            if dw_chunk_buf.num_instances > 0 {
+                render_pass.set_vertex_buffer(0, self.vertex_buf.slice(..));
+                render_pass.set_vertex_buffer(1, dw_chunk_buf.instance_buf.slice(..));
+                render_pass.set_index_buffer(self.index_buf.slice(..), wgpu::IndexFormat::Uint16);
+                render_pass.draw_indexed(
+                    0..DwIconVertex::INDICES.len() as u32,
+                    0,
+                    0..dw_chunk_buf.num_instances,
+                );
+            }
         }
     }
 }

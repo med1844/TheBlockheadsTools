@@ -17,6 +17,10 @@
 @group(0) @binding(7) var translucency_texture: texture_2d<f32>;
 @group(0) @binding(8) var translucency_sampler: sampler;
 
+// Annotation Overlay (icons, grid)
+@group(0) @binding(9) var overlay_texture:      texture_2d<f32>;
+@group(0) @binding(10) var overlay_sampler:     sampler;
+
 struct RenderSettings {
     light_dir:          vec3<f32>,
     enable_reflect:     u32,
@@ -68,5 +72,10 @@ fn fs_composite(in: VertexOutput) -> @location(0) vec4<f32> {
     let final_rgb = occluded_solid * (1.0 - translucent.a) + translucent.rgb * translucent.a;
     let final_a   = albedo.a + translucent.a * (1.0 - albedo.a);
 
-    return vec4<f32>(final_rgb, final_a);
+    // --- Step 3: blend annotation overlay on top ---
+    let overlay = textureSample(overlay_texture, overlay_sampler, in.uv);
+    let final_color = vec3<f32>(final_rgb * (1.0 - overlay.a) + overlay.rgb * overlay.a);
+    let final_alpha = final_a + overlay.a * (1.0 - final_a);
+
+    return vec4<f32>(final_color, final_alpha);
 }
