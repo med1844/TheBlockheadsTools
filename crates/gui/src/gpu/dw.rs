@@ -54,11 +54,13 @@ impl DwIcon {
         }
     }
 
-    pub fn instance(self, id: DwChunkObjId) -> DwIconInstanceRaw {
+    pub fn instance(self, id: DwChunkObjId, coord: ChunkCoord) -> DwIconInstanceRaw {
         DwIconInstanceRaw {
             position: self.position,
             item_type: self.item_type as u32,
             raw_id: id.to_raw_id(),
+            chunk_x: coord.x(),
+            chunk_y: coord.y() as u32,
         }
     }
 }
@@ -69,11 +71,18 @@ pub struct DwIconInstanceRaw {
     pub position: [f32; 2],
     pub item_type: u32,
     pub raw_id: u32,
+    pub chunk_x: u32,
+    pub chunk_y: u32,
 }
 
 impl DwIconInstanceRaw {
-    const ATTRIBS: [wgpu::VertexAttribute; 3] =
-        wgpu::vertex_attr_array![1 => Float32x2, 2 => Uint32, 3 => Uint32];
+    const ATTRIBS: [wgpu::VertexAttribute; 5] = wgpu::vertex_attr_array![
+        1 => Float32x2,
+        2 => Uint32,
+        3 => Uint32,
+        4 => Uint32,
+        5 => Uint32,
+    ];
 
     pub fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
         wgpu::VertexBufferLayout {
@@ -385,7 +394,7 @@ impl DwChunkBuf {
                     DwObj::Icon(dw_icon) => {
                         builder
                             .icon_instances
-                            .push(dw_icon.instance(DwChunkObjId::new(obj_type, index)));
+                            .push(dw_icon.instance(DwChunkObjId::new(obj_type, index), coord));
                     }
                     DwObj::Sprite(dw_sprite) => {
                         let (vertices, indices) =

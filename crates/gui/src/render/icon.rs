@@ -102,6 +102,8 @@ impl DwIconRenderer {
         camera_buf: &wgpu::Buffer,
         items_texture: &Texture,
         tile_map_texture: &Texture,
+        hover_on_chunk_buf: &wgpu::Buffer,
+        hover_on_id_buf: &wgpu::Buffer,
     ) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Dynamic Object Icon Shader"),
@@ -136,7 +138,7 @@ impl DwIconRenderer {
                 // Camera Uniform
                 wgpu::BindGroupLayoutEntry {
                     binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX,
+                    visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform,
                         has_dynamic_offset: false,
@@ -191,6 +193,28 @@ impl DwIconRenderer {
                     },
                     count: None,
                 },
+                // Hover on chunk coord
+                wgpu::BindGroupLayoutEntry {
+                    binding: 6,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                // Hover on id
+                wgpu::BindGroupLayoutEntry {
+                    binding: 7,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
             ],
             label: Some("dynamic_object_icon_bind_group_layout"),
         });
@@ -221,6 +245,14 @@ impl DwIconRenderer {
                 wgpu::BindGroupEntry {
                     binding: 5,
                     resource: uv_at_face_buf.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 6,
+                    resource: hover_on_chunk_buf.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 7,
+                    resource: hover_on_id_buf.as_entire_binding(),
                 },
             ],
             label: Some("dynamic_object_icon_bind_group"),

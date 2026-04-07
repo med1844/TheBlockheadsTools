@@ -247,6 +247,8 @@ impl RenderResources {
                 &camera_buf,
                 &items_texture,
                 &tile_map_texture,
+                &hover_on_chunk_buf,
+                &hover_on_id_buf,
             ),
             dw_sprite: sprite::DwSpriteRenderer::new(
                 device,

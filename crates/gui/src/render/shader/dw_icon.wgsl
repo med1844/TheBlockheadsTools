@@ -5,12 +5,26 @@ struct CameraUniform {
     world_offset: vec4<f32>,
 };
 
+struct CoordUniform {
+    is_some: u32,
+    x: u32,
+    y: u32,
+    _padding: u32,
+};
+
+struct IdUniform {
+    is_some: u32,
+    id: u32,
+};
+
 @group(0) @binding(0) var<uniform> camera: CameraUniform;
 @group(0) @binding(1) var items_texture: texture_2d<f32>;
 @group(0) @binding(2) var items_sampler: sampler;
 @group(0) @binding(3) var tilemap_texture: texture_2d<f32>;
 @group(0) @binding(4) var tilemap_sampler: sampler;
 @group(0) @binding(5) var<storage, read> voxel_uv_atlas: array<u32>;
+@group(0) @binding(6) var<uniform> hover_on_chunk: CoordUniform;
+@group(0) @binding(7) var<uniform> hover_on_id: IdUniform;
 
 // --- Item Texture Atlas Constants ---
 const ITEMS_ATLAS_DIM_PX: vec2<f32> = vec2<f32>(512.0, 256.0);
@@ -36,6 +50,8 @@ struct DynObjInstanceInput {
     @location(1) instance_pos: vec2<f32>,
     @location(2) item_type: u32,
     @location(3) raw_id: u32,
+    @location(4) chunk_x: u32,
+    @location(5) chunk_y: u32,
 };
 
 struct DynObjVSOutput {
@@ -43,6 +59,8 @@ struct DynObjVSOutput {
     @location(0) uv: vec2<f32>,
     @location(1) @interpolate(flat) item_type: u32,
     @location(2) @interpolate(flat) raw_id: u32,
+    @location(3) @interpolate(flat) chunk_x: u32,
+    @location(4) @interpolate(flat) chunk_y: u32,
 };
 
 struct FragmentOutput {
@@ -64,6 +82,8 @@ fn vs_dynamic_object_icon(model: DynObjVertexInput, instance: DynObjInstanceInpu
     out.uv.y = 1 - out.uv.y;
     out.item_type = instance.item_type;
     out.raw_id = instance.raw_id;
+    out.chunk_x = instance.chunk_x;
+    out.chunk_y = instance.chunk_y;
 
     return out;
 }
@@ -151,12 +171,12 @@ fn render_block_icon(uv: vec2<f32>, block_type_id: u32) -> vec4<f32> {
 
 @fragment
 fn fs_dynamic_object_icon(in: DynObjVSOutput) -> FragmentOutput {
-    var final_color: vec4<f32>;
+    var color: vec4<f32>;
 
     if (in.item_type >= 1024u) {
         // It's a block, render it as a 2.5D icon
         let block_type_id = in.item_type - 1024u;
-        final_color = render_block_icon(in.uv, block_type_id);
+        color = render_block_icon(in.uv, block_type_id);
 
     } else {
         // It's a regular item, use the Items texture
@@ -166,7 +186,7 @@ fn fs_dynamic_object_icon(in: DynObjVSOutput) -> FragmentOutput {
         let uv_min_tile = vec2<f32>(tile_x * ITEMS_TILE_SIZE_UV.x, tile_y * ITEMS_TILE_SIZE_UV.y);
 
         let final_atlas_uv = uv_min_tile + in.uv * ITEMS_TILE_SIZE_UV;
-        final_color = textureSampleLevel(items_texture, items_sampler, final_atlas_uv, 0.0);
+        color = textureSampleLevel(items_texture, items_sampler, final_atlas_uv, 0.0);
     }
 
     // Add outline
@@ -180,14 +200,30 @@ fn fs_dynamic_object_icon(in: DynObjVSOutput) -> FragmentOutput {
 
         // Simple blend, overlaying the outline
         // You might want a more sophisticated blend mode depending on desired effect
-        final_color = mix(final_color, outline_color, outline_color.a);
+        color = mix(color, outline_color, outline_color.a);
     }
 
     let gamma = 2.2;
-    let corrected_color = pow(final_color.rgb, vec3<f32>(1.0 / gamma));
+    let corrected_color = pow(color.rgb, vec3<f32>(1.0 / gamma));
+
+    // Highlight when both chunk coord and object id match the hovered target.
+    let chunk_matches = hover_on_chunk.is_some != 0u
+        && in.chunk_x == hover_on_chunk.x
+        && in.chunk_y == hover_on_chunk.y;
+    let id_matches = hover_on_id.is_some != 0u
+        && in.raw_id == hover_on_id.id;
+    let highlighted = chunk_matches && id_matches;
+
+    var final_color: vec3<f32>;
+    if highlighted {
+        // Brighten and tint towards white to indicate hover.
+        final_color = mix(corrected_color, vec3<f32>(1.0), 0.35);
+    } else {
+        final_color = corrected_color;
+    }
 
     var output: FragmentOutput;
-    output.color = vec4<f32>(corrected_color, final_color.a);
+    output.color = vec4<f32>(final_color, color.a);
     output.id = in.raw_id;
     return output;
 }

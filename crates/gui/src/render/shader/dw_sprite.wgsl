@@ -89,7 +89,7 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     var output: FragmentOutput;
     let depth = in.clip_position.z;
     output.depth = depth;
-    output.color = vec4<f32>(final_color, 1.0);
+    output.color = vec4<f32>(final_color, color.a);
     // World-space forward normal (Z is 1.0), with 0.0 specular intensity.
     output.normal_spec = vec4<f32>(0.0, 0.0, 1.0, 0.0);
     output.id = in.id;
