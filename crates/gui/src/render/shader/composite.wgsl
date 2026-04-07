@@ -74,8 +74,14 @@ fn fs_composite(in: VertexOutput) -> @location(0) vec4<f32> {
 
     // --- Step 3: blend annotation overlay on top ---
     let overlay = textureSample(overlay_texture, overlay_sampler, in.uv);
-    let final_color = vec3<f32>(final_rgb * (1.0 - overlay.a) + overlay.rgb * overlay.a);
-    let final_alpha = final_a + overlay.a * (1.0 - final_a);
+    let blended_rgb = vec3<f32>(final_rgb * (1.0 - overlay.a) + overlay.rgb * overlay.a);
+    let blended_a   = final_a + overlay.a * (1.0 - final_a);
 
-    return vec4<f32>(final_color, final_alpha);
+    // --- Step 4: gamma correction (single canonical location) ---
+    // All upstream shaders output linear-space colors. We apply γ=2.2 here
+    // before writing to the sRGB/Bgra8Unorm surface.
+    let gamma = 2.2;
+    let corrected = pow(blended_rgb, vec3<f32>(1.0 / gamma));
+
+    return vec4<f32>(corrected, blended_a);
 }

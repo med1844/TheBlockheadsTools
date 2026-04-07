@@ -203,9 +203,6 @@ fn fs_dynamic_object_icon(in: DynObjVSOutput) -> FragmentOutput {
         color = mix(color, outline_color, outline_color.a);
     }
 
-    let gamma = 2.2;
-    let corrected_color = pow(color.rgb, vec3<f32>(1.0 / gamma));
-
     // Highlight when both chunk coord and object id match the hovered target.
     let chunk_matches = hover_on_chunk.is_some != 0u
         && in.chunk_x == hover_on_chunk.x
@@ -217,9 +214,9 @@ fn fs_dynamic_object_icon(in: DynObjVSOutput) -> FragmentOutput {
     var final_color: vec3<f32>;
     if highlighted {
         // Brighten and tint towards white to indicate hover.
-        final_color = mix(corrected_color, vec3<f32>(1.0), 0.35);
+        final_color = mix(color.rgb, vec3<f32>(1.0), 0.35);
     } else {
-        final_color = corrected_color;
+        final_color = color.rgb;
     }
 
     var output: FragmentOutput;

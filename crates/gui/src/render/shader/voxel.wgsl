@@ -579,16 +579,11 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     var solid = traversal.solid_color;
     solid = apply_block_highlights(solid, traversal.hit_selected_block, traversal.hit_hovered_block);
 
-    // eframe uses Bgra8Unorm so we have to manually do gamma correction
-    let gamma = 2.2;
-    let corrected_solid        = pow(solid.rgb, vec3<f32>(1.0 / gamma));
-    let corrected_translucency = pow(traversal.translucency_color.rgb, vec3<f32>(1.0 / gamma));
-
     var output: FragmentOutput;
-    output.translucency = vec4<f32>(corrected_translucency, traversal.translucency_color.a);
+    output.translucency = vec4<f32>(traversal.translucency_color.rgb, traversal.translucency_color.a);
 
     if (traversal.depth_hit.is_set) {
-        output.albedo      = vec4<f32>(corrected_solid, 1.0);
+        output.albedo      = vec4<f32>(solid.rgb, 1.0);
         output.normal_spec = vec4<f32>(traversal.depth_hit.normal, traversal.depth_hit.specular);
         output.depth       = calculate_depth(traversal.depth_hit.surface.distance, ray);
     } else {
