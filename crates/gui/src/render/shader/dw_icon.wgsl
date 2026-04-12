@@ -154,7 +154,8 @@ fn render_block_icon(uv: vec2<f32>, block_type_id: u32) -> vec4<f32> {
     let tile_y = f32(tile_index / VOXEL_TILES_PER_ROW);
     let uv_min_tile = vec2<f32>(tile_x * VOXEL_TILE_SIZE_UV, tile_y * VOXEL_TILE_SIZE_UV);
 
-    let final_atlas_uv = uv_min_tile + face_uv * VOXEL_TILE_SIZE_UV;
+    let clenched_uv = face_uv * 0.998 + 0.001; // inset by 0.1% to avoid atlas bleeding
+    let final_atlas_uv = uv_min_tile + clenched_uv * VOXEL_TILE_SIZE_UV;
     var surface_color = textureSampleLevel(tilemap_texture, tilemap_sampler, final_atlas_uv, 0.0);
 
     // Apply lighting similar to voxel.wgsl
@@ -185,7 +186,8 @@ fn fs_dynamic_object_icon(in: DynObjVSOutput) -> FragmentOutput {
         let tile_y = f32(tile_index / ITEMS_TILES_PER_ROW);
         let uv_min_tile = vec2<f32>(tile_x * ITEMS_TILE_SIZE_UV.x, tile_y * ITEMS_TILE_SIZE_UV.y);
 
-        let final_atlas_uv = uv_min_tile + in.uv * ITEMS_TILE_SIZE_UV;
+        let clenched_uv = in.uv * 0.998 + 0.001; // inset by 0.1% to avoid atlas bleeding
+        let final_atlas_uv = uv_min_tile + clenched_uv * ITEMS_TILE_SIZE_UV;
         color = textureSampleLevel(items_texture, items_sampler, final_atlas_uv, 0.0);
     }
 

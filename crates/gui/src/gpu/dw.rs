@@ -116,10 +116,10 @@ impl DwSprite {
         let [sprite_width, sprite_height] = sprite_size;
         let [global_center_x, global_center_y] = global_center_pos;
 
-        let u_min = u_tile as f32 * DwSprite::TILE_SIZE;
-        let v_min = v_tile as f32 * DwSprite::TILE_SIZE;
-        let u_max = (u_tile as f32 + sprite_width) * DwSprite::TILE_SIZE;
-        let v_max = (v_tile as f32 + sprite_height) * DwSprite::TILE_SIZE;
+        let u_min = (u_tile as f32 + 0.001) * DwSprite::TILE_SIZE;
+        let v_min = (v_tile as f32 + 0.001) * DwSprite::TILE_SIZE;
+        let u_max = (u_tile as f32 + sprite_width - 0.001) * DwSprite::TILE_SIZE;
+        let v_max = (v_tile as f32 + sprite_height - 0.001) * DwSprite::TILE_SIZE;
 
         let min_x = global_center_x - local_center_x_offset;
         let min_y = global_center_y - local_center_y_offset;
