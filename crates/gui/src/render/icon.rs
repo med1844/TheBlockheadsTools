@@ -102,8 +102,8 @@ impl DwIconRenderer {
         camera_buf: &wgpu::Buffer,
         items_texture: &Texture,
         tile_map_texture: &Texture,
-        hover_on_chunk_buf: &wgpu::Buffer,
         hover_on_id_buf: &wgpu::Buffer,
+        selected_id_buf: &wgpu::Buffer,
     ) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Dynamic Object Icon Shader"),
@@ -193,7 +193,7 @@ impl DwIconRenderer {
                     },
                     count: None,
                 },
-                // Hover on chunk coord
+                // Hover on id
                 wgpu::BindGroupLayoutEntry {
                     binding: 6,
                     visibility: wgpu::ShaderStages::FRAGMENT,
@@ -204,7 +204,7 @@ impl DwIconRenderer {
                     },
                     count: None,
                 },
-                // Hover on id
+                // Selected id
                 wgpu::BindGroupLayoutEntry {
                     binding: 7,
                     visibility: wgpu::ShaderStages::FRAGMENT,
@@ -248,11 +248,11 @@ impl DwIconRenderer {
                 },
                 wgpu::BindGroupEntry {
                     binding: 6,
-                    resource: hover_on_chunk_buf.as_entire_binding(),
+                    resource: hover_on_id_buf.as_entire_binding(),
                 },
                 wgpu::BindGroupEntry {
                     binding: 7,
-                    resource: hover_on_id_buf.as_entire_binding(),
+                    resource: selected_id_buf.as_entire_binding(),
                 },
             ],
             label: Some("dynamic_object_icon_bind_group"),

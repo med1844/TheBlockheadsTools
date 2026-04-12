@@ -5,23 +5,18 @@ struct CameraUniform {
     world_offset: vec4<f32>,
 };
 
-struct CoordUniform {
-    is_some: u32,
-    x: u32,
-    y: u32,
-    _padding: u32,
-};
-
 struct IdUniform {
     is_some: u32,
     id: u32,
+    x: u32,
+    y: u32,
 };
 
 @group(0) @binding(0) var<uniform> camera: CameraUniform;
 @group(0) @binding(1) var tilemap_texture: texture_2d<f32>;
 @group(0) @binding(2) var tilemap_sampler: sampler;
-@group(0) @binding(3) var<uniform> hover_on_chunk: CoordUniform;
-@group(0) @binding(4) var<uniform> hover_on_id: IdUniform;
+@group(0) @binding(3) var<uniform> hover_on_id: IdUniform;
+@group(0) @binding(4) var<uniform> selected_id: IdUniform;
 
 struct VertexInput {
     @location(0) @interpolate(flat) id: u32,
@@ -68,19 +63,24 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     }
 
     // Highlight when both chunk coord and object id match the hovered target.
-    let chunk_matches = hover_on_chunk.is_some != 0u
-        && in.chunk_x == hover_on_chunk.x
-        && in.chunk_y == hover_on_chunk.y;
-    let id_matches = hover_on_id.is_some != 0u
+    let hovered = hover_on_id.is_some != 0u
+        && in.chunk_x == hover_on_id.x
+        && in.chunk_y == hover_on_id.y
         && in.id == hover_on_id.id;
-    let highlighted = chunk_matches && id_matches;
 
-    var final_color: vec3<f32>;
-    if highlighted {
+    var final_color: vec3<f32> = color.rgb;
+    if (hovered) {
         // Brighten and tint towards white to indicate hover.
-        final_color = mix(color.rgb, vec3<f32>(1.0), 0.35);
-    } else {
-        final_color = color.rgb;
+        final_color = mix(final_color, vec3<f32>(1.0), 0.25);
+    }
+
+    let selected = selected_id.is_some != 0u
+        && in.chunk_x == selected_id.x
+        && in.chunk_y == selected_id.y
+        && in.id == selected_id.id;
+
+    if (selected) {
+        final_color = mix(final_color, vec3<f32>(1.0, 1.0, 0.0), 0.15);
     }
 
     var output: FragmentOutput;

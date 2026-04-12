@@ -5,16 +5,11 @@ struct CameraUniform {
     world_offset: vec4<f32>,
 };
 
-struct CoordUniform {
-    is_some: u32,
-    x: u32,
-    y: u32,
-    _padding: u32,
-};
-
 struct IdUniform {
     is_some: u32,
     id: u32,
+    x: u32,
+    y: u32,
 };
 
 @group(0) @binding(0) var<uniform> camera: CameraUniform;
@@ -23,8 +18,8 @@ struct IdUniform {
 @group(0) @binding(3) var tilemap_texture: texture_2d<f32>;
 @group(0) @binding(4) var tilemap_sampler: sampler;
 @group(0) @binding(5) var<storage, read> voxel_uv_atlas: array<u32>;
-@group(0) @binding(6) var<uniform> hover_on_chunk: CoordUniform;
-@group(0) @binding(7) var<uniform> hover_on_id: IdUniform;
+@group(0) @binding(6) var<uniform> hover_on_id: IdUniform;
+@group(0) @binding(7) var<uniform> selected_id: IdUniform;
 
 // --- Item Texture Atlas Constants ---
 const ITEMS_ATLAS_DIM_PX: vec2<f32> = vec2<f32>(512.0, 256.0);
@@ -49,7 +44,7 @@ struct DynObjVertexInput {
 struct DynObjInstanceInput {
     @location(1) instance_pos: vec2<f32>,
     @location(2) item_type: u32,
-    @location(3) raw_id: u32,
+    @location(3) id: u32,
     @location(4) chunk_x: u32,
     @location(5) chunk_y: u32,
 };
@@ -58,7 +53,7 @@ struct DynObjVSOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) uv: vec2<f32>,
     @location(1) @interpolate(flat) item_type: u32,
-    @location(2) @interpolate(flat) raw_id: u32,
+    @location(2) @interpolate(flat) id: u32,
     @location(3) @interpolate(flat) chunk_x: u32,
     @location(4) @interpolate(flat) chunk_y: u32,
 };
@@ -81,7 +76,7 @@ fn vs_dynamic_object_icon(model: DynObjVertexInput, instance: DynObjInstanceInpu
     out.uv = model.position + 0.5;
     out.uv.y = 1 - out.uv.y;
     out.item_type = instance.item_type;
-    out.raw_id = instance.raw_id;
+    out.id = instance.id;
     out.chunk_x = instance.chunk_x;
     out.chunk_y = instance.chunk_y;
 
@@ -205,24 +200,27 @@ fn fs_dynamic_object_icon(in: DynObjVSOutput) -> FragmentOutput {
         color = mix(color, outline_color, outline_color.a);
     }
 
-    // Highlight when both chunk coord and object id match the hovered target.
-    let chunk_matches = hover_on_chunk.is_some != 0u
-        && in.chunk_x == hover_on_chunk.x
-        && in.chunk_y == hover_on_chunk.y;
-    let id_matches = hover_on_id.is_some != 0u
-        && in.raw_id == hover_on_id.id;
-    let highlighted = chunk_matches && id_matches;
+    let hovered = hover_on_id.is_some != 0u
+        && in.chunk_x == hover_on_id.x
+        && in.chunk_y == hover_on_id.y
+        && in.id == hover_on_id.id;
 
-    var final_color: vec3<f32>;
-    if highlighted {
-        // Brighten and tint towards white to indicate hover.
-        final_color = mix(color.rgb, vec3<f32>(1.0), 0.35);
-    } else {
-        final_color = color.rgb;
+    var final_color: vec3<f32> = color.rgb;
+    if (hovered) {
+        final_color = mix(final_color, vec3<f32>(1.0), 0.15);
+    }
+
+    let selected = selected_id.is_some != 0u
+        && in.chunk_x == selected_id.x
+        && in.chunk_y == selected_id.y
+        && in.id == selected_id.id;
+
+    if (selected) {
+        final_color = mix(final_color, vec3<f32>(1.0, 1.0, 0.0), 0.25);
     }
 
     var output: FragmentOutput;
     output.color = vec4<f32>(final_color, color.a);
-    output.id = in.raw_id;
+    output.id = in.id;
     return output;
 }

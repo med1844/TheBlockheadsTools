@@ -1,7 +1,7 @@
 use eframe::wgpu::{self, util::DeviceExt};
 use the_blockheads_tools_lib::game::coord::{BlockCoord, ChunkCoord};
 
-pub(crate) trait Coord {
+pub trait Coord {
     fn x_u32(&self) -> u32;
     fn y_u32(&self) -> u32;
 }
@@ -72,16 +72,6 @@ impl<T: Coord> GpuCoord<T> {
 impl<T: Copy> GpuCoord<T> {
     pub fn coord(&self) -> Option<T> {
         self.coord
-    }
-}
-
-impl<T: Eq> GpuCoord<T> {
-    pub fn toggle(&mut self, new_coord: Option<T>) {
-        if new_coord == self.coord {
-            self.coord = None;
-        } else {
-            self.coord = new_coord;
-        }
     }
 }
 

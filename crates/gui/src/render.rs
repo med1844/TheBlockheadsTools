@@ -25,7 +25,7 @@ pub(crate) enum ResizeOutcome {
 pub(crate) struct GeometryBuffer {
     size: (u32, u32),
     albedo: Texture,
-    /// Semi-transparent voxel pixels (alpha < 1.0) accumulated during ray marching.
+    // Semi-transparent voxel pixels (alpha < 1.0) accumulated during ray marching.
     translucency: Texture,
     normal_spec: Texture,
     ssao_raw: Texture,
@@ -33,7 +33,7 @@ pub(crate) struct GeometryBuffer {
     // transparent voxels needs depth texture of meshes to be obscured correctly during ray marching
     mesh_depth: Texture,
     voxel_depth: Texture,
-    /// A DepthOnly-aspect view of voxel_depth, for binding as texture_2d<f32> (Float sample type).
+    // A DepthOnly-aspect view of voxel_depth, for binding as texture_2d<f32> (Float sample type).
     voxel_depth_float_view: wgpu::TextureView,
     dyn_obj_id: Texture,
     overlay: Texture,
@@ -142,10 +142,10 @@ mod voxel;
 
 pub struct RenderResources {
     camera_buf: wgpu::Buffer,
-    selected_block_buf: wgpu::Buffer,
     hover_on_block_buf: wgpu::Buffer,
-    hover_on_chunk_buf: wgpu::Buffer, // for DW highlighting as the DwChunkObjId has no chunk coords
+    selected_block_buf: wgpu::Buffer,
     hover_on_id_buf: wgpu::Buffer,
+    selected_id_buf: wgpu::Buffer,
 
     g_buffer: GeometryBuffer,
 
@@ -175,7 +175,6 @@ impl RenderResources {
         voxel_buf: wgpu::Buffer,
         selected_block_buf: wgpu::Buffer,
         hover_on_block_buf: wgpu::Buffer,
-        hover_on_chunk_buf: wgpu::Buffer,
         hover_on_dyn_obj_id: Arc<Mutex<Option<DwChunkObjId>>>,
     ) -> Self {
         let device = &state.device;
@@ -220,12 +219,12 @@ impl RenderResources {
             target_format,
             &render_settings_buf,
         );
-        let hover_on_id_buf = {
-            let hover_on_id_uniform: DwChunkObjIdUniform = {
-                let guard = hover_on_dyn_obj_id.lock().expect("should lock");
-                guard.as_ref().into()
-            };
-            hover_on_id_uniform.create_buffer(device)
+        let (hover_on_id_buf, selected_id_buf) = {
+            let id_uniform = DwChunkObjIdUniform::default();
+            (
+                id_uniform.create_buffer(device),
+                id_uniform.create_buffer(device),
+            )
         };
 
         Self {
@@ -247,15 +246,15 @@ impl RenderResources {
                 &camera_buf,
                 &items_texture,
                 &tile_map_texture,
-                &hover_on_chunk_buf,
                 &hover_on_id_buf,
+                &selected_id_buf,
             ),
             dw_sprite: sprite::DwSpriteRenderer::new(
                 device,
                 &camera_buf,
                 &tile_map_texture,
-                &hover_on_chunk_buf,
                 &hover_on_id_buf,
+                &selected_id_buf,
                 target_format,
             ),
             grid: grid::GridRenderer::new(device, &camera_buf, target_format),
@@ -266,8 +265,8 @@ impl RenderResources {
             camera_buf,
             selected_block_buf,
             hover_on_block_buf,
-            hover_on_chunk_buf,
             hover_on_id_buf,
+            selected_id_buf,
 
             g_buffer,
 
@@ -388,8 +387,8 @@ pub struct Render3dCallback {
     pub show_grid: bool,
     pub selected_block_coord_uniform: GpuCoordUniform,
     pub hover_on_block_coord_uniform: GpuCoordUniform,
-    pub hover_on_chunk_coord_uniform: GpuCoordUniform,
     pub hover_on_id_uniform: DwChunkObjIdUniform,
+    pub selected_id_uniform: DwChunkObjIdUniform,
     pub mouse_physical_pos: Option<(f32, f32)>,
     pub world_viewport_rect: egui::Rect,
     pub render_settings: RenderSettings,
@@ -425,14 +424,14 @@ impl egui_wgpu::CallbackTrait for Render3dCallback {
             bytemuck::cast_slice(&[self.hover_on_block_coord_uniform]),
         );
         queue.write_buffer(
-            &r.hover_on_chunk_buf,
-            0,
-            bytemuck::cast_slice(&[self.hover_on_chunk_coord_uniform]),
-        );
-        queue.write_buffer(
             &r.hover_on_id_buf,
             0,
             bytemuck::cast_slice(&[self.hover_on_id_uniform]),
+        );
+        queue.write_buffer(
+            &r.selected_id_buf,
+            0,
+            bytemuck::cast_slice(&[self.selected_id_uniform]),
         );
         queue.write_buffer(
             &r.render_settings_buf,

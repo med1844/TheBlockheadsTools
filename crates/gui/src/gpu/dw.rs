@@ -1,3 +1,4 @@
+use super::coord::Coord;
 use eframe::wgpu::{self, util::DeviceExt};
 use std::collections::HashMap;
 use the_blockheads_tools_lib::game::{
@@ -275,7 +276,7 @@ impl<V, I> MeshAggregator<V, I> {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct DwChunkObjId {
     pub obj_type: DynamicObjectType,
     pub index: usize,
@@ -316,12 +317,20 @@ impl DwChunkObjId {
     }
 }
 
-impl From<Option<&DwChunkObjId>> for DwChunkObjIdUniform {
-    fn from(value: Option<&DwChunkObjId>) -> Self {
+impl Default for DwChunkObjIdUniform {
+    fn default() -> Self {
+        Self([0; 4])
+    }
+}
+
+impl From<Option<(DwChunkObjId, ChunkCoord)>> for DwChunkObjIdUniform {
+    fn from(value: Option<(DwChunkObjId, ChunkCoord)>) -> Self {
         let mut uniform = [0; 4];
-        if let Some(id) = value {
+        if let Some((id, chunk_coord)) = value {
             uniform[0] = 1;
             uniform[1] = id.to_raw_id();
+            uniform[2] = chunk_coord.x_u32();
+            uniform[3] = chunk_coord.y_u32();
         }
         Self(uniform)
     }

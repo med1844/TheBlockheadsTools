@@ -10,8 +10,8 @@ impl DwSpriteRenderer {
         device: &wgpu::Device,
         camera_buf: &wgpu::Buffer,
         tile_map_texture: &Texture,
-        hover_on_chunk_buf: &wgpu::Buffer,
         hover_on_id_buf: &wgpu::Buffer,
+        selected_id_buf: &wgpu::Buffer,
         target_format: wgpu::TextureFormat,
     ) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -51,7 +51,7 @@ impl DwSpriteRenderer {
                     ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                     count: None,
                 },
-                // Hover on chunk coord
+                // Hover on id
                 wgpu::BindGroupLayoutEntry {
                     binding: 3,
                     visibility: wgpu::ShaderStages::FRAGMENT,
@@ -62,7 +62,7 @@ impl DwSpriteRenderer {
                     },
                     count: None,
                 },
-                // Hover on id
+                // Selected id
                 wgpu::BindGroupLayoutEntry {
                     binding: 4,
                     visibility: wgpu::ShaderStages::FRAGMENT,
@@ -93,11 +93,11 @@ impl DwSpriteRenderer {
                 },
                 wgpu::BindGroupEntry {
                     binding: 3,
-                    resource: hover_on_chunk_buf.as_entire_binding(),
+                    resource: hover_on_id_buf.as_entire_binding(),
                 },
                 wgpu::BindGroupEntry {
                     binding: 4,
-                    resource: hover_on_id_buf.as_entire_binding(),
+                    resource: selected_id_buf.as_entire_binding(),
                 },
             ],
             label: Some("dw_bind_group"),

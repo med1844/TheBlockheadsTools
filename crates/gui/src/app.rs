@@ -85,7 +85,7 @@ impl FileReader {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum InteractionTarget {
     Block(BlockCoord),
     DynamicObject {
@@ -103,7 +103,6 @@ struct InteractionState {
 
     selected_block_gpu: GpuCoord<BlockCoord>,
     hover_on_block_gpu: GpuCoord<BlockCoord>,
-    hover_on_chunk_gpu: GpuCoord<ChunkCoord>,
 }
 
 impl Default for InteractionState {
@@ -115,7 +114,6 @@ impl Default for InteractionState {
             hover_on_dyn_obj_id: Arc::new(Mutex::new(None)),
             selected_block_gpu: GpuCoord::default(),
             hover_on_block_gpu: GpuCoord::default(),
-            hover_on_chunk_gpu: GpuCoord::default(),
         }
     }
 }
@@ -124,29 +122,29 @@ impl InteractionState {
     fn set_hover_on_obj(&mut self, chunk_coord: ChunkCoord, id: DwChunkObjId) {
         self.hover = Some(InteractionTarget::DynamicObject { chunk_coord, id });
         self.hover_on_block_gpu.update(None);
-        self.hover_on_chunk_gpu.update(Some(chunk_coord));
     }
 
     fn set_hover_on_block(&mut self, block_coord: BlockCoord) {
         self.hover = Some(InteractionTarget::Block(block_coord));
         self.hover_on_block_gpu.update(Some(block_coord));
-        self.hover_on_chunk_gpu.update(Some(block_coord.into()));
     }
 
     fn clear_hover(&mut self) {
         self.hover = None;
         self.hover_on_block_gpu.update(None);
-        self.hover_on_chunk_gpu.update(None);
     }
 
     fn copy_hover_to_select(&mut self, world_db: Option<&WorldDb>) {
-        self.select = self.hover;
+        self.select = match self.select == self.hover {
+            true => None,
+            false => self.hover,
+        };
         if let Some(InteractionTarget::Block(block_coord)) = self.select
             && let Some(world_db) = world_db
             && let Some(compressed_chunk) = world_db.chunks.chunk_at(block_coord)
             && let Ok(chunk) = compressed_chunk.decompress()
         {
-            self.selected_block_gpu.toggle(Some(block_coord));
+            self.selected_block_gpu.update(Some(block_coord));
             self.selected_block_chunk = Some(chunk);
         } else {
             self.selected_block_gpu.update(None);
@@ -156,7 +154,18 @@ impl InteractionState {
 
     fn hover_on_id_uniform(&self) -> DwChunkObjIdUniform {
         match self.hover {
-            Some(InteractionTarget::DynamicObject { id, .. }) => Some(&id).into(),
+            Some(InteractionTarget::DynamicObject { id, chunk_coord }) => {
+                Some((id, chunk_coord)).into()
+            }
+            _ => None.into(),
+        }
+    }
+
+    fn selected_id_uniform(&self) -> DwChunkObjIdUniform {
+        match self.select {
+            Some(InteractionTarget::DynamicObject { id, chunk_coord }) => {
+                Some((id, chunk_coord)).into()
+            }
             _ => None.into(),
         }
     }
@@ -215,10 +224,6 @@ impl EditorApp {
                 .create_buffer(device),
             interaction_state
                 .hover_on_block_gpu
-                .uniform()
-                .create_buffer(device),
-            interaction_state
-                .hover_on_chunk_gpu
                 .uniform()
                 .create_buffer(device),
             interaction_state.hover_on_dyn_obj_id.clone(),
@@ -601,8 +606,6 @@ impl EditorApp {
             }
         }
 
-        let hover_on_id_uniform = self.interaction_state.hover_on_id_uniform();
-
         ui.painter().add(egui_wgpu::Callback::new_paint_callback(
             rect,
             Render3dCallback {
@@ -611,8 +614,8 @@ impl EditorApp {
                 show_grid: self.show_grid,
                 selected_block_coord_uniform: self.interaction_state.selected_block_gpu.uniform(),
                 hover_on_block_coord_uniform: self.interaction_state.hover_on_block_gpu.uniform(),
-                hover_on_chunk_coord_uniform: self.interaction_state.hover_on_chunk_gpu.uniform(),
-                hover_on_id_uniform,
+                hover_on_id_uniform: self.interaction_state.hover_on_id_uniform(),
+                selected_id_uniform: self.interaction_state.selected_id_uniform(),
                 mouse_physical_pos: self.mouse_pos,
                 world_viewport_rect: self.world_viewport_rect,
                 render_settings: self.render_settings,

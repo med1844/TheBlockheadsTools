@@ -309,14 +309,14 @@ fn apply_block_highlights(base_color: vec4<f32>, is_selected: bool, is_hovered: 
     var final_color = base_color;
 
     if (is_selected) {
-        let highlight_color = vec4<f32>(1.0, 1.0, 1.0, 0.1);
+        let highlight_color = vec4<f32>(1.0, 1.0, 0.0, 0.15);
         let final_rgb = mix(final_color.rgb, highlight_color.rgb, highlight_color.a);
         let final_a = highlight_color.a + final_color.a * (1.0 - highlight_color.a);
         final_color = vec4<f32>(final_rgb, final_a);
     }
 
     if (is_hovered) {
-        let highlight_color = vec4<f32>(0.0, 0.0, 1.0, 0.1);
+        let highlight_color = vec4<f32>(1.0, 1.0, 1.0, 0.15);
         let final_rgb = mix(final_color.rgb, highlight_color.rgb, highlight_color.a);
         let final_a = highlight_color.a + final_color.a * (1.0 - highlight_color.a);
         final_color = vec4<f32>(final_rgb, final_a);
