@@ -3,7 +3,7 @@ use super::{
     fps_counter::FpsCounter,
     gpu::{
         Camera, GpuCoord, RenderSettings,
-        dw::{DwBuf, DwChunkObjId},
+        dw::{DwBuf, DwChunkObjId, DwChunkObjIdUniform},
         voxel_util,
     },
     render::{GeometryBuffer, Render3dCallback, RenderResources},
@@ -85,6 +85,83 @@ impl FileReader {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+enum InteractionTarget {
+    Block(BlockCoord),
+    DynamicObject {
+        chunk_coord: ChunkCoord,
+        id: DwChunkObjId,
+    },
+}
+
+struct InteractionState {
+    hover: Option<InteractionTarget>,
+    select: Option<InteractionTarget>,
+
+    selected_block_chunk: Option<Chunk>,
+    hover_on_dyn_obj_id: Arc<Mutex<Option<DwChunkObjId>>>,
+
+    selected_block_gpu: GpuCoord<BlockCoord>,
+    hover_on_block_gpu: GpuCoord<BlockCoord>,
+    hover_on_chunk_gpu: GpuCoord<ChunkCoord>,
+}
+
+impl Default for InteractionState {
+    fn default() -> Self {
+        Self {
+            hover: None,
+            select: None,
+            selected_block_chunk: None,
+            hover_on_dyn_obj_id: Arc::new(Mutex::new(None)),
+            selected_block_gpu: GpuCoord::default(),
+            hover_on_block_gpu: GpuCoord::default(),
+            hover_on_chunk_gpu: GpuCoord::default(),
+        }
+    }
+}
+
+impl InteractionState {
+    fn set_hover_on_obj(&mut self, chunk_coord: ChunkCoord, id: DwChunkObjId) {
+        self.hover = Some(InteractionTarget::DynamicObject { chunk_coord, id });
+        self.hover_on_block_gpu.update(None);
+        self.hover_on_chunk_gpu.update(Some(chunk_coord));
+    }
+
+    fn set_hover_on_block(&mut self, block_coord: BlockCoord) {
+        self.hover = Some(InteractionTarget::Block(block_coord));
+        self.hover_on_block_gpu.update(Some(block_coord));
+        self.hover_on_chunk_gpu.update(Some(block_coord.into()));
+    }
+
+    fn clear_hover(&mut self) {
+        self.hover = None;
+        self.hover_on_block_gpu.update(None);
+        self.hover_on_chunk_gpu.update(None);
+    }
+
+    fn copy_hover_to_select(&mut self, world_db: Option<&WorldDb>) {
+        self.select = self.hover;
+        if let Some(InteractionTarget::Block(block_coord)) = self.select
+            && let Some(world_db) = world_db
+            && let Some(compressed_chunk) = world_db.chunks.chunk_at(block_coord)
+            && let Ok(chunk) = compressed_chunk.decompress()
+        {
+            self.selected_block_gpu.toggle(Some(block_coord));
+            self.selected_block_chunk = Some(chunk);
+        } else {
+            self.selected_block_gpu.update(None);
+            self.selected_block_chunk = None;
+        }
+    }
+
+    fn hover_on_id_uniform(&self) -> DwChunkObjIdUniform {
+        match self.hover {
+            Some(InteractionTarget::DynamicObject { id, .. }) => Some(&id).into(),
+            _ => None.into(),
+        }
+    }
+}
+
 #[derive(Debug, Snafu)]
 pub enum EditorAppError {
     #[snafu(display("Failed to open world_db: {source}"))]
@@ -106,12 +183,7 @@ pub struct EditorApp {
     show_grid: bool,
     fps_counter: FpsCounter,
 
-    selected_block_coord: GpuCoord<BlockCoord>,
-    hover_on_block_coord: GpuCoord<BlockCoord>,
-    selected_chunk: Option<Chunk>,
-    hover_on_dyn_obj_id: Arc<Mutex<Option<DwChunkObjId>>>,
-    selected_dyn_obj: Option<(ChunkCoord, DwChunkObjId)>,
-    hover_on_chunk_coord: GpuCoord<ChunkCoord>,
+    interaction_state: InteractionState,
 
     file_reader: FileReader,
     load_err: Option<EditorAppError>,
@@ -131,19 +203,25 @@ impl EditorApp {
         let device = &state.device;
 
         let camera = Camera::default();
-        let selected_block_coord = GpuCoord::default();
-        let hover_on_block_coord = GpuCoord::default();
-        let hover_on_chunk_coord = GpuCoord::default();
         let voxel_buf = voxel_util::create_buffer(device, 512);
-        let hover_on_dyn_obj_id = Arc::new(Mutex::new(None));
+        let interaction_state = InteractionState::default();
         let render_resources = RenderResources::new(
             state,
             camera.create_buffer(device),
             voxel_buf,
-            selected_block_coord.uniform().create_buffer(device),
-            hover_on_block_coord.uniform().create_buffer(device),
-            hover_on_chunk_coord.uniform().create_buffer(device),
-            hover_on_dyn_obj_id.clone(),
+            interaction_state
+                .selected_block_gpu
+                .uniform()
+                .create_buffer(device),
+            interaction_state
+                .hover_on_block_gpu
+                .uniform()
+                .create_buffer(device),
+            interaction_state
+                .hover_on_chunk_gpu
+                .uniform()
+                .create_buffer(device),
+            interaction_state.hover_on_dyn_obj_id.clone(),
         );
 
         state
@@ -161,12 +239,7 @@ impl EditorApp {
             show_grid: false,
             fps_counter: FpsCounter::new(2.0),
 
-            selected_block_coord,
-            hover_on_block_coord,
-            selected_chunk: None,
-            hover_on_dyn_obj_id,
-            selected_dyn_obj: None,
-            hover_on_chunk_coord,
+            interaction_state,
 
             file_reader: FileReader::new(),
             load_err: None,
@@ -289,23 +362,6 @@ impl EditorApp {
                     }
                 }
             });
-            let hover_on_dyn_obj_id = {
-                let guard = self.hover_on_dyn_obj_id.lock().expect("should lock mutex");
-                *guard
-            };
-            // info here can be replaced with some function to render internal of the dynamic object
-            // NOTE: `self.hover_on_chunk` must be from last frame, i.e. it must not be updated in this frame before here
-            let info = match (self.hover_on_chunk_coord.coord(), hover_on_dyn_obj_id) {
-                (Some(hover_on_chunk), Some(hover_on_dyn_obj_id)) => Some(format!(
-                    "type: {:?}, i-th: {} in chunk: {}",
-                    hover_on_dyn_obj_id.obj_type, hover_on_dyn_obj_id.index, hover_on_chunk
-                )),
-                _ => None,
-            };
-            if let Some(info) = info {
-                ui.separator();
-                ui.label(info);
-            }
         });
 
         if let Some(state) = frame.wgpu_render_state()
@@ -413,8 +469,9 @@ impl EditorApp {
                 .range(Camera::MAX_BLOCK_Z..=Camera::MAX_Z)
                 .prefix("Distance: "),
         );
-        if let Some(selected_chunk) = self.selected_chunk.as_ref()
-            && let Some(selected_block_coord) = self.selected_block_coord.coord()
+        if let Some(selected_chunk) = self.interaction_state.selected_block_chunk.as_ref()
+            && let Some(InteractionTarget::Block(selected_block_coord)) =
+                self.interaction_state.select
         {
             let block = selected_chunk.view().block_at(selected_block_coord);
             ui.separator();
@@ -463,32 +520,7 @@ impl EditorApp {
         }
     }
 
-    fn update_gpu_block_coords(&mut self, dyn_obj_id_updated: bool, response: &egui::Response) {
-        if response.clicked_by(egui::PointerButton::Primary)
-            && !dyn_obj_id_updated
-            && let Some(pos) = response.interact_pointer_pos()
-        {
-            let [x, y] = self
-                .camera
-                .mouse_at(
-                    (pos - self.world_viewport_rect.min).into(),
-                    self.world_viewport_rect.size().into(),
-                )
-                .floor()
-                .to_array();
-            self.selected_block_coord
-                .toggle(BlockCoord::new(x as u32, y as u16).ok());
-            if let Some(coord) = self.selected_block_coord.coord()
-                && let Some(world_db) = self.world_db.as_ref()
-                && let Some(compressed_chunk) = world_db.chunks.chunk_at(coord)
-                && let Ok(chunk) = compressed_chunk.decompress()
-            {
-                self.selected_chunk = Some(chunk);
-            } else {
-                self.selected_chunk = None;
-            }
-        }
-
+    fn update_interaction_state(&mut self, response: &egui::Response) {
         if response.hovered()
             && let Some(pos) = response.hover_pos()
         {
@@ -501,27 +533,35 @@ impl EditorApp {
                 .floor()
                 .to_array();
             let hover_on_block_coord = BlockCoord::new(x as u32, y as u16).ok();
-            self.hover_on_block_coord.update(hover_on_block_coord);
-            self.hover_on_chunk_coord
-                .update(hover_on_block_coord.map(|block_coord| block_coord.into()));
+
+            if let Some(block_coord) = hover_on_block_coord {
+                if let Some(id) = {
+                    self.interaction_state
+                        .hover_on_dyn_obj_id
+                        .lock()
+                        .expect("should lock")
+                        .clone()
+                } {
+                    let chunk_coord = block_coord.into();
+                    self.interaction_state.set_hover_on_obj(chunk_coord, id);
+                } else {
+                    self.interaction_state.set_hover_on_block(block_coord);
+                }
+            } else {
+                self.interaction_state.clear_hover();
+            }
         }
 
+        if response.clicked_by(egui::PointerButton::Primary) {
+            self.interaction_state
+                .copy_hover_to_select(self.world_db.as_ref());
+        }
+    }
+
+    fn update_mouse_pos(&mut self, response: &egui::Response) {
         self.mouse_pos = response.hover_pos().map(|pos| {
             ((pos - self.world_viewport_rect.min) * response.ctx.pixels_per_point()).into()
         });
-    }
-
-    fn update_selected_dyn_obj_id(&mut self, response: &egui::Response) -> bool {
-        if response.clicked_by(egui::PointerButton::Primary)
-            && let Some(hover_on_chunk_coord) = self.hover_on_chunk_coord.into()
-        {
-            let selected_dyn_obj_id = {
-                let guard = self.hover_on_dyn_obj_id.lock().expect("should lock");
-                guard.clone()
-            };
-            self.selected_dyn_obj = selected_dyn_obj_id.map(|id| (hover_on_chunk_coord, id));
-        }
-        self.selected_dyn_obj.is_some()
     }
 
     fn render_3d_viewport(&mut self, ui: &mut egui::Ui) {
@@ -532,9 +572,9 @@ impl EditorApp {
         self.world_viewport_rect = rect;
         self.camera.set_aspect(rect.aspect_ratio());
 
+        self.update_mouse_pos(&response);
+        self.update_interaction_state(&response);
         self.update_camera_pos(ui, &response);
-        let dyn_obj_id_updated = self.update_selected_dyn_obj_id(&response);
-        self.update_gpu_block_coords(dyn_obj_id_updated, &response);
 
         let [min_coords, max_coords] = self.camera.visible_world_region_2d(rect.size().into());
         let center = self.camera.world_offset().xy();
@@ -561,10 +601,7 @@ impl EditorApp {
             }
         }
 
-        let hover_on_id_uniform = {
-            let guard = self.hover_on_dyn_obj_id.lock().expect("should lock");
-            guard.as_ref().into()
-        };
+        let hover_on_id_uniform = self.interaction_state.hover_on_id_uniform();
 
         ui.painter().add(egui_wgpu::Callback::new_paint_callback(
             rect,
@@ -572,9 +609,9 @@ impl EditorApp {
                 camera_uniform: self.camera.uniform(),
                 dw_chunks,
                 show_grid: self.show_grid,
-                selected_block_coord_uniform: self.selected_block_coord.uniform(),
-                hover_on_block_coord_uniform: self.hover_on_block_coord.uniform(),
-                hover_on_chunk_coord_uniform: self.hover_on_chunk_coord.uniform(),
+                selected_block_coord_uniform: self.interaction_state.selected_block_gpu.uniform(),
+                hover_on_block_coord_uniform: self.interaction_state.hover_on_block_gpu.uniform(),
+                hover_on_chunk_coord_uniform: self.interaction_state.hover_on_chunk_gpu.uniform(),
                 hover_on_id_uniform,
                 mouse_physical_pos: self.mouse_pos,
                 world_viewport_rect: self.world_viewport_rect,
@@ -623,7 +660,8 @@ impl EditorApp {
     }
 
     fn render_selected_dyn_obj_info_window(&mut self, ctx: &egui::Context) {
-        if let Some((chunk_coord, id)) = self.selected_dyn_obj
+        if let Some(InteractionTarget::DynamicObject { chunk_coord, id }) =
+            self.interaction_state.select
             && let Some(world_db) = self.world_db.as_mut()
             && let Some(dw_chunk) = world_db.dw.chunk_at_mut(chunk_coord)
         {
