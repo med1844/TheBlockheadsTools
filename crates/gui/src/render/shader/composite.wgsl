@@ -1,26 +1,3 @@
-// Solid voxel albedo (fully-opaque pixels only)
-@group(0) @binding(0) var albedo_texture:  texture_2d<f32>;
-@group(0) @binding(1) var albedo_sampler:  sampler;
-
-// Normal + specular scalar (from depth_hit surface)
-@group(0) @binding(2) var normal_spec_texture: texture_2d<f32>;
-@group(0) @binding(3) var normal_spec_sampler: sampler;
-
-// SSAO occlusion factor (blurred)
-@group(0) @binding(4) var ssao_texture:   texture_2d<f32>;
-@group(0) @binding(5) var ssao_sampler:   sampler;
-
-@group(0) @binding(6) var<uniform> render_settings: RenderSettings;
-
-// Semi-transparent voxel colors (water, leaves, glass …)
-// Written to a separate target so SSAO never touches them.
-@group(0) @binding(7) var translucency_texture: texture_2d<f32>;
-@group(0) @binding(8) var translucency_sampler: sampler;
-
-// Annotation Overlay (icons, grid)
-@group(0) @binding(9) var overlay_texture:      texture_2d<f32>;
-@group(0) @binding(10) var overlay_sampler:     sampler;
-
 struct RenderSettings {
     light_dir:          vec3<f32>,
     enable_reflect:     u32,
@@ -33,6 +10,35 @@ struct RenderSettings {
     _padding0:          u32,
     _padding1:          u32,
 };
+
+struct CameraUniform {
+    view_proj: mat4x4<f32>,
+    inv_view_proj: mat4x4<f32>,
+    camera_pos: vec4<f32>,
+    world_offset: vec4<f32>,
+};
+
+@group(0) @binding(0) var uv_texture:           texture_2d<f32>;
+@group(0) @binding(1) var uv_sampler:           sampler;
+@group(0) @binding(2) var normal_texture:       texture_2d<f32>;
+@group(0) @binding(3) var normal_sampler:       sampler;
+@group(0) @binding(4) var ssao_texture:         texture_2d<f32>;
+@group(0) @binding(5) var ssao_sampler:         sampler;
+@group(0) @binding(6) var translucency_texture: texture_2d<f32>;
+@group(0) @binding(7) var translucency_sampler: sampler;
+@group(0) @binding(8) var overlay_texture:      texture_2d<f32>;
+@group(0) @binding(9) var overlay_sampler:      sampler;
+@group(0) @binding(10) var flags_texture:        texture_2d<u32>;
+@group(0) @binding(11) var voxel_depth_texture:  texture_depth_2d;
+
+@group(1) @binding(0) var<uniform> render_settings: RenderSettings;
+@group(1) @binding(1) var<uniform> camera:      CameraUniform;
+@group(1) @binding(2) var tile_map:             texture_2d<f32>;
+@group(1) @binding(3) var tile_map_sampler:     sampler;
+@group(1) @binding(4) var tile_reflect:         texture_2d<f32>;
+@group(1) @binding(5) var tile_reflect_sampler: sampler;
+@group(1) @binding(6) var tile_destruct:        texture_2d<f32>;
+@group(1) @binding(7) var tile_destruct_sampler: sampler;
 
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
@@ -52,36 +58,132 @@ fn vs_composite(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
     return out;
 }
 
-@fragment
-fn fs_composite(in: VertexOutput) -> @location(0) vec4<f32> {
-    let albedo      = textureSample(albedo_texture,      albedo_sampler,      in.uv);
-    let normal_spec = textureSample(normal_spec_texture, normal_spec_sampler, in.uv);
-    let ssao_val    = textureSample(ssao_texture,        ssao_sampler,        in.uv).r;
-    let translucent = textureSample(translucency_texture, translucency_sampler, in.uv);
+fn calculate_lighting(
+    p_pos: vec3<f32>,
+    p_normal: vec3<f32>,
+    p_albedo: vec3<f32>,
+    p_specular_val: f32,
+    p_occlusion: f32,
+    depth: f32,
+) -> vec3<f32> {
+    let light_dir = normalize(render_settings.light_dir);
+    let view_dir = normalize(camera.camera_pos.xyz - p_pos);
+    let half_dir = normalize(light_dir + view_dir);
 
-    // --- Step 1: apply SSAO + specular to the solid albedo only ---
+    // Diffuse
+    let diffuse_strength = max(dot(p_normal, light_dir), 0.0);
+    let diffuse = p_albedo * (render_settings.ambient_light + diffuse_strength);
+
+    // Specular (Blinn-Phong)
+    var specular = vec3<f32>(0.0);
+    if (render_settings.enable_reflect != 0u) {
+        let spec_strength = pow(max(dot(p_normal, half_dir), 0.0), render_settings.shininess);
+        specular = vec3<f32>(spec_strength * render_settings.specular_intensity * p_specular_val);
+    }
+
+    // Depth falloff (darkening distant blocks)
+    let depth_factor = (1.0 - depth) * (1.0 - render_settings.min_depth_factor) + render_settings.min_depth_factor;
+
+    return (diffuse * p_occlusion + specular) * depth_factor;
+}
+
+fn perturb_normal(normal: vec3<f32>, destruct_color: vec3<f32>) -> vec3<f32> {
+    // Replicate logic from voxel.wgsl for Tangent Space mapping
+    // We need to find the tangent/bitangent for the given normal.
+    // Since our voxels are axis-aligned, we can infer it.
+    var tangent: vec3<f32>;
+    var bitangent: vec3<f32>;
+
+    if (normal.x != 0.0) {
+        tangent = vec3<f32>(0.0, 0.0, 1.0);
+        bitangent = vec3<f32>(0.0, -1.0, 0.0);
+    } else if (normal.y != 0.0) {
+        tangent = vec3<f32>(1.0, 0.0, 0.0);
+        bitangent = vec3<f32>(0.0, 0.0, 1.0);
+    } else {
+        tangent = vec3<f32>(1.0, 0.0, 0.0);
+        bitangent = vec3<f32>(0.0, -1.0, 0.0);
+    }
+
+    let local_n = vec3<f32>(
+        (destruct_color.r - 0.5) * 0.5,
+        (destruct_color.g - 0.5) * 0.5,
+        1.0
+    );
+
+    return normalize(tangent * local_n.x + bitangent * local_n.y + normal * local_n.z);
+}
+
+fn calculate_solid_color(in: VertexOutput, raw_depth: f32) -> vec4<f32> {
+    let raw_uv = textureSampleLevel(uv_texture, uv_sampler, in.uv, 0.0).rg;
+    let normal_data = textureSampleLevel(normal_texture, normal_sampler, in.uv, 0.0).rgb;
+    let ssao_raw = textureSampleLevel(ssao_texture, ssao_sampler, in.uv, 0.0).r;
+
+    // Reconstruct world position
+    let ndc = vec2<f32>(in.uv.x * 2.0 - 1.0, (1.0 - in.uv.y) * 2.0 - 1.0);
+    let clip_pos = vec4<f32>(ndc, raw_depth, 1.0);
+    let world_pos_homo = camera.inv_view_proj * clip_pos;
+    let world_pos = world_pos_homo.xyz / world_pos_homo.w;
+
+    // Sample material
+    let albedo_color = textureSampleLevel(tile_map, tile_map_sampler, raw_uv, 0.0);
+    let reflect_val = textureSampleLevel(tile_reflect, tile_reflect_sampler, raw_uv, 0.0).r;
+
+    // Normal perturbation
+    var normal = normalize(normal_data);
+    if (render_settings.enable_destruct != 0u) {
+        let destruct_color = textureSampleLevel(tile_destruct, tile_destruct_sampler, raw_uv, 0.0).rgb;
+        normal = perturb_normal(normal, destruct_color);
+    }
+
+    // SSAO
     var occlusion = 1.0;
     if (render_settings.enable_ssao != 0u) {
-        occlusion = ssao_val;
+        occlusion = ssao_raw;
     }
-    let specular_color = vec3<f32>(1.0) * normal_spec.a;
-    let occluded_solid = albedo.rgb * occlusion + specular_color;
 
-    // --- Step 2: blend translucency on top (over-operator) ---
-    // translucent pixels were never occluded, so SSAO does not darken water/glass/leaves.
-    let final_rgb = occluded_solid * (1.0 - translucent.a) + translucent.rgb * translucent.a;
-    let final_a   = albedo.a + translucent.a * (1.0 - albedo.a);
+    // Lighting
+    var solid_rgb = calculate_lighting(world_pos, normal, albedo_color.rgb, reflect_val, occlusion, raw_depth);
+    return vec4<f32>(solid_rgb, 1.0);
+}
 
-    // --- Step 3: blend annotation overlay on top ---
+fn blend_alpha(a: vec4<f32>, b: vec4<f32>) -> vec4<f32> {
+    let rgb = mix(a.rgb, b.rgb, b.a);
+    return vec4<f32>(rgb, a.a + b.a * (1.0 - a.a));
+}
+
+@fragment
+fn fs_composite(in: VertexOutput) -> @location(0) vec4<f32> {
+    let screen_size = vec2<f32>(textureDimensions(uv_texture));
+    let pixel_coords = vec2<i32>(in.uv * screen_size);
+    let raw_depth = textureLoad(voxel_depth_texture, pixel_coords, 0);
+
+    var solid_color = vec4<f32>(0.0);
+    if (raw_depth < 1.0) {
+        solid_color = calculate_solid_color(in, raw_depth);
+    }
+
+    // Translucency blend
+    let translucent = textureSample(translucency_texture, translucency_sampler, in.uv);
+    let composed = blend_alpha(solid_color, translucent);
+
+    // Flags (highlights)
+    var highlight = vec4<f32>(0.0);
+    let flags = textureLoad(flags_texture, pixel_coords, 0).r;
+    if ((flags & 1u) != 0u) { // Hovered
+        highlight = vec4<f32>(1.0, 1.0, 1.0, 0.25);
+    }
+    if ((flags & 2u) != 0u) { // Selected
+        highlight = vec4<f32>(1.0, 1.0, 0.0, 0.3);
+    }
+
+    // Overlay blend
     let overlay = textureSample(overlay_texture, overlay_sampler, in.uv);
-    let blended_rgb = vec3<f32>(final_rgb * (1.0 - overlay.a) + overlay.rgb * overlay.a);
-    let blended_a   = final_a + overlay.a * (1.0 - final_a);
+    let blended = blend_alpha(composed, blend_alpha(overlay, highlight));
 
-    // --- Step 4: gamma correction (single canonical location) ---
-    // All upstream shaders output linear-space colors. We apply γ=2.2 here
-    // before writing to the sRGB/Bgra8Unorm surface.
+    // Gamma correction
     let gamma = 2.2;
-    let corrected = pow(blended_rgb, vec3<f32>(1.0 / gamma));
+    let corrected = pow(blended.rgb, vec3<f32>(1.0 / gamma));
 
-    return vec4<f32>(corrected, blended_a);
+    return vec4<f32>(corrected, blended.a);
 }

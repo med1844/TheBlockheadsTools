@@ -1,4 +1,4 @@
-use super::{GeometryBuffer, ID_TEXTURE_FORMAT, Texture, VoxelType};
+use super::{GeometryBuffer, Texture, VoxelType};
 use eframe::wgpu::{self, util::DeviceExt};
 
 // Raymarch voxel renderer
@@ -6,8 +6,8 @@ pub struct VoxelRenderer {
     pub voxel_buf: wgpu::Buffer,
     pipeline: wgpu::RenderPipeline,
     bind_group: wgpu::BindGroup,
-    depth_bind_group_layout: wgpu::BindGroupLayout,
-    depth_bind_group: wgpu::BindGroup,
+    buffer_bind_group_layout: wgpu::BindGroupLayout,
+    buffer_bind_group: wgpu::BindGroup,
 }
 
 impl VoxelRenderer {
@@ -19,7 +19,7 @@ impl VoxelRenderer {
         selected_block_buf: &wgpu::Buffer,
         hover_on_block_buf: &wgpu::Buffer,
         texture: &Texture,
-        target_format: wgpu::TextureFormat,
+        _target_format: wgpu::TextureFormat,
         g_buffer: &GeometryBuffer,
         render_settings_buf: &wgpu::Buffer,
         reflect_texture: &Texture,
@@ -115,7 +115,7 @@ impl VoxelRenderer {
                 },
                 // render_settings uniform
                 wgpu::BindGroupLayoutEntry {
-                    binding: 8,
+                    binding: 7,
                     visibility: wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform,
@@ -125,7 +125,7 @@ impl VoxelRenderer {
                     count: None,
                 },
                 wgpu::BindGroupLayoutEntry {
-                    binding: 9,
+                    binding: 8,
                     visibility: wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Texture {
                         sample_type: wgpu::TextureSampleType::Float { filterable: true },
@@ -135,13 +135,13 @@ impl VoxelRenderer {
                     count: None,
                 },
                 wgpu::BindGroupLayoutEntry {
-                    binding: 10,
+                    binding: 9,
                     visibility: wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                     count: None,
                 },
                 wgpu::BindGroupLayoutEntry {
-                    binding: 11,
+                    binding: 10,
                     visibility: wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Texture {
                         sample_type: wgpu::TextureSampleType::Float { filterable: true },
@@ -151,7 +151,7 @@ impl VoxelRenderer {
                     count: None,
                 },
                 wgpu::BindGroupLayoutEntry {
-                    binding: 12,
+                    binding: 11,
                     visibility: wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                     count: None,
@@ -192,32 +192,32 @@ impl VoxelRenderer {
                     resource: hover_on_block_buf.as_entire_binding(),
                 },
                 wgpu::BindGroupEntry {
-                    binding: 8,
+                    binding: 7,
                     resource: render_settings_buf.as_entire_binding(),
                 },
                 wgpu::BindGroupEntry {
-                    binding: 9,
+                    binding: 8,
                     resource: wgpu::BindingResource::TextureView(&reflect_texture.view),
                 },
                 wgpu::BindGroupEntry {
-                    binding: 10,
+                    binding: 9,
                     resource: wgpu::BindingResource::Sampler(&reflect_texture.sampler),
                 },
                 wgpu::BindGroupEntry {
-                    binding: 11,
+                    binding: 10,
                     resource: wgpu::BindingResource::TextureView(&destruct_texture.view),
                 },
                 wgpu::BindGroupEntry {
-                    binding: 12,
+                    binding: 11,
                     resource: wgpu::BindingResource::Sampler(&destruct_texture.sampler),
                 },
             ],
             label: Some("bind_group"),
         });
 
-        let depth_bind_group_layout =
+        let buffer_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                label: Some("Voxel Depth Bind Group Layout"),
+                label: Some("Voxel Buffer Bind Group Layout"),
                 entries: &[
                     wgpu::BindGroupLayoutEntry {
                         binding: 0,
@@ -235,15 +235,25 @@ impl VoxelRenderer {
                         ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
                         count: None,
                     },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 2,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            sample_type: wgpu::TextureSampleType::Uint,
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
+                    },
                 ],
             });
 
         let depth_bind_group =
-            Self::create_depth_bind_group(device, &depth_bind_group_layout, g_buffer);
+            Self::create_buffer_bind_group(device, &buffer_bind_group_layout, g_buffer);
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Render Pipeline Layout"),
-            bind_group_layouts: &[&bind_group_layout, &depth_bind_group_layout],
+            bind_group_layouts: &[&bind_group_layout, &buffer_bind_group_layout],
             push_constant_ranges: &[],
         });
 
@@ -260,25 +270,28 @@ impl VoxelRenderer {
                 module: &shader,
                 entry_point: Some("fs_main"),
                 targets: &[
+                    // slot 0: uv. only r and g is filled. set a=1.0 to overwrite mesh output.
                     Some(wgpu::ColorTargetState {
-                        format: target_format,
+                        format: wgpu::TextureFormat::Rgba16Float,
                         blend: Some(wgpu::BlendState::ALPHA_BLENDING),
                         write_mask: wgpu::ColorWrites::ALL,
                     }),
+                    // slot 1: normal. set a=1.0 to overwrite mesh output, a=0.0 to keep it
                     Some(wgpu::ColorTargetState {
                         format: wgpu::TextureFormat::Rgba16Float,
-                        blend: None,
+                        blend: Some(wgpu::BlendState::ALPHA_BLENDING),
                         write_mask: wgpu::ColorWrites::ALL,
                     }),
-                    Some(wgpu::ColorTargetState {
-                        format: ID_TEXTURE_FORMAT,
-                        blend: None,
-                        write_mask: wgpu::ColorWrites::empty(),
-                    }),
-                    // slot 3: translucency — semi-transparent voxels (alpha < 1.0)
+                    // slot 2: translucency - semi-transparent voxels (alpha < 1.0)
                     Some(wgpu::ColorTargetState {
                         format: wgpu::TextureFormat::Bgra8Unorm,
                         blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    }),
+                    // slot 3: flags
+                    Some(wgpu::ColorTargetState {
+                        format: wgpu::TextureFormat::R8Uint,
+                        blend: None,
                         write_mask: wgpu::ColorWrites::ALL,
                     }),
                 ],
@@ -304,12 +317,12 @@ impl VoxelRenderer {
             voxel_buf,
             pipeline,
             bind_group,
-            depth_bind_group_layout,
-            depth_bind_group,
+            buffer_bind_group_layout,
+            buffer_bind_group: depth_bind_group,
         }
     }
 
-    fn create_depth_bind_group(
+    fn create_buffer_bind_group(
         device: &wgpu::Device,
         layout: &wgpu::BindGroupLayout,
         g_buffer: &GeometryBuffer,
@@ -325,20 +338,24 @@ impl VoxelRenderer {
                     binding: 1,
                     resource: wgpu::BindingResource::Sampler(&g_buffer.mesh_depth.sampler),
                 },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::TextureView(&g_buffer.mesh_flags.view),
+                },
             ],
-            label: Some("Voxel Depth Bind Group"),
+            label: Some("Voxel Buffer Bind Group"),
         })
     }
 
     pub fn resize(&mut self, g_buffer: &GeometryBuffer, device: &wgpu::Device) {
-        self.depth_bind_group =
-            Self::create_depth_bind_group(device, &self.depth_bind_group_layout, g_buffer);
+        self.buffer_bind_group =
+            Self::create_buffer_bind_group(device, &self.buffer_bind_group_layout, g_buffer);
     }
 
     pub fn render(&self, render_pass: &mut wgpu::RenderPass<'_>) {
         render_pass.set_pipeline(&self.pipeline);
         render_pass.set_bind_group(0, &self.bind_group, &[]);
-        render_pass.set_bind_group(1, &self.depth_bind_group, &[]);
+        render_pass.set_bind_group(1, &self.buffer_bind_group, &[]);
         render_pass.draw(0..3, 0..1);
     }
 }

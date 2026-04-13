@@ -24,10 +24,12 @@ pub(crate) enum ResizeOutcome {
 
 pub(crate) struct GeometryBuffer {
     size: (u32, u32),
-    albedo: Texture,
+    uv: Texture,
     // Semi-transparent voxel pixels (alpha < 1.0) accumulated during ray marching.
     translucency: Texture,
-    normal_spec: Texture,
+    normal: Texture,
+    mesh_flags: Texture,
+    flags: Texture,
     ssao_raw: Texture,
     ssao_blur: Texture,
     // transparent voxels needs depth texture of meshes to be obscured correctly during ray marching
@@ -44,17 +46,29 @@ impl GeometryBuffer {
     pub const DEFAULT_HEIGHT: u32 = 1080;
 
     pub fn new(size: (u32, u32), device: &wgpu::Device) -> Self {
-        let color_texture = Texture::new(
-            size,
-            device,
-            wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
-            wgpu::TextureFormat::Bgra8Unorm,
-        );
-        let normal_spec_texture = Texture::new(
+        let uv_texture = Texture::new(
             size,
             device,
             wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
             wgpu::TextureFormat::Rgba16Float,
+        );
+        let normal_texture = Texture::new(
+            size,
+            device,
+            wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            wgpu::TextureFormat::Rgba16Float,
+        );
+        let mesh_flags_texture = Texture::new(
+            size,
+            device,
+            wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            wgpu::TextureFormat::R8Uint,
+        );
+        let flags_texture = Texture::new(
+            size,
+            device,
+            wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            wgpu::TextureFormat::R8Uint,
         );
         let ssao_raw_texture = Texture::new(
             size,
@@ -101,9 +115,11 @@ impl GeometryBuffer {
                 });
         Self {
             size,
-            albedo: color_texture,
+            uv: uv_texture,
             translucency: translucency_texture,
-            normal_spec: normal_spec_texture,
+            normal: normal_texture,
+            mesh_flags: mesh_flags_texture,
+            flags: flags_texture,
             ssao_raw: ssao_raw_texture,
             ssao_blur: ssao_blur_texture,
             voxel_depth,
@@ -157,7 +173,7 @@ pub struct RenderResources {
 
     voxel: voxel::VoxelRenderer,
     dw_icon: icon::DwIconRenderer,
-    dw_sprite: mesh::DwMeshRenderer,
+    dw_mesh: mesh::DwMeshRenderer,
     grid: grid::GridRenderer,
     composite: composite::CompositeRenderer,
     ssao: ssao::SsaoRenderer,
@@ -218,6 +234,10 @@ impl RenderResources {
             &g_buffer,
             target_format,
             &render_settings_buf,
+            &camera_buf,
+            &tile_map_texture,
+            &reflect_texture,
+            &destruct_texture,
         );
         let (hover_on_id_buf, selected_id_buf) = {
             let id_uniform = DwChunkObjIdUniform::default();
@@ -249,7 +269,7 @@ impl RenderResources {
                 &hover_on_id_buf,
                 &selected_id_buf,
             ),
-            dw_sprite: mesh::DwMeshRenderer::new(
+            dw_mesh: mesh::DwMeshRenderer::new(
                 device,
                 &camera_buf,
                 &tile_map_texture,
@@ -284,8 +304,7 @@ impl RenderResources {
 
     pub fn resize(&mut self, size: (u32, u32), device: &wgpu::Device) {
         if let ResizeOutcome::Resized = self.g_buffer.resize(size, device) {
-            self.composite
-                .resize(&self.g_buffer, &self.render_settings_buf, device);
+            self.composite.resize(&self.g_buffer, device);
             self.ssao.resize(&self.camera_buf, &self.g_buffer, device);
             self.ssao_blur.resize(&self.g_buffer, device);
             self.voxel.resize(&self.g_buffer, device);
@@ -293,7 +312,7 @@ impl RenderResources {
     }
 
     pub fn render_mesh_pass(&self, render_pass: &mut wgpu::RenderPass<'_>, dw_buf: &[DwChunkBuf]) {
-        self.dw_sprite.render(render_pass, dw_buf);
+        self.dw_mesh.render(render_pass, dw_buf);
     }
 
     pub fn render_voxel_pass(&self, render_pass: &mut wgpu::RenderPass<'_>) {
@@ -443,16 +462,16 @@ impl egui_wgpu::CallbackTrait for Render3dCallback {
                 label: Some("mesh pass"),
                 color_attachments: &[
                     Some(wgpu::RenderPassColorAttachment {
-                        view: &r.g_buffer.albedo.view,
+                        view: &r.g_buffer.uv.view,
                         depth_slice: None,
                         resolve_target: None,
                         ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                            load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
                             store: wgpu::StoreOp::Store,
                         },
                     }),
                     Some(wgpu::RenderPassColorAttachment {
-                        view: &r.g_buffer.normal_spec.view,
+                        view: &r.g_buffer.normal.view,
                         depth_slice: None,
                         resolve_target: None,
                         ops: wgpu::Operations {
@@ -462,6 +481,16 @@ impl egui_wgpu::CallbackTrait for Render3dCallback {
                     }),
                     Some(wgpu::RenderPassColorAttachment {
                         view: &r.g_buffer.dyn_obj_id.view,
+                        depth_slice: None,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                            store: wgpu::StoreOp::Store,
+                        },
+                    }),
+                    None, // slot 3: translucency (unused in mesh pass)
+                    Some(wgpu::RenderPassColorAttachment {
+                        view: &r.g_buffer.mesh_flags.view,
                         depth_slice: None,
                         resolve_target: None,
                         ops: wgpu::Operations {
@@ -489,7 +518,7 @@ impl egui_wgpu::CallbackTrait for Render3dCallback {
                 label: Some("voxel pass"),
                 color_attachments: &[
                     Some(wgpu::RenderPassColorAttachment {
-                        view: &r.g_buffer.albedo.view,
+                        view: &r.g_buffer.uv.view,
                         depth_slice: None,
                         resolve_target: None,
                         ops: wgpu::Operations {
@@ -498,7 +527,7 @@ impl egui_wgpu::CallbackTrait for Render3dCallback {
                         },
                     }),
                     Some(wgpu::RenderPassColorAttachment {
-                        view: &r.g_buffer.normal_spec.view,
+                        view: &r.g_buffer.normal.view,
                         depth_slice: None,
                         resolve_target: None,
                         ops: wgpu::Operations {
@@ -506,18 +535,19 @@ impl egui_wgpu::CallbackTrait for Render3dCallback {
                             store: wgpu::StoreOp::Store,
                         },
                     }),
-                    Some(wgpu::RenderPassColorAttachment {
-                        view: &r.g_buffer.dyn_obj_id.view,
-                        depth_slice: None,
-                        resolve_target: None,
-                        ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Load,
-                            store: wgpu::StoreOp::Store,
-                        },
-                    }),
-                    // slot 3: translucency — cleared each voxel pass
+                    // slot 2: translucency - cleared each voxel pass
                     Some(wgpu::RenderPassColorAttachment {
                         view: &r.g_buffer.translucency.view,
+                        depth_slice: None,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                            store: wgpu::StoreOp::Store,
+                        },
+                    }),
+                    // slot 3: flags
+                    Some(wgpu::RenderPassColorAttachment {
+                        view: &r.g_buffer.flags.view,
                         depth_slice: None,
                         resolve_target: None,
                         ops: wgpu::Operations {

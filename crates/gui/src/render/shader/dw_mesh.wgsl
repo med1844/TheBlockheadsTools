@@ -37,9 +37,10 @@ struct VertexOutput {
 };
 
 struct FragmentOutput {
-    @location(0) color: vec4<f32>,
-    @location(1) normal_spec: vec4<f32>,
+    @location(0) uv: vec4<f32>,
+    @location(1) normal: vec4<f32>,
     @location(2) id: u32,
+    @location(4) flags: u32,
     @builtin(frag_depth) depth: f32,
 }
 
@@ -58,11 +59,15 @@ fn vs_main(model: VertexInput) -> VertexOutput {
 
 @fragment
 fn fs_main(in: VertexOutput) -> FragmentOutput {
+    // We sample here only to discard transparent pixels Early.
+    // The actual color sampling happens in the composite pass.
     let color = textureSample(tilemap_texture, tilemap_sampler, in.tex_coords);
 
     if (color.a == 0.0) {
         discard;
     }
+
+    var flags = 0u;
 
     // Highlight when both chunk coord and object id match the hovered target.
     let hovered = hover_on_id.is_some != 0u
@@ -70,10 +75,8 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
         && in.chunk_y == hover_on_id.y
         && in.id == hover_on_id.id;
 
-    var final_color: vec3<f32> = color.rgb;
     if (hovered) {
-        // Brighten and tint towards white to indicate hover.
-        final_color = mix(final_color, vec3<f32>(1.0), 0.25);
+        flags |= 1u;
     }
 
     let selected = selected_id.is_some != 0u
@@ -82,14 +85,14 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
         && in.id == selected_id.id;
 
     if (selected) {
-        final_color = mix(final_color, vec3<f32>(1.0, 1.0, 0.0), 0.15);
+        flags |= 2u;
     }
 
     var output: FragmentOutput;
-    let depth = in.clip_position.z;
-    output.depth = depth;
-    output.color = vec4<f32>(final_color, color.a);
-    output.normal_spec = vec4<f32>(in.normal, 0.0);
+    output.depth = in.clip_position.z;
+    output.uv = vec4<f32>(in.tex_coords, 0.0, 1.0);
+    output.normal = vec4<f32>(in.normal, 1.0);
     output.id = in.id;
+    output.flags = flags;
     return output;
 }

@@ -66,7 +66,7 @@ struct DepthHit {
     is_set:   bool,
     surface:  VoxelSurface,
     normal:   vec3<f32>,
-    specular: f32,
+    uv:       vec2<f32>,
 }
 
 struct TraversalResult {
@@ -120,17 +120,18 @@ struct RenderSettings {
     _padding1: u32,
 };
 
-@group(0) @binding(8)
+@group(0) @binding(7)
 var<uniform> render_settings: RenderSettings;
 
-@group(0) @binding(9) var texture_reflect: texture_2d<f32>;
-@group(0) @binding(10) var sampler_reflect: sampler;
+@group(0) @binding(8) var texture_reflect: texture_2d<f32>;
+@group(0) @binding(9) var sampler_reflect: sampler;
 
-@group(0) @binding(11) var texture_destruct: texture_2d<f32>;
-@group(0) @binding(12) var sampler_destruct: sampler;
+@group(0) @binding(10) var texture_destruct: texture_2d<f32>;
+@group(0) @binding(11) var sampler_destruct: sampler;
 
 @group(1) @binding(0) var mesh_depth_texture: texture_depth_2d;
 @group(1) @binding(1) var mesh_depth_sampler: sampler;
+@group(1) @binding(2) var mesh_flags_texture: texture_2d<u32>;
 
 fn get_voxel_type(global_voxel_coords: vec3<i32>) -> u32 {
     if global_voxel_coords.x < 0 || global_voxel_coords.x >= i32(WORLD_DIM_X) ||
@@ -196,7 +197,6 @@ fn blend_colors(current_color: vec4<f32>, new_color: vec4<f32>) -> vec4<f32> {
 struct MaterialData {
     base_color: vec4<f32>,
     reflect_intensity: f32,
-    normal: vec3<f32>,
 }
 
 fn sample_material(surface: VoxelSurface) -> MaterialData {
@@ -221,48 +221,13 @@ fn sample_material(surface: VoxelSurface) -> MaterialData {
     uv = clamp(uv, vec2<f32>(0.0), vec2<f32>(1.0 - 1e-6));
 
     let base_color = sample_texture_by_face(surface.voxel_type, hit_face_id, uv);
-    var perturbed_normal = vec3<f32>(surface.normal);
-
-    if (render_settings.enable_destruct == 1u) {
-        let destruct_color = sample_destruct_texture(surface.voxel_type, hit_face_id, uv);
-
-        var tangent: vec3<f32>;
-        var bitangent: vec3<f32>;
-        if (surface.normal.x != 0) {
-            tangent = vec3<f32>(0.0, 0.0, 1.0);
-            bitangent = vec3<f32>(0.0, -1.0, 0.0);
-        } else if (surface.normal.y != 0) {
-            tangent = vec3<f32>(1.0, 0.0, 0.0);
-            bitangent = vec3<f32>(0.0, 0.0, 1.0);
-        } else {
-            tangent = vec3<f32>(1.0, 0.0, 0.0);
-            bitangent = vec3<f32>(0.0, -1.0, 0.0);
-        }
-
-        // In the original game, normal perturbation is calculated as:
-        // vec3((-destruct.r + 0.5) * 0.5, (destruct.g - 0.5) * 0.5, 0.0)
-        // It hardcodes Z to 0.0 (ignoring the noisy blue channel) and flips X.
-        // It also applies it universally without any alpha masking.
-        // We replicate that mathematical behavior here but map it properly into our 3D Tangent Space.
-        let local_normal = vec3<f32>(
-            (destruct_color.r - 0.5) * 0.5,
-            (destruct_color.g - 0.5) * 0.5,
-            1.0 // Z acts as the unperturbed outward strength base
-        );
-
-        perturbed_normal = normalize(
-            tangent * local_normal.x +
-            bitangent * local_normal.y +
-            vec3<f32>(surface.normal) * local_normal.z
-        );
-    }
 
     var reflect_intensity = 0.0;
     if (render_settings.enable_reflect == 1u) {
         let reflect_color = sample_reflect_texture(surface.voxel_type, hit_face_id, uv);
         reflect_intensity = reflect_color.r * reflect_color.a * base_color.a;
     }
-    return MaterialData(base_color, reflect_intensity, perturbed_normal);
+    return MaterialData(base_color, reflect_intensity);
 }
 
 struct LightingOutput {
@@ -270,8 +235,7 @@ struct LightingOutput {
     specular_scalar: f32,
 }
 
-fn calculate_lighting(surface: VoxelSurface, material: MaterialData, ray_dir: vec3<f32>) -> LightingOutput {
-    let face_normal_f32 = material.normal;
+fn calculate_translucent_lighting(material: MaterialData, face_normal_f32: vec3<f32>, ray_dir: vec3<f32>) -> LightingOutput {
     let light_direction = normalize(render_settings.light_dir);
     let ambient_light = render_settings.ambient_light;
     let diffuse_factor = max(dot(face_normal_f32, light_direction), 0.0);
@@ -296,33 +260,8 @@ fn calculate_lighting(surface: VoxelSurface, material: MaterialData, ray_dir: ve
     let lit_rgb = material.base_color.rgb * final_light_factor;
 
     let min_depth_factor = render_settings.min_depth_factor;
-    let depth_multiplier = (surface.hit_point.z / 3.0) * (1.0 - min_depth_factor) + min_depth_factor;
 
-    var out_lighting: LightingOutput;
-    out_lighting.lit_color = lit_rgb * depth_multiplier;
-    out_lighting.specular_scalar = spec_scalar;
-
-    return out_lighting;
-}
-
-fn apply_block_highlights(base_color: vec4<f32>, is_selected: bool, is_hovered: bool) -> vec4<f32> {
-    var final_color = base_color;
-
-    if (is_selected) {
-        let highlight_color = vec4<f32>(1.0, 1.0, 0.0, 0.15);
-        let final_rgb = mix(final_color.rgb, highlight_color.rgb, highlight_color.a);
-        let final_a = highlight_color.a + final_color.a * (1.0 - highlight_color.a);
-        final_color = vec4<f32>(final_rgb, final_a);
-    }
-
-    if (is_hovered) {
-        let highlight_color = vec4<f32>(1.0, 1.0, 1.0, 0.15);
-        let final_rgb = mix(final_color.rgb, highlight_color.rgb, highlight_color.a);
-        let final_a = highlight_color.a + final_color.a * (1.0 - highlight_color.a);
-        final_color = vec4<f32>(final_rgb, final_a);
-    }
-
-    return final_color;
+    return LightingOutput(lit_rgb, spec_scalar);
 }
 
 fn calculate_depth(hit_distance: f32, ray: Ray) -> f32 {
@@ -352,21 +291,42 @@ fn render_and_blend(
     let material = sample_material(surface);
 
     if (material.base_color.a > 0.0) {
-        let lighting = calculate_lighting(surface, material, ray_dir);
-        let lit = vec4<f32>(lighting.lit_color, material.base_color.a);
-
         if (material.base_color.a >= 1.0) {
-            // Fully opaque — goes to the solid albedo buffer
-            *solid_color = blend_colors(*solid_color, lit);
+            // Fully opaque — in deferred pipeline, we don't calculate lighting here.
+            // We just mark it as opaque and record attributes for the composite pass.
+            (*solid_color).a = 1.0;
 
             if (!(*depth_hit).is_set) {
+                // Determine hit face ID and UV for the atlas
+                var hit_face_id: u32;
+                if (face_normal.x != 0) {
+                    hit_face_id = select(FACE_NX, FACE_PX, face_normal.x > 0);
+                } else if (face_normal.y != 0) {
+                    hit_face_id = select(FACE_NY, FACE_PY, face_normal.y > 0);
+                } else {
+                    hit_face_id = select(FACE_NZ, FACE_PZ, face_normal.z > 0);
+                }
+
+                var uv_on_face: vec2<f32>;
+                let fractional_pos = hit_point / VOXEL_SIZE;
+                if (face_normal.x != 0) {
+                    uv_on_face = vec2<f32>(fract(fractional_pos.z), 1.0 - fract(fractional_pos.y));
+                } else if (face_normal.y != 0) {
+                    uv_on_face = vec2<f32>(fract(fractional_pos.x), fract(fractional_pos.z));
+                } else {
+                    uv_on_face = vec2<f32>(fract(fractional_pos.x), 1.0 - fract(fractional_pos.y));
+                }
+                uv_on_face = clamp(uv_on_face, vec2<f32>(0.0), vec2<f32>(1.0 - 1e-6));
+
                 (*depth_hit).surface  = surface;
-                (*depth_hit).normal   = material.normal;
-                (*depth_hit).specular = lighting.specular_scalar;
+                (*depth_hit).normal   = vec3<f32>(face_normal);
+                (*depth_hit).uv       = get_atlas_uv(voxel_type, hit_face_id, uv_on_face);
                 (*depth_hit).is_set   = true;
             }
         } else {
-            // Semi-transparent — goes to the translucency buffer
+            // Semi-transparent — stays forward-lit for volume raymarching consistency.
+            let lighting = calculate_translucent_lighting(material, vec3<f32>(face_normal), ray_dir);
+            let lit = vec4<f32>(lighting.lit_color, material.base_color.a);
             *translucency_color = blend_colors(*translucency_color, lit);
         }
     }
@@ -391,11 +351,11 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
 }
 
 struct FragmentOutput {
-    @location(0) albedo:       vec4<f32>,
-    @location(1) normal_spec:  vec4<f32>,
+    @location(0) uv:           vec4<f32>,
+    @location(1) normal:       vec4<f32>,
+    @location(2) translucency: vec4<f32>,
+    @location(3) flags:        u32,
     @builtin(frag_depth) depth: f32,
-    // @location(2) is dyn_obj_id — written by dw_sprite, not voxel
-    @location(3) translucency: vec4<f32>,
 }
 
 fn create_camera_ray(ndc: vec2<f32>) -> Ray {
@@ -567,29 +527,38 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
 
     if (!bounds_intersect.hit || bounds_intersect.t_min > bounds_intersect.t_max) {
         var output: FragmentOutput;
-        output.albedo       = vec4<f32>(0.0);
+        output.uv           = vec4<f32>(0.0);
+        output.normal       = vec4<f32>(0.0, 0.0, 1.0, 0.0);
         output.translucency = vec4<f32>(0.0);
+        output.flags        = 0u;
         output.depth        = 1.0;
         return output;
     }
 
     let traversal = traverse_world(ray, bounds_intersect);
 
-    // Apply block highlights to solid surface only
-    var solid = traversal.solid_color;
-    solid = apply_block_highlights(solid, traversal.hit_selected_block, traversal.hit_hovered_block);
-
     var output: FragmentOutput;
     output.translucency = vec4<f32>(traversal.translucency_color.rgb, traversal.translucency_color.a);
 
+    var flags = 0u;
+    if (traversal.hit_hovered_block)  { flags |= 1u; }
+    if (traversal.hit_selected_block) { flags |= 2u; }
+
+    let screen_size = vec2<f32>(textureDimensions(mesh_flags_texture));
+    let pixel_coords = vec2<i32>(in.uv * screen_size);
+    let mesh_flags = textureLoad(mesh_flags_texture, pixel_coords, 0).r;
+
+    output.flags = flags | mesh_flags;
+
     if (traversal.depth_hit.is_set) {
-        output.albedo      = vec4<f32>(solid.rgb, 1.0);
-        output.normal_spec = vec4<f32>(traversal.depth_hit.normal, traversal.depth_hit.specular);
-        output.depth       = calculate_depth(traversal.depth_hit.surface.distance, ray);
+        // set alpha to 1.0 to overwrite mesh pass output
+        output.uv     = vec4<f32>(traversal.depth_hit.uv, 0.0, 1.0);
+        output.normal = vec4<f32>(traversal.depth_hit.normal, 1.0);
+        output.depth  = calculate_depth(traversal.depth_hit.surface.distance, ray);
     } else {
-        output.albedo      = vec4<f32>(0.0);
-        output.normal_spec = vec4<f32>(0.0, 0.0, 1.0, 0.0);
-        output.depth       = raw_mesh_depth;
+        output.uv     = vec4<f32>(0.0);
+        output.normal = vec4<f32>(0.0, 0.0, 1.0, 0.0);
+        output.depth  = raw_mesh_depth;
     }
 
     return output;

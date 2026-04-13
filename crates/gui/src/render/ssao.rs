@@ -178,11 +178,11 @@ impl SsaoRenderer {
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
-                    resource: wgpu::BindingResource::TextureView(&g_buffer.normal_spec.view),
+                    resource: wgpu::BindingResource::TextureView(&g_buffer.normal.view),
                 },
                 wgpu::BindGroupEntry {
                     binding: 2,
-                    resource: wgpu::BindingResource::Sampler(&g_buffer.normal_spec.sampler),
+                    resource: wgpu::BindingResource::Sampler(&g_buffer.normal.sampler),
                 },
                 wgpu::BindGroupEntry {
                     binding: 3,

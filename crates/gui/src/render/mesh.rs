@@ -12,7 +12,7 @@ impl DwMeshRenderer {
         tile_map_texture: &Texture,
         hover_on_id_buf: &wgpu::Buffer,
         selected_id_buf: &wgpu::Buffer,
-        target_format: wgpu::TextureFormat,
+        _target_format: wgpu::TextureFormat,
     ) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("DW Sprite Shader"),
@@ -110,7 +110,7 @@ impl DwMeshRenderer {
         });
 
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("DW Pipeline"),
+            label: Some("DW mesh Pipeline"),
             layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &shader,
@@ -123,8 +123,8 @@ impl DwMeshRenderer {
                 entry_point: Some("fs_main"),
                 targets: &[
                     Some(wgpu::ColorTargetState {
-                        format: target_format,
-                        blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                        format: wgpu::TextureFormat::Rgba16Float,
+                        blend: None,
                         write_mask: wgpu::ColorWrites::ALL,
                     }),
                     Some(wgpu::ColorTargetState {
@@ -135,7 +135,13 @@ impl DwMeshRenderer {
                     Some(wgpu::ColorTargetState {
                         format: ID_TEXTURE_FORMAT,
                         blend: None,
-                        write_mask: wgpu::ColorWrites::RED,
+                        write_mask: wgpu::ColorWrites::ALL,
+                    }),
+                    None, // slot 3: translucency
+                    Some(wgpu::ColorTargetState {
+                        format: wgpu::TextureFormat::R8Uint,
+                        blend: None,
+                        write_mask: wgpu::ColorWrites::ALL,
                     }),
                 ],
                 compilation_options: Default::default(),
