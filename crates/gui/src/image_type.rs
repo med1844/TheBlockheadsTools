@@ -213,8 +213,8 @@ pub enum ImageType {
     WorkbenchPress2Top = 297,
     Safe = 298,
     SafeTop = 299,
-    MetalworkBench = 300,
-    MetalworkBenchTop = 301,
+    MetalworkBenchLevel1 = 300,
+    MetalworkBenchLevel1Top = 301,
     ChestGold = 302,
     ChestGoldTop = 303,
     TradingPost = 304,
@@ -347,8 +347,8 @@ pub enum ImageType {
     PortalRuby0 = 496,
     SharkJaw = 504,
     SharkJawRight = 505,
-    ArmorBench = 506,
-    ArmorBenchTop = 507,
+    ArmorBenchLevel1 = 506,
+    ArmorBenchLevel1Top = 507,
     ArmorBenchLevel2 = 508,
     ArmorBenchLevel2Top = 509,
     GravelPainted = 510,
@@ -550,10 +550,15 @@ impl ImageType {
     pub const PIXEL_PER_EDGE: usize = Self::PIXEL_PER_TILE * Self::TILE_PER_ROW;
     pub const TILE_SIZE: f32 = Self::PIXEL_PER_TILE as f32 / Self::PIXEL_PER_EDGE as f32;
 
-    pub fn to_uv_min(self) -> [f32; 2] {
+    pub fn to_tile_xy(self) -> (u32, u32) {
         let tile_index = self as u32;
         let tile_x = tile_index % Self::TILE_PER_ROW as u32;
         let tile_y = tile_index / Self::TILE_PER_ROW as u32;
+        (tile_x, tile_y)
+    }
+
+    pub fn to_uv_min(self) -> [f32; 2] {
+        let (tile_x, tile_y) = self.to_tile_xy();
         [
             tile_x as f32 * Self::TILE_SIZE,
             tile_y as f32 * Self::TILE_SIZE,

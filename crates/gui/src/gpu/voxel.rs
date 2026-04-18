@@ -148,10 +148,55 @@ pub enum VoxelType {
     Safe = 139,
     PortalChest = 140,
     FeederChest = 141,
+    WorkbenchLevel1 = 142,
+    WorkbenchLevel2 = 143,
+    WorkbenchLevel3 = 144,
+    WorkbenchLevel4 = 145,
+    TailorsBenchLevel1 = 146,
+    TailorsBenchLevel2 = 147,
+    WoodworkBench = 148,
+    ToolBenchLevel1 = 149,
+    ToolBenchLevel2 = 150,
+    ToolBenchLevel3 = 151,
+    ToolBenchLevel4 = 152,
+    ToolBenchLevel5 = 153,
+    ToolBenchLevel6 = 154,
+    ToolBenchLevel7 = 155,
+    PressLevel1 = 156,
+    PressLevel2 = 157,
+    Kiln = 158,
+    FurnaceLevel1 = 159,
+    FurnaceLevel2 = 160,
+    FurnaceLevel3 = 161,
+    CraftBenchLevel1 = 162,
+    CraftBenchLevel2 = 163,
+    CraftBenchLevel3 = 164,
+    CraftBenchLevel4 = 165,
+    MixingBench = 166,
+    DyeBench = 167,
+    MetalworkBenchLevel1 = 168,
+    MetalworkBenchLevel2 = 169,
+    SteamGenerator = 170,
+    ElectricKiln = 171,
+    ElectricFurnace = 172,
+    ElectricMetalworkBench = 173,
+    ElectricStove = 174,
+    SolarPanel = 175,
+    Flywheel = 176,
+    ArmorBenchLevel1 = 177,
+    ArmorBenchLevel2 = 178,
+    ArmorBenchLevel3 = 179,
+    TrainYard = 180,
+    BuildersBenchLevel1 = 181,
+    BuildersBenchLevel2 = 182,
+    ElectricPress = 183,
+    CompostBin = 184,
+    EggExtractor = 185,
+    PizzaOven = 186,
 }
 
 impl VoxelType {
-    pub const MAX_VALUE: u16 = 138;
+    pub const MAX_VALUE: u16 = 187;
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -441,6 +486,186 @@ impl VoxelType {
                 top: ChestFeederTop,
                 side: ChestFeeder,
             },
+            Self::WorkbenchLevel1 => TopSide {
+                top: WorkbenchLevel1Top,
+                side: WorkbenchLevel1,
+            },
+            Self::WorkbenchLevel2 => TopSide {
+                top: WorkbenchLevel2Top,
+                side: WorkbenchLevel2,
+            },
+            Self::WorkbenchLevel3 => TopSide {
+                top: WorkbenchLevel3Top,
+                side: WorkbenchLevel3,
+            },
+            Self::WorkbenchLevel4 => TopSide {
+                top: WorkbenchLevel4Top,
+                side: WorkbenchLevel4,
+            },
+            Self::TailorsBenchLevel1 => TopSide {
+                top: WorkbenchWeave1Top,
+                side: WorkbenchWeave1,
+            },
+            Self::TailorsBenchLevel2 => TopSide {
+                top: WorkbenchWeave2Top,
+                side: WorkbenchWeave2,
+            },
+            Self::WoodworkBench => TopSide {
+                top: WorkbenchWood1Top,
+                side: WorkbenchWood1,
+            },
+            Self::ToolBenchLevel1 => TopSide {
+                top: WorkbenchTool1Top,
+                side: WorkbenchTool1,
+            },
+            Self::ToolBenchLevel2 => TopSide {
+                top: WorkbenchTool2Top,
+                side: WorkbenchTool2,
+            },
+            Self::ToolBenchLevel3 => TopSide {
+                top: WorkbenchTool3Top,
+                side: WorkbenchTool3,
+            },
+            Self::ToolBenchLevel4 => TopSide {
+                top: WorkbenchTool4Top,
+                side: WorkbenchTool4,
+            },
+            Self::ToolBenchLevel5 => TopSide {
+                top: WorkbenchTool5Top,
+                side: WorkbenchTool5,
+            },
+            Self::ToolBenchLevel6 => TopSide {
+                top: WorkbenchTool6Top,
+                side: WorkbenchTool6,
+            },
+            Self::ToolBenchLevel7 => TopSide {
+                top: WorkbenchTool7Top,
+                side: WorkbenchTool7,
+            },
+            Self::PressLevel1 => TopSide {
+                top: WorkbenchPress1Top,
+                side: WorkbenchPress1,
+            },
+            Self::PressLevel2 => TopSide {
+                top: WorkbenchPress2Top,
+                side: WorkbenchPress2,
+            },
+            Self::Kiln => TopSide {
+                top: KilnTop,
+                side: Kiln,
+            },
+            Self::FurnaceLevel1 => TopSide {
+                top: Furnace1Top,
+                side: Furnace1,
+            },
+            Self::FurnaceLevel2 => TopSide {
+                top: Furnace2Top,
+                side: Furnace2,
+            },
+            Self::FurnaceLevel3 => TopSide {
+                top: Furnace3Top,
+                side: Furnace3,
+            },
+            Self::CraftBenchLevel1 => TopSide {
+                top: CraftBenchLevel1Top,
+                side: CraftBenchLevel1,
+            },
+            Self::CraftBenchLevel2 => TopSide {
+                top: CraftBenchLevel2Top,
+                side: CraftBenchLevel2,
+            },
+            Self::CraftBenchLevel3 => TopSide {
+                top: CraftBenchLevel3Top,
+                side: CraftBenchLevel3,
+            },
+            Self::CraftBenchLevel4 => TopSide {
+                top: CraftBenchLevel4Top,
+                side: CraftBenchLevel4,
+            },
+            Self::MixingBench => TopSide {
+                top: MixBenchLevel1Top,
+                side: MixBenchLevel1,
+            },
+            Self::DyeBench => TopSide {
+                top: DyeBenchLevel1Top,
+                side: DyeBenchLevel1,
+            },
+            Self::MetalworkBenchLevel1 => TopSide {
+                top: MetalworkBenchLevel1Top,
+                side: MetalworkBenchLevel1,
+            },
+            Self::MetalworkBenchLevel2 => TopSide {
+                top: MetalworkBenchLevel2Top,
+                side: MetalworkBenchLevel2,
+            },
+            Self::SteamGenerator => TopSide {
+                top: SteamGeneratorTop,
+                side: SteamGenerator,
+            },
+            Self::ElectricKiln => TopSide {
+                top: ElectricKilnTop,
+                side: ElectricKiln,
+            },
+            Self::ElectricFurnace => TopSide {
+                top: ElectricFurnaceTop,
+                side: ElectricFurnace,
+            },
+            Self::ElectricMetalworkBench => TopSide {
+                top: ElectricMetalworkBenchTop,
+                side: ElectricMetalworkBench,
+            },
+            Self::ElectricStove => TopSide {
+                top: ElectricStoveTop,
+                side: ElectricStove,
+            },
+            Self::SolarPanel => TopSide {
+                top: SolarPanelTop,
+                side: SolarPanel,
+            },
+            Self::Flywheel => TopSide {
+                top: FlywheelTop,
+                side: Flywheel,
+            },
+            Self::ArmorBenchLevel1 => TopSide {
+                top: ArmorBenchLevel1Top,
+                side: ArmorBenchLevel1,
+            },
+            Self::ArmorBenchLevel2 => TopSide {
+                top: ArmorBenchLevel2Top,
+                side: ArmorBenchLevel2,
+            },
+            Self::ArmorBenchLevel3 => TopSide {
+                top: ArmorBenchLevel3Top,
+                side: ArmorBenchLevel3,
+            },
+            Self::TrainYard => TopSide {
+                top: TrainYardTop,
+                side: TrainYard,
+            },
+            Self::BuildersBenchLevel1 => TopSide {
+                top: BuildersBenchLevel1Top,
+                side: BuildersBenchLevel1,
+            },
+            Self::BuildersBenchLevel2 => TopSide {
+                top: BuildersBenchLevel2Top,
+                side: BuildersBenchLevel2,
+            },
+            Self::ElectricPress => TopSide {
+                top: ElectricPressTop,
+                side: ElectricPress,
+            },
+            Self::CompostBin => TopSide {
+                top: CompostBinTop,
+                side: CompostBin,
+            },
+            Self::EggExtractor => TopSide {
+                top: EggExtractorTop,
+                side: EggExtractor,
+            },
+            Self::PizzaOven => TopSide {
+                top: PizzaOvenTop,
+                side: PizzaOven,
+            },
         }
     }
 }
@@ -475,7 +700,10 @@ impl VoxelType {
 
     fn mg_from_block_inner<'b>(block: BlockView<'b>) -> Result<Self, BlockError> {
         Ok(match block.content()? {
-            BlockContentType::Nothing | BlockContentType::Sprite => Self::Air,
+            BlockContentType::Nothing
+            | BlockContentType::Workbench
+            | BlockContentType::WorkbenchSprite
+            | BlockContentType::Sprite => Self::Air,
             BlockContentType::AppleTreeLeaf => Self::AppleTreeLeaf,
             BlockContentType::AppleTreeTrunk => Self::AppleTreeTrunk,
             BlockContentType::AppleTreeTrunkLeaf => Self::AppleTreeTrunkLeaf,

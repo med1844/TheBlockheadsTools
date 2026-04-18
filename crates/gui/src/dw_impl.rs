@@ -1,9 +1,16 @@
 // Implements traits for dynamic object types defined in lib
-use super::gpu::{
-    VoxelType,
-    dw::{DwBlock, DwIcon, DwObj, DwSprite, ToDwObj},
+use super::{
+    gpu::{
+        VoxelType,
+        dw::{
+            CoordOutOfBoundSnafu, DwBlock, DwIcon, DwObj, DwSprite, InvalidWorkbenchLevelSnafu,
+            ToDwObj, ToDwObjError,
+        },
+    },
+    image_type::ImageType,
 };
 use eframe::egui;
+use snafu::ResultExt;
 use std::{hash::Hash, ops::DerefMut};
 use the_blockheads_tools_lib::game::{
     coord::BlockCoord,
@@ -16,6 +23,7 @@ use the_blockheads_tools_lib::game::{
             AppleTree, CactusTree, CherryTree, CoconutTree, CoffeeTree, GemTree, LimeTree,
             MangoTree, MapleTree, OrangeTree, PineTree, Tree, TreeFruit, TreeType,
         },
+        workbench::{Workbench, WorkbenchType},
     },
     item::ItemType,
 };
@@ -52,6 +60,12 @@ impl ToRow for u32 {
 }
 
 impl ToRow for u16 {
+    fn to_row(&mut self, ui: &mut egui::Ui) {
+        ui.add(egui::DragValue::new(self));
+    }
+}
+
+impl ToRow for u8 {
     fn to_row(&mut self, ui: &mut egui::Ui) {
         ui.add(egui::DragValue::new(self));
     }
@@ -168,8 +182,10 @@ impl<T: ToGrid> ToRow for T {
     fn to_row(&mut self, ui: &mut egui::Ui) {
         // Indent or frame the nested grid so it's visually distinct
         // from the parent grid rows.
-        ui.indent("inner_grid_indent", |ui| {
-            self.add_grid("inner_grid", ui);
+        ui.vertical(|ui| {
+            ui.indent("inner_grid_indent", |ui| {
+                self.add_grid("inner_grid", ui);
+            })
         });
     }
 }
@@ -231,8 +247,8 @@ impl InfoUi for Tree {
 }
 
 impl ToDwObj for AppleTree {
-    fn to_dw_obj(&self) -> DwObj {
-        DwObj::Icon(DwIcon::new(self.float_pos, ItemType::Apple))
+    fn to_dw_obj(&self) -> Result<DwObj, ToDwObjError> {
+        Ok(DwObj::Icon(DwIcon::new(self.float_pos, ItemType::Apple)))
     }
 }
 
@@ -256,8 +272,11 @@ impl InfoUi for AppleTree {
 }
 
 impl ToDwObj for MapleTree {
-    fn to_dw_obj(&self) -> DwObj {
-        DwObj::Icon(DwIcon::new(self.float_pos, ItemType::MapleSeed))
+    fn to_dw_obj(&self) -> Result<DwObj, ToDwObjError> {
+        Ok(DwObj::Icon(DwIcon::new(
+            self.float_pos,
+            ItemType::MapleSeed,
+        )))
     }
 }
 
@@ -269,8 +288,8 @@ impl InfoUi for MapleTree {
 }
 
 impl ToDwObj for MangoTree {
-    fn to_dw_obj(&self) -> DwObj {
-        DwObj::Icon(DwIcon::new(self.float_pos, ItemType::Mango))
+    fn to_dw_obj(&self) -> Result<DwObj, ToDwObjError> {
+        Ok(DwObj::Icon(DwIcon::new(self.float_pos, ItemType::Mango)))
     }
 }
 
@@ -301,8 +320,8 @@ impl InfoUi for PineTree {
 }
 
 impl ToDwObj for PineTree {
-    fn to_dw_obj(&self) -> DwObj {
-        DwObj::Icon(DwIcon::new(self.float_pos, ItemType::Pinecone))
+    fn to_dw_obj(&self) -> Result<DwObj, ToDwObjError> {
+        Ok(DwObj::Icon(DwIcon::new(self.float_pos, ItemType::Pinecone)))
     }
 }
 
@@ -329,8 +348,11 @@ impl InfoUi for CactusTree {
 }
 
 impl ToDwObj for CactusTree {
-    fn to_dw_obj(&self) -> DwObj {
-        DwObj::Icon(DwIcon::new(self.float_pos, ItemType::PricklyPear))
+    fn to_dw_obj(&self) -> Result<DwObj, ToDwObjError> {
+        Ok(DwObj::Icon(DwIcon::new(
+            self.float_pos,
+            ItemType::PricklyPear,
+        )))
     }
 }
 
@@ -342,8 +364,8 @@ impl InfoUi for CoconutTree {
 }
 
 impl ToDwObj for CoconutTree {
-    fn to_dw_obj(&self) -> DwObj {
-        DwObj::Icon(DwIcon::new(self.float_pos, ItemType::Coconut))
+    fn to_dw_obj(&self) -> Result<DwObj, ToDwObjError> {
+        Ok(DwObj::Icon(DwIcon::new(self.float_pos, ItemType::Coconut)))
     }
 }
 
@@ -355,8 +377,8 @@ impl InfoUi for OrangeTree {
 }
 
 impl ToDwObj for OrangeTree {
-    fn to_dw_obj(&self) -> DwObj {
-        DwObj::Icon(DwIcon::new(self.float_pos, ItemType::Orange))
+    fn to_dw_obj(&self) -> Result<DwObj, ToDwObjError> {
+        Ok(DwObj::Icon(DwIcon::new(self.float_pos, ItemType::Orange)))
     }
 }
 
@@ -368,8 +390,8 @@ impl InfoUi for CherryTree {
 }
 
 impl ToDwObj for CherryTree {
-    fn to_dw_obj(&self) -> DwObj {
-        DwObj::Icon(DwIcon::new(self.float_pos, ItemType::Cherry))
+    fn to_dw_obj(&self) -> Result<DwObj, ToDwObjError> {
+        Ok(DwObj::Icon(DwIcon::new(self.float_pos, ItemType::Cherry)))
     }
 }
 
@@ -381,8 +403,11 @@ impl InfoUi for CoffeeTree {
 }
 
 impl ToDwObj for CoffeeTree {
-    fn to_dw_obj(&self) -> DwObj {
-        DwObj::Icon(DwIcon::new(self.float_pos, ItemType::CoffeeCherry))
+    fn to_dw_obj(&self) -> Result<DwObj, ToDwObjError> {
+        Ok(DwObj::Icon(DwIcon::new(
+            self.float_pos,
+            ItemType::CoffeeCherry,
+        )))
     }
 }
 
@@ -418,7 +443,7 @@ impl InfoUi for Plant {
 
 impl ToRow for LightDirection {
     fn to_row(&mut self, ui: &mut egui::Ui) {
-        egui::ComboBox::from_label("Select one")
+        egui::ComboBox::from_id_salt("light_direction_combo_box")
             .selected_text(format!("{:?}", self))
             .show_ui(ui, |ui| {
                 ui.selectable_value(self, Self::All, "All");
@@ -471,14 +496,18 @@ impl InfoUi for CornPlant {
 }
 
 impl ToDwObj for CornPlant {
-    fn to_dw_obj(&self) -> DwObj {
-        DwObj::Sprite(DwSprite::new_from_parts(
-            if self.flowering { (19, 6) } else { (20, 6) },
+    fn to_dw_obj(&self) -> Result<DwObj, ToDwObjError> {
+        Ok(DwObj::Sprite(DwSprite::new_from_parts(
+            if self.flowering {
+                ImageType::CornPlantFlower
+            } else {
+                ImageType::CornPlant
+            },
             [0.5, 0.0],
             self.float_pos,
-            [1.0, 2.0],
+            [1, 2],
             2.0,
-        ))
+        )))
     }
 }
 
@@ -490,14 +519,18 @@ impl InfoUi for CarrotPlant {
 }
 
 impl ToDwObj for CarrotPlant {
-    fn to_dw_obj(&self) -> DwObj {
-        DwObj::Sprite(DwSprite::new_from_parts(
-            if self.flowering { (21, 6) } else { (22, 6) },
+    fn to_dw_obj(&self) -> Result<DwObj, ToDwObjError> {
+        Ok(DwObj::Sprite(DwSprite::new_from_parts(
+            if self.flowering {
+                ImageType::CarrotFlower
+            } else {
+                ImageType::CarrotPlant
+            },
             [0.5, 0.0],
             self.float_pos,
-            [1.0, 2.0],
+            [1, 2],
             2.0,
-        ))
+        )))
     }
 }
 
@@ -523,14 +556,15 @@ impl InfoUi for KelpPlant {
 }
 
 impl ToDwObj for KelpPlant {
-    fn to_dw_obj(&self) -> DwObj {
-        DwObj::Sprite(DwSprite::new_from_parts(
-            (25, 6),
+    fn to_dw_obj(&self) -> Result<DwObj, ToDwObjError> {
+        // TODO needs more complicated meshs to correctly render KelpPlantTop
+        Ok(DwObj::Sprite(DwSprite::new_from_parts(
+            ImageType::KelpPlant,
             [0.5, 0.0],
             self.float_pos,
-            [1.0, 2.0],
+            [1, 2],
             2.0,
-        ))
+        )))
     }
 }
 
@@ -542,14 +576,14 @@ impl InfoUi for LimeTree {
 }
 
 impl ToDwObj for LimeTree {
-    fn to_dw_obj(&self) -> DwObj {
-        DwObj::Icon(DwIcon::new(self.float_pos, ItemType::Lime))
+    fn to_dw_obj(&self) -> Result<DwObj, ToDwObjError> {
+        Ok(DwObj::Icon(DwIcon::new(self.float_pos, ItemType::Lime)))
     }
 }
 
 impl ToRow for InteractionObjectType {
     fn to_row(&mut self, ui: &mut egui::Ui) {
-        egui::ComboBox::from_label("Select one")
+        egui::ComboBox::from_id_salt("interaction_object_type_combo_box")
             .selected_text(format!("{:?}", self))
             .show_ui(ui, |ui| {
                 ui.selectable_value(self, Self::InteractionObject, "InteractionObject");
@@ -589,6 +623,282 @@ impl InfoUi for InteractionObject {
     }
 }
 
+impl ToRow for WorkbenchType {
+    fn to_row(&mut self, ui: &mut egui::Ui) {
+        egui::ComboBox::from_id_salt("workbench_type_combo_box")
+            .selected_text(format!("{:?}", self))
+            .show_ui(ui, |ui| {
+                ui.selectable_value(self, Self::Undefined, "Undefined");
+                ui.selectable_value(self, Self::BasicPortal, "BasicPortal");
+                ui.selectable_value(self, Self::Workbench, "Workbench");
+                ui.selectable_value(self, Self::Campfire, "Campfire");
+                ui.selectable_value(self, Self::Weave, "Weave");
+                ui.selectable_value(self, Self::Wood, "Wood");
+                ui.selectable_value(self, Self::Tool, "Tool");
+                ui.selectable_value(self, Self::Press, "Press");
+                ui.selectable_value(self, Self::Kiln, "Kiln");
+                ui.selectable_value(self, Self::Furnace, "Furnace");
+                ui.selectable_value(self, Self::Craft, "Craft");
+                ui.selectable_value(self, Self::Mix, "Mix");
+                ui.selectable_value(self, Self::Dye, "Dye");
+                ui.selectable_value(self, Self::PlacedPortal, "PlacedPortal");
+                ui.selectable_value(self, Self::Metalwork, "Metalwork");
+                ui.selectable_value(self, Self::SteamGenerator, "SteamGenerator");
+                ui.selectable_value(self, Self::ElectricKiln, "ElectricKiln");
+                ui.selectable_value(self, Self::ElectricFurnace, "ElectricFurnace");
+                ui.selectable_value(self, Self::ElectricMetalworkBench, "ElectricMetalworkBench");
+                ui.selectable_value(self, Self::ElectricStove, "ElectricStove");
+                ui.selectable_value(self, Self::SolarPanel, "SolarPanel");
+                ui.selectable_value(self, Self::Flywheel, "Flywheel");
+                ui.selectable_value(self, Self::ArmorBench, "ArmorBench");
+                ui.selectable_value(self, Self::TrainYard, "TrainYard");
+                ui.selectable_value(self, Self::Easel, "Easel");
+                ui.selectable_value(self, Self::Build, "Build");
+                ui.selectable_value(self, Self::Refinery, "Refinery");
+                ui.selectable_value(self, Self::ElectricPress, "ElectricPress");
+                ui.selectable_value(self, Self::CompostBin, "CompostBin");
+                ui.selectable_value(self, Self::Sluice, "Sluice");
+                ui.selectable_value(self, Self::EggExtractor, "EggExtractor");
+                ui.selectable_value(self, Self::PizzaOven, "PizzaOven");
+            });
+    }
+}
+
+impl ToGrid for Workbench {
+    fn to_grid(&mut self, ui: &mut egui::Ui) {
+        self.available_electricity
+            .add_row("availableElectricity", ui);
+        self.craft_progress_count.add_row("craftProgressCount", ui);
+        self.fire_spread_timer.add_row("fireSpreadTimer", ui);
+        self.fuel_fraction.add_row("fuelFraction", ui);
+        self.has_fuel.add_row("hasFuel", ui);
+        self.hurry_cost.add_row("hurryCost", ui);
+        self.hurry_seconds.add_row("hurrySeconds", ui);
+        self.hurry_timer.add_row("hurryTimer", ui);
+        self.hurrying.add_row("hurrying", ui);
+        self.last_world_time.add_row("lastWorldTime", ui);
+        self.level.add_row("level", ui);
+        self.save_time.add_row("saveTime", ui);
+        self.selected_index.add_row("selectedIndex", ui);
+        self.workbench_type.add_row("workbenchType", ui);
+        self.x_scroll.add_row("xScroll", ui);
+        self.light_dict.add_row("lightDict", ui);
+    }
+}
+
+impl InfoUi for Workbench {
+    fn info(&mut self, ui: &mut egui::Ui) {
+        let obj = self.deref_mut();
+        obj.info(ui);
+
+        ui.vertical(|ui| {
+            ui.heading("Workbench");
+            ui.separator();
+            self.add_grid("workbench_grid", ui);
+        });
+    }
+}
+
+impl ToDwObj for Workbench {
+    fn to_dw_obj(&self) -> Result<DwObj, ToDwObjError> {
+        let block_coord =
+            BlockCoord::new(self.pos_x as u32, self.pos_y).context(CoordOutOfBoundSnafu)?;
+        let obj = match self.workbench_type {
+            WorkbenchType::Undefined => DwObj::Icon(DwIcon::new(self.float_pos, ItemType::Unknown)),
+            WorkbenchType::BasicPortal | WorkbenchType::PlacedPortal => {
+                DwObj::Sprite(DwSprite::new_from_parts(
+                    ImageType::Portal0,
+                    [0.5, 0.0],
+                    self.float_pos,
+                    [1, 2],
+                    2.0,
+                ))
+            }
+            WorkbenchType::Workbench => DwObj::Block(DwBlock::new(
+                block_coord,
+                match self.level {
+                    0 => VoxelType::WorkbenchLevel1,
+                    1 => VoxelType::WorkbenchLevel2,
+                    2 => VoxelType::WorkbenchLevel3,
+                    3 => VoxelType::WorkbenchLevel4,
+                    _ => InvalidWorkbenchLevelSnafu {
+                        workbench_type: self.workbench_type,
+                        level: self.level,
+                        maximum: 4,
+                    }
+                    .fail()?,
+                },
+            )),
+            WorkbenchType::Campfire => DwObj::Sprite(DwSprite::new_from_parts(
+                ImageType::Campfire0,
+                [0.5, 0.0],
+                self.float_pos,
+                [1, 1],
+                2.0,
+            )),
+            WorkbenchType::Weave => DwObj::Block(DwBlock::new(
+                block_coord,
+                match self.level {
+                    0 => VoxelType::TailorsBenchLevel1,
+                    1 => VoxelType::TailorsBenchLevel2,
+                    _ => InvalidWorkbenchLevelSnafu {
+                        workbench_type: self.workbench_type,
+                        level: self.level,
+                        maximum: 2,
+                    }
+                    .fail()?,
+                },
+            )),
+            WorkbenchType::Wood => {
+                DwObj::Block(DwBlock::new(block_coord, VoxelType::WoodworkBench))
+            }
+            WorkbenchType::Tool => DwObj::Block(DwBlock::new(
+                block_coord,
+                match self.level {
+                    0 => VoxelType::ToolBenchLevel1,
+                    1 => VoxelType::ToolBenchLevel2,
+                    2 => VoxelType::ToolBenchLevel3,
+                    3 => VoxelType::ToolBenchLevel4,
+                    4 => VoxelType::ToolBenchLevel5,
+                    5 => VoxelType::ToolBenchLevel6,
+                    6 => VoxelType::ToolBenchLevel7,
+                    _ => InvalidWorkbenchLevelSnafu {
+                        workbench_type: self.workbench_type,
+                        level: self.level,
+                        maximum: 7,
+                    }
+                    .fail()?,
+                },
+            )),
+            WorkbenchType::Press => DwObj::Block(DwBlock::new(
+                block_coord,
+                match self.level {
+                    0 => VoxelType::PressLevel1,
+                    1 => VoxelType::PressLevel2,
+                    _ => InvalidWorkbenchLevelSnafu {
+                        workbench_type: self.workbench_type,
+                        level: self.level,
+                        maximum: 2,
+                    }
+                    .fail()?,
+                },
+            )),
+            WorkbenchType::Kiln => DwObj::Block(DwBlock::new(block_coord, VoxelType::Kiln)),
+            WorkbenchType::Furnace => DwObj::Block(DwBlock::new(
+                block_coord,
+                match self.level {
+                    0 => VoxelType::FurnaceLevel1,
+                    1 => VoxelType::FurnaceLevel2,
+                    2 => VoxelType::FurnaceLevel3,
+                    _ => InvalidWorkbenchLevelSnafu {
+                        workbench_type: self.workbench_type,
+                        level: self.level,
+                        maximum: 3,
+                    }
+                    .fail()?,
+                },
+            )),
+            WorkbenchType::Craft => DwObj::Block(DwBlock::new(
+                block_coord,
+                match self.level {
+                    0 => VoxelType::CraftBenchLevel1,
+                    1 => VoxelType::CraftBenchLevel2,
+                    2 => VoxelType::CraftBenchLevel3,
+                    3 => VoxelType::CraftBenchLevel4,
+                    _ => InvalidWorkbenchLevelSnafu {
+                        workbench_type: self.workbench_type,
+                        level: self.level,
+                        maximum: 4,
+                    }
+                    .fail()?,
+                },
+            )),
+            WorkbenchType::Mix => DwObj::Block(DwBlock::new(block_coord, VoxelType::MixingBench)),
+            WorkbenchType::Dye => DwObj::Block(DwBlock::new(block_coord, VoxelType::DyeBench)),
+            WorkbenchType::Metalwork => DwObj::Block(DwBlock::new(
+                block_coord,
+                match self.level {
+                    0 => VoxelType::MetalworkBenchLevel1,
+                    1 => VoxelType::MetalworkBenchLevel2,
+                    _ => InvalidWorkbenchLevelSnafu {
+                        workbench_type: self.workbench_type,
+                        level: self.level,
+                        maximum: 2,
+                    }
+                    .fail()?,
+                },
+            )),
+            WorkbenchType::SteamGenerator => {
+                DwObj::Block(DwBlock::new(block_coord, VoxelType::SteamGenerator))
+            }
+            WorkbenchType::ElectricKiln => {
+                DwObj::Block(DwBlock::new(block_coord, VoxelType::ElectricKiln))
+            }
+            WorkbenchType::ElectricFurnace => {
+                DwObj::Block(DwBlock::new(block_coord, VoxelType::ElectricFurnace))
+            }
+            WorkbenchType::ElectricMetalworkBench => {
+                DwObj::Block(DwBlock::new(block_coord, VoxelType::ElectricMetalworkBench))
+            }
+            WorkbenchType::ElectricStove => {
+                DwObj::Block(DwBlock::new(block_coord, VoxelType::ElectricStove))
+            }
+            WorkbenchType::SolarPanel => {
+                DwObj::Block(DwBlock::new(block_coord, VoxelType::SolarPanel))
+            }
+            WorkbenchType::Flywheel => DwObj::Block(DwBlock::new(block_coord, VoxelType::Flywheel)),
+            WorkbenchType::ArmorBench => DwObj::Block(DwBlock::new(
+                block_coord,
+                match self.level {
+                    0 => VoxelType::ArmorBenchLevel1,
+                    1 => VoxelType::ArmorBenchLevel2,
+                    2 => VoxelType::ArmorBenchLevel3,
+                    _ => InvalidWorkbenchLevelSnafu {
+                        workbench_type: self.workbench_type,
+                        level: self.level,
+                        maximum: 3,
+                    }
+                    .fail()?,
+                },
+            )),
+            WorkbenchType::TrainYard => {
+                DwObj::Block(DwBlock::new(block_coord, VoxelType::TrainYard))
+            }
+            WorkbenchType::Easel => DwObj::Icon(DwIcon::new(self.float_pos, ItemType::Easel)),
+            WorkbenchType::Build => DwObj::Block(DwBlock::new(
+                block_coord,
+                match self.level {
+                    0 => VoxelType::BuildersBenchLevel1,
+                    1 => VoxelType::BuildersBenchLevel2,
+                    _ => InvalidWorkbenchLevelSnafu {
+                        workbench_type: self.workbench_type,
+                        level: self.level,
+                        maximum: 2,
+                    }
+                    .fail()?,
+                },
+            )),
+            WorkbenchType::Refinery => DwObj::Icon(DwIcon::new(self.float_pos, ItemType::Refinery)),
+            WorkbenchType::ElectricPress => {
+                DwObj::Block(DwBlock::new(block_coord, VoxelType::ElectricPress))
+            }
+            WorkbenchType::CompostBin => {
+                DwObj::Block(DwBlock::new(block_coord, VoxelType::CompostBin))
+            }
+            WorkbenchType::Sluice => {
+                DwObj::Icon(DwIcon::new(self.float_pos, ItemType::ElectricSluice))
+            }
+            WorkbenchType::EggExtractor => {
+                DwObj::Block(DwBlock::new(block_coord, VoxelType::EggExtractor))
+            }
+            WorkbenchType::PizzaOven => {
+                DwObj::Block(DwBlock::new(block_coord, VoxelType::PizzaOven))
+            }
+        };
+        Ok(obj)
+    }
+}
+
 impl ToGrid for Chest {
     fn to_grid(&mut self, ui: &mut egui::Ui) {
         self.save_time.add_row("saveTime", ui);
@@ -610,11 +920,10 @@ impl InfoUi for Chest {
 }
 
 impl ToDwObj for Chest {
-    fn to_dw_obj(&self) -> DwObj {
-        // TODO: make this fallable
-        let block_coord = BlockCoord::new(self.pos_x as u32, self.pos_y)
-            .expect("dynamic object size out of world bound");
-        match self.slots.chest_type() {
+    fn to_dw_obj(&self) -> Result<DwObj, ToDwObjError> {
+        let block_coord =
+            BlockCoord::new(self.pos_x as u32, self.pos_y).context(CoordOutOfBoundSnafu)?;
+        let obj = match self.slots.chest_type() {
             ChestType::Standard => {
                 DwObj::Block(DwBlock::new(block_coord, VoxelType::StandardChest))
             }
@@ -626,13 +935,14 @@ impl ToDwObj for Chest {
                 DwObj::Icon(DwIcon::new(self.float_pos, ItemType::DisplayCabinet))
             }
             ChestType::Feeder => DwObj::Block(DwBlock::new(block_coord, VoxelType::FeederChest)),
-        }
+        };
+        Ok(obj)
     }
 }
 
 impl ToRow for TreeType {
     fn to_row(&mut self, ui: &mut egui::Ui) {
-        egui::ComboBox::from_label("Select one")
+        egui::ComboBox::from_id_salt("tree_type_combo_box")
             .selected_text(format!("{:?}", self))
             .show_ui(ui, |ui| {
                 ui.selectable_value(self, Self::Nothing, "Nothing");
@@ -676,7 +986,7 @@ impl InfoUi for GemTree {
 }
 
 impl ToDwObj for GemTree {
-    fn to_dw_obj(&self) -> DwObj {
+    fn to_dw_obj(&self) -> Result<DwObj, ToDwObjError> {
         let item_type = match self.gem_tree_type {
             TreeType::Amethyst => ItemType::Amethyst,
             TreeType::Sapphire => ItemType::Sapphire,
@@ -685,7 +995,7 @@ impl ToDwObj for GemTree {
             TreeType::Diamond => ItemType::Diamond,
             _ => ItemType::Unknown,
         };
-        DwObj::Icon(DwIcon::new(self.float_pos, item_type))
+        Ok(DwObj::Icon(DwIcon::new(self.float_pos, item_type)))
     }
 }
 
@@ -697,13 +1007,17 @@ impl InfoUi for TomatoPlant {
 }
 
 impl ToDwObj for TomatoPlant {
-    fn to_dw_obj(&self) -> DwObj {
-        DwObj::Sprite(DwSprite::new_from_parts(
-            if self.flowering { (27, 22) } else { (26, 22) },
+    fn to_dw_obj(&self) -> Result<DwObj, ToDwObjError> {
+        Ok(DwObj::Sprite(DwSprite::new_from_parts(
+            if self.flowering {
+                ImageType::TomatoPlantFlower
+            } else {
+                ImageType::TomatoPlant
+            },
             [0.5, 0.0],
             self.float_pos,
-            [1.0, 2.0],
+            [1, 2],
             2.0,
-        ))
+        )))
     }
 }

@@ -752,7 +752,7 @@ impl EditorApp {
                 SteamLocomotive => {}
                 FreightCar => {}
                 PassengerCar => {}
-                Workbench => {}
+                Workbench => draw_window(title, dw_chunk.workbench.get_mut(id.index), ctx),
                 Chest => draw_window(title, dw_chunk.chest.get_mut(id.index), ctx),
                 Sign => {}
                 TradingPost => {}
