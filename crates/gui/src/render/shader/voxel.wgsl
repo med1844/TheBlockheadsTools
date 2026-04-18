@@ -571,7 +571,7 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     var bounds_intersect = intersect_world_bounds(ray);
 
     let t_mesh = get_t_mesh(in.uv, raw_mesh_depth, ray);
-    bounds_intersect.t_max = min(bounds_intersect.t_max, t_mesh);
+    bounds_intersect.t_max = min(bounds_intersect.t_max, t_mesh - 1e-3);
 
     if (!bounds_intersect.hit || bounds_intersect.t_min > bounds_intersect.t_max) {
         var output: FragmentOutput;
