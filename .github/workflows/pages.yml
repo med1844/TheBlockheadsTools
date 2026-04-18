@@ -37,7 +37,7 @@ jobs:
         # relatively as eframe_template/favicon.ico. if we skip public-url option, the href paths will instead request username.github.io/favicon.ico which
         # will obviously return error 404 not found.
         working-directory: crates/web_gui
-        run: trunk build --release --public-url $public_url
+        run: trunk build --cargo-profile wasm-release --public-url $public_url
         env:
           public_url: "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/editor/"
       # setup uv for mkdocs
