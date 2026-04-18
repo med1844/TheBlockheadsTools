@@ -282,6 +282,7 @@ impl RenderResources {
                 &albedo_texture,
                 &hover_on_id_buf,
                 &selected_id_buf,
+                &render_settings_buf,
             ),
             grid: grid::GridRenderer::new(
                 device,
@@ -511,7 +512,15 @@ impl egui_wgpu::CallbackTrait for Render3dCallback {
                             store: wgpu::StoreOp::Store,
                         },
                     }),
-                    None, // slot 3: translucency (unused in mesh pass)
+                    Some(wgpu::RenderPassColorAttachment {
+                        view: &r.g_buffer.translucency.view,
+                        depth_slice: None,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                            store: wgpu::StoreOp::Store,
+                        },
+                    }),
                     Some(wgpu::RenderPassColorAttachment {
                         view: &r.g_buffer.mesh_flags.view,
                         depth_slice: None,
@@ -558,17 +567,15 @@ impl egui_wgpu::CallbackTrait for Render3dCallback {
                             store: wgpu::StoreOp::Store,
                         },
                     }),
-                    // slot 2: translucency - cleared each voxel pass
                     Some(wgpu::RenderPassColorAttachment {
                         view: &r.g_buffer.translucency.view,
                         depth_slice: None,
                         resolve_target: None,
                         ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                            load: wgpu::LoadOp::Load,
                             store: wgpu::StoreOp::Store,
                         },
                     }),
-                    // slot 3: flags
                     Some(wgpu::RenderPassColorAttachment {
                         view: &r.g_buffer.flags.view,
                         depth_slice: None,

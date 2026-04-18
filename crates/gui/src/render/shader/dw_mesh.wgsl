@@ -34,12 +34,29 @@ struct VertexOutput {
     @location(2) @interpolate(flat) id: u32,
     @location(3) @interpolate(flat) chunk_x: u32,
     @location(4) @interpolate(flat) chunk_y: u32,
+    @location(5) world_pos: vec3<f32>,
 };
+
+struct RenderSettings {
+    light_dir: vec3<f32>,
+    enable_reflect: u32,
+    enable_destruct: u32,
+    enable_ssao: u32,
+    enable_cyclic: u32,
+    ambient_light: f32,
+    shininess: f32,
+    specular_intensity: f32,
+    min_depth_factor: f32,
+    _padding0: u32,
+};
+
+@group(0) @binding(5) var<uniform> render_settings: RenderSettings;
 
 struct FragmentOutput {
     @location(0) uv: vec4<f32>,
     @location(1) normal: vec4<f32>,
     @location(2) id: u32,
+    @location(3) translucency: vec4<f32>,
     @location(4) flags: u32,
     @builtin(frag_depth) depth: f32,
 }
@@ -54,13 +71,22 @@ fn vs_main(model: VertexInput) -> VertexOutput {
     out.chunk_x = model.chunk_x;
     out.chunk_y = model.chunk_y;
     out.normal = model.normal;
+    out.world_pos = model.position;
     return out;
+}
+
+fn calculate_translucent_lighting(base_color: vec3<f32>, face_normal: vec3<f32>, view_dir: vec3<f32>) -> vec3<f32> {
+    let light_direction = normalize(render_settings.light_dir);
+    let ambient_light = render_settings.ambient_light;
+    let diffuse_factor = max(dot(face_normal, light_direction), 0.0);
+    let final_light_factor = ambient_light + (1.0 - ambient_light) * diffuse_factor;
+
+    // Specular is ignored for meshes for now
+    return base_color * final_light_factor;
 }
 
 @fragment
 fn fs_main(in: VertexOutput) -> FragmentOutput {
-    // We sample here only to discard transparent pixels Early.
-    // The actual color sampling happens in the composite pass.
     let color = textureSample(tilemap_texture, tilemap_sampler, in.tex_coords);
 
     if (color.a == 0.0) {
@@ -89,10 +115,26 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     }
 
     var output: FragmentOutput;
-    output.depth = in.clip_position.z;
-    output.uv = vec4<f32>(in.tex_coords, 0.0, 1.0);
-    output.normal = vec4<f32>(in.normal, 1.0);
     output.id = in.id;
     output.flags = flags;
+
+    if (color.a < 1.0) {
+        // Translucent mesh pixel
+        let view_dir = normalize(camera.camera_pos.xyz - (in.world_pos - camera.world_offset.xyz));
+        let lit_rgb = calculate_translucent_lighting(color.rgb, normalize(in.normal), view_dir);
+        output.translucency = vec4<f32>(lit_rgb, color.a);
+
+        // Clear other targets
+        output.uv = vec4<f32>(0.0);
+        output.normal = vec4<f32>(0.0, 0.0, 1.0, 0.0);
+        output.depth = 1.0; // Don't write to depth
+    } else {
+        // Opaque mesh pixel
+        output.depth = in.clip_position.z;
+        output.uv = vec4<f32>(in.tex_coords, 0.0, 1.0);
+        output.normal = vec4<f32>(in.normal, 1.0);
+        output.translucency = vec4<f32>(0.0);
+    }
+
     return output;
 }

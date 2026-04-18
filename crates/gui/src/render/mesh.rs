@@ -12,6 +12,7 @@ impl DwMeshRenderer {
         albedo_texture: &Texture,
         hover_on_id_buf: &wgpu::Buffer,
         selected_id_buf: &wgpu::Buffer,
+        render_settings_buf: &wgpu::Buffer,
     ) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("DW Sprite Shader"),
@@ -24,7 +25,7 @@ impl DwMeshRenderer {
                 // Camera
                 wgpu::BindGroupLayoutEntry {
                     binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX,
+                    visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform,
                         has_dynamic_offset: false,
@@ -72,6 +73,17 @@ impl DwMeshRenderer {
                     },
                     count: None,
                 },
+                // Render Settings
+                wgpu::BindGroupLayoutEntry {
+                    binding: 5,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
             ],
         });
 
@@ -98,6 +110,10 @@ impl DwMeshRenderer {
                     binding: 4,
                     resource: selected_id_buf.as_entire_binding(),
                 },
+                wgpu::BindGroupEntry {
+                    binding: 5,
+                    resource: render_settings_buf.as_entire_binding(),
+                },
             ],
             label: Some("dw_bind_group"),
         });
@@ -121,22 +137,31 @@ impl DwMeshRenderer {
                 module: &shader,
                 entry_point: Some("fs_main"),
                 targets: &[
+                    // slot 0: uv
                     Some(wgpu::ColorTargetState {
                         format: wgpu::TextureFormat::Rgba16Float,
                         blend: None,
                         write_mask: wgpu::ColorWrites::ALL,
                     }),
+                    // slot 1: normal
                     Some(wgpu::ColorTargetState {
                         format: wgpu::TextureFormat::Rgba16Float,
                         blend: None,
                         write_mask: wgpu::ColorWrites::ALL,
                     }),
+                    // slot 2: id
                     Some(wgpu::ColorTargetState {
                         format: ID_TEXTURE_FORMAT,
                         blend: None,
                         write_mask: wgpu::ColorWrites::ALL,
                     }),
-                    None, // slot 3: translucency
+                    // slot 3: translucency
+                    Some(wgpu::ColorTargetState {
+                        format: wgpu::TextureFormat::Bgra8Unorm,
+                        blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    }),
+                    // slot 4: flags
                     Some(wgpu::ColorTargetState {
                         format: wgpu::TextureFormat::R8Uint,
                         blend: None,
