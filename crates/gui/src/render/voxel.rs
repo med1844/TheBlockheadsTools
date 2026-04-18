@@ -1,17 +1,16 @@
-use super::{GeometryBuffer, Texture, VoxelType};
+use super::{super::gpu::voxel_util, GeometryBuffer, Texture, VoxelType};
 use eframe::wgpu::{self, util::DeviceExt};
-use the_blockheads_tools_lib::game::chunk::Chunk;
 
 // Raymarch voxel renderer
 pub struct VoxelRenderer {
     pub voxel_buf: wgpu::Buffer,
+    pub world_dim_x_buf: wgpu::Buffer,
     pipeline: wgpu::RenderPipeline,
     bind_group: wgpu::BindGroup,
     buffer_bind_group_layout: wgpu::BindGroupLayout,
     buffer_bind_group: wgpu::BindGroup,
     voxel_bind_group_layout: wgpu::BindGroupLayout,
     voxel_bind_group: wgpu::BindGroup,
-    world_dim_x_buf: wgpu::Buffer,
 }
 
 impl VoxelRenderer {
@@ -22,8 +21,8 @@ impl VoxelRenderer {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         device: &wgpu::Device,
-        voxel_buf: wgpu::Buffer,
         camera_buf: &wgpu::Buffer,
+        world_dim_x_buf: wgpu::Buffer,
         selected_block_buf: &wgpu::Buffer,
         hover_on_block_buf: &wgpu::Buffer,
         g_buffer: &GeometryBuffer,
@@ -156,6 +155,17 @@ impl VoxelRenderer {
                     ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                     count: None,
                 },
+                // world_width_macro uniform (u32 = num chunks wide)
+                wgpu::BindGroupLayoutEntry {
+                    binding: 11,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
             ],
             label: Some("Voxel Static Bind Group Layout"),
         });
@@ -206,6 +216,10 @@ impl VoxelRenderer {
                 wgpu::BindGroupEntry {
                     binding: 10,
                     resource: wgpu::BindingResource::Sampler(&destruct_texture.sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 11,
+                    resource: world_dim_x_buf.as_entire_binding(),
                 },
             ],
             label: Some("Voxel Static Bind Group"),
@@ -264,33 +278,12 @@ impl VoxelRenderer {
                         },
                         count: None,
                     },
-                    // world_width_macro uniform (u32 = num chunks wide)
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 1,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Buffer {
-                            ty: wgpu::BufferBindingType::Uniform,
-                            has_dynamic_offset: false,
-                            min_binding_size: None,
-                        },
-                        count: None,
-                    },
                 ],
             });
 
-        let default_world_dim_x = Self::DEFAULT_WORLD_WIDTH_CHUNK * Chunk::NUM_BLOCK_PER_ROW as u32;
-        let world_dim_x_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("World Dim X Buffer"),
-            contents: bytemuck::cast_slice(&[default_world_dim_x]),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
-
-        let voxel_bind_group = Self::create_voxel_bind_group(
-            device,
-            &voxel_bind_group_layout,
-            &voxel_buf,
-            &world_dim_x_buf,
-        );
+        let voxel_buf = voxel_util::create_buffer(device, Self::DEFAULT_WORLD_WIDTH_CHUNK as usize);
+        let voxel_bind_group =
+            Self::create_voxel_bind_group(device, &voxel_bind_group_layout, &voxel_buf);
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Render Pipeline Layout"),
@@ -400,20 +393,13 @@ impl VoxelRenderer {
         device: &wgpu::Device,
         layout: &wgpu::BindGroupLayout,
         voxel_buf: &wgpu::Buffer,
-        world_dim_x_buf: &wgpu::Buffer,
     ) -> wgpu::BindGroup {
         device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: voxel_buf.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: world_dim_x_buf.as_entire_binding(),
-                },
-            ],
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: voxel_buf.as_entire_binding(),
+            }],
             label: Some("Voxel Data Bind Group"),
         })
     }
@@ -436,12 +422,8 @@ impl VoxelRenderer {
             bytemuck::cast_slice(&[world_dim_x]),
         );
         self.voxel_buf = new_voxel_buf;
-        self.voxel_bind_group = Self::create_voxel_bind_group(
-            device,
-            &self.voxel_bind_group_layout,
-            &self.voxel_buf,
-            &self.world_dim_x_buf,
-        );
+        self.voxel_bind_group =
+            Self::create_voxel_bind_group(device, &self.voxel_bind_group_layout, &self.voxel_buf);
     }
 
     pub fn render(&self, render_pass: &mut wgpu::RenderPass<'_>) {

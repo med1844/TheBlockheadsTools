@@ -13,6 +13,8 @@ use std::sync::{
     Arc, Mutex,
     atomic::{AtomicBool, Ordering},
 };
+use the_blockheads_tools_lib::game::chunk::Chunk;
+use wgpu::util::DeviceExt;
 use zune_png::PngDecoder;
 
 const ID_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::R32Uint;
@@ -188,7 +190,6 @@ impl RenderResources {
     pub fn new(
         state: &egui_wgpu::RenderState,
         camera_buf: wgpu::Buffer,
-        voxel_buf: wgpu::Buffer,
         selected_block_buf: wgpu::Buffer,
         hover_on_block_buf: wgpu::Buffer,
         hover_on_dyn_obj_id: Arc<Mutex<Option<DwChunkObjId>>>,
@@ -246,12 +247,19 @@ impl RenderResources {
                 id_uniform.create_buffer(device),
             )
         };
+        let default_world_dim_x =
+            voxel::VoxelRenderer::DEFAULT_WORLD_WIDTH_CHUNK * Chunk::NUM_BLOCK_PER_ROW as u32;
+        let world_dim_x_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("World Dim X Buffer"),
+            contents: bytemuck::cast_slice(&[default_world_dim_x]),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
 
         Self {
             voxel: voxel::VoxelRenderer::new(
                 device,
-                voxel_buf,
                 &camera_buf,
+                world_dim_x_buf.clone(),
                 &selected_block_buf,
                 &hover_on_block_buf,
                 &g_buffer,
@@ -275,7 +283,13 @@ impl RenderResources {
                 &hover_on_id_buf,
                 &selected_id_buf,
             ),
-            grid: grid::GridRenderer::new(device, &camera_buf, target_format),
+            grid: grid::GridRenderer::new(
+                device,
+                &camera_buf,
+                &world_dim_x_buf,
+                &render_settings_buf,
+                target_format,
+            ),
             ssao: ssao::SsaoRenderer::new(device, queue, &camera_buf, &g_buffer),
             ssao_blur: ssao::SsaoBlurRenderer::new(device, &g_buffer),
             composite,

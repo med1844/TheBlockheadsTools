@@ -110,19 +110,23 @@ struct RenderSettings {
 @group(0) @binding(9)  var texture_destruct: texture_2d<f32>;
 @group(0) @binding(10) var sampler_destruct: sampler;
 
+// 1x world = 16384, 16x world = 262144
+// Must be power of 2, or wrap_voxel_x will produce undefined behavior.
+// Enforced by Rust code.
+@group(0) @binding(11) var<uniform> world_dim_x: u32;
+
 @group(1) @binding(0) var mesh_depth_texture: texture_depth_2d;
 @group(1) @binding(1) var mesh_depth_sampler: sampler;
 @group(1) @binding(2) var mesh_flags_texture: texture_2d<u32>;
 
 @group(2) @binding(0) var<storage, read> voxel_data: array<u32>;
-@group(2) @binding(1) var<uniform> world_dim_x: u32; // 1x world = 16384, 16x world = 262144
 
 fn wrap_voxel_x(x: i32) -> i32 {
     if render_settings.enable_cyclic == 0u {
         return x;
     }
-    // Fast positive modulo for potentially-negative values
-    return ((x % i32(world_dim_x)) + i32(world_dim_x)) % i32(world_dim_x);
+    let mask = i32(world_dim_x) - 1;
+    return x & mask; // works for negative numbers as well
 }
 
 fn get_voxel_type(global_voxel_coords: vec3<i32>) -> u32 {

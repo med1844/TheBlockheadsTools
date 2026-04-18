@@ -6,7 +6,7 @@ use super::{
         dw::{DwBuf, DwChunkObjId, DwChunkObjIdUniform},
         voxel_util,
     },
-    render::{GeometryBuffer, Render3dCallback, RenderResources, voxel::VoxelRenderer},
+    render::{GeometryBuffer, Render3dCallback, RenderResources},
 };
 use eframe::{egui, egui_wgpu, emath::Rect, wgpu};
 use glam::Vec3Swizzles;
@@ -212,13 +212,10 @@ impl EditorApp {
         let device = &state.device;
 
         let camera = Camera::default();
-        let voxel_buf =
-            voxel_util::create_buffer(device, VoxelRenderer::DEFAULT_WORLD_WIDTH_CHUNK as usize);
         let interaction_state = InteractionState::default();
         let render_resources = RenderResources::new(
             state,
             camera.create_buffer(device),
-            voxel_buf,
             interaction_state
                 .selected_block_gpu
                 .uniform()

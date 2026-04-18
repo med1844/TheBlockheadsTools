@@ -6,18 +6,40 @@ struct CameraUniform {
 };
 
 @group(0) @binding(0) var<uniform> camera: CameraUniform;
+@group(0) @binding(1) var<uniform> world_dim_x: u32; // 1x world = 16384, 16x world = 262144
+
+struct RenderSettings {
+    light_dir: vec3<f32>,
+    enable_reflect: u32,
+    enable_destruct: u32,
+    enable_ssao: u32,
+    enable_cyclic: u32,
+    ambient_light: f32,
+    shininess: f32,
+    specular_intensity: f32,
+    min_depth_factor: f32,
+    _padding0: u32,
+};
+
+@group(0) @binding(2) var<uniform> render_settings: RenderSettings;
 
 // --- World Constants (must match voxel.wgsl) ---
-const WORLD_CHUNKS_X: u32 = 512u;
 const WORLD_CHUNKS_Y: u32 = 32u;
 const CHUNK_DIM_X: u32 = 32u;
 const CHUNK_DIM_Y: u32 = 32u;
-const WORLD_DIM_X_F32: f32 = f32(CHUNK_DIM_X * WORLD_CHUNKS_X); // 16384.0
 const WORLD_DIM_Y_F32: f32 = f32(CHUNK_DIM_Y * WORLD_CHUNKS_Y); // 1024.0
 
 // --- Grid Constants ---
 const GRID_Z: f32 = 3.0;
 const CHUNK_SIZE: f32 = 32.0;
+
+fn wrap_voxel_x(x: f32) -> f32 {
+    if render_settings.enable_cyclic == 0u {
+        return x;
+    }
+    let dim = f32(world_dim_x);
+    return x - dim * floor(x / dim);
+}
 
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
@@ -69,10 +91,11 @@ fn fs_grid(in: VertexOutput) -> @location(0) vec4<f32> {
         discard;
     }
 
-    let world_pos = ray_origin_world + ray_dir_world * t;
+    let raw_world_pos = ray_origin_world + ray_dir_world * t;
+    let world_pos = vec3<f32>(wrap_voxel_x(raw_world_pos.x), raw_world_pos.yz);
 
     // --- 3. Check World Boundaries ---
-    if (world_pos.x < 0.0 || world_pos.x > WORLD_DIM_X_F32 ||
+    if (world_pos.x < 0.0 || world_pos.x > f32(world_dim_x) ||
         world_pos.y < 0.0 || world_pos.y > WORLD_DIM_Y_F32) {
         discard;
     }
@@ -81,23 +104,25 @@ fn fs_grid(in: VertexOutput) -> @location(0) vec4<f32> {
 
     // Get the width of one pixel in world coordinates
     let line_width_vec = fwidth(world_pos.xy);
-    let line_width = (line_width_vec.x + line_width_vec.y) * 0.5 * 1.0; // 1.0 pixel wide
+
+    let chunk_size_vec = vec2<f32>(f32(CHUNK_DIM_X), f32(CHUNK_DIM_Y));
 
     // `d` = distance from the "previous" grid line
-    let d = world_pos.xy % CHUNK_SIZE;
+    let d = world_pos.xy % chunk_size_vec;
     // `dist` = distance to the *nearest* grid line
-    let dist = min(d, CHUNK_SIZE - d);
+    let dist = min(d, chunk_size_vec - d);
 
-    // `grid_line` will be 0.0 on the line, and increase as we move away
-    let grid_line = dist / line_width;
+    // Calculate distance to the line in screen pixels
+    let pixel_dist = dist / line_width_vec;
 
-    // Find the closest line (horizontal or vertical)
-    let line = min(grid_line.x, grid_line.y);
+    // Find the closest line (horizontal or vertical) in pixels
+    let line = min(pixel_dist.x, pixel_dist.y);
 
-    // `alpha` will be 1.0 on the line, fading to 0.0 over 1 pixel
-    let alpha = 1.0 - min(line, 1.0);
+    let line_width_pixels = 2.0;
+    // `alpha` is 1.0 inside the solid core, and fades to 0.0 over 1 pixel on the edges for AA
+    let alpha = clamp((line_width_pixels * 0.5 + 0.5) - line, 0.0, 1.0);
 
-    let final_alpha = alpha * 0.1;
+    let final_alpha = alpha * 0.25;
 
     if (final_alpha < 1e-6) {
         discard;
