@@ -10,6 +10,8 @@ use the_blockheads_tools_lib::game::{
     item::ItemType,
 };
 
+const EPSILON: f32 = 1e-6;
+
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct DwIconVertex {
@@ -145,8 +147,8 @@ impl DwSprite {
     pub fn to_vertices(&self, id: DwChunkObjId, coord: ChunkCoord) -> ([DwVertex; 4], [u32; 6]) {
         let [min_x, min_y] = self.min;
         let [max_x, max_y] = self.max;
-        let [u_min, v_min] = self.uv_min;
-        let [u_max, v_max] = self.uv_max;
+        let [u_min, v_min] = self.uv_min.map(|v| v + EPSILON);
+        let [u_max, v_max] = self.uv_max.map(|v| v - 2.0 * EPSILON);
         let raw_id = id.to_raw_id();
         let chunk_x = coord.x();
         let chunk_y = coord.y() as u32;
@@ -279,8 +281,9 @@ impl ChunkDwBlock {
             Face::Down { .. } => uv.down(),
             Face::Left { .. } | Face::Right { .. } | Face::Front => uv.side(),
         }
-        .to_uv_min();
-        let [u_max, v_max] = [u_min + ImageType::TILE_SIZE, v_min + ImageType::TILE_SIZE];
+        .to_uv_min()
+        .map(|v| v + EPSILON);
+        let [u_max, v_max] = [u_min, v_min].map(|v| v + ImageType::TILE_SIZE - 2.0 * EPSILON);
 
         let normal = match face {
             Face::Up => [0.0, 1.0, 0.0],
