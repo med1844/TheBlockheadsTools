@@ -428,15 +428,9 @@ impl ChunkDwBlock {
     }
 }
 
-pub enum DwObj {
-    Icon(DwIcon),
-    Sprite(DwSprite),
-    Block(DwBlock),
-}
-
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub(crate)))]
-pub enum ToDwObjError {
+pub enum BuildDwMeshError {
     #[snafu(display("Object coordinate out of world bound: {source}"))]
     CoordOutOfBound { source: CoordError },
     #[snafu(display("Workbench with type {} has level {level} that exceeds maximum {maximum}"))]
@@ -447,8 +441,8 @@ pub enum ToDwObjError {
     },
 }
 
-pub trait ToDwObj {
-    fn to_dw_obj(&self) -> Result<DwObj, ToDwObjError>;
+pub trait BuildDwMesh {
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError>;
 }
 
 struct MeshAggregator<V, I> {
@@ -635,10 +629,38 @@ impl DwVertex {
     }
 }
 
-struct DwChunkBufBuilder {
+pub struct DwChunkBufBuilder {
+    id: DwChunkObjId,
+    coord: ChunkCoord,
     icon_instances: Vec<DwIconInstanceRaw>,
     faces_mesh_builder: MeshAggregator<[DwVertex; 4], [u32; 6]>,
     blocks: ChunkDwBlock,
+}
+
+impl DwChunkBufBuilder {
+    pub fn set_id(&mut self, id: DwChunkObjId) {
+        self.id = id;
+    }
+
+    pub fn add_icon(&mut self, icon: DwIcon) {
+        self.icon_instances.push(icon.instance(self.id, self.coord));
+    }
+
+    pub fn add_sprite(&mut self, sprite: DwSprite) {
+        let (vertices, indices) = sprite.to_vertices(self.id, self.coord);
+        self.faces_mesh_builder.add(vertices, indices);
+    }
+
+    pub fn add_block(&mut self, block: DwBlock) {
+        self.blocks.add(block, self.id);
+    }
+
+    #[allow(unused)]
+    pub fn add_faces<I: Iterator<Item = ([DwVertex; 4], [u32; 6])>>(&mut self, faces: I) {
+        for (vertices, indices) in faces {
+            self.faces_mesh_builder.add(vertices, indices);
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -659,28 +681,17 @@ impl DwChunkBuf {
         coord: ChunkCoord,
         device: &wgpu::Device,
     ) -> Option<Self> {
-        fn add<'a, T: ToDwObj + 'a, I: Iterator<Item = &'a T>>(
+        fn add<'a, T: BuildDwMesh + 'a, I: Iterator<Item = &'a T>>(
             i: I,
             obj_type: DynamicObjectType,
-            coord: ChunkCoord,
             builder: &mut DwChunkBufBuilder,
         ) {
             for (index, obj) in i.enumerate() {
                 let id = DwChunkObjId::new(obj_type, index);
-                if let Ok(dw_obj) = obj.to_dw_obj() {
-                    match dw_obj {
-                        DwObj::Icon(dw_icon) => {
-                            builder.icon_instances.push(dw_icon.instance(id, coord));
-                        }
-                        DwObj::Sprite(dw_sprite) => {
-                            let (vertices, indices) = dw_sprite.to_vertices(id, coord);
-                            builder.faces_mesh_builder.add(vertices, indices);
-                        }
-                        DwObj::Block(dw_block) => {
-                            builder.blocks.add(dw_block, id);
-                        }
-                    }
-                }
+                builder.set_id(id);
+
+                // should report error, for now we just skip
+                let _ = obj.build_dw_mesh(builder);
             }
         }
 
@@ -693,30 +704,33 @@ impl DwChunkBuf {
             icon_instances: Vec::with_capacity(num_objs),
             faces_mesh_builder: MeshAggregator::with_capacity(num_objs),
             blocks: ChunkDwBlock::default(),
+            id: DwChunkObjId::new(DynamicObjectType::AppleTree, 0), // random id - won't be read.
+            coord,
         };
 
         use DynamicObjectType::*;
-        add(chunk.apple_tree.iter(), AppleTree, coord, &mut builder);
-        add(chunk.maple_tree.iter(), MapleTree, coord, &mut builder);
-        add(chunk.mango_tree.iter(), MangoTree, coord, &mut builder);
-        add(chunk.pine_tree.iter(), PineTree, coord, &mut builder);
-        add(chunk.cactus_tree.iter(), CactusTree, coord, &mut builder);
-        add(chunk.coconut_tree.iter(), CoconutTree, coord, &mut builder);
-        add(chunk.orange_tree.iter(), OrangeTree, coord, &mut builder);
-        add(chunk.cherry_tree.iter(), CherryTree, coord, &mut builder);
-        add(chunk.coffee_tree.iter(), CoffeeTree, coord, &mut builder);
-        add(chunk.corn_plant.iter(), CornPlant, coord, &mut builder);
-        add(chunk.carrot_plant.iter(), CarrotPlant, coord, &mut builder);
-        add(chunk.kelp_plant.iter(), KelpPlant, coord, &mut builder);
-        add(chunk.lime_tree.iter(), LimeTree, coord, &mut builder);
-        add(chunk.workbench.iter(), Workbench, coord, &mut builder);
-        add(chunk.chest.iter(), Chest, coord, &mut builder);
-        add(chunk.tomato_plant.iter(), TomatoPlant, coord, &mut builder);
+        add(chunk.apple_tree.iter(), AppleTree, &mut builder);
+        add(chunk.maple_tree.iter(), MapleTree, &mut builder);
+        add(chunk.mango_tree.iter(), MangoTree, &mut builder);
+        add(chunk.pine_tree.iter(), PineTree, &mut builder);
+        add(chunk.cactus_tree.iter(), CactusTree, &mut builder);
+        add(chunk.coconut_tree.iter(), CoconutTree, &mut builder);
+        add(chunk.orange_tree.iter(), OrangeTree, &mut builder);
+        add(chunk.cherry_tree.iter(), CherryTree, &mut builder);
+        add(chunk.coffee_tree.iter(), CoffeeTree, &mut builder);
+        add(chunk.corn_plant.iter(), CornPlant, &mut builder);
+        add(chunk.carrot_plant.iter(), CarrotPlant, &mut builder);
+        add(chunk.kelp_plant.iter(), KelpPlant, &mut builder);
+        add(chunk.lime_tree.iter(), LimeTree, &mut builder);
+        add(chunk.workbench.iter(), Workbench, &mut builder);
+        add(chunk.chest.iter(), Chest, &mut builder);
+        add(chunk.tomato_plant.iter(), TomatoPlant, &mut builder);
 
         let DwChunkBufBuilder {
             icon_instances,
             mut faces_mesh_builder,
             blocks,
+            ..
         } = builder;
 
         let instance_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {

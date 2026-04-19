@@ -3,8 +3,8 @@ use super::{
     gpu::{
         VoxelType,
         dw::{
-            CoordOutOfBoundSnafu, DwBlock, DwIcon, DwObj, DwSprite, InvalidWorkbenchLevelSnafu,
-            ToDwObj, ToDwObjError,
+            BuildDwMesh, BuildDwMeshError, CoordOutOfBoundSnafu, DwBlock, DwChunkBufBuilder,
+            DwIcon, DwSprite, InvalidWorkbenchLevelSnafu,
         },
     },
     image_type::ImageType,
@@ -246,9 +246,10 @@ impl InfoUi for Tree {
     }
 }
 
-impl ToDwObj for AppleTree {
-    fn to_dw_obj(&self) -> Result<DwObj, ToDwObjError> {
-        Ok(DwObj::Icon(DwIcon::new(self.float_pos, ItemType::Apple)))
+impl BuildDwMesh for AppleTree {
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        builder.add_icon(DwIcon::new(self.float_pos, ItemType::Apple));
+        Ok(())
     }
 }
 
@@ -271,12 +272,10 @@ impl InfoUi for AppleTree {
     }
 }
 
-impl ToDwObj for MapleTree {
-    fn to_dw_obj(&self) -> Result<DwObj, ToDwObjError> {
-        Ok(DwObj::Icon(DwIcon::new(
-            self.float_pos,
-            ItemType::MapleSeed,
-        )))
+impl BuildDwMesh for MapleTree {
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        builder.add_icon(DwIcon::new(self.float_pos, ItemType::MapleSeed));
+        Ok(())
     }
 }
 
@@ -287,9 +286,10 @@ impl InfoUi for MapleTree {
     }
 }
 
-impl ToDwObj for MangoTree {
-    fn to_dw_obj(&self) -> Result<DwObj, ToDwObjError> {
-        Ok(DwObj::Icon(DwIcon::new(self.float_pos, ItemType::Mango)))
+impl BuildDwMesh for MangoTree {
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        builder.add_icon(DwIcon::new(self.float_pos, ItemType::Mango));
+        Ok(())
     }
 }
 
@@ -319,9 +319,10 @@ impl InfoUi for PineTree {
     }
 }
 
-impl ToDwObj for PineTree {
-    fn to_dw_obj(&self) -> Result<DwObj, ToDwObjError> {
-        Ok(DwObj::Icon(DwIcon::new(self.float_pos, ItemType::Pinecone)))
+impl BuildDwMesh for PineTree {
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        builder.add_icon(DwIcon::new(self.float_pos, ItemType::Pinecone));
+        Ok(())
     }
 }
 
@@ -347,12 +348,10 @@ impl InfoUi for CactusTree {
     }
 }
 
-impl ToDwObj for CactusTree {
-    fn to_dw_obj(&self) -> Result<DwObj, ToDwObjError> {
-        Ok(DwObj::Icon(DwIcon::new(
-            self.float_pos,
-            ItemType::PricklyPear,
-        )))
+impl BuildDwMesh for CactusTree {
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        builder.add_icon(DwIcon::new(self.float_pos, ItemType::PricklyPear));
+        Ok(())
     }
 }
 
@@ -363,9 +362,10 @@ impl InfoUi for CoconutTree {
     }
 }
 
-impl ToDwObj for CoconutTree {
-    fn to_dw_obj(&self) -> Result<DwObj, ToDwObjError> {
-        Ok(DwObj::Icon(DwIcon::new(self.float_pos, ItemType::Coconut)))
+impl BuildDwMesh for CoconutTree {
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        builder.add_icon(DwIcon::new(self.float_pos, ItemType::Coconut));
+        Ok(())
     }
 }
 
@@ -375,10 +375,10 @@ impl InfoUi for OrangeTree {
         tree.info(ui);
     }
 }
-
-impl ToDwObj for OrangeTree {
-    fn to_dw_obj(&self) -> Result<DwObj, ToDwObjError> {
-        Ok(DwObj::Icon(DwIcon::new(self.float_pos, ItemType::Orange)))
+impl BuildDwMesh for OrangeTree {
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        builder.add_icon(DwIcon::new(self.float_pos, ItemType::Orange));
+        Ok(())
     }
 }
 
@@ -389,9 +389,10 @@ impl InfoUi for CherryTree {
     }
 }
 
-impl ToDwObj for CherryTree {
-    fn to_dw_obj(&self) -> Result<DwObj, ToDwObjError> {
-        Ok(DwObj::Icon(DwIcon::new(self.float_pos, ItemType::Cherry)))
+impl BuildDwMesh for CherryTree {
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        builder.add_icon(DwIcon::new(self.float_pos, ItemType::Cherry));
+        Ok(())
     }
 }
 
@@ -402,12 +403,10 @@ impl InfoUi for CoffeeTree {
     }
 }
 
-impl ToDwObj for CoffeeTree {
-    fn to_dw_obj(&self) -> Result<DwObj, ToDwObjError> {
-        Ok(DwObj::Icon(DwIcon::new(
-            self.float_pos,
-            ItemType::CoffeeCherry,
-        )))
+impl BuildDwMesh for CoffeeTree {
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        builder.add_icon(DwIcon::new(self.float_pos, ItemType::CoffeeCherry));
+        Ok(())
     }
 }
 
@@ -495,9 +494,9 @@ impl InfoUi for CornPlant {
     }
 }
 
-impl ToDwObj for CornPlant {
-    fn to_dw_obj(&self) -> Result<DwObj, ToDwObjError> {
-        Ok(DwObj::Sprite(DwSprite::new_from_parts(
+impl BuildDwMesh for CornPlant {
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        builder.add_sprite(DwSprite::new_from_parts(
             if self.flowering {
                 ImageType::CornPlantFlower
             } else {
@@ -507,7 +506,8 @@ impl ToDwObj for CornPlant {
             self.float_pos,
             [1, 2],
             2.0,
-        )))
+        ));
+        Ok(())
     }
 }
 
@@ -518,9 +518,9 @@ impl InfoUi for CarrotPlant {
     }
 }
 
-impl ToDwObj for CarrotPlant {
-    fn to_dw_obj(&self) -> Result<DwObj, ToDwObjError> {
-        Ok(DwObj::Sprite(DwSprite::new_from_parts(
+impl BuildDwMesh for CarrotPlant {
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        builder.add_sprite(DwSprite::new_from_parts(
             if self.flowering {
                 ImageType::CarrotFlower
             } else {
@@ -530,7 +530,8 @@ impl ToDwObj for CarrotPlant {
             self.float_pos,
             [1, 2],
             2.0,
-        )))
+        ));
+        Ok(())
     }
 }
 
@@ -555,16 +556,16 @@ impl InfoUi for KelpPlant {
     }
 }
 
-impl ToDwObj for KelpPlant {
-    fn to_dw_obj(&self) -> Result<DwObj, ToDwObjError> {
-        // TODO needs more complicated meshs to correctly render KelpPlantTop
-        Ok(DwObj::Sprite(DwSprite::new_from_parts(
+impl BuildDwMesh for KelpPlant {
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        builder.add_sprite(DwSprite::new_from_parts(
             ImageType::KelpPlant,
             [0.5, 0.0],
             self.float_pos,
             [1, 2],
             2.0,
-        )))
+        ));
+        Ok(())
     }
 }
 
@@ -575,9 +576,10 @@ impl InfoUi for LimeTree {
     }
 }
 
-impl ToDwObj for LimeTree {
-    fn to_dw_obj(&self) -> Result<DwObj, ToDwObjError> {
-        Ok(DwObj::Icon(DwIcon::new(self.float_pos, ItemType::Lime)))
+impl BuildDwMesh for LimeTree {
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        builder.add_icon(DwIcon::new(self.float_pos, ItemType::Lime));
+        Ok(())
     }
 }
 
@@ -699,14 +701,16 @@ impl InfoUi for Workbench {
     }
 }
 
-impl ToDwObj for Workbench {
-    fn to_dw_obj(&self) -> Result<DwObj, ToDwObjError> {
+impl BuildDwMesh for Workbench {
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         let block_coord =
             BlockCoord::new(self.pos_x as u32, self.pos_y).context(CoordOutOfBoundSnafu)?;
-        let obj = match self.workbench_type {
-            WorkbenchType::Undefined => DwObj::Icon(DwIcon::new(self.float_pos, ItemType::Unknown)),
+        match self.workbench_type {
+            WorkbenchType::Undefined => {
+                builder.add_icon(DwIcon::new(self.float_pos, ItemType::Unknown))
+            }
             WorkbenchType::BasicPortal | WorkbenchType::PlacedPortal => {
-                DwObj::Sprite(DwSprite::new_from_parts(
+                builder.add_sprite(DwSprite::new_from_parts(
                     ImageType::Portal0,
                     [0.5, 0.0],
                     self.float_pos,
@@ -714,7 +718,7 @@ impl ToDwObj for Workbench {
                     2.0,
                 ))
             }
-            WorkbenchType::Workbench => DwObj::Block(DwBlock::new(
+            WorkbenchType::Workbench => builder.add_block(DwBlock::new(
                 block_coord,
                 match self.level {
                     0 => VoxelType::WorkbenchLevel1,
@@ -729,14 +733,14 @@ impl ToDwObj for Workbench {
                     .fail()?,
                 },
             )),
-            WorkbenchType::Campfire => DwObj::Sprite(DwSprite::new_from_parts(
+            WorkbenchType::Campfire => builder.add_sprite(DwSprite::new_from_parts(
                 ImageType::Campfire0,
                 [0.5, 0.0],
                 self.float_pos,
                 [1, 1],
                 2.0,
             )),
-            WorkbenchType::Weave => DwObj::Block(DwBlock::new(
+            WorkbenchType::Weave => builder.add_block(DwBlock::new(
                 block_coord,
                 match self.level {
                     0 => VoxelType::TailorsBenchLevel1,
@@ -750,9 +754,9 @@ impl ToDwObj for Workbench {
                 },
             )),
             WorkbenchType::Wood => {
-                DwObj::Block(DwBlock::new(block_coord, VoxelType::WoodworkBench))
+                builder.add_block(DwBlock::new(block_coord, VoxelType::WoodworkBench))
             }
-            WorkbenchType::Tool => DwObj::Block(DwBlock::new(
+            WorkbenchType::Tool => builder.add_block(DwBlock::new(
                 block_coord,
                 match self.level {
                     0 => VoxelType::ToolBenchLevel1,
@@ -770,7 +774,7 @@ impl ToDwObj for Workbench {
                     .fail()?,
                 },
             )),
-            WorkbenchType::Press => DwObj::Block(DwBlock::new(
+            WorkbenchType::Press => builder.add_block(DwBlock::new(
                 block_coord,
                 match self.level {
                     0 => VoxelType::PressLevel1,
@@ -783,8 +787,8 @@ impl ToDwObj for Workbench {
                     .fail()?,
                 },
             )),
-            WorkbenchType::Kiln => DwObj::Block(DwBlock::new(block_coord, VoxelType::Kiln)),
-            WorkbenchType::Furnace => DwObj::Block(DwBlock::new(
+            WorkbenchType::Kiln => builder.add_block(DwBlock::new(block_coord, VoxelType::Kiln)),
+            WorkbenchType::Furnace => builder.add_block(DwBlock::new(
                 block_coord,
                 match self.level {
                     0 => VoxelType::FurnaceLevel1,
@@ -798,7 +802,7 @@ impl ToDwObj for Workbench {
                     .fail()?,
                 },
             )),
-            WorkbenchType::Craft => DwObj::Block(DwBlock::new(
+            WorkbenchType::Craft => builder.add_block(DwBlock::new(
                 block_coord,
                 match self.level {
                     0 => VoxelType::CraftBenchLevel1,
@@ -813,9 +817,11 @@ impl ToDwObj for Workbench {
                     .fail()?,
                 },
             )),
-            WorkbenchType::Mix => DwObj::Block(DwBlock::new(block_coord, VoxelType::MixingBench)),
-            WorkbenchType::Dye => DwObj::Block(DwBlock::new(block_coord, VoxelType::DyeBench)),
-            WorkbenchType::Metalwork => DwObj::Block(DwBlock::new(
+            WorkbenchType::Mix => {
+                builder.add_block(DwBlock::new(block_coord, VoxelType::MixingBench))
+            }
+            WorkbenchType::Dye => builder.add_block(DwBlock::new(block_coord, VoxelType::DyeBench)),
+            WorkbenchType::Metalwork => builder.add_block(DwBlock::new(
                 block_coord,
                 match self.level {
                     0 => VoxelType::MetalworkBenchLevel1,
@@ -829,25 +835,27 @@ impl ToDwObj for Workbench {
                 },
             )),
             WorkbenchType::SteamGenerator => {
-                DwObj::Block(DwBlock::new(block_coord, VoxelType::SteamGenerator))
+                builder.add_block(DwBlock::new(block_coord, VoxelType::SteamGenerator))
             }
             WorkbenchType::ElectricKiln => {
-                DwObj::Block(DwBlock::new(block_coord, VoxelType::ElectricKiln))
+                builder.add_block(DwBlock::new(block_coord, VoxelType::ElectricKiln))
             }
             WorkbenchType::ElectricFurnace => {
-                DwObj::Block(DwBlock::new(block_coord, VoxelType::ElectricFurnace))
+                builder.add_block(DwBlock::new(block_coord, VoxelType::ElectricFurnace))
             }
             WorkbenchType::ElectricMetalworkBench => {
-                DwObj::Block(DwBlock::new(block_coord, VoxelType::ElectricMetalworkBench))
+                builder.add_block(DwBlock::new(block_coord, VoxelType::ElectricMetalworkBench))
             }
             WorkbenchType::ElectricStove => {
-                DwObj::Block(DwBlock::new(block_coord, VoxelType::ElectricStove))
+                builder.add_block(DwBlock::new(block_coord, VoxelType::ElectricStove))
             }
             WorkbenchType::SolarPanel => {
-                DwObj::Block(DwBlock::new(block_coord, VoxelType::SolarPanel))
+                builder.add_block(DwBlock::new(block_coord, VoxelType::SolarPanel))
             }
-            WorkbenchType::Flywheel => DwObj::Block(DwBlock::new(block_coord, VoxelType::Flywheel)),
-            WorkbenchType::ArmorBench => DwObj::Block(DwBlock::new(
+            WorkbenchType::Flywheel => {
+                builder.add_block(DwBlock::new(block_coord, VoxelType::Flywheel))
+            }
+            WorkbenchType::ArmorBench => builder.add_block(DwBlock::new(
                 block_coord,
                 match self.level {
                     0 => VoxelType::ArmorBenchLevel1,
@@ -862,10 +870,10 @@ impl ToDwObj for Workbench {
                 },
             )),
             WorkbenchType::TrainYard => {
-                DwObj::Block(DwBlock::new(block_coord, VoxelType::TrainYard))
+                builder.add_block(DwBlock::new(block_coord, VoxelType::TrainYard))
             }
-            WorkbenchType::Easel => DwObj::Icon(DwIcon::new(self.float_pos, ItemType::Easel)),
-            WorkbenchType::Build => DwObj::Block(DwBlock::new(
+            WorkbenchType::Easel => builder.add_icon(DwIcon::new(self.float_pos, ItemType::Easel)),
+            WorkbenchType::Build => builder.add_block(DwBlock::new(
                 block_coord,
                 match self.level {
                     0 => VoxelType::BuildersBenchLevel1,
@@ -878,24 +886,26 @@ impl ToDwObj for Workbench {
                     .fail()?,
                 },
             )),
-            WorkbenchType::Refinery => DwObj::Icon(DwIcon::new(self.float_pos, ItemType::Refinery)),
+            WorkbenchType::Refinery => {
+                builder.add_icon(DwIcon::new(self.float_pos, ItemType::Refinery))
+            }
             WorkbenchType::ElectricPress => {
-                DwObj::Block(DwBlock::new(block_coord, VoxelType::ElectricPress))
+                builder.add_block(DwBlock::new(block_coord, VoxelType::ElectricPress))
             }
             WorkbenchType::CompostBin => {
-                DwObj::Block(DwBlock::new(block_coord, VoxelType::CompostBin))
+                builder.add_block(DwBlock::new(block_coord, VoxelType::CompostBin))
             }
             WorkbenchType::Sluice => {
-                DwObj::Icon(DwIcon::new(self.float_pos, ItemType::ElectricSluice))
+                builder.add_icon(DwIcon::new(self.float_pos, ItemType::ElectricSluice))
             }
             WorkbenchType::EggExtractor => {
-                DwObj::Block(DwBlock::new(block_coord, VoxelType::EggExtractor))
+                builder.add_block(DwBlock::new(block_coord, VoxelType::EggExtractor))
             }
             WorkbenchType::PizzaOven => {
-                DwObj::Block(DwBlock::new(block_coord, VoxelType::PizzaOven))
+                builder.add_block(DwBlock::new(block_coord, VoxelType::PizzaOven))
             }
-        };
-        Ok(obj)
+        }
+        Ok(())
     }
 }
 
@@ -919,24 +929,28 @@ impl InfoUi for Chest {
     }
 }
 
-impl ToDwObj for Chest {
-    fn to_dw_obj(&self) -> Result<DwObj, ToDwObjError> {
+impl BuildDwMesh for Chest {
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         let block_coord =
             BlockCoord::new(self.pos_x as u32, self.pos_y).context(CoordOutOfBoundSnafu)?;
-        let obj = match self.slots.chest_type() {
+        match self.slots.chest_type() {
             ChestType::Standard => {
-                DwObj::Block(DwBlock::new(block_coord, VoxelType::StandardChest))
+                builder.add_block(DwBlock::new(block_coord, VoxelType::StandardChest))
             }
-            ChestType::Safe => DwObj::Block(DwBlock::new(block_coord, VoxelType::Safe)),
-            ChestType::Shelf => DwObj::Icon(DwIcon::new(self.float_pos, ItemType::Shelf)),
-            ChestType::Gold => DwObj::Block(DwBlock::new(block_coord, VoxelType::GoldChest)),
-            ChestType::Portal => DwObj::Block(DwBlock::new(block_coord, VoxelType::PortalChest)),
+            ChestType::Safe => builder.add_block(DwBlock::new(block_coord, VoxelType::Safe)),
+            ChestType::Shelf => builder.add_icon(DwIcon::new(self.float_pos, ItemType::Shelf)),
+            ChestType::Gold => builder.add_block(DwBlock::new(block_coord, VoxelType::GoldChest)),
+            ChestType::Portal => {
+                builder.add_block(DwBlock::new(block_coord, VoxelType::PortalChest))
+            }
             ChestType::Cabinet => {
-                DwObj::Icon(DwIcon::new(self.float_pos, ItemType::DisplayCabinet))
+                builder.add_icon(DwIcon::new(self.float_pos, ItemType::DisplayCabinet))
             }
-            ChestType::Feeder => DwObj::Block(DwBlock::new(block_coord, VoxelType::FeederChest)),
+            ChestType::Feeder => {
+                builder.add_block(DwBlock::new(block_coord, VoxelType::FeederChest))
+            }
         };
-        Ok(obj)
+        Ok(())
     }
 }
 
@@ -985,8 +999,8 @@ impl InfoUi for GemTree {
     }
 }
 
-impl ToDwObj for GemTree {
-    fn to_dw_obj(&self) -> Result<DwObj, ToDwObjError> {
+impl BuildDwMesh for GemTree {
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         let item_type = match self.gem_tree_type {
             TreeType::Amethyst => ItemType::Amethyst,
             TreeType::Sapphire => ItemType::Sapphire,
@@ -995,7 +1009,8 @@ impl ToDwObj for GemTree {
             TreeType::Diamond => ItemType::Diamond,
             _ => ItemType::Unknown,
         };
-        Ok(DwObj::Icon(DwIcon::new(self.float_pos, item_type)))
+        builder.add_icon(DwIcon::new(self.float_pos, item_type));
+        Ok(())
     }
 }
 
@@ -1006,9 +1021,9 @@ impl InfoUi for TomatoPlant {
     }
 }
 
-impl ToDwObj for TomatoPlant {
-    fn to_dw_obj(&self) -> Result<DwObj, ToDwObjError> {
-        Ok(DwObj::Sprite(DwSprite::new_from_parts(
+impl BuildDwMesh for TomatoPlant {
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        builder.add_sprite(DwSprite::new_from_parts(
             if self.flowering {
                 ImageType::TomatoPlantFlower
             } else {
@@ -1018,6 +1033,7 @@ impl ToDwObj for TomatoPlant {
             self.float_pos,
             [1, 2],
             2.0,
-        )))
+        ));
+        Ok(())
     }
 }
