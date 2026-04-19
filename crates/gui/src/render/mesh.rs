@@ -193,18 +193,13 @@ impl DwMeshRenderer {
         rpass.set_pipeline(&self.pipeline);
         rpass.set_bind_group(0, &self.bind_group, &[]);
         for dw_chunk_buf in dw_buf {
-            if dw_chunk_buf.sprite_num_indices > 0 {
-                rpass.set_vertex_buffer(0, dw_chunk_buf.sprite_vertex_buf.slice(..));
+            if dw_chunk_buf.faces_num_indices > 0 {
+                rpass.set_vertex_buffer(0, dw_chunk_buf.faces_vertex_buf.slice(..));
                 rpass.set_index_buffer(
-                    dw_chunk_buf.sprite_index_buf.slice(..),
+                    dw_chunk_buf.faces_index_buf.slice(..),
                     wgpu::IndexFormat::Uint32,
                 );
-                rpass.draw_indexed(0..dw_chunk_buf.sprite_num_indices, 0, 0..1);
-            }
-            if let Some(blocks) = dw_chunk_buf.block_buf.as_ref() {
-                rpass.set_vertex_buffer(0, blocks.vertex_buf.slice(..));
-                rpass.set_index_buffer(blocks.index_buf.slice(..), wgpu::IndexFormat::Uint32);
-                rpass.draw_indexed(0..blocks.num_indices, 0, 0..1);
+                rpass.draw_indexed(0..dw_chunk_buf.faces_num_indices, 0, 0..1);
             }
         }
     }

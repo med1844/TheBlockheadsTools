@@ -364,17 +364,16 @@ impl ChunkDwBlock {
         }
     }
 
-    pub fn build_culled_mesh(
+    fn build_culled_mesh(
         self,
         chunk_coord: ChunkCoord,
-        device: &wgpu::Device,
-    ) -> Option<DwChunkBlockBuf> {
+        builder: &mut MeshAggregator<[DwVertex; 4], [u32; 6]>,
+    ) {
         if self.num_blocks == 0 {
-            return None;
+            return;
         }
 
-        let mut block_builder =
-            MeshAggregator::<[DwVertex; 4], [u32; 6]>::with_capacity(self.num_blocks * 6); // at most 6 faces for each block
+        builder.reserve(self.num_blocks * 6); // at most 6 faces for each block
 
         // 0th bit is y=0, 31th bit is y=31; [0] is first column (leftmost)
         // bit = 1 means there's a block
@@ -394,7 +393,7 @@ impl ChunkDwBlock {
                 v_blocks[x] <<= 1;
                 v_blocks[x] |= is_block;
                 if let Some((block, id)) = block {
-                    Self::add_face(Face::Front, chunk_coord, block, id, &mut block_builder);
+                    Self::add_face(Face::Front, chunk_coord, block, id, builder);
                 }
             }
         }
@@ -405,40 +404,27 @@ impl ChunkDwBlock {
                 Face::Up,
                 x as u8,
                 chunk_coord,
-                &mut block_builder,
+                builder,
             );
             self.add_faces(
                 column & !(column << 1),
                 Face::Down,
                 x as u8,
                 chunk_coord,
-                &mut block_builder,
+                builder,
             );
         }
 
         for (y, row) in h_blocks.iter().enumerate() {
-            self.add_faces(
-                row & !(row << 1),
-                Face::Left,
-                y as u8,
-                chunk_coord,
-                &mut block_builder,
-            );
+            self.add_faces(row & !(row << 1), Face::Left, y as u8, chunk_coord, builder);
             self.add_faces(
                 row & !(row >> 1),
                 Face::Right,
                 y as u8,
                 chunk_coord,
-                &mut block_builder,
+                builder,
             );
         }
-
-        let (vertex_buf, index_buf, num_indices) = block_builder.build_const(device);
-        Some(DwChunkBlockBuf {
-            vertex_buf,
-            index_buf,
-            num_indices,
-        })
     }
 }
 
@@ -481,6 +467,10 @@ impl<V, I> MeshAggregator<V, I> {
         Self {
             vi_pairs: Vec::with_capacity(capacity),
         }
+    }
+
+    fn reserve(&mut self, additional: usize) {
+        self.vi_pairs.reserve(additional);
     }
 
     fn add(&mut self, vertices: V, indices: I) {
@@ -647,15 +637,8 @@ impl DwVertex {
 
 struct DwChunkBufBuilder {
     icon_instances: Vec<DwIconInstanceRaw>,
-    sprite_builder: MeshAggregator<[DwVertex; 4], [u32; 6]>,
+    faces_mesh_builder: MeshAggregator<[DwVertex; 4], [u32; 6]>,
     blocks: ChunkDwBlock,
-}
-
-#[derive(Clone)]
-pub struct DwChunkBlockBuf {
-    pub vertex_buf: wgpu::Buffer,
-    pub index_buf: wgpu::Buffer,
-    pub num_indices: u32,
 }
 
 #[derive(Clone)]
@@ -664,13 +647,10 @@ pub struct DwChunkBuf {
     pub instance_buf: wgpu::Buffer,
     pub num_instances: u32,
 
-    // sprites
-    pub sprite_vertex_buf: wgpu::Buffer,
-    pub sprite_index_buf: wgpu::Buffer,
-    pub sprite_num_indices: u32,
-
-    // blocks
-    pub block_buf: Option<DwChunkBlockBuf>,
+    // faces (sprites, blocks, custom ones like kelp, doors)
+    pub faces_vertex_buf: wgpu::Buffer,
+    pub faces_index_buf: wgpu::Buffer,
+    pub faces_num_indices: u32,
 }
 
 impl DwChunkBuf {
@@ -694,7 +674,7 @@ impl DwChunkBuf {
                         }
                         DwObj::Sprite(dw_sprite) => {
                             let (vertices, indices) = dw_sprite.to_vertices(id, coord);
-                            builder.sprite_builder.add(vertices, indices);
+                            builder.faces_mesh_builder.add(vertices, indices);
                         }
                         DwObj::Block(dw_block) => {
                             builder.blocks.add(dw_block, id);
@@ -711,7 +691,7 @@ impl DwChunkBuf {
 
         let mut builder = DwChunkBufBuilder {
             icon_instances: Vec::with_capacity(num_objs),
-            sprite_builder: MeshAggregator::with_capacity(num_objs),
+            faces_mesh_builder: MeshAggregator::with_capacity(num_objs),
             blocks: ChunkDwBlock::default(),
         };
 
@@ -735,7 +715,7 @@ impl DwChunkBuf {
 
         let DwChunkBufBuilder {
             icon_instances,
-            sprite_builder,
+            mut faces_mesh_builder,
             blocks,
         } = builder;
 
@@ -745,13 +725,13 @@ impl DwChunkBuf {
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         });
 
-        let (sprite_vertex_buf, sprite_index_buf, sprite_num_indices) =
-            sprite_builder.build_const(device);
+        blocks.build_culled_mesh(coord, &mut faces_mesh_builder);
 
-        let block_buf = blocks.build_culled_mesh(coord, device);
+        let (faces_vertex_buf, faces_index_buf, faces_num_indices) =
+            faces_mesh_builder.build_const(device);
 
         let num_instances = icon_instances.len() as u32;
-        if num_instances + sprite_num_indices == 0 && block_buf.is_none() {
+        if num_instances + faces_num_indices == 0 {
             return None;
         }
 
@@ -759,11 +739,9 @@ impl DwChunkBuf {
             instance_buf,
             num_instances,
 
-            sprite_vertex_buf,
-            sprite_index_buf,
-            sprite_num_indices,
-
-            block_buf,
+            faces_vertex_buf,
+            faces_index_buf,
+            faces_num_indices,
         })
     }
 }
