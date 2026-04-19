@@ -646,6 +646,47 @@ impl BuildDwMesh for KelpPlant {
             [1, 2],
             2.0,
         ));
+        let mut len = self.number_of_occupied_tiles_above;
+        let [x, mut y] = self.float_pos;
+        while len >= 3 {
+            builder.add_face(DwFace::new_sprite(
+                ImageType::KelpPlant,
+                [0.5, 0.0],
+                [x, y],
+                [1, 2],
+                2.0,
+            ));
+            y += 2.0;
+            len -= 2;
+        }
+        match len {
+            1 => {
+                builder.add_face(DwFace::new_sprite(
+                    ImageType::KelpPlantOddLenTop,
+                    [0.5, 0.0],
+                    [x, y],
+                    [1, 1],
+                    2.0,
+                ));
+            }
+            2 => {
+                builder.add_face(DwFace::new_sprite(
+                    ImageType::KelpPlant,
+                    [0.5, 0.0],
+                    [x, y],
+                    [1, 1],
+                    2.0,
+                ));
+                builder.add_face(DwFace::new_sprite(
+                    ImageType::KelpPlantEvenLenTop,
+                    [0.5, 0.0],
+                    [x, y + 1.0],
+                    [1, 1],
+                    2.0,
+                ));
+            }
+            _ => {}
+        }
         Ok(())
     }
 }
