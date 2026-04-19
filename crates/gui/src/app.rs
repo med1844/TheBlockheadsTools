@@ -730,7 +730,7 @@ impl EditorApp {
                 Torch => {}
                 GlowBlock => {}
                 Ladder => {}
-                Door => {}
+                Door => draw_window(title, dw_chunk.door.get_mut(id.index), ctx),
                 ArtificialLight => {}
                 Bed => {}
                 DropBear => {}

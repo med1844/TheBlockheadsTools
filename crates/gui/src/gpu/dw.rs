@@ -100,125 +100,8 @@ impl DwIconInstanceRaw {
     }
 }
 
-pub struct DwSprite {
-    pub min: [f32; 2],
-    pub max: [f32; 2],
-    pub uv_min: [f32; 2],
-    pub uv_max: [f32; 2],
-    pub z: f32,
-}
-
-impl DwSprite {
-    pub const TILE_SIZE: f32 = 16.0 / 512.0;
-
-    pub(crate) fn new_from_parts(
-        uv_bottom_left: ImageType,
-        local_center_pos: [f32; 2],
-        global_center_pos: [f32; 2],
-        sprite_size: [u8; 2],
-        z: f32,
-    ) -> Self {
-        let [local_center_x_offset, local_center_y_offset] = local_center_pos;
-        let [sprite_width, sprite_height] = sprite_size;
-        let [global_center_x, global_center_y] = global_center_pos;
-        let (u_min_tile, v_max_tile) = uv_bottom_left.to_tile_xy();
-        let v_min_tile = v_max_tile + 1 - sprite_height as u32;
-
-        let u_min = (u_min_tile as f32) * DwSprite::TILE_SIZE;
-        let v_min = (v_min_tile as f32) * DwSprite::TILE_SIZE;
-        let u_max = (u_min_tile + sprite_width as u32) as f32 * DwSprite::TILE_SIZE;
-        let v_max = (v_min_tile + sprite_height as u32) as f32 * DwSprite::TILE_SIZE;
-
-        let min_x = global_center_x - local_center_x_offset;
-        let min_y = global_center_y - local_center_y_offset;
-
-        let max_x = min_x + sprite_width as f32;
-        let max_y = min_y + sprite_height as f32;
-
-        DwSprite {
-            min: [min_x, min_y],
-            max: [max_x, max_y],
-            uv_min: [u_min, v_min],
-            uv_max: [u_max, v_max],
-            z,
-        }
-    }
-
-    pub fn to_vertices(&self, id: DwChunkObjId, coord: ChunkCoord) -> ([DwVertex; 4], [u32; 6]) {
-        let [min_x, min_y] = self.min;
-        let [max_x, max_y] = self.max;
-        let [u_min, v_min] = self.uv_min.map(|v| v + EPSILON);
-        let [u_max, v_max] = self.uv_max.map(|v| v - 2.0 * EPSILON);
-        let raw_id = id.to_raw_id();
-        let chunk_x = coord.x();
-        let chunk_y = coord.y() as u32;
-        (
-            [
-                DwVertex {
-                    raw_id,
-                    chunk_x,
-                    chunk_y,
-                    position: [min_x, min_y, self.z],
-                    normal: [0.0, 0.0, 1.0],
-                    tex_coords: [u_min, v_max],
-                }, // Bottom-left
-                DwVertex {
-                    raw_id,
-                    chunk_x,
-                    chunk_y,
-                    position: [max_x, min_y, self.z],
-                    normal: [0.0, 0.0, 1.0],
-                    tex_coords: [u_max, v_max],
-                }, // Bottom-right
-                DwVertex {
-                    raw_id,
-                    chunk_x,
-                    chunk_y,
-                    position: [max_x, max_y, self.z],
-                    normal: [0.0, 0.0, 1.0],
-                    tex_coords: [u_max, v_min],
-                }, // Top-right
-                DwVertex {
-                    raw_id,
-                    chunk_x,
-                    chunk_y,
-                    position: [min_x, max_y, self.z],
-                    normal: [0.0, 0.0, 1.0],
-                    tex_coords: [u_min, v_min],
-                }, // Top-left
-            ],
-            [0, 1, 2, 0, 2, 3],
-        )
-    }
-}
-
-pub struct DwBlock {
-    coord: BlockCoord,
-    voxel_type: VoxelType,
-}
-
-impl DwBlock {
-    pub fn new(coord: BlockCoord, voxel_type: VoxelType) -> Self {
-        Self { coord, voxel_type }
-    }
-}
-
-pub struct ChunkDwBlock {
-    blocks: [Option<(DwBlock, DwChunkObjId)>; Chunk::NUM_BLOCK_PER_ROW * Chunk::NUM_BLOCK_PER_COL],
-    num_blocks: usize,
-}
-
-impl Default for ChunkDwBlock {
-    fn default() -> Self {
-        Self {
-            blocks: [const { None }; _],
-            num_blocks: 0,
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy)]
-enum Face {
+pub enum FaceDirection {
     Up,
     Down,
     Left,
@@ -226,78 +109,96 @@ enum Face {
     Front,
 }
 
-impl ChunkDwBlock {
-    fn to_index(chunk_block_coord: ChunkBlockCoord) -> usize {
-        chunk_block_coord.x() as usize * Chunk::NUM_BLOCK_PER_COL + chunk_block_coord.y() as usize
-    }
+pub struct DwFace {
+    face_direction: FaceDirection,
+    bottom_left: [f32; 3],
+    size: [f32; 2],
+    uv_min: [f32; 2],
+    uv_max: [f32; 2],
+}
 
-    pub fn add(&mut self, dw_block: DwBlock, id: DwChunkObjId) {
-        let index = Self::to_index(dw_block.coord.into());
-        self.blocks[index] = Some((dw_block, id));
-        self.num_blocks += 1;
-    }
+impl DwFace {
+    pub fn from_tile_map(
+        bottom_left_tile: ImageType,
+        face_direction: FaceDirection,
+        bottom_left: [f32; 3],
+        size: [u8; 2],
+    ) -> Self {
+        let [_, h] = size;
+        let (u_min_tile, v_max_tile) = bottom_left_tile.to_tile_xy();
+        let v_min_tile = v_max_tile + 1 - h as u32;
 
-    fn block_at(&self, coord: ChunkBlockCoord) -> Option<&(DwBlock, DwChunkObjId)> {
-        self.blocks[Self::to_index(coord)].as_ref()
-    }
+        let u_min = (u_min_tile as f32) * ImageType::TILE_SIZE;
+        let v_min = (v_min_tile as f32) * ImageType::TILE_SIZE;
+        let [w, h] = size.map(|v| v as f32);
+        let [u_max, v_max] = [
+            u_min + w * ImageType::TILE_SIZE,
+            v_min + h * ImageType::TILE_SIZE,
+        ];
 
-    fn add_face(
-        face: Face,
-        chunk_coord: ChunkCoord,
-        block: &DwBlock,
-        id: &DwChunkObjId,
-        builder: &mut MeshAggregator<[DwVertex; 4], [u32; 6]>,
-    ) {
-        let z = 1;
-        let x = block.coord.x();
-        let y = block.coord.y() as u32;
-
-        let [bottom_left, bottom_right, top_right, top_left] = match face {
-            Face::Up => [
-                [x, y + 1, z + 1],
-                [x + 1, y + 1, z + 1],
-                [x + 1, y + 1, z],
-                [x, y + 1, z],
-            ],
-            Face::Down => [[x, y, z + 1], [x + 1, y, z + 1], [x + 1, y, z], [x, y, z]],
-            Face::Left => [[x, y, z], [x, y, z + 1], [x, y + 1, z + 1], [x, y + 1, z]],
-            Face::Right => [
-                [x + 1, y, z],
-                [x + 1, y, z + 1],
-                [x + 1, y + 1, z + 1],
-                [x + 1, y + 1, z],
-            ],
-            Face::Front => [
-                [x, y, z + 1],
-                [x + 1, y, z + 1],
-                [x + 1, y + 1, z + 1],
-                [x, y + 1, z + 1],
-            ],
-        };
-
-        let uv = block.voxel_type.uv();
-        let [u_min, v_min] = match face {
-            Face::Up { .. } => uv.up(),
-            Face::Down { .. } => uv.down(),
-            Face::Left { .. } | Face::Right { .. } | Face::Front => uv.side(),
+        Self {
+            face_direction,
+            bottom_left,
+            size: [w, h],
+            uv_min: [u_min, v_min].map(|v| v + EPSILON),
+            uv_max: [u_max, v_max].map(|v| v - EPSILON),
         }
-        .to_uv_min()
-        .map(|v| v + EPSILON);
-        let [u_max, v_max] = [u_min, v_min].map(|v| v + ImageType::TILE_SIZE - 2.0 * EPSILON);
+    }
 
-        let normal = match face {
-            Face::Up => [0.0, 1.0, 0.0],
-            Face::Down => [0.0, -1.0, 0.0],
-            Face::Left => [-1.0, 0.0, 0.0],
-            Face::Right => [1.0, 0.0, 0.0],
-            Face::Front => [0.0, 0.0, 1.0],
+    pub fn new_sprite(
+        bottom_left_tile: ImageType,
+        local_center_pos: [f32; 2],
+        global_center_pos: [f32; 2],
+        size: [u8; 2],
+        z: f32,
+    ) -> Self {
+        let [local_center_x_offset, local_center_y_offset] = local_center_pos;
+        let [global_center_x, global_center_y] = global_center_pos;
+        let min_x = global_center_x - local_center_x_offset;
+        let min_y = global_center_y - local_center_y_offset;
+
+        Self::from_tile_map(
+            bottom_left_tile,
+            FaceDirection::Front,
+            [min_x, min_y, z],
+            size,
+        )
+    }
+
+    fn to_vertices(
+        &self,
+        id: &DwChunkObjId,
+        chunk_coord: &ChunkCoord,
+    ) -> ([DwVertex; 4], [u32; 6]) {
+        let [x, y, z] = self.bottom_left;
+        let [w, h] = self.size;
+
+        let [bottom_left, bottom_right, top_right, top_left] = match self.face_direction {
+            FaceDirection::Up | FaceDirection::Down => {
+                [[x, y, z], [x + w, y, z], [x + w, y, z - h], [x, y, z - h]]
+            }
+            FaceDirection::Left | FaceDirection::Right => {
+                [[x, y, z], [x, y, z + w], [x, y + h, z + w], [x, y + h, z]]
+            }
+            FaceDirection::Front => [[x, y, z], [x + w, y, z], [x + w, y + h, z], [x, y + h, z]],
         };
+
+        let normal = match self.face_direction {
+            FaceDirection::Up => [0, 1, 0],
+            FaceDirection::Down => [0, -1, 0],
+            FaceDirection::Left => [-1, 0, 0],
+            FaceDirection::Right => [1, 0, 0],
+            FaceDirection::Front => [0, 0, 1],
+        }
+        .map(|v| v as f32);
+        let [u_min, v_min] = self.uv_min;
+        let [u_max, v_max] = self.uv_max;
 
         let raw_id = id.to_raw_id();
         let chunk_x = chunk_coord.x();
         let chunk_y = chunk_coord.y() as u32;
 
-        builder.add(
+        (
             [
                 DwVertex {
                     raw_id,
@@ -333,15 +234,91 @@ impl ChunkDwBlock {
                 },
             ],
             [0, 1, 2, 0, 2, 3],
+        )
+    }
+}
+
+pub struct DwBlock {
+    coord: BlockCoord,
+    voxel_type: VoxelType,
+}
+
+impl DwBlock {
+    pub fn new(coord: BlockCoord, voxel_type: VoxelType) -> Self {
+        Self { coord, voxel_type }
+    }
+}
+
+pub struct ChunkDwBlock {
+    blocks: [Option<(DwBlock, DwChunkObjId)>; Chunk::NUM_BLOCK_PER_ROW * Chunk::NUM_BLOCK_PER_COL],
+    num_blocks: usize,
+}
+
+impl Default for ChunkDwBlock {
+    fn default() -> Self {
+        Self {
+            blocks: [const { None }; _],
+            num_blocks: 0,
+        }
+    }
+}
+
+impl ChunkDwBlock {
+    fn to_index(chunk_block_coord: ChunkBlockCoord) -> usize {
+        chunk_block_coord.x() as usize * Chunk::NUM_BLOCK_PER_COL + chunk_block_coord.y() as usize
+    }
+
+    pub fn add(&mut self, dw_block: DwBlock, id: DwChunkObjId) {
+        let index = Self::to_index(dw_block.coord.into());
+        self.blocks[index] = Some((dw_block, id));
+        self.num_blocks += 1;
+    }
+
+    fn block_at(&self, coord: ChunkBlockCoord) -> Option<&(DwBlock, DwChunkObjId)> {
+        self.blocks[Self::to_index(coord)].as_ref()
+    }
+
+    fn add_face(
+        face_direction: FaceDirection,
+        chunk_coord: &ChunkCoord,
+        block: &DwBlock,
+        id: &DwChunkObjId,
+        builder: &mut MeshAggregator<[DwVertex; 4], [u32; 6]>,
+    ) {
+        let z = 1;
+        let x = block.coord.x();
+        let y = block.coord.y() as u32;
+        let uv = block.voxel_type.uv();
+
+        let dw_face = DwFace::from_tile_map(
+            match face_direction {
+                FaceDirection::Up { .. } => uv.up(),
+                FaceDirection::Down { .. } => uv.down(),
+                FaceDirection::Left { .. } | FaceDirection::Right { .. } | FaceDirection::Front => {
+                    uv.side()
+                }
+            },
+            face_direction,
+            match face_direction {
+                FaceDirection::Up => [x, y + 1, z + 1],
+                FaceDirection::Down => [x, y, z + 1],
+                FaceDirection::Left => [x, y, z],
+                FaceDirection::Right => [x + 1, y, z],
+                FaceDirection::Front => [x, y, z + 1],
+            }
+            .map(|v| v as f32),
+            [1, 1],
         );
+        let (vertices, indices) = dw_face.to_vertices(id, chunk_coord);
+        builder.add(vertices, indices);
     }
 
     fn add_faces(
         &self,
         mut mask: u32,
-        face: Face,
+        face: FaceDirection,
         row_or_col_index: u8,
-        chunk_coord: ChunkCoord,
+        chunk_coord: &ChunkCoord,
         builder: &mut MeshAggregator<[DwVertex; 4], [u32; 6]>,
     ) {
         while mask != 0 {
@@ -350,9 +327,11 @@ impl ChunkDwBlock {
             mask ^= lsb;
 
             let (x, y) = match face {
-                Face::Up | Face::Down => (row_or_col_index, lsb_index),
-                Face::Left | Face::Right => (lsb_index, row_or_col_index),
-                Face::Front => unreachable!("add_faces must not be called with Face::Front"),
+                FaceDirection::Up | FaceDirection::Down => (row_or_col_index, lsb_index),
+                FaceDirection::Left | FaceDirection::Right => (lsb_index, row_or_col_index),
+                FaceDirection::Front => {
+                    unreachable!("add_faces must not be called with Face::Front")
+                }
             };
             // SAFETY: non-zero u32 must have < 32 trailing zeros; thus lsb_index < 32.
             // Face ensures the attached values < 32 by loop in build_culled_mesh.
@@ -360,13 +339,13 @@ impl ChunkDwBlock {
 
             // SAFETY: x, y is 1 in mask, meaning block_at result must have is_some() == true.
             let (block, id) = self.block_at(coord).unwrap();
-            Self::add_face(face, chunk_coord, block, id, builder);
+            Self::add_face(face, &chunk_coord, block, id, builder);
         }
     }
 
     fn build_culled_mesh(
         self,
-        chunk_coord: ChunkCoord,
+        chunk_coord: &ChunkCoord,
         builder: &mut MeshAggregator<[DwVertex; 4], [u32; 6]>,
     ) {
         if self.num_blocks == 0 {
@@ -393,7 +372,7 @@ impl ChunkDwBlock {
                 v_blocks[x] <<= 1;
                 v_blocks[x] |= is_block;
                 if let Some((block, id)) = block {
-                    Self::add_face(Face::Front, chunk_coord, block, id, builder);
+                    Self::add_face(FaceDirection::Front, chunk_coord, block, id, builder);
                 }
             }
         }
@@ -401,14 +380,14 @@ impl ChunkDwBlock {
         for (x, column) in v_blocks.iter().enumerate() {
             self.add_faces(
                 column & !(column >> 1),
-                Face::Up,
+                FaceDirection::Up,
                 x as u8,
                 chunk_coord,
                 builder,
             );
             self.add_faces(
                 column & !(column << 1),
-                Face::Down,
+                FaceDirection::Down,
                 x as u8,
                 chunk_coord,
                 builder,
@@ -416,10 +395,16 @@ impl ChunkDwBlock {
         }
 
         for (y, row) in h_blocks.iter().enumerate() {
-            self.add_faces(row & !(row << 1), Face::Left, y as u8, chunk_coord, builder);
+            self.add_faces(
+                row & !(row << 1),
+                FaceDirection::Left,
+                y as u8,
+                chunk_coord,
+                builder,
+            );
             self.add_faces(
                 row & !(row >> 1),
-                Face::Right,
+                FaceDirection::Right,
                 y as u8,
                 chunk_coord,
                 builder,
@@ -433,12 +418,16 @@ impl ChunkDwBlock {
 pub enum BuildDwMeshError {
     #[snafu(display("Object coordinate out of world bound: {source}"))]
     CoordOutOfBound { source: CoordError },
-    #[snafu(display("Workbench with type {} has level {level} that exceeds maximum {maximum}"))]
+    #[snafu(display(
+        "Workbench with type {workbench_type:?} has level {level} that exceeds maximum {maximum}"
+    ))]
     InvalidWorkbenchLevel {
         workbench_type: WorkbenchType,
         level: u8,
         maximum: u8,
     },
+    #[snafu(display("Item type {item_type:?} is not door"))]
+    InvalidItemTypeForDoor { item_type: ItemType },
 }
 
 pub trait BuildDwMesh {
@@ -646,20 +635,13 @@ impl DwChunkBufBuilder {
         self.icon_instances.push(icon.instance(self.id, self.coord));
     }
 
-    pub fn add_sprite(&mut self, sprite: DwSprite) {
-        let (vertices, indices) = sprite.to_vertices(self.id, self.coord);
-        self.faces_mesh_builder.add(vertices, indices);
-    }
-
     pub fn add_block(&mut self, block: DwBlock) {
         self.blocks.add(block, self.id);
     }
 
-    #[allow(unused)]
-    pub fn add_faces<I: Iterator<Item = ([DwVertex; 4], [u32; 6])>>(&mut self, faces: I) {
-        for (vertices, indices) in faces {
-            self.faces_mesh_builder.add(vertices, indices);
-        }
+    pub fn add_face(&mut self, face: DwFace) {
+        let (vertices, indices) = face.to_vertices(&self.id, &self.coord);
+        self.faces_mesh_builder.add(vertices, indices);
     }
 }
 
@@ -719,6 +701,7 @@ impl DwChunkBuf {
         add(chunk.cherry_tree.iter(), CherryTree, &mut builder);
         add(chunk.coffee_tree.iter(), CoffeeTree, &mut builder);
         add(chunk.corn_plant.iter(), CornPlant, &mut builder);
+        add(chunk.door.iter(), Door, &mut builder);
         add(chunk.carrot_plant.iter(), CarrotPlant, &mut builder);
         add(chunk.kelp_plant.iter(), KelpPlant, &mut builder);
         add(chunk.lime_tree.iter(), LimeTree, &mut builder);
@@ -739,7 +722,7 @@ impl DwChunkBuf {
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         });
 
-        blocks.build_culled_mesh(coord, &mut faces_mesh_builder);
+        blocks.build_culled_mesh(&coord, &mut faces_mesh_builder);
 
         let (faces_vertex_buf, faces_index_buf, faces_num_indices) =
             faces_mesh_builder.build_const(device);

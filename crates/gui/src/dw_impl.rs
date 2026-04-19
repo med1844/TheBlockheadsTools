@@ -4,7 +4,7 @@ use super::{
         VoxelType,
         dw::{
             BuildDwMesh, BuildDwMeshError, CoordOutOfBoundSnafu, DwBlock, DwChunkBufBuilder,
-            DwIcon, DwSprite, InvalidWorkbenchLevelSnafu,
+            DwFace, DwIcon, FaceDirection, InvalidItemTypeForDoorSnafu, InvalidWorkbenchLevelSnafu,
         },
     },
     image_type::ImageType,
@@ -18,6 +18,7 @@ use the_blockheads_tools_lib::game::{
         ArtificialLight, DynamicObject, InteractionObject, InteractionObjectType, LightDirection,
         UniqueID,
         chest::{Chest, ChestType},
+        craft::Door,
         plant::{CarrotPlant, CornPlant, KelpPlant, NormalPlant, Plant, TomatoPlant},
         tree::{
             AppleTree, CactusTree, CherryTree, CoconutTree, CoffeeTree, GemTree, LimeTree,
@@ -86,6 +87,12 @@ impl ToRow for UniqueID {
 impl ToRow for String {
     fn to_row(&mut self, ui: &mut egui::Ui) {
         ui.text_edit_singleline(self);
+    }
+}
+
+impl ToRow for &'static str {
+    fn to_row(&mut self, ui: &mut egui::Ui) {
+        ui.label(*self);
     }
 }
 
@@ -496,7 +503,7 @@ impl InfoUi for CornPlant {
 
 impl BuildDwMesh for CornPlant {
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
-        builder.add_sprite(DwSprite::new_from_parts(
+        builder.add_face(DwFace::new_sprite(
             if self.flowering {
                 ImageType::CornPlantFlower
             } else {
@@ -511,6 +518,80 @@ impl BuildDwMesh for CornPlant {
     }
 }
 
+impl ToGrid for Door {
+    fn to_grid(&mut self, ui: &mut egui::Ui) {
+        // ItemType contains TOO MANY types, might need dedicated selector.
+        // TODO either add selector, limit door type, or display raw id
+        let mut item_type_str: &'static str = self.item_type.into();
+        item_type_str.add_row("itemType", ui);
+        self.blocked.add_row("blocked", ui);
+        self.iron_place_client_id.add_row("ironPlaceClientId", ui);
+    }
+}
+
+impl InfoUi for Door {
+    fn info(&mut self, ui: &mut egui::Ui) {
+        let obj = self.deref_mut();
+        obj.info(ui);
+
+        ui.vertical(|ui| {
+            ui.heading("Door");
+            ui.separator();
+            self.add_grid("door_grid", ui);
+        });
+    }
+}
+
+impl BuildDwMesh for Door {
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        let [x, y] = self.float_pos;
+        let z = 2.0;
+        let image_type = match self.item_type {
+            ItemType::Door => ImageType::Door,
+            ItemType::IronDoor => ImageType::IronDoor,
+            ItemType::Trapdoor => ImageType::DoorTop,
+            ItemType::IronTrapdoor => ImageType::IronDoorTop,
+            _ => InvalidItemTypeForDoorSnafu {
+                item_type: self.item_type,
+            }
+            .fail()?,
+        };
+        match self.item_type {
+            ItemType::Door | ItemType::IronDoor => {
+                builder.add_face(DwFace::from_tile_map(
+                    image_type,
+                    FaceDirection::Left,
+                    [x - 0.5, y, z],
+                    [1, 2],
+                ));
+                builder.add_face(DwFace::from_tile_map(
+                    image_type,
+                    FaceDirection::Right,
+                    [x + 0.5, y, z],
+                    [1, 2],
+                ));
+            }
+            ItemType::Trapdoor | ItemType::IronTrapdoor => {
+                builder.add_face(DwFace::from_tile_map(
+                    image_type,
+                    FaceDirection::Up,
+                    [x - 0.5, y + 1.0, z + 1.0],
+                    [1, 1],
+                ));
+                builder.add_face(DwFace::from_tile_map(
+                    image_type,
+                    FaceDirection::Down,
+                    [x - 0.5, y, z + 1.0],
+                    [1, 1],
+                ));
+            }
+            // SAFETY: previous match have failed this arm
+            _ => unreachable!(),
+        }
+        Ok(())
+    }
+}
+
 impl InfoUi for CarrotPlant {
     fn info(&mut self, ui: &mut egui::Ui) {
         let normal_plant = self.deref_mut();
@@ -520,7 +601,7 @@ impl InfoUi for CarrotPlant {
 
 impl BuildDwMesh for CarrotPlant {
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
-        builder.add_sprite(DwSprite::new_from_parts(
+        builder.add_face(DwFace::new_sprite(
             if self.flowering {
                 ImageType::CarrotFlower
             } else {
@@ -558,7 +639,7 @@ impl InfoUi for KelpPlant {
 
 impl BuildDwMesh for KelpPlant {
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
-        builder.add_sprite(DwSprite::new_from_parts(
+        builder.add_face(DwFace::new_sprite(
             ImageType::KelpPlant,
             [0.5, 0.0],
             self.float_pos,
@@ -709,15 +790,9 @@ impl BuildDwMesh for Workbench {
             WorkbenchType::Undefined => {
                 builder.add_icon(DwIcon::new(self.float_pos, ItemType::Unknown))
             }
-            WorkbenchType::BasicPortal | WorkbenchType::PlacedPortal => {
-                builder.add_sprite(DwSprite::new_from_parts(
-                    ImageType::Portal0,
-                    [0.5, 0.0],
-                    self.float_pos,
-                    [1, 2],
-                    2.0,
-                ))
-            }
+            WorkbenchType::BasicPortal | WorkbenchType::PlacedPortal => builder.add_face(
+                DwFace::new_sprite(ImageType::Portal0, [0.5, 0.0], self.float_pos, [1, 2], 2.0),
+            ),
             WorkbenchType::Workbench => builder.add_block(DwBlock::new(
                 block_coord,
                 match self.level {
@@ -733,7 +808,7 @@ impl BuildDwMesh for Workbench {
                     .fail()?,
                 },
             )),
-            WorkbenchType::Campfire => builder.add_sprite(DwSprite::new_from_parts(
+            WorkbenchType::Campfire => builder.add_face(DwFace::new_sprite(
                 ImageType::Campfire0,
                 [0.5, 0.0],
                 self.float_pos,
@@ -1023,7 +1098,7 @@ impl InfoUi for TomatoPlant {
 
 impl BuildDwMesh for TomatoPlant {
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
-        builder.add_sprite(DwSprite::new_from_parts(
+        builder.add_face(DwFace::new_sprite(
             if self.flowering {
                 ImageType::TomatoPlantFlower
             } else {

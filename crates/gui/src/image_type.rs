@@ -556,12 +556,4 @@ impl ImageType {
         let tile_y = tile_index / Self::TILE_PER_ROW as u32;
         (tile_x, tile_y)
     }
-
-    pub fn to_uv_min(self) -> [f32; 2] {
-        let (tile_x, tile_y) = self.to_tile_xy();
-        [
-            tile_x as f32 * Self::TILE_SIZE,
-            tile_y as f32 * Self::TILE_SIZE,
-        ]
-    }
 }
