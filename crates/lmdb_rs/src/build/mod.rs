@@ -11,7 +11,7 @@ pub enum BuildError {
     BufferTooSmall { expected: usize, available: usize },
 
     /// I/O error during build.
-    #[snafu(display("I/O error: {source}"))]
+    #[snafu(display("I/O error"))]
     Io { source: std::io::Error },
 }
 

@@ -17,51 +17,47 @@ use std::{collections::HashMap, io::Write};
 
 #[derive(Debug, Snafu)]
 pub enum MainError {
-    #[snafu(display("Failed to get entry {key} from database: {source}"))]
+    #[snafu(display("Failed to get entry {key} from database"))]
     GetEntry {
         source: lmdb_rs::error::DatabaseError,
         key: &'static str,
     },
     #[snafu(display("Key {key} doesn't exist in database"))]
     MissingKey { key: &'static str },
-    #[snafu(display("Failed to iterate over database: {source}"))]
+    #[snafu(display("Failed to iterate over database"))]
     IterateDatabase {
         source: lmdb_rs::error::DatabaseError,
     },
-    #[snafu(display("Failed to decode database entry: {source}"))]
+    #[snafu(display("Failed to decode database entry"))]
     DecodeEntry {
         source: lmdb_rs::error::DatabaseError,
     },
-    #[snafu(display("Failed to put entry with key {key} in database: {source}"))]
+    #[snafu(display("Failed to put entry with key {key} in database"))]
     PutEntry {
         key: String,
         source: lmdb_rs::error::DatabaseError,
     },
-    #[snafu(display(
-        "Failed to deserialize inventory of blockhead with unique id = {unique_id}: {source}"
-    ))]
+    #[snafu(display("Failed to deserialize inventory of blockhead with unique id = {unique_id}"))]
     DeserializeBlockheadInventory {
         unique_id: u64,
         source: plist::Error,
     },
-    #[snafu(display(
-        "Failed to serialize inventory of blockhead with unique id = {unique_id}: {source}"
-    ))]
+    #[snafu(display("Failed to serialize inventory of blockhead with unique id = {unique_id}"))]
     SerializeBlockheadInventory {
         unique_id: u64,
         source: plist::Error,
     },
-    #[snafu(display("Failed to deserialize `blockheads` : {source}"))]
+    #[snafu(display("Failed to deserialize `blockheads`"))]
     DeserializeBlockheads { source: plist::Error },
-    #[snafu(display("Failed to serialize `blockheads` : {source}"))]
+    #[snafu(display("Failed to serialize `blockheads`"))]
     SerializeBlockheads { source: plist::Error },
-    #[snafu(display("Failed to deserialize `dynamic_world_v2` : {source}"))]
+    #[snafu(display("Failed to deserialize `dynamic_world_v2`"))]
     DeserializeDynamicWorldV2 { source: plist::Error },
-    #[snafu(display("Failed to serialize `dynamic_world_v2` : {source}"))]
+    #[snafu(display("Failed to serialize `dynamic_world_v2`"))]
     SerializeDynamicWorldV2 { source: plist::Error },
-    #[snafu(display("Failed to deserialize `world_v2` : {source}"))]
+    #[snafu(display("Failed to deserialize `world_v2`"))]
     DeserializeWorldV2 { source: plist::Error },
-    #[snafu(display("Failed to serialize `world_v2` : {source}"))]
+    #[snafu(display("Failed to serialize `world_v2`"))]
     SerializeWorldV2 { source: plist::Error },
 }
 

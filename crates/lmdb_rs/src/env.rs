@@ -9,22 +9,22 @@ use std::io::Write;
 
 #[derive(Debug, Snafu)]
 pub enum EnvError {
-    #[snafu(display("Failed to parse meta page during environment bootstrap: {source}"))]
+    #[snafu(display("Failed to parse meta page during environment bootstrap"))]
     MetaParse { source: crate::page::PageError },
 
-    #[snafu(display("Failed to initialize read transaction: {source}"))]
+    #[snafu(display("Failed to initialize read transaction"))]
     ReadTransactionStart { source: TxnError },
 
-    #[snafu(display("Failed to initialize write transaction: {source}"))]
+    #[snafu(display("Failed to initialize write transaction"))]
     WriteTransactionStart { source: TxnError },
 
-    #[snafu(display("Error while opening database '{name:?}': {source}"))]
+    #[snafu(display("Error while opening database '{name:?}'"))]
     DatabaseOpen {
         name: Option<String>,
         source: TxnError,
     },
 
-    #[snafu(display("IO error during environment operation: {source}"))]
+    #[snafu(display("IO error during environment operation"))]
     Io { source: std::io::Error },
 }
 

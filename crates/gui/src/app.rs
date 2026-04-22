@@ -20,7 +20,7 @@ use the_blockheads_tools_lib::{
     self as lib, DynArch,
     game::{
         block::{Block, BlockView},
-        chunk::Chunk,
+        chunk::{Chunk, Chunks},
         coord::{BlockCoord, ChunkCoord},
         db::world_db::{WorldDb, WorldDbError},
     },
@@ -173,11 +173,11 @@ impl InteractionState {
 
 #[derive(Debug, Snafu)]
 pub enum EditorAppError {
-    #[snafu(display("Failed to open world_db: {source}"))]
+    #[snafu(display("Failed to open world_db"))]
     OpenWorldDb { source: WorldDbError },
-    #[snafu(display("Failed to save world_db: {source}"))]
+    #[snafu(display("Failed to save world_db"))]
     SaveWorldDb { source: WorldDbError },
-    #[snafu(display("Failed to read world_db bytes: {source}"))]
+    #[snafu(display("Failed to read world_db bytes"))]
     ReadWorldDbBytes { source: std::io::Error },
 }
 
@@ -299,9 +299,9 @@ impl EditorApp {
         );
 
         self.dw_buf.clear();
-        for chunk_y in 0..32 {
+        for chunk_y in 0..Chunks::NUM_CHUNK_PER_COL {
             for chunk_x in 0..world_db.main.world_v2.world_width_macro {
-                let chunk_coord = ChunkCoord::new(chunk_x, chunk_y).unwrap();
+                let chunk_coord = ChunkCoord::new(chunk_x, chunk_y as u8).unwrap();
                 if !self.dw_buf.has_chunk(chunk_coord)
                     && let Some(chunk) = world_db.dw.chunk_at(chunk_coord)
                 {
@@ -661,8 +661,9 @@ impl EditorApp {
                 .open(&mut open)
                 .resizable(false)
                 .show(ctx, |ui| {
+                    let e = snafu::Report::from_error(e);
                     ui.heading("Error message");
-                    ui.label(e.to_string());
+                    ui.label(format!("{}", e));
                 });
             if !open {
                 self.load_err = None;

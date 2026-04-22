@@ -17,11 +17,11 @@ pub enum DatabaseError {
     ReadOnlyHandle,
 
     /// Error during cursor operations
-    #[snafu(display("Cursor error: {source}"))]
+    #[snafu(display("Cursor error"))]
     Cursor { source: CursorError },
 
     /// Error during key/value codec operations
-    #[snafu(display("Codec error: {source}"))]
+    #[snafu(display("Codec error"))]
     Codec { source: CodecError },
 }
 

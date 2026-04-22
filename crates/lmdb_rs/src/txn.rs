@@ -16,13 +16,13 @@ pub enum TxnError {
     #[snafu(display("No named database '{name}' found"))]
     DatabaseNotFound { name: String },
 
-    #[snafu(display("Build error: {source}"))]
+    #[snafu(display("Build error"))]
     Build { source: crate::build::BuildError },
 
-    #[snafu(display("Cursor error during transaction: {source}"))]
+    #[snafu(display("Cursor error during transaction"))]
     Cursor { source: crate::cursor::CursorError },
 
-    #[snafu(display("IO error while writing transaction data: {source}"))]
+    #[snafu(display("IO error while writing transaction data"))]
     Io { source: std::io::Error },
 }
 

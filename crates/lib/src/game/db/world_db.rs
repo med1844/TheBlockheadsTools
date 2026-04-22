@@ -19,39 +19,39 @@ use std::{
 
 #[derive(Debug, Snafu)]
 pub enum WorldDbError {
-    #[snafu(display("Failed to initialize LMDB environment: {source}"))]
+    #[snafu(display("Failed to initialize LMDB environment"))]
     InitEnv { source: lmdb_rs::error::EnvError },
-    #[snafu(display("Failed to open database {name}: {source}"))]
+    #[snafu(display("Failed to open database {name}"))]
     OpenDatabase {
         source: lmdb_rs::error::EnvError,
         name: &'static str,
     },
     #[snafu(display("No database named {name}"))]
     MissingDatabase { name: &'static str },
-    #[snafu(display("Failed to create database {name}: {source}"))]
+    #[snafu(display("Failed to create database {name}"))]
     CreateDatabase {
         source: lmdb_rs::error::TxnError,
         name: &'static str,
     },
-    #[snafu(display("Failed to load sub-db `main`: {source}"))]
+    #[snafu(display("Failed to load sub-db `main`"))]
     LoadMain { source: MainError },
-    #[snafu(display("Failed to save sub-db `main`: {source}"))]
+    #[snafu(display("Failed to save sub-db `main`"))]
     SaveMain { source: MainError },
-    #[snafu(display("Failed to load sub-db `blocks`: {source}"))]
+    #[snafu(display("Failed to load sub-db `blocks`"))]
     LoadBlocks { source: ChunksError },
-    #[snafu(display("Failed to save sub-db `blocks`: {source}"))]
+    #[snafu(display("Failed to save sub-db `blocks`"))]
     SaveBlocks { source: ChunksError },
-    #[snafu(display("Failed to load sub-db `dw`: {source}"))]
+    #[snafu(display("Failed to load sub-db `dw`"))]
     LoadDw { source: DynamicWorldError },
-    #[snafu(display("Failed to save sub-db `dw`: {source}"))]
+    #[snafu(display("Failed to save sub-db `dw`"))]
     SaveDw { source: DynamicWorldError },
-    #[snafu(display("Failed to commit changes: {source}"))]
+    #[snafu(display("Failed to commit changes"))]
     Commit { source: lmdb_rs::error::TxnError },
-    #[snafu(display("Failed to open file: {source}"))]
+    #[snafu(display("Failed to open file"))]
     OpenFile { source: std::io::Error },
-    #[snafu(display("Failed to read file: {source}"))]
+    #[snafu(display("Failed to read file"))]
     ReadFile { source: std::io::Error },
-    #[snafu(display("Failed to create file: {source}"))]
+    #[snafu(display("Failed to create file"))]
     CreateFile { source: std::io::Error },
 }
 

@@ -16,7 +16,7 @@ pub enum CursorError {
     /// Failed to fetch or parse a page from the environment data.
     ///
     /// `pgno` tells you *which* page triggered the failure; `source` tells you *why*.
-    #[snafu(display("Failed to read page {pgno}: {source}"))]
+    #[snafu(display("Failed to read page {pgno}"))]
     GetPage { pgno: u64, source: PageError },
 
     /// The B-tree structure is internally inconsistent.
@@ -32,7 +32,7 @@ pub enum CursorError {
     UnexpectedEof { expected: usize, available: usize },
 
     /// Underlying page error
-    #[snafu(display("Page error: {source}"))]
+    #[snafu(display("Page error"))]
     Page { source: PageError },
 }
 

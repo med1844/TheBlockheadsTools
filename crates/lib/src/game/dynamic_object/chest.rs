@@ -65,13 +65,13 @@ pub enum ChestError {
     PortalChestHaveSlots,
     #[snafu(display("No save_item_slot when chest type {chest_type:?} should have one"))]
     NoSaveItemSlot { chest_type: ChestType },
-    #[snafu(display("Failed to compress slots: {source}"))]
+    #[snafu(display("Failed to compress slots"))]
     CompressSlots { source: std::io::Error },
-    #[snafu(display("Failed to decompress slots: {source}"))]
+    #[snafu(display("Failed to decompress slots"))]
     DecompressSlots { source: std::io::Error },
-    #[snafu(display("Failed to deserialize slots: {source}"))]
+    #[snafu(display("Failed to deserialize slots"))]
     DeserializeSlots { source: plist::Error },
-    #[snafu(display("Failed to serialize slots: {source}"))]
+    #[snafu(display("Failed to serialize slots"))]
     SerializeSlots { source: plist::Error },
 }
 
