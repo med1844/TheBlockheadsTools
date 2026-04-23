@@ -8,17 +8,17 @@ use strum_macros::IntoStaticStr;
 
 #[derive(Debug, Snafu)]
 pub enum DynamicObjectError {
-    #[snafu(display("Failed to parse {type_str} as dynamic object type: {source}"))]
+    #[snafu(display("Failed to parse {type_str} as dynamic object type"))]
     ParseObjTypeAsInt {
         type_str: String,
         source: std::num::ParseIntError,
     },
-    #[snafu(display("Failed to parse {unique_id_str} as u64: {source}"))]
+    #[snafu(display("Failed to parse {unique_id_str} as u64"))]
     ParseUniqueIdAsInt {
         unique_id_str: String,
         source: std::num::ParseIntError,
     },
-    #[snafu(display("Invalid dynamic object type ID {id}: {source}"))]
+    #[snafu(display("Invalid dynamic object type ID {id}"))]
     InvalidDynamicObjectTypeId {
         id: u16,
         source: num_enum::TryFromPrimitiveError<DynamicObjectType>,

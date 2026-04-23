@@ -43,7 +43,7 @@ impl Serialize for DroppedItem {
     {
         DroppedItemXml {
             obj: self.obj.clone(),
-            item: self.item.to_xml(),
+            item: self.item.to_xml().map_err(serde::ser::Error::custom)?,
             bounce_timer: self.bounce_timer,
             creation_time: self.creation_time,
             fall_speed: self.fall_speed,

@@ -48,11 +48,11 @@ impl<'a> ChunkViewMut<'a> {
 
 #[derive(Debug, Snafu)]
 pub enum ChunkError {
-    #[snafu(display("Failed to compress chunk: {source}"))]
+    #[snafu(display("Failed to compress chunk"))]
     CompressChunk { source: std::io::Error },
-    #[snafu(display("Failed to decompress chunk: {source}"))]
+    #[snafu(display("Failed to decompress chunk"))]
     DecompressChunk { source: std::io::Error },
-    #[snafu(display("Invalid chunk size, expect {expect}, got {got}: {source}"))]
+    #[snafu(display("Invalid chunk size, expect {expect}, got {got}"))]
     InvalidChunkSize {
         expect: usize,
         got: usize,

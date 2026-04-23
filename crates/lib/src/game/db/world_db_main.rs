@@ -1,12 +1,12 @@
 use super::{
-    super::dynamic_object::{
-        DynamicObjectList, UniqueID,
-        blockhead::{Blockhead, Inventory},
+    super::{
+        super::util::plist::to_xml_plist,
+        dynamic_object::{DynamicObjectList, UniqueID, blockhead::Blockhead},
+        item::{Inventory, ItemError},
     },
     dynamic_world_v2::DynamicWorldV2,
     world_v2::WorldV2,
 };
-use crate::util::plist::to_xml_plist;
 use lmdb_rs::{
     codec::types::{Bytes, Str},
     database::Database,
@@ -47,6 +47,10 @@ pub enum MainError {
         unique_id: u64,
         source: plist::Error,
     },
+    #[snafu(display("Failed to save inventory of blockhead with unique id = {unique_id}"))]
+    SaveBlockheadInventory { unique_id: u64, source: ItemError },
+    #[snafu(display("Failed to parse inventory of blockhead with unique id = {unique_id}"))]
+    ParseBlockheadInventory { unique_id: u64, source: ItemError },
     #[snafu(display("Failed to deserialize `blockheads`"))]
     DeserializeBlockheads { source: plist::Error },
     #[snafu(display("Failed to serialize `blockheads`"))]
@@ -89,12 +93,15 @@ impl Main {
                 .and_then(|key| key.strip_suffix("_inventory"))
                 && let Ok(blockhead_id) = blockhead_id_str.parse()
             {
-                let _ = blockhead_inventories.insert(
-                    UniqueID::new(blockhead_id),
+                let value =
                     plist::from_reader_xml(value).context(DeserializeBlockheadInventorySnafu {
                         unique_id: blockhead_id,
-                    })?,
-                );
+                    })?;
+                let inventory =
+                    Inventory::try_from_value(value).context(ParseBlockheadInventorySnafu {
+                        unique_id: blockhead_id,
+                    })?;
+                let _ = blockhead_inventories.insert(UniqueID::new(blockhead_id), inventory);
             }
         }
         Ok(Self {
@@ -131,8 +138,11 @@ impl Main {
                 .as_slice(),
         )?;
         for (unique_id, inventory) in self.blockhead_inventories.iter() {
+            let inventory_value = inventory.to_value().context(SaveBlockheadInventorySnafu {
+                unique_id: *unique_id.inner(),
+            })?;
             let inventory_bytes =
-                to_xml_plist(inventory).context(SerializeBlockheadInventorySnafu {
+                to_xml_plist(&inventory_value).context(SerializeBlockheadInventorySnafu {
                     unique_id: *unique_id.inner(),
                 })?;
             let key = format!("blockhead_{}_inventory", unique_id.inner());

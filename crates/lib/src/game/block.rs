@@ -4,12 +4,12 @@ use strum_macros::{Display, IntoStaticStr};
 
 #[derive(Debug, Snafu)]
 pub enum BlockError {
-    #[snafu(display("Invalid block type ID {id}: {source}"))]
+    #[snafu(display("Invalid block type ID {id}"))]
     InvalidBlockTypeId {
         id: u8,
         source: num_enum::TryFromPrimitiveError<BlockType>,
     },
-    #[snafu(display("Invalid block content type ID {id}: {source}"))]
+    #[snafu(display("Invalid block content type ID {id}"))]
     InvalidBlockContentTypeId {
         id: u8,
         source: num_enum::TryFromPrimitiveError<BlockContentType>,

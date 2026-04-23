@@ -1,11 +1,13 @@
 use super::{
-    super::item::{ItemType, Slot},
+    super::{
+        super::util::{
+            gzip::{compress, decompress},
+            plist::to_xml_plist,
+            serde::{deserialize_some, serialize_some},
+        },
+        item::{ItemError, ItemType, Slot},
+    },
     InteractionObject,
-};
-use crate::util::{
-    gzip::{compress, decompress},
-    plist::to_xml_plist,
-    serde::{deserialize_some, serialize_some},
 };
 use num_enum::TryFromPrimitive;
 use serde::{Deserialize, Serialize};
@@ -73,6 +75,10 @@ pub enum ChestError {
     DeserializeSlots { source: plist::Error },
     #[snafu(display("Failed to serialize slots"))]
     SerializeSlots { source: plist::Error },
+    #[snafu(display("Failed to load slots"))]
+    LoadSlots { source: Box<ItemError> },
+    #[snafu(display("Failed to save slots"))]
+    SaveSlots { source: Box<ItemError> },
 }
 
 type Result<T> = std::result::Result<T, ChestError>;
@@ -266,7 +272,7 @@ pub(crate) struct ChestItem {
         serialize_with = "serialize_some",
         skip_serializing_if = "Option::is_none"
     )]
-    pub save_item_slots: Option<Vec<Slot>>,
+    pub save_item_slots: Option<Vec<plist::Value>>,
 }
 inherit!(ChestItem -> InteractionObject, obj);
 
@@ -348,15 +354,27 @@ pub(crate) struct ChestMeta {
 inherit!(ChestMeta -> InteractionObject, obj);
 
 impl Chest {
-    pub(crate) fn from_meta_and_slots(meta: ChestMeta, slot_bytes: Option<&[u8]>) -> Result<Self> {
-        let save_item_slots: Option<Vec<Slot>> = match slot_bytes {
-            Some(bytes) => {
-                let decompressed = decompress(bytes).context(DecompressSlotsSnafu)?;
-                Some(plist::from_bytes(&decompressed).context(DeserializeSlotsSnafu)?)
-            }
-            None => None,
-        };
+    pub(crate) fn parse_slot_bytes(bytes: &[u8]) -> Result<Vec<plist::Value>> {
+        let decompressed = decompress(bytes).context(DecompressSlotsSnafu)?;
+        plist::from_bytes(&decompressed).context(DeserializeSlotsSnafu)
+    }
 
+    pub(crate) fn parse_raw_slots(raw_slots: Vec<plist::Value>) -> Result<Vec<Slot>> {
+        raw_slots
+            .into_iter()
+            .map(|raw_slot| Slot::try_from_value(raw_slot))
+            .collect::<std::result::Result<Vec<Slot>, ItemError>>()
+            .map_err(Box::new)
+            .context(LoadSlotsSnafu)
+    }
+
+    pub(crate) fn from_meta_and_slots(meta: ChestMeta, slot_bytes: Option<&[u8]>) -> Result<Self> {
+        let slots = slot_bytes
+            .map(|bytes| -> Result<Vec<Slot>> {
+                let raw_slots = Self::parse_slot_bytes(bytes)?;
+                Chest::parse_raw_slots(raw_slots)
+            })
+            .transpose()?;
         let shelf_render_items = match (
             meta.shelf_render_items_0,
             meta.shelf_render_items_1,
@@ -385,7 +403,7 @@ impl Chest {
 
         let slots = ChestSlots::from_chest_type_and_slots(
             meta.chest_type,
-            save_item_slots,
+            slots,
             shelf_render_items,
             shelf_item_data_bs,
         )?;
@@ -410,8 +428,16 @@ impl Chest {
         };
         let slot_bytes = match &save_item_slots {
             Some(slots) => {
-                let compressed = compress(&to_xml_plist(slots).context(SerializeSlotsSnafu)?)
-                    .context(CompressSlotsSnafu)?;
+                let values = slots
+                    .iter()
+                    .map(|slot| slot.to_value())
+                    .collect::<std::result::Result<Vec<_>, _>>()
+                    .map_err(Box::new)
+                    .context(SaveSlotsSnafu)?;
+                let compressed = compress(
+                    &to_xml_plist(&plist::Value::Array(values)).context(SerializeSlotsSnafu)?,
+                )
+                .context(CompressSlotsSnafu)?;
                 Some(compressed)
             }
             None => None,
@@ -435,25 +461,35 @@ impl Chest {
     }
 
     pub(crate) fn from_chest_item(chest_item: ChestItem) -> Result<Self> {
+        let slots = match chest_item.save_item_slots {
+            Some(raw_slots) => Some(Chest::parse_raw_slots(raw_slots)?),
+            None => None,
+        };
+
         Ok(Self {
             obj: chest_item.obj,
             save_time: chest_item.save_time,
-            slots: ChestSlots::from_chest_type_and_slots(
-                chest_item.chest_type,
-                chest_item.save_item_slots,
-                None,
-                None,
-            )?,
+            slots: ChestSlots::from_chest_type_and_slots(chest_item.chest_type, slots, None, None)?,
         })
     }
 
-    pub(crate) fn to_chest_item(&self) -> ChestItem {
+    pub(crate) fn to_chest_item(&self) -> Result<ChestItem> {
         let (chest_type, slots, _, _) = self.slots.to_chest_type_and_slots();
-        ChestItem {
+        let save_item_slots = slots
+            .map(|slots| {
+                slots
+                    .iter()
+                    .map(|slot| slot.to_value())
+                    .collect::<std::result::Result<Vec<_>, _>>()
+            })
+            .transpose()
+            .map_err(Box::new)
+            .context(SaveSlotsSnafu)?;
+        Ok(ChestItem {
             obj: self.obj.clone(),
             chest_type,
             save_time: self.save_time,
-            save_item_slots: slots,
-        }
+            save_item_slots,
+        })
     }
 }

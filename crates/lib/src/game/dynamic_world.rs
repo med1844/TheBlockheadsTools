@@ -196,45 +196,45 @@ impl ChunkDynamicObjects {
 
 #[derive(Debug, Snafu)]
 pub enum DynamicWorldError {
-    #[snafu(display("Failed to iterate over database: {source}"))]
+    #[snafu(display("Failed to iterate over database"))]
     IterateDatabase {
         source: lmdb_rs::error::DatabaseError,
     },
-    #[snafu(display("Failed to deserialize {object_type:?} in {coord}: {source}"))]
+    #[snafu(display("Failed to deserialize {object_type:?} in {coord}"))]
     DeserializeObject {
         object_type: DynamicObjectType,
         coord: ChunkCoord,
         source: plist::Error,
     },
-    #[snafu(display("Failed to serialize {object_type:?} in {coord}: {source}"))]
+    #[snafu(display("Failed to serialize {object_type:?} in {coord}"))]
     SerializeObject {
         object_type: DynamicObjectType,
         coord: String,
         source: plist::Error,
     },
-    #[snafu(display("Failed to get entry {key} from database: {source}"))]
+    #[snafu(display("Failed to get entry {key} from database"))]
     GetEntry {
         source: lmdb_rs::error::DatabaseError,
         key: String,
     },
-    #[snafu(display("Failed to put entry with key {key} in database: {source}"))]
+    #[snafu(display("Failed to put entry with key {key} in database"))]
     PutEntry {
         key: String,
         source: lmdb_rs::error::DatabaseError,
     },
-    #[snafu(display("Failed to load chest {id} in chunk {coord}: {source}"))]
+    #[snafu(display("Failed to load chest {id} in chunk {coord}"))]
     LoadChest {
         id: u64,
         coord: ChunkCoord,
         source: ChestError,
     },
-    #[snafu(display("Failed to save chest {id} in chunk {coord}: {source}"))]
+    #[snafu(display("Failed to save chest {id} in chunk {coord}"))]
     SaveChest {
         id: u64,
         coord: ChunkCoord,
         source: ChestError,
     },
-    #[snafu(display("Failed to parse chunk coord {coord}: {source}"))]
+    #[snafu(display("Failed to parse chunk coord {coord}"))]
     ParseChunkCoordFromStr { coord: String, source: CoordError },
 }
 

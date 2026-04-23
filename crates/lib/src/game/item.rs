@@ -2,9 +2,12 @@ use super::dynamic_object::{
     chest::{Chest, ChestError, ChestItem},
     workbench::Workbench,
 };
-use crate::util::gzip::{compress_into, decompress};
+use crate::util::{
+    gzip::{compress_into, decompress},
+    plist::to_xml_plist,
+};
 use num_enum::TryFromPrimitive;
-use serde::{Deserialize, Serialize, de::Error as DeError, ser::Error as SerError};
+use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use snafu::prelude::*;
 use std::{
@@ -15,33 +18,39 @@ use strum_macros::IntoStaticStr;
 
 #[derive(Debug, Snafu)]
 pub enum ItemError {
-    #[snafu(display("Invalid item type ID {id}: {source}"))]
+    #[snafu(display("Invalid item type ID {id}"))]
     InvalidItemTypeId {
         id: u16,
         source: num_enum::TryFromPrimitiveError<ItemType>,
     },
-    #[snafu(display("Invalid color type ID {id}: {source}"))]
+    #[snafu(display("Invalid color type ID {id}"))]
     InvalidColorTypeId {
         id: u8,
         source: num_enum::TryFromPrimitiveError<PigmentColor>,
     },
-    #[snafu(display("Failed to deserialize extra: {source}"))]
+    #[snafu(display("Failed to deserialize extra"))]
     DeserializeExtra { source: plist::Error },
-    #[snafu(display("Failed to serialize extra: {source}"))]
+    #[snafu(display("Failed to serialize extra"))]
     SerializeExtra { source: plist::Error },
-    #[snafu(display("Failed to load chest: {source}"))]
-    LoadChest { source: ChestError },
-    #[snafu(display("Failed to deserialize basket slots: {source}"))]
+    #[snafu(display("Failed to save extra"))]
+    SaveExtra { source: Box<ItemError> },
+    #[snafu(display("Failed to deserialize basket slots"))]
     DeserializeBasket { source: plist::Error },
-    #[snafu(display("Failed to serialize basket slots: {source}"))]
-    SerializeBasket { source: plist::Error },
-    #[snafu(display("Failed to deserialize chest data in item: {source}"))]
+    #[snafu(display("Failed to load {i}-th slot in basket slots"))]
+    LoadBasket { source: Box<ItemError>, i: usize },
+    #[snafu(display("Failed to save {i}-th slot in basket slots"))]
+    SaveBasket { source: Box<ItemError>, i: usize },
+    #[snafu(display("Failed to deserialize chest data in item"))]
     DeserializeChestItem { source: plist::Error },
-    #[snafu(display("Failed to serialize chest data in item: {source}"))]
+    #[snafu(display("Failed to serialize chest data in item"))]
     SerializeChestItem { source: plist::Error },
-    #[snafu(display("Failed to deserialize workbench: {source}"))]
+    #[snafu(display("Failed to load chest"))]
+    LoadChest { source: ChestError },
+    #[snafu(display("Failed to save chest"))]
+    SaveChest { source: ChestError },
+    #[snafu(display("Failed to deserialize workbench"))]
     DeserializeWorkbench { source: plist::Error },
-    #[snafu(display("Failed to serialize workbench: {source}"))]
+    #[snafu(display("Failed to serialize workbench"))]
     SerializeWorkbench { source: plist::Error },
     #[snafu(display("No known key in extra: {dict:?}"))]
     NoKnownKeyInExtra { dict: plist::Dictionary },
@@ -49,10 +58,24 @@ pub enum ItemError {
         "Item data too short: expected at least 8 bytes, got {got} bytes, data: {data:?}"
     ))]
     ItemDataTooShort { got: usize, data: Vec<u8> },
-    #[snafu(display("Failed to decompress item extra as gzip: {source}"))]
+    #[snafu(display("Failed to decompress item extra as gzip"))]
     DecompressExtraBytes { source: std::io::Error },
-    #[snafu(display("Failed to compress item extra as gzip: {source}"))]
+    #[snafu(display("Failed to compress item extra as gzip"))]
     CompressExtraBytes { source: std::io::Error },
+    #[snafu(display(
+        "Failed to parse {type_name} because input value is not {target_structure}: {value:?}"
+    ))]
+    UnexpectedStructure {
+        type_name: &'static str,
+        target_structure: &'static str,
+        value: plist::Value,
+    },
+    #[snafu(display("Failed to load {i}-th slot in inventory"))]
+    LoadInventory { source: Box<ItemError>, i: usize },
+    #[snafu(display("Failed to save {i}-th slot in inventory"))]
+    SaveInventory { source: Box<ItemError>, i: usize },
+    #[snafu(display("Failed to save {i}-th item in slot"))]
+    SaveSlot { source: Box<ItemError>, i: usize },
 }
 
 type Result<T> = std::result::Result<T, ItemError>;
@@ -511,9 +534,19 @@ impl Extra {
 
     pub(crate) fn from_item_dict(dict: plist::Dictionary) -> Result<Self> {
         if let Some(value) = dict.get("s") {
-            Ok(Self::Basket(
-                plist::from_value(value).context(DeserializeBasketSnafu)?,
-            ))
+            let raw_slots: [plist::Value; Self::NUM_SLOT_BASKET] =
+                plist::from_value(value).context(DeserializeBasketSnafu)?;
+            let mut arr = core::array::from_fn(|_| Slot(Vec::new()));
+            for (i, value) in raw_slots
+                .into_iter()
+                .take(Extra::NUM_SLOT_BASKET)
+                .enumerate()
+            {
+                arr[i] = Slot::try_from_value(value)
+                    .map_err(Box::new)
+                    .context(LoadBasketSnafu { i })?;
+            }
+            Ok(Self::Basket(arr))
         } else if let Some(value @ plist::Value::Dictionary(d)) = dict.get("d")
             && d.contains_key("chestType")
         {
@@ -537,13 +570,20 @@ impl Extra {
         let mut dict = plist::Dictionary::new();
         match self {
             Self::Basket(items) => {
-                dict.insert(
-                    "s".to_string(),
-                    plist::to_value(items).context(SerializeBasketSnafu)?,
-                );
+                let slot_values = items
+                    .iter()
+                    .enumerate()
+                    .map(|(i, slot)| {
+                        slot.to_value()
+                            .map_err(Box::new)
+                            .context(SaveBasketSnafu { i })
+                    })
+                    .collect::<Result<Vec<_>>>()?;
+                let value = plist::Value::Array(slot_values);
+                dict.insert("s".to_string(), value);
             }
             Self::Chest(chest) => {
-                let chest_item = chest.to_chest_item();
+                let chest_item = chest.to_chest_item().context(SaveChestSnafu)?;
                 dict.insert(
                     "d".to_string(),
                     plist::to_value(&chest_item).context(SerializeChestItemSnafu)?,
@@ -560,30 +600,7 @@ impl Extra {
     }
 }
 
-impl<'de> Deserialize<'de> for Extra {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let dict = plist::Dictionary::deserialize(deserializer)?;
-        Self::from_item_dict(dict)
-            .map_err(|e| D::Error::custom(format!("failed to load item extra: {}", e)))
-    }
-}
-
-impl Serialize for Extra {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        let dict = self
-            .to_item_dict()
-            .map_err(|e| S::Error::custom(format!("failed to save item to dict: {}", e)))?;
-        dict.serialize(serializer)
-    }
-}
-
-pub(crate) struct AsDisplay<'a, T>(pub(crate) &'a T);
+struct AsDisplay<'a, T>(&'a T);
 
 impl<'a, T: Display> std::fmt::Debug for AsDisplay<'a, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -665,7 +682,7 @@ pub(crate) struct ItemXml {
         serialize_with = "crate::util::serde::serialize_some",
         skip_serializing_if = "Option::is_none"
     )]
-    pub sub_items: Option<Vec<Slot>>,
+    pub sub_items: Option<Vec<plist::Value>>,
 
     #[serde(
         default,
@@ -711,7 +728,10 @@ impl Item {
             None
         } else {
             let extra_bytes = decompress(&compressed_extra).context(DecompressExtraBytesSnafu)?;
-            Some(plist::from_reader_xml(extra_bytes.as_slice()).context(DeserializeExtraSnafu)?)
+            let dict =
+                plist::from_reader_xml(extra_bytes.as_slice()).context(DeserializeExtraSnafu)?;
+            let extra = Extra::from_item_dict(dict)?;
+            Some(extra)
         };
         Ok(Self {
             type_id,
@@ -723,6 +743,18 @@ impl Item {
         })
     }
 
+    pub(crate) fn try_from_value(value: plist::Value) -> Result<Self> {
+        match value {
+            plist::Value::Data(item_data) => Item::try_from_bytes(item_data),
+            _ => UnexpectedStructureSnafu {
+                type_name: "Item",
+                target_structure: "plist::Data",
+                value,
+            }
+            .fail(),
+        }
+    }
+
     fn to_bytes(&self) -> Result<Vec<u8>> {
         let mut buffer = Vec::with_capacity(8);
 
@@ -732,35 +764,20 @@ impl Item {
         buffer.push(self.selected_sub_item_index);
         buffer.push(self.padding);
         if let Some(extra) = self.extra.as_ref() {
-            let mut serialized_extra = Vec::new();
-            plist::to_writer_xml(&mut serialized_extra, extra).context(SerializeExtraSnafu)?;
+            let value = extra
+                .to_item_dict()
+                .map_err(Box::new)
+                .context(SaveExtraSnafu)?;
+            let serialized_extra =
+                to_xml_plist(&plist::Value::Dictionary(value)).context(SerializeExtraSnafu)?;
             compress_into(&serialized_extra, &mut buffer).context(CompressExtraBytesSnafu)?;
         }
         Ok(buffer)
     }
-}
 
-impl<'de> Deserialize<'de> for Item {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let data = plist::Data::deserialize(deserializer)?.into();
-        Item::try_from_bytes(data)
-            .map_err(|e| D::Error::custom(format!("failed to load item from bytes: {}", e)))
-    }
-}
-
-impl Serialize for Item {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        let buffer = self
-            .to_bytes()
-            .map_err(|e| S::Error::custom(format!("failed to save item to bytes: {}", e)))?;
-        // Wrap in plist::Data so it renders as <data> in the XML
-        plist::Data::new(buffer).serialize(serializer)
+    pub(crate) fn to_value(&self) -> Result<plist::Value> {
+        let bytes = self.to_bytes()?;
+        Ok(plist::Value::Data(bytes))
     }
 }
 
@@ -948,12 +965,14 @@ impl Item {
     pub(crate) fn from_xml(xml: ItemXml) -> Result<Self> {
         let extra = if let Some(sub_items) = xml.sub_items {
             let mut arr = core::array::from_fn(|_| Slot(Vec::new()));
-            for (i, slot) in sub_items
+            for (i, value) in sub_items
                 .into_iter()
                 .take(Extra::NUM_SLOT_BASKET)
                 .enumerate()
             {
-                arr[i] = slot;
+                arr[i] = Slot::try_from_value(value)
+                    .map_err(Box::new)
+                    .context(LoadBasketSnafu { i })?;
             }
             Some(Extra::Basket(arr))
         } else if let Some(value) = xml.dynamic_object_save_dict
@@ -989,24 +1008,38 @@ impl Item {
     }
 
     /// Convert Item to XML representation (drops selectedSubItemIndex/padding)
-    pub(crate) fn to_xml(&self) -> ItemXml {
+    pub(crate) fn to_xml(&self) -> Result<ItemXml> {
         let (sub_items, dynamic_object_save_dict) = match &self.extra {
-            Some(Extra::Basket(items)) => (Some(items.to_vec()), None),
+            Some(Extra::Basket(slots)) => (
+                Some(
+                    slots
+                        .iter()
+                        .enumerate()
+                        .map(|(i, slot)| {
+                            slot.to_value()
+                                .map_err(Box::new)
+                                .context(SaveBasketSnafu { i })
+                        })
+                        .collect::<std::result::Result<Vec<_>, _>>()?,
+                ),
+                None,
+            ),
             Some(Extra::Chest(chest)) => {
-                let chest_item = chest.to_chest_item();
+                let chest_item = chest.to_chest_item().context(SaveChestSnafu)?;
+                // TODO: to_xml should failable
                 (None, Some(plist::to_value(&chest_item).unwrap()))
             }
             Some(Extra::Workbench(workbench)) => (None, Some(plist::to_value(workbench).unwrap())),
             None => (None, None),
         };
 
-        ItemXml {
+        Ok(ItemXml {
             item_type: self.type_id,
             data_a: self.data_a,
             data_b: self.data_b,
             sub_items,
             dynamic_object_save_dict,
-        }
+        })
     }
 }
 
@@ -1034,13 +1067,43 @@ impl Display for Item {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(transparent)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Slot(pub Vec<Item>); // TODO consider switch to smallvec
 
 impl Slot {
     pub fn new(items: Vec<Item>) -> Self {
         Self(items)
+    }
+
+    pub fn try_from_value(value: plist::Value) -> Result<Self> {
+        match value {
+            plist::Value::Array(values) => Ok(Self(
+                values
+                    .into_iter()
+                    .map(|value| Item::try_from_value(value))
+                    .collect::<Result<Vec<Item>>>()?,
+            )),
+            _ => UnexpectedStructureSnafu {
+                type_name: "Slot",
+                target_structure: "plist::Array",
+                value,
+            }
+            .fail(),
+        }
+    }
+
+    pub fn to_value(&self) -> Result<plist::Value> {
+        Ok(plist::Value::Array(
+            self.0
+                .iter()
+                .enumerate()
+                .map(|(i, item)| {
+                    item.to_value()
+                        .map_err(Box::new)
+                        .context(SaveSlotSnafu { i })
+                })
+                .collect::<Result<Vec<_>>>()?,
+        ))
     }
 }
 
@@ -1081,9 +1144,84 @@ impl Display for Slot {
     }
 }
 
+// An inventory of a blockhead
+#[derive(Debug, Clone, PartialEq)]
+pub struct Inventory([Slot; Self::NUM_SLOTS]);
+
+impl Inventory {
+    pub const NUM_SLOTS: usize = 8;
+
+    pub fn new(slots: [Slot; Self::NUM_SLOTS]) -> Self {
+        Self(slots)
+    }
+
+    pub fn try_from_value(value: plist::Value) -> Result<Self> {
+        match value {
+            plist::Value::Array(values) => {
+                let mut arr = core::array::from_fn(|_| Slot(Vec::new()));
+                for (i, value) in values.into_iter().take(Self::NUM_SLOTS).enumerate() {
+                    arr[i] = Slot::try_from_value(value)
+                        .map_err(Box::new)
+                        .context(LoadInventorySnafu { i })?;
+                }
+                Ok(Self(arr))
+            }
+            _ => UnexpectedStructureSnafu {
+                type_name: "Inventory",
+                target_structure: "plist::Array",
+                value,
+            }
+            .fail(),
+        }
+    }
+
+    pub fn to_value(&self) -> Result<plist::Value> {
+        Ok(plist::Value::Array(
+            self.0
+                .iter()
+                .map(|slot| slot.to_value())
+                .collect::<Result<Vec<_>>>()?,
+        ))
+    }
+}
+
+impl Deref for Inventory {
+    type Target = [Slot; Self::NUM_SLOTS];
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for Inventory {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl Display for Inventory {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_list().entries(self.iter().map(AsDisplay)).finish()
+    }
+}
+
+impl IntoIterator for Inventory {
+    type Item = Slot;
+    type IntoIter = std::array::IntoIter<Self::Item, { Self::NUM_SLOTS }>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{Extra, Item, ItemType, PigmentColor, Slot};
+    use super::{
+        super::dynamic_object::{
+            DynamicObject, InteractionObject, InteractionObjectType, UniqueID,
+            workbench::{Workbench, WorkbenchType},
+        },
+        Extra, Inventory, Item, ItemType, PigmentColor, Slot,
+    };
+    use crate::util::plist::{diff_plist_keys, to_xml_plist};
 
     #[test]
     fn test_color_round_trip() {
@@ -1129,8 +1267,8 @@ mod tests {
         ];
 
         for item in items {
-            let serialized = plist::to_value(&item).unwrap();
-            let deserialized: Item = plist::from_value(&serialized).unwrap();
+            let serialized = item.to_value().unwrap();
+            let deserialized = Item::try_from_value(serialized).unwrap();
             assert_eq!(item, deserialized);
         }
     }
@@ -1170,8 +1308,8 @@ mod tests {
             extra: Some(Extra::Basket(basket_items)),
         };
 
-        let serialized = plist::to_value(&item).unwrap();
-        let deserialized: Item = plist::from_value(&serialized).unwrap();
+        let serialized = item.to_value().unwrap();
+        let deserialized = Item::try_from_value(serialized).unwrap();
         assert_eq!(item, deserialized);
     }
 
@@ -1186,8 +1324,8 @@ mod tests {
             extra: None,
         };
         let slot = Slot(vec![item]);
-        let serialized = plist::to_value(&slot).unwrap();
-        let deserialized: Slot = plist::from_value(&serialized).unwrap();
+        let serialized = slot.to_value().unwrap();
+        let deserialized = Slot::try_from_value(serialized).unwrap();
         assert_eq!(slot, deserialized);
     }
 
@@ -1246,7 +1384,8 @@ mod tests {
         </dict>
 </dict>
 </plist>";
-        let extra: Extra = plist::from_reader_xml(xml.as_bytes()).unwrap();
+        let dict = plist::from_reader_xml(xml.as_bytes()).unwrap();
+        let extra = Extra::from_item_dict(dict).unwrap();
         assert!(matches!(extra, Extra::Chest(..)));
     }
 
@@ -1305,7 +1444,8 @@ mod tests {
         </dict>
 </dict>
 </plist>";
-        let extra: Extra = plist::from_reader_xml(xml.as_bytes()).unwrap();
+        let dict = plist::from_reader_xml(xml.as_bytes()).unwrap();
+        let extra = Extra::from_item_dict(dict).unwrap();
         assert!(matches!(extra, Extra::Chest(..)));
     }
 
@@ -1345,7 +1485,370 @@ mod tests {
         </dict>
 </dict>
 </plist>";
-        let extra: Extra = plist::from_reader_xml(xml.as_bytes()).unwrap();
+        let dict = plist::from_reader_xml(xml.as_bytes()).unwrap();
+        let extra = Extra::from_item_dict(dict).unwrap();
         assert!(matches!(extra, Extra::Chest(..)));
+    }
+
+    #[test]
+    fn test_basket_with_bed_deserialization() {
+        let xml = "
+<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
+<plist version=\"1.0\">
+    <data>
+        DAAAAAAAAZIfiwgAAAAAAAAH7Zlbc6JIFMefJ5/C9ZVKwBvolMlUcxMQuSio
+        +IagaARBQNF8+gUzk93Z2kqfhzztwouN/s6F0/8+bRfDH9cobFw2abaPj8/N
+        1hPVbGyOXuzvj8Fz07bEx37zx8vD8A9e5yzHEBpJuM/yhmGzqsw1mo8kiZIk
+        3JAkb/ENQ5VnVqP0QZKC1mw0d3mefCfJoiie3Ip68uKoAjPSSONkk+Y3tXT2
+        WBo8+bnfLMO8e/8tnfJbf+/lLw/fhofN7SUbktVHeeemqVsN/jb6NvTd3L2P
+        jAK9X4q83RfBzxskva4Uf92VC1F2L4O5VzAnmxalURIJLa+ycyI5um3Z/Zw6
+        izGRjfLRJWXJAcFaJKJL29yi+j2ixSzjRCLezGu+R4fKbuUfTUbc5VQXZc6r
+        pLUO2ptg0Z2lZBy07cg3roS07ktCF0XzWxAsLMZIKrs2z645vnU7Biy3PQfr
+        YvFGj3aJi2hJ2bcjR6LSK9udts+9lshlp/FCPKHKTggWnDdFp2M7uoYRXTi7
+        xZpITjwR2/7SaSWJeo1QZ8Ayme2ITkZI7lmq7Po7dV9cxo5i37w9cqPIkVvc
+        mNCoRci4YRCGki6POytRCKJ4kFBT0WJXlR2yTdk+d90FYpWLzPg+QefSYR2e
+        3KTDLFfzgnj15lm80IKZErK9y+VyEyq7mWz3du0LP0jnu/FpuzKz8XZ3iriB
+        6joepWuMJZs2Q3DJVKYNiuAoPXyt7Hz+tvEEmioMku/ZN4KhSWWSSmtf6mnh
+        25FY7Zcr8/BqtZNpSB1Xna7hZPd6ElEvYBjL989tm8xEdn1UaMMb0YG+TYmw
+        w+420YQ/9dNRnC/p5ZJEYlzZvQnhVEWTUiLPz3clkb+kNCQxSkPcAemTSmn/
+        sPwdCpF21+SnkIm0AAtNkXbAQjowXB8SLsZCKiTxCdK6EMjDQbyEVHzioJxm
+        kJxUSJ1uSBOwEIU0BwtdkYawUAdpNmSC8SpQkJZBSoAPp0AqrsOmRceXYAFI
+        vJIKtgT8GKlYFVQQ3tMEAHEB5Ol2kLnbwDwBoO29iWHDAXKaQFaLCukqOkSZ
+        oHAG0iiIJ3w4AxLOhIRTIcU0IP1pBiwmPhxoWiYQyAQmju8FGsQTaCubATsd
+        HpIgJRAhKjC/bDfXgNMCWgigPg4qJj6nGeTpQHOnQXYpUE5zgJ7KvWUif03r
+        Mb6sTibEE6iJ6RBlypDFCVot5aaIL2a53+H/ZAUQSAG2aPxCkP5dmbiDg2ai
+        9+uzg8MH9FkONVRDNVRDNVRDNVRDNVRDNVRDNfRfh3BnTPmX3WdnzA/osxz+
+        r9BfFf4YlT/e30gPyfv76peHPwEV755kRh8AAA==
+    </data>
+</plist>";
+        let data: plist::Data = plist::from_reader_xml(xml.as_bytes()).unwrap();
+        let bytes: Vec<u8> = data.into();
+
+        let _ = Item::try_from_bytes(bytes).expect("should parse");
+    }
+
+    fn inventory_round_trip(inventory_data: &[u8]) {
+        let inventory_value =
+            plist::from_reader_xml(inventory_data).expect("should be able to deserialize");
+        let inventory =
+            Inventory::try_from_value(inventory_value).expect("should be able to parse");
+        let round_trip_inventory_data = to_xml_plist(
+            &inventory
+                .to_value()
+                .expect("inventory should be converted to value"),
+        )
+        .expect("should serialize");
+        let round_trip_inventory_value =
+            plist::from_reader_xml(inventory_data).expect("should deserialize");
+        let round_trip_inventory =
+            Inventory::try_from_value(round_trip_inventory_value).expect("should parse");
+        assert_eq!(inventory, round_trip_inventory);
+
+        let inventory_value: plist::Value =
+            plist::from_reader_xml(inventory_data).expect("should deserialize");
+        let round_trip_inventory_value: plist::Value =
+            plist::from_reader_xml(round_trip_inventory_data.as_slice())
+                .expect("should deserialize");
+        let mut diffs = Vec::new();
+        diff_plist_keys(
+            "",
+            &inventory_value,
+            &round_trip_inventory_value,
+            &mut diffs,
+        );
+        assert!(
+            diffs.is_empty(),
+            "structural fidelity violations:\n{}",
+            diffs.join("\n")
+        );
+    }
+
+    #[test]
+    fn inventory_round_trip_test() {
+        let inventory_data = b"
+<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
+<plist version=\"1.0\">
+<array>
+        <array>
+                <data>
+                AQAAAAAAAAw=
+                </data>
+        </array>
+        <array>
+                <data>
+                DAAAAAAAAgwfiwgAAAAAAAAH7dyxbtNQFAbguX0K4z25sCHkpApNQZUiSNV0
+                gM2KrWCRJpZtYfL22KmaFAGpGBiQPi/3v77fOb7rWZxcfL9fR9/yqi62m1H8
+                avgyjvLNcpsVm9Uovlu8G7yOL8bnyYvpx8vFp/lVVK6Luonmd29n15dRPAhh
+                UpbrPITpYhrNZ9e3i6jrEcLVhziKvzRN+SaEtm2Haa+Gy+19D+swr7ZlXjW7
+                Wdds0BUMsyaLu888dP/pOt3brFg24/Oz5Gu+G9dJ6Jdul1ZV2ocn6SzJ0ibd
+                p9nqZvLwtKP9STgc/Q5NIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiC
+                IAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiC
+                IAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAiCIAj6S5SEtKrS3T4e0pPK
+                z6vHwvbP7Y/oxB0gCIIgCIIgCIL+X/Ts7NTuq25/nZ2eq3x/8zivnZi6jujE
+                7SEIgiAIgiAIgiAIgiAIgiAIgiAIgiAIgiAIgiAIgiAIgiAIgiAIgiAIgiAI
+                giAIgiAIgiAI+ufo+GOhQ+oOi2XTr+W6qLvwA2esHopJ5wAA
+                </data>
+        </array>
+        <array>
+                <data>
+                DAAAAAAAAgwfiwgAAAAAAAAH7ZZLk6JIFEbXXb/CcWtUJYKITljVwdMSBAFB
+                gR2SKCgvIXn++gZ7pucRHRPR2wlzw5fccy65uUGuvjZxNKr8vAjT5H08fcPG
+                Iz/xUhgml/exaQivi/HXj5fVb9yONWyVH2VRWKCRajLbDTsavwJAZ1nkA8AZ
+                3EjdbvbGqO8BAK+MR+MAoex3AOq6fnMH6s1L4wEsgJqnmZ+jdts3e+2FN4jg
+                uP/M9+7/OE7/FoYe+nj5srr57UexAsOj37l57g7hb+nLCrrIfaSjxtH8he5X
+                /f6ogD9LK/DfplP3Ekvrv27ytUZ/X/U5rC9/ZPqTcgL9RBY1L/vnGwYYn17s
+                XChcNpGGDR4UMGzKSAd112SLgo1OGwbiLaEgcsKIChuHsCkTQztYOVedKxtC
+                yuUHD1QnUSNn2XIWtgIDjQM8r++pJLEyzG5md3DOAelIadIhbjITiF0dA2bw
+                YlNqo08+OorUfEHG4fXC1Kx302iBSiWbB1WdHgrNo53Gv6eIrI3r7OGZohsx
+                IZJCgvEvWs0LjMJPvNSKZwRPh0Rc7HNW2RZgf4P2rDPCLmEuj3Nim1ykHGap
+                Sx06mY3e+ZuFxQiYbC8LZcemta47eMt1FsNZuJdt9kE5ePixtGVNm58vDXkR
+                bluNzwJVz21B/pQxe4IK13SUe5DkEJsluYav8dYavClER/dA295ZQFG3nKRx
+                oNaZCgNBxrekLVMmZkf1MfTmYCpjpMA0+Hrw7mwYc/BkcOb8wnIct3adPbmX
+                7LMFbNEvXJWfVLCM5/Jt6TAl0BNJXQyeVKiLyfFOaEuhadd8t1RwoSTm8VWb
+                YF1yXkOTcohkg0RZxQgRNXw8dQcv+hQDv6TQbnPDExP5+G3nddJBcZAx7Q4w
+                kQ6xnCQlSGStKVFYqkEbDx45pXZ7xwBuu7VIh6LOXSiibBHnVRH5Z6ut1Paq
+                EV45OVWG1xEE6uuDZxPxqdrpJj1LGuNyrWrZykoLcPBwNMRalETd511I6Zqe
+                NvrVK8ylnAxeeTXx672+Yt2GWt8agQisjNKJ+zxUTpynzlyO2su8FiKXMqsY
+                KW2QTAaPiatMXxZ3vp+oX5sk+8fw/HsGfwrRT+gJPaEn9ISe0P8ZWvwc+ut3
+                +iP1xceteQUed+qPl29sHDTy6gsAAA==
+                </data>
+        </array>
+        <array>
+                <data>
+                DAAAAAAAAAwfiwgAYA9lXgL/7dlBT4MwFAfw8/gUtXd4ejOmsGxjJkuIw8gO
+                89ZBo0QGpDTWfXsLmqkXx8nD/HPh0ffrn97eoWL6tq/Yq9Jd2dQhvwouOVN1
+                3hRl/RTyTXbrX/Np5ImLeL3ItumStVXZGZZu5slqwbhPNGvbShHFWczSZPWQ
+                MZdBtLzjjD8b094QWWsD2asgb/Y97CjVTau0OSQuzHcbgsIU3P3mI/3Hcdxq
+                UeYm8ibiRR2iTlD/cl9Sa9kX36qJKKSRQ7W7n30+Nhw6dGwBAQEBAQH9AyTo
+                90m5HhMPBAQEBAR0tujUpNzaEfFAQEBAQEBni05NyscxgxgICAgICOjv0Nfo
+                OlauOdwwChruHyPvHUCTe1QWHQAA
+                </data>
+        </array>
+        <array>
+                <data>
+                DAAAAAAAAAwfiwgAAAAAAAAH7d3JjqNWFAbgdfdTON5aXRiXx8hVLcxswGAb
+                PO3MjBnNaNfTx1R3p5Moqt5FivSzuQf4/stdcAS7O/96i6NO7eRFkCYvXfKp
+                3+04iZXaQeK9dA2d+zLtfn39PP+NUWn9qLGdLAqKsqMZC1mkO90vBEFlWeQQ
+                BKMzHU0Wt3rnMQdBsKtup+uXZfY7QTRN83Ru1ZOVxi0sCC1PMycv7/Jjsi+P
+                wJNd2t3HY77N/rflPK7agVW+fv40D537azEn2uFxds7zc1v8pfo0t8/l+b3i
+                vTX17WjcoPG+15Rw2enmpUwbViCdOpBX6rNAu+ey2MV9qs3R66TcBFI6jlZR
+                6AnWyjzlKvnWq8OhxzdXf8pvEqsyldhRb4TtzvwoM9tcKGbNLF5OLnFpNgvJ
+                YfPTuHDcW8XEzWGo8sTgMBSKI5GO2EjihHNQmW6by0bausgK0d2oNBXKjMP7
+                XH8aFqXXCOur8jyYyId9WtW0Sg7Uxk0k2vXbXHy7pwa9HVFSqBl9bb+iIvUa
+                aWbExHfirgkbTt2OJeY2EghKNPxZRBNxmxvf1jO/ZvfsMD1w7NFgA3K5rrf+
+                hpmMfD46euubJYwOpnLhN44Ur5Klwb6v05AcZTeIthbVtxYDfee8SRG93ygL
+                JY6UU0gRYi/xRV+UyGbbb3aprBFtTlAr8dpcqczSuUmhZ/ZpYnu2WjoscTOv
+                Nrnzylnmk5kyXlyCzarM5Xve5qzj826gLupzdEsMf0Tn9YbJfDPlt1src7Le
+                ePM2jZcKR7JvsX6KRyGnyW1uMqzdky8H3nCR3+0xeZLE2JQm3vKicdua8EL/
+                lLiBYFiziqnL1WySJLM2V5b1dZZcGXrWN8rKdaL8YJJv8vCS8hZDV4VSaMou
+                ZenK6q/UZLC3RHbV5taWl0VNzw56zJWcTPhLcp+OS5aMxt6xCquiiarUmpq5
+                nVzV4qzXTjXYt7kBwVYXjl8fSFtc3u8cH7OkvN8qhJJ4z5Kgyfltnz337ELV
+                7scB75TC4X2d0krvF9k0CiNtnAySft8VblfbDIbr9Ow2HL+/7Ht6Yzxe9ZeX
+                944gfrTEnPi4Y5QfPUI1/0j+K6KAgICAgICAgICA/gOE31ggICAgICAgICAg
+                ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg
+                ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg
+                ICAgICAgICAgICAgICAgICAgICAgICCg/yn61Yb12pr9Hvxgw/qf6IM1AAEB
+                AQEB/Qr9/Cr9WT1uBlbZjlkUFI/iD75cbuYdlAAA
+                </data>
+        </array>
+        <array>
+                <data>
+                DAAAAAAAAAwfiwgAYA9lXgL/nVBNC8IwDD27X1F736I3kW6jbgrC0InzoLey
+                Fh3uo3TF6r+3myh6ETGXvOTlvYSQ8FqV6CJUWzS1j8feCCNR5w0v6qOPd9nC
+                neAwcMgwXkfZPp0jWRatRululiwjhF0AKmUpAOIsRmmy3GbIegDMVxjhk9Zy
+                CmCM8Vg35eVN1Q22kKpGCqVviTVzrcDjmmO75uH+cY7t8iLXgTMgZ3ELWgJd
+                shVTinXgDQ0IZ5r16GCojdmRUuP3DDwpAj8pN/8qqflb+XXnC1myfwiB/l2B
+                cwc3T8VwxQEAAA==
+                </data>
+        </array>
+        <array>
+                <data>
+                DAAAAAAAAwwfiwgAYA9lXgL/nZBRC4IwFIWf81esveutt4hpmBYEUkL2UG/D
+                jZJMxxyt/n1Xo6iXCAdjZzv3O3dcNrtdSnKVuinqyqdjb0SJrPJaFNXRp7ts
+                6U7oLHDYMN5E2T5dEFUWjSHpbp6sIkJdgFCpUgLEWUzSZLXNCGYALNaU0JMx
+                agpgrfV4W+Xl9aUtbCDVtZLa3BMMcxHwhBEU2zzTv76Dr6LITeAM2Fneg4ZB
+                e+CNa81b8aEGTHDDO3WwIa4It/U7B14Wg3/IeX/S9iXD4y/yrdDsBsKgG1fg
+                PABFr9BBxQEAAA==
+                </data>
+        </array>
+        <array>
+                <data>
+                DAAAAAAAAAwfiwgAYA9lXgL/7dlBT4MwFAfw8/gUtXd4ejOmsOCYyRLiSGQH
+                d0PaTCKDpjTivr0FzdSL42jmnwuPvl//9PYOFfO3fc1elemqtgn5VXDJmWrK
+                VlbNLuSb/M6/5vPIExfJepE/Zkum66qzLNvcpqsF4z5RrHWtiJI8YVm6esiZ
+                yyBa3nPGn63VN0R93wfFoIKy3Q+wo8y0Whl7SF2Y7zYE0krufvOR/uM4blVW
+                pY28mXhRh6gTNLzcV2FMMRTfqpmQhS3GSvbx59OHY4eOLSAgICAgoH+ABP0+
+                KZ92E+KBgICAgIDOFp2alOt4QjwQEBAQENDZolOTcjslHggICAgI6I+hr/l2
+                rFxzvIYUNF5SRt47sNC68TsdAAA=
+                </data>
+        </array>
+</array>
+</plist>";
+        inventory_round_trip(inventory_data);
+    }
+
+    #[test]
+    fn real_inventory_bronze_age_round_trip_test() {
+        let inventory_data = b"
+        <?xml version=\"1.0\" encoding=\"UTF-8\"?>
+        <!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
+        <plist version=\"1.0\">
+        <array>
+                <array>
+                        <data>
+                        AQAAAAAAAJI=
+                        </data>
+                </array>
+                <array>
+                        <data>
+                        DAAAAAAAAZIfiwgAAAAAAAAH7Zlbc6JIFMefJ5/C9ZVKwBvolMlUcxMQuSio
+                        +IagaARBQNF8+gUzk93Z2kqfhzztwouN/s6F0/8+bRfDH9cobFw2abaPj8/N
+                        1hPVbGyOXuzvj8Fz07bEx37zx8vD8A9e5yzHEBpJuM/yhmGzqsw1mo8kiZIk
+                        3JAkb/ENQ5VnVqP0QZKC1mw0d3mefCfJoiie3Ip68uKoAjPSSONkk+Y3tXT2
+                        WBo8+bnfLMO8e/8tnfJbf+/lLw/fhofN7SUbktVHeeemqVsN/jb6NvTd3L2P
+                        jAK9X4q83RfBzxskva4Uf92VC1F2L4O5VzAnmxalURIJLa+ycyI5um3Z/Zw6
+                        izGRjfLRJWXJAcFaJKJL29yi+j2ixSzjRCLezGu+R4fKbuUfTUbc5VQXZc6r
+                        pLUO2ptg0Z2lZBy07cg3roS07ktCF0XzWxAsLMZIKrs2z645vnU7Biy3PQfr
+                        YvFGj3aJi2hJ2bcjR6LSK9udts+9lshlp/FCPKHKTggWnDdFp2M7uoYRXTi7
+                        xZpITjwR2/7SaSWJeo1QZ8Ayme2ITkZI7lmq7Po7dV9cxo5i37w9cqPIkVvc
+                        mNCoRci4YRCGki6POytRCKJ4kFBT0WJXlR2yTdk+d90FYpWLzPg+QefSYR2e
+                        3KTDLFfzgnj15lm80IKZErK9y+VyEyq7mWz3du0LP0jnu/FpuzKz8XZ3iriB
+                        6joepWuMJZs2Q3DJVKYNiuAoPXyt7Hz+tvEEmioMku/ZN4KhSWWSSmtf6mnh
+                        25FY7Zcr8/BqtZNpSB1Xna7hZPd6ElEvYBjL989tm8xEdn1UaMMb0YG+TYmw
+                        w+420YQ/9dNRnC/p5ZJEYlzZvQnhVEWTUiLPz3clkb+kNCQxSkPcAemTSmn/
+                        sPwdCpF21+SnkIm0AAtNkXbAQjowXB8SLsZCKiTxCdK6EMjDQbyEVHzioJxm
+                        kJxUSJ1uSBOwEIU0BwtdkYawUAdpNmSC8SpQkJZBSoAPp0AqrsOmRceXYAFI
+                        vJIKtgT8GKlYFVQQ3tMEAHEB5Ol2kLnbwDwBoO29iWHDAXKaQFaLCukqOkSZ
+                        oHAG0iiIJ3w4AxLOhIRTIcU0IP1pBiwmPhxoWiYQyAQmju8FGsQTaCubATsd
+                        HpIgJRAhKjC/bDfXgNMCWgigPg4qJj6nGeTpQHOnQXYpUE5zgJ7KvWUif03r
+                        Mb6sTibEE6iJ6RBlypDFCVot5aaIL2a53+H/ZAUQSAG2aPxCkP5dmbiDg2ai
+                        9+uzg8MH9FkONVRDNVRDNVRDNVRDNVRDNVRDNfRfh3BnTPmX3WdnzA/osxz+
+                        r9BfFf4YlT/e30gPyfv76peHPwEV755kRh8AAA==
+                        </data>
+                </array>
+                <array>
+                        <data>
+                        DAAAAAAAAJIfiwgAAAAAAAAH7ZXBT4MwFMbP46+ovcPTmzGFpcLUKlGI7LBj
+                        QxskMmhKY91/b2HRuGhc4mmH9tLv9f2+rz31keX7tkNvUo/t0Mf4IjrHSPb1
+                        INq+ifG6ugkv8TIJyFn2lFabYoVU144GFevrnKUIhwBUqU4CZFWGipw9V8hl
+                        AKweMcIvxqgrAGttxCcqqoftBI5Q6EFJbXa5CwudIRJGYHfNPv3gOe5UtLVJ
+                        ggV5lbtkJDBtruJa80l8UwsiuOGzYmVK70pK6T2L5w58tgj87Sxp1tw2/3Hm
+                        lu7XD+dvEKUe8pCHPOShE4COfe4PNqXsyED5Uq45zywC80RLgg87lbwFaAcA
+                        AA==
+                        </data>
+                </array>
+                <array>
+                        <data>
+                        DAAAAAAAApIfiwgAAAAAAAAH7dlPa4MwFADwc/spstzr62CHMlLLW/+Ao3GW
+                        2UOPotLaWhXN5vrtFx0rGwwjO5bnxaf55eXxyCVEzD7OKXuPyyrJsym/t8ac
+                        xVmYR0m2n/KtvxpN+MweirvFy9zfeUtWpEmlmLd9WjtzxkcAWBRpDLDwF8xb
+                        O68+0zkAli5n/KBU8QhQ17UVNMoK83MDK/DKvIhLdVnrZCM9wYpUxPUyX9l/
+                        laP/Rkmo7OFAnOKLXQloXvorKMugCX5EAxEFKmgjxA22z7MzbUfgOvQHQiRE
+                        iBAhQoQIESJEiNANIgHdB4fVZn5AWXUfHDTKUD5016BRinJiRPs+mfZtTWZk
+                        Xi5B1zGiEuXWiN5QboyoQLnrg0IjOvUpXLegNqIjyrERHfp0/NQHHdH9z050
+                        v7dw1068oq4aCBEiRIgQIUKECBEiRIjQrSM6Y5r6co30YHvPLKC9hbaHnx7/
+                        tIkcHwAA
+                        </data>
+                </array>
+                <array>
+                        <data>
+                        DAAAAAAAA5IfiwgAAAAAAAAH7dhNa4MwGAfwc/spslxLzQZj60ZqeaqWWnSz
+                        zB56FJVO+qJomOu3X3TFdTCSMHrYIF6M5pfHv9GASCfv+x16S8sqyw9jfGNc
+                        Y5Qe4jzJDpsxXoWz4QhPzD69sp+tcB04qNhlFUPBauq5FsJDQqAodikhdmij
+                        wHNfQsRrEOI8YYRfGSseCanr2ogaZcT5voEVCcq8SEt29HixIR9gJCzB/DKf
+                        1b/F4WeTLGZmv0e36dGsKGl2/Cgqy6hpnLV6NIlY1LbCpQ3gLwEW7rjtIV3X
+                        ObIewBsB30TIdsAHKbLAX0kRz+RK0Uyxkn+RTHwKFNBABd2Dv5Wiu/axyDPF
+                        KlOwUQl+oUwj8NfSTHMVNFN5CxyFu2uQI0WLnytRIl5COUwH4LriJZSDZcP8
+                        VpyBI4B5/YsMUzhtogwdEmXQSCONNNJII4000kijP4hkH8TO8jRO9EHcIVEG
+                        jf4Z+no1uhbvbP+NUNL+OTH7Hy3t4NzQEQAA
+                        </data>
+                </array>
+                <array>
+                        <data>
+                        DAAAAAAAA5IfiwgAAAAAAAAH7dhBb4IwFADg8/wVjLtWM5eYBTFv1jlGEdww
+                        2Y6MMiQqECBj/vsVTNyWGF+zk4dysdqP1ye0zUuNydduq31GRZlk6Vgf9Pq6
+                        FqVhxpM0Husr/6E70idmx7im7tR/82Zavk3KSvNW98yaanqXEMjzbUQI9anm
+                        MevF10QMQmYLXdPXVZXfEVLXdS9oVC/Mdg0siVdkeVRUeyaCdcUNPV5xXQxz
+                        iP4nHfErT8LK7FwZm2hvlgZpPsS3oCiCpvGrdWXwoAra1qKGw/Vkjdsecuw6
+                        gQAUUkghhRRSSCGFLgMZBKlyYnoDboZUOTEdglsiOcT0FtxaBmUo6oPbR9Ec
+                        GJ6TAyxEkS0TiQPDXkNMQxn0AfZQBo1QtAEbf+I7YI5EJInEU5nh1sBmKHqX
+                        GU4qEpfJKZKJJBYCPlUegeEz05ZBA5klFck8pwRsfDguM+lE4jgSK3jzj61m
+                        vlwetqhzW80RnctBIYUUUkghhRS6NITWATV9BidE6oCaLsGJkRxq+goOUvoI
+                        RMG1UDQF91SV/PNvji3R2Z4nG6Q9bTY73+flnIYEFwAA
+                        </data>
+                </array>
+                <array>
+                        <data>
+                        DAAAAAAAA5IfiwgAAAAAAAAHvVHRboIwFH2Wr+j6Dte9LUuBdOASFlTM8MHH
+                        hjaODKEpzdC/t60x2bKpxIf1pefee87paS6J97sGfQnV110b4sdgipFoq47X
+                        7TbE6/LVf8Jx5JGHdJmUm2KGZFP3GhXrlzxLEPYBqJSNAEjLFBV59l4i4wEw
+                        W2CEP7SWzwDDMATMsoKq21liD4XqpFD6kBsz3wgCrjk2z5zcf8QxXV5XOvIm
+                        5FMcop6AvUzFlGIWfEMTwplmDs1XCXXnLQvdBM4jAteVYkUvKP8iUXoP6WYG
+                        OiYDHZPhH0i/fgN2P+em4bn9EXDbjbwjbCEt8HQCAAA=
+                        </data>
+                </array>
+                <array>
+                        <data>
+                        DAAAAAAAAJIfiwgAAAAAAAAHjU/BDoIwDD3LV8zdoXozZkAmqMGgYsSDx4Ut
+                        SERYxiL69w6MRi/GXvra1/faEv92KdFVqKaoKxePnRFGospqXlS5iw/pwp5g
+                        37PIMNwG6TGZI1kWjUbJYRZHAcI2AJWyFABhGqIkjvYpMh4A8w1G+KS1nAK0
+                        beuwbsrJ6ks32ECiaimUvsfGzDYCh2uOzZqn+9c5psuLTHvWgJzF3WsIdMlU
+                        TCnWgQ80IJxp1qN1TumMmlhFbs/AiyLwW7mkO0r/U8I3fPNG0p9MoH/Isx72
+                        38H+ZwEAAA==
+                        </data>
+                </array>
+        </array>
+        </plist>";
+        inventory_round_trip(inventory_data);
+    }
+
+    #[test]
+    fn test_extra_workbench_isolation() {
+        let wb_data = Workbench::new(
+            InteractionObject::new(
+                DynamicObject {
+                    float_pos: [0.0f32.try_into().unwrap(), 0.0f32.try_into().unwrap()],
+                    pos_x: 5,
+                    pos_y: 5,
+                    unique_id: UniqueID::new(456),
+                    owner_id: Some("wb_owner".to_string()),
+                },
+                InteractionObjectType::Workbench,
+                false,
+                false,
+                0,
+            ),
+            0,
+            0.0f32.try_into().unwrap(),
+            0.0f32.try_into().unwrap(),
+            0.0f32.try_into().unwrap(),
+            false,
+            0,
+            0.0f32.try_into().unwrap(),
+            0.0f32.try_into().unwrap(),
+            false,
+            0.0f32.try_into().unwrap(),
+            1,
+            100.0f32.try_into().unwrap(),
+            0,
+            WorkbenchType::Workbench,
+            0.0f32.try_into().unwrap(),
+            None,
+        );
+
+        let item = Item {
+            type_id: ItemType::WorkBench as u16,
+            data_a: 0,
+            data_b: 0,
+            selected_sub_item_index: 0,
+            padding: 0,
+            extra: Some(Extra::Workbench(Box::new(wb_data))),
+        };
+
+        let serialized = item.to_value().unwrap();
+        let deserialized = Item::try_from_value(serialized).unwrap();
+        assert_eq!(item, deserialized);
     }
 }

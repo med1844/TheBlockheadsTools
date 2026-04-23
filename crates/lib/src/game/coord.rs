@@ -19,9 +19,7 @@ pub enum CoordError {
         "Too many parts in coordinate {raw_coord}. Expected 'x_y' format where x and y are decimal numbers."
     ))]
     InvalidChunkCoordFormat { raw_coord: String },
-    #[snafu(display(
-        "Failed to parse {label} coordinate `{coord_str}` as {target_type}: {source}"
-    ))]
+    #[snafu(display("Failed to parse {label} coordinate `{coord_str}` as {target_type}"))]
     ParseStrCoordAsInt {
         label: &'static str,
         coord_str: String,
