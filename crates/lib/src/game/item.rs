@@ -34,12 +34,10 @@ pub enum ItemError {
     SerializeExtra { source: plist::Error },
     #[snafu(display("Failed to save extra"))]
     SaveExtra { source: Box<ItemError> },
-    #[snafu(display("Failed to deserialize basket slots"))]
-    DeserializeBasket { source: plist::Error },
-    #[snafu(display("Failed to load {i}-th slot in basket slots"))]
-    LoadBasket { source: Box<ItemError>, i: usize },
-    #[snafu(display("Failed to save {i}-th slot in basket slots"))]
-    SaveBasket { source: Box<ItemError>, i: usize },
+    #[snafu(display("Failed to load {i}-th slot in subItem slots"))]
+    LoadSubItems { source: Box<ItemError>, i: usize },
+    #[snafu(display("Failed to save {i}-th slot in subItem slots"))]
+    SaveSubItems { source: Box<ItemError>, i: usize },
     #[snafu(display("Failed to deserialize chest data in item"))]
     DeserializeChestItem { source: plist::Error },
     #[snafu(display("Failed to serialize chest data in item"))]
@@ -532,69 +530,104 @@ pub enum Extra {
 impl Extra {
     pub const NUM_SLOT_BASKET: usize = 4;
 
-    pub(crate) fn from_item_dict(dict: plist::Dictionary) -> Result<Self> {
-        if let Some(value) = dict.get("s") {
-            let raw_slots: [plist::Value; Self::NUM_SLOT_BASKET] =
-                plist::from_value(value).context(DeserializeBasketSnafu)?;
-            let mut arr = core::array::from_fn(|_| Slot(Vec::new()));
-            for (i, value) in raw_slots
-                .into_iter()
-                .take(Extra::NUM_SLOT_BASKET)
-                .enumerate()
-            {
-                arr[i] = Slot::try_from_value(value)
-                    .map_err(Box::new)
-                    .context(LoadBasketSnafu { i })?;
-            }
-            Ok(Self::Basket(arr))
-        } else if let Some(value @ plist::Value::Dictionary(d)) = dict.get("d")
-            && d.contains_key("chestType")
+    fn from_sub_items(sub_items: Vec<plist::Value>) -> Result<Self> {
+        let mut arr = core::array::from_fn(|_| Slot(Vec::new()));
+        for (i, value) in sub_items
+            .into_iter()
+            .take(Extra::NUM_SLOT_BASKET)
+            .enumerate()
         {
-            let chest_item: ChestItem =
-                plist::from_value(value).context(DeserializeChestItemSnafu)?;
+            arr[i] = Slot::try_from_value(value)
+                .map_err(Box::new)
+                .context(LoadSubItemsSnafu { i })?;
+        }
+        Ok(Self::Basket(arr))
+    }
+
+    fn from_dyn_obj_save_dict(dict: plist::Dictionary) -> Result<Self> {
+        if dict.contains_key("chestType") {
+            let dict = plist::Value::Dictionary(dict);
+            let chest_item: ChestItem = plist::from_value(&dict).context(DeserializeExtraSnafu)?;
             Ok(Self::Chest(Box::new(
                 Chest::from_chest_item(chest_item).context(LoadChestSnafu)?,
             )))
-        } else if let Some(value @ plist::Value::Dictionary(d)) = dict.get("d")
-            && d.contains_key("workbenchType")
-        {
-            Ok(Self::Workbench(
-                plist::from_value(value).context(DeserializeWorkbenchSnafu)?,
-            ))
+        } else if dict.contains_key("workbenchType") {
+            let dict = plist::Value::Dictionary(dict);
+            let workbench: Workbench = plist::from_value(&dict).context(DeserializeExtraSnafu)?;
+            Ok(Self::Workbench(Box::new(workbench)))
         } else {
-            NoKnownKeyInExtraSnafu { dict }.fail()
+            return NoKnownKeyInExtraSnafu { dict }.fail();
         }
     }
 
-    pub(crate) fn to_item_dict(&self) -> Result<plist::Dictionary> {
-        let mut dict = plist::Dictionary::new();
+    fn to_sub_items(&self) -> Result<Option<Vec<plist::Value>>> {
         match self {
-            Self::Basket(items) => {
+            Extra::Basket(items) => {
                 let slot_values = items
                     .iter()
                     .enumerate()
                     .map(|(i, slot)| {
                         slot.to_value()
                             .map_err(Box::new)
-                            .context(SaveBasketSnafu { i })
+                            .context(SaveSubItemsSnafu { i })
                     })
                     .collect::<Result<Vec<_>>>()?;
-                let value = plist::Value::Array(slot_values);
-                dict.insert("s".to_string(), value);
+                Ok(Some(slot_values))
             }
-            Self::Chest(chest) => {
+            Extra::Chest(_) | Extra::Workbench(_) => Ok(None),
+        }
+    }
+
+    fn to_dyn_obj_save_dict(&self) -> Result<Option<plist::Value>> {
+        match self {
+            Extra::Chest(chest) => {
                 let chest_item = chest.to_chest_item().context(SaveChestSnafu)?;
-                dict.insert(
-                    "d".to_string(),
+                Ok(Some(
                     plist::to_value(&chest_item).context(SerializeChestItemSnafu)?,
-                );
+                ))
             }
-            Self::Workbench(workbench) => {
-                dict.insert(
-                    "d".to_string(),
-                    plist::to_value(workbench).context(SerializeWorkbenchSnafu)?,
-                );
-            }
+            Extra::Workbench(workbench) => Ok(Some(
+                plist::to_value(workbench).context(SerializeWorkbenchSnafu)?,
+            )),
+            Extra::Basket(_) => Ok(None),
+        }
+    }
+
+    fn from_binary_item_dict(dict: plist::Dictionary) -> Result<Self> {
+        if let Some(value) = dict.get("s") {
+            let sub_item_values = match value.clone() {
+                plist::Value::Array(values) => values,
+                _ => UnexpectedStructureSnafu {
+                    type_name: "subItems",
+                    target_structure: "plist::Array",
+                    value: value.clone(),
+                }
+                .fail()?,
+            };
+            Self::from_sub_items(sub_item_values)
+        } else if let Some(value) = dict.get("d") {
+            let dict = match value.to_owned() {
+                plist::Value::Dictionary(dict) => dict,
+                _ => UnexpectedStructureSnafu {
+                    type_name: "dynamicObjectSaveDict",
+                    target_structure: "plist::Array",
+                    value: value.clone(),
+                }
+                .fail()?,
+            };
+            Self::from_dyn_obj_save_dict(dict)
+        } else {
+            NoKnownKeyInExtraSnafu { dict }.fail()
+        }
+    }
+
+    fn to_binary_item_dict(&self) -> Result<plist::Dictionary> {
+        let mut dict = plist::Dictionary::new();
+        if let Some(sub_item_values) = self.to_sub_items()? {
+            dict.insert("s".to_string(), plist::Value::Array(sub_item_values));
+        }
+        if let Some(dyn_obj_save_dict_value) = self.to_dyn_obj_save_dict()? {
+            dict.insert("d".to_string(), dyn_obj_save_dict_value);
         }
         Ok(dict)
     }
@@ -730,7 +763,7 @@ impl Item {
             let extra_bytes = decompress(&compressed_extra).context(DecompressExtraBytesSnafu)?;
             let dict =
                 plist::from_reader_xml(extra_bytes.as_slice()).context(DeserializeExtraSnafu)?;
-            let extra = Extra::from_item_dict(dict)?;
+            let extra = Extra::from_binary_item_dict(dict)?;
             Some(extra)
         };
         Ok(Self {
@@ -765,7 +798,7 @@ impl Item {
         buffer.push(self.padding);
         if let Some(extra) = self.extra.as_ref() {
             let value = extra
-                .to_item_dict()
+                .to_binary_item_dict()
                 .map_err(Box::new)
                 .context(SaveExtraSnafu)?;
             let serialized_extra =
@@ -964,35 +997,11 @@ impl Item {
     /// Build Item from its XML representation (defaults selectedSubItemIndex/padding to 0)
     pub(crate) fn from_xml(xml: ItemXml) -> Result<Self> {
         let extra = if let Some(sub_items) = xml.sub_items {
-            let mut arr = core::array::from_fn(|_| Slot(Vec::new()));
-            for (i, value) in sub_items
-                .into_iter()
-                .take(Extra::NUM_SLOT_BASKET)
-                .enumerate()
-            {
-                arr[i] = Slot::try_from_value(value)
-                    .map_err(Box::new)
-                    .context(LoadBasketSnafu { i })?;
-            }
-            Some(Extra::Basket(arr))
+            Some(Extra::from_sub_items(sub_items)?)
         } else if let Some(value) = xml.dynamic_object_save_dict
             && let plist::Value::Dictionary(dict) = value
         {
-            if dict.contains_key("chestType") {
-                let dict = plist::Value::Dictionary(dict);
-                let chest_item: ChestItem =
-                    plist::from_value(&dict).context(DeserializeExtraSnafu)?;
-                Some(Extra::Chest(Box::new(
-                    Chest::from_chest_item(chest_item).context(LoadChestSnafu)?,
-                )))
-            } else if dict.contains_key("workbenchType") {
-                let dict = plist::Value::Dictionary(dict);
-                let workbench: Workbench =
-                    plist::from_value(&dict).context(DeserializeExtraSnafu)?;
-                Some(Extra::Workbench(Box::new(workbench)))
-            } else {
-                return NoKnownKeyInExtraSnafu { dict }.fail();
-            }
+            Some(Extra::from_dyn_obj_save_dict(dict)?)
         } else {
             None
         };
@@ -1010,26 +1019,7 @@ impl Item {
     /// Convert Item to XML representation (drops selectedSubItemIndex/padding)
     pub(crate) fn to_xml(&self) -> Result<ItemXml> {
         let (sub_items, dynamic_object_save_dict) = match &self.extra {
-            Some(Extra::Basket(slots)) => (
-                Some(
-                    slots
-                        .iter()
-                        .enumerate()
-                        .map(|(i, slot)| {
-                            slot.to_value()
-                                .map_err(Box::new)
-                                .context(SaveBasketSnafu { i })
-                        })
-                        .collect::<std::result::Result<Vec<_>, _>>()?,
-                ),
-                None,
-            ),
-            Some(Extra::Chest(chest)) => {
-                let chest_item = chest.to_chest_item().context(SaveChestSnafu)?;
-                // TODO: to_xml should failable
-                (None, Some(plist::to_value(&chest_item).unwrap()))
-            }
-            Some(Extra::Workbench(workbench)) => (None, Some(plist::to_value(workbench).unwrap())),
+            Some(extra) => (extra.to_sub_items()?, extra.to_dyn_obj_save_dict()?),
             None => (None, None),
         };
 
@@ -1385,7 +1375,7 @@ mod tests {
 </dict>
 </plist>";
         let dict = plist::from_reader_xml(xml.as_bytes()).unwrap();
-        let extra = Extra::from_item_dict(dict).unwrap();
+        let extra = Extra::from_binary_item_dict(dict).unwrap();
         assert!(matches!(extra, Extra::Chest(..)));
     }
 
@@ -1445,7 +1435,7 @@ mod tests {
 </dict>
 </plist>";
         let dict = plist::from_reader_xml(xml.as_bytes()).unwrap();
-        let extra = Extra::from_item_dict(dict).unwrap();
+        let extra = Extra::from_binary_item_dict(dict).unwrap();
         assert!(matches!(extra, Extra::Chest(..)));
     }
 
@@ -1486,7 +1476,7 @@ mod tests {
 </dict>
 </plist>";
         let dict = plist::from_reader_xml(xml.as_bytes()).unwrap();
-        let extra = Extra::from_item_dict(dict).unwrap();
+        let extra = Extra::from_binary_item_dict(dict).unwrap();
         assert!(matches!(extra, Extra::Chest(..)));
     }
 
