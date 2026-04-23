@@ -1,10 +1,14 @@
-use super::dynamic_object::{
-    chest::{Chest, ChestError, ChestItem},
-    workbench::Workbench,
-};
-use crate::util::{
-    gzip::{compress_into, decompress},
-    plist::to_xml_plist,
+use super::{
+    super::util::{
+        gzip::{compress_into, decompress},
+        plist::to_xml_plist,
+    },
+    dynamic_object::{
+        InteractionObjectType,
+        chest::{Chest, ChestError, ChestItem},
+        craft::Bed,
+        workbench::Workbench,
+    },
 };
 use num_enum::TryFromPrimitive;
 use serde::{Deserialize, Serialize};
@@ -50,12 +54,21 @@ pub enum ItemError {
     DeserializeWorkbench { source: plist::Error },
     #[snafu(display("Failed to serialize workbench"))]
     SerializeWorkbench { source: plist::Error },
-    #[snafu(display("No known key in extra: {dict:?}"))]
-    NoKnownKeyInExtra { dict: plist::Dictionary },
+    #[snafu(display("Can't parse dynamicObjectSaveDict as known type: {dict:?}"))]
+    DynObjSaveDictNoTypeMatch { dict: plist::Dictionary },
+    #[snafu(display("Can't load value as InteractionObjectType: {value:?}"))]
+    UnknownInteractionObjectType {
+        value: plist::Value,
+        source: plist::Error,
+    },
+    #[snafu(display("Can't understand dynamicObjectSaveDict with {obj_type:?} yet"))]
+    UnsupportedInteractionObjectType { obj_type: InteractionObjectType },
     #[snafu(display(
         "Item data too short: expected at least 8 bytes, got {got} bytes, data: {data:?}"
     ))]
     ItemDataTooShort { got: usize, data: Vec<u8> },
+    #[snafu(display("Failed to serialize bed"))]
+    SerializeBed { source: plist::Error },
     #[snafu(display("Failed to decompress item extra as gzip"))]
     DecompressExtraBytes { source: std::io::Error },
     #[snafu(display("Failed to compress item extra as gzip"))]
@@ -525,6 +538,7 @@ pub enum Extra {
     Basket([Slot; Self::NUM_SLOT_BASKET]),
     Chest(Box<Chest>),
     Workbench(Box<Workbench>),
+    Bed(Bed),
 }
 
 impl Extra {
@@ -555,8 +569,24 @@ impl Extra {
             let dict = plist::Value::Dictionary(dict);
             let workbench: Workbench = plist::from_value(&dict).context(DeserializeExtraSnafu)?;
             Ok(Self::Workbench(Box::new(workbench)))
+        } else if let Some(value) = dict.get("interactionObjectType") {
+            let interaction_obj_type: InteractionObjectType =
+                plist::from_value(value).context(UnknownInteractionObjectTypeSnafu {
+                    value: value.to_owned(),
+                })?;
+            match interaction_obj_type {
+                InteractionObjectType::Bed => {
+                    let bed: Bed = plist::from_value(&plist::Value::Dictionary(dict))
+                        .context(DeserializeExtraSnafu)?;
+                    Ok(Self::Bed(bed))
+                }
+                _ => UnsupportedInteractionObjectTypeSnafu {
+                    obj_type: interaction_obj_type,
+                }
+                .fail(),
+            }
         } else {
-            return NoKnownKeyInExtraSnafu { dict }.fail();
+            DynObjSaveDictNoTypeMatchSnafu { dict }.fail()
         }
     }
 
@@ -574,7 +604,7 @@ impl Extra {
                     .collect::<Result<Vec<_>>>()?;
                 Ok(Some(slot_values))
             }
-            Extra::Chest(_) | Extra::Workbench(_) => Ok(None),
+            Extra::Chest(_) | Extra::Workbench(_) | Extra::Bed(_) => Ok(None),
         }
     }
 
@@ -589,6 +619,7 @@ impl Extra {
             Extra::Workbench(workbench) => Ok(Some(
                 plist::to_value(workbench).context(SerializeWorkbenchSnafu)?,
             )),
+            Extra::Bed(bed) => Ok(Some(plist::to_value(bed).context(SerializeBedSnafu)?)),
             Extra::Basket(_) => Ok(None),
         }
     }
@@ -617,7 +648,7 @@ impl Extra {
             };
             Self::from_dyn_obj_save_dict(dict)
         } else {
-            NoKnownKeyInExtraSnafu { dict }.fail()
+            DynObjSaveDictNoTypeMatchSnafu { dict }.fail()
         }
     }
 
@@ -697,6 +728,7 @@ impl Display for Extra {
                 builder.finish()
             }
             Extra::Workbench(workbench) => std::fmt::Debug::fmt(workbench, f),
+            Extra::Bed(bed) => std::fmt::Debug::fmt(bed, f),
         }
     }
 }
