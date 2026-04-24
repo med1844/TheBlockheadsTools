@@ -701,6 +701,7 @@ impl DwChunkBuf {
         add(chunk.cherry_tree.iter(), CherryTree, &mut builder);
         add(chunk.coffee_tree.iter(), CoffeeTree, &mut builder);
         add(chunk.corn_plant.iter(), CornPlant, &mut builder);
+        add(chunk.ladder.iter(), Ladder, &mut builder);
         add(chunk.door.iter(), Door, &mut builder);
         add(chunk.carrot_plant.iter(), CarrotPlant, &mut builder);
         add(chunk.kelp_plant.iter(), KelpPlant, &mut builder);

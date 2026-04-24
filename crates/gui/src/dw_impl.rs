@@ -18,7 +18,7 @@ use the_blockheads_tools_lib::game::{
         ArtificialLight, DynamicObject, InteractionObject, InteractionObjectType, LightDirection,
         UniqueID,
         chest::{Chest, ChestType},
-        craft::Door,
+        craft::{Door, Ladder},
         plant::{CarrotPlant, CornPlant, KelpPlant, NormalPlant, Plant, TomatoPlant},
         tree::{
             AppleTree, CactusTree, CherryTree, CoconutTree, CoffeeTree, GemTree, LimeTree,
@@ -518,12 +518,51 @@ impl BuildDwMesh for CornPlant {
     }
 }
 
+impl ToRow for ItemType {
+    fn to_row(&mut self, ui: &mut egui::Ui) {
+        // ItemType contains TOO MANY types, might need dedicated selector.
+        // TODO either add selector, limit door/ladder/etc type, or display raw id
+        let item_type_str: &'static str = (*self).into();
+        ui.label(item_type_str);
+    }
+}
+
+impl ToGrid for Ladder {
+    fn to_grid(&mut self, ui: &mut egui::Ui) {
+        self.paint_color.add_row("paintColor", ui);
+        self.item_type.add_row("itemType", ui);
+    }
+}
+
+impl InfoUi for Ladder {
+    fn info(&mut self, ui: &mut egui::Ui) {
+        let obj = self.deref_mut();
+        obj.info(ui);
+
+        ui.vertical(|ui| {
+            ui.heading("Ladder");
+            ui.separator();
+            self.add_grid("ladder_grid", ui);
+        });
+    }
+}
+
+impl BuildDwMesh for Ladder {
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        builder.add_face(DwFace::new_sprite(
+            ImageType::Ladder,
+            [0.5, 0.0],
+            self.float_pos,
+            [1, 1],
+            2.0,
+        ));
+        Ok(())
+    }
+}
+
 impl ToGrid for Door {
     fn to_grid(&mut self, ui: &mut egui::Ui) {
-        // ItemType contains TOO MANY types, might need dedicated selector.
-        // TODO either add selector, limit door type, or display raw id
-        let mut item_type_str: &'static str = self.item_type.into();
-        item_type_str.add_row("itemType", ui);
+        self.item_type.add_row("itemType", ui);
         self.blocked.add_row("blocked", ui);
         self.iron_place_client_id.add_row("ironPlaceClientId", ui);
     }
