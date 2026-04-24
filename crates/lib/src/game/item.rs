@@ -38,10 +38,10 @@ pub enum ItemError {
     SerializeExtra { source: plist::Error },
     #[snafu(display("Failed to save extra"))]
     SaveExtra { source: Box<ItemError> },
-    #[snafu(display("Failed to load {i}-th slot in subItem slots"))]
-    LoadSubItems { source: Box<ItemError>, i: usize },
-    #[snafu(display("Failed to save {i}-th slot in subItem slots"))]
-    SaveSubItems { source: Box<ItemError>, i: usize },
+    #[snafu(display("Failed to load subItem slots"))]
+    LoadSubItems { source: Box<ItemError> },
+    #[snafu(display("Failed to save subItem slots"))]
+    SaveSubItems { source: Box<ItemError> },
     #[snafu(display("Failed to deserialize chest data in item"))]
     DeserializeChestItem { source: plist::Error },
     #[snafu(display("Failed to serialize chest data in item"))]
@@ -81,10 +81,14 @@ pub enum ItemError {
         target_structure: &'static str,
         value: plist::Value,
     },
-    #[snafu(display("Failed to load {i}-th slot in inventory"))]
-    LoadInventory { source: Box<ItemError>, i: usize },
+    #[snafu(display("Failed to load slots in inventory"))]
+    LoadInventory { source: Box<ItemError> },
     #[snafu(display("Failed to save {i}-th slot in inventory"))]
     SaveInventory { source: Box<ItemError>, i: usize },
+    #[snafu(display("Failed to save {i}-th slot"))]
+    LoadSlots { source: Box<ItemError>, i: usize },
+    #[snafu(display("Failed to save {i}-th slot"))]
+    SaveSlots { source: Box<ItemError>, i: usize },
     #[snafu(display("Failed to save {i}-th item in slot"))]
     SaveSlot { source: Box<ItemError>, i: usize },
 }
@@ -535,7 +539,7 @@ pub enum ItemType {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Extra {
-    Basket([Slot; Self::NUM_SLOT_BASKET]),
+    Basket(Slots<{ Self::NUM_SLOT_BASKET }>),
     Chest(Box<Chest>),
     Workbench(Box<Workbench>),
     Bed(Bed),
@@ -545,17 +549,11 @@ impl Extra {
     pub const NUM_SLOT_BASKET: usize = 4;
 
     fn from_sub_items(sub_items: Vec<plist::Value>) -> Result<Self> {
-        let mut arr = core::array::from_fn(|_| Slot(Vec::new()));
-        for (i, value) in sub_items
-            .into_iter()
-            .take(Extra::NUM_SLOT_BASKET)
-            .enumerate()
-        {
-            arr[i] = Slot::try_from_value(value)
+        Ok(Self::Basket(
+            Slots::from_values(sub_items)
                 .map_err(Box::new)
-                .context(LoadSubItemsSnafu { i })?;
-        }
-        Ok(Self::Basket(arr))
+                .context(LoadSubItemsSnafu)?,
+        ))
     }
 
     fn from_dyn_obj_save_dict(dict: plist::Dictionary) -> Result<Self> {
@@ -592,18 +590,12 @@ impl Extra {
 
     fn to_sub_items(&self) -> Result<Option<Vec<plist::Value>>> {
         match self {
-            Extra::Basket(items) => {
-                let slot_values = items
-                    .iter()
-                    .enumerate()
-                    .map(|(i, slot)| {
-                        slot.to_value()
-                            .map_err(Box::new)
-                            .context(SaveSubItemsSnafu { i })
-                    })
-                    .collect::<Result<Vec<_>>>()?;
-                Ok(Some(slot_values))
-            }
+            Extra::Basket(slots) => Ok(Some(
+                slots
+                    .to_values()
+                    .map_err(Box::new)
+                    .context(SaveSubItemsSnafu)?,
+            )),
             Extra::Chest(_) | Extra::Workbench(_) | Extra::Bed(_) => Ok(None),
         }
     }
@@ -684,7 +676,7 @@ impl<'a, T: Display> Display for ListDisplay<'a, T> {
 impl Display for Extra {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Extra::Basket(items) => f.debug_list().entries(items.iter().map(AsDisplay)).finish(),
+            Extra::Basket(slots) => f.debug_list().entries(slots.iter().map(AsDisplay)).finish(),
             Extra::Chest(chest) => {
                 use crate::game::dynamic_object::chest::{ChestSlots, ChestType};
                 let mut builder = f.debug_struct("ChestData");
@@ -1102,7 +1094,7 @@ impl Slot {
             plist::Value::Array(values) => Ok(Self(
                 values
                     .into_iter()
-                    .map(|value| Item::try_from_value(value))
+                    .map(Item::try_from_value)
                     .collect::<Result<Vec<Item>>>()?,
             )),
             _ => UnexpectedStructureSnafu {
@@ -1166,28 +1158,72 @@ impl Display for Slot {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct Slots<const N: usize>([Slot; N]);
+
+impl<const N: usize> Slots<N> {
+    pub fn from_values(values: Vec<plist::Value>) -> Result<Self> {
+        // TODO report slot number mismatch
+        // #[snafu(display("Num slots mismatch: expected {expected}, got {got}"))]
+        // NumSlotsMismatch {
+        //     expected: usize,
+        //     got: usize,
+        // },
+        let mut arr = core::array::from_fn(|_| Slot(Vec::new()));
+        for (i, value) in values.into_iter().take(N).enumerate() {
+            arr[i] = Slot::try_from_value(value)
+                .map_err(Box::new)
+                .context(LoadSlotsSnafu { i })?;
+        }
+        Ok(Self(arr))
+    }
+
+    pub fn to_values(&self) -> Result<Vec<plist::Value>> {
+        let slot_values = self
+            .0
+            .iter()
+            .enumerate()
+            .map(|(i, slot)| {
+                slot.to_value()
+                    .map_err(Box::new)
+                    .context(SaveSlotsSnafu { i })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        Ok(slot_values)
+    }
+}
+
+impl<const N: usize> Deref for Slots<N> {
+    type Target = [Slot; N];
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<const N: usize> DerefMut for Slots<N> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
 // An inventory of a blockhead
 #[derive(Debug, Clone, PartialEq)]
-pub struct Inventory([Slot; Self::NUM_SLOTS]);
+pub struct Inventory(Slots<{ Self::NUM_SLOTS }>);
 
 impl Inventory {
     pub const NUM_SLOTS: usize = 8;
 
-    pub fn new(slots: [Slot; Self::NUM_SLOTS]) -> Self {
+    pub fn new(slots: Slots<{ Self::NUM_SLOTS }>) -> Self {
         Self(slots)
     }
 
     pub fn try_from_value(value: plist::Value) -> Result<Self> {
         match value {
-            plist::Value::Array(values) => {
-                let mut arr = core::array::from_fn(|_| Slot(Vec::new()));
-                for (i, value) in values.into_iter().take(Self::NUM_SLOTS).enumerate() {
-                    arr[i] = Slot::try_from_value(value)
-                        .map_err(Box::new)
-                        .context(LoadInventorySnafu { i })?;
-                }
-                Ok(Self(arr))
-            }
+            plist::Value::Array(values) => Ok(Self(
+                Slots::from_values(values)
+                    .map_err(Box::new)
+                    .context(LoadInventorySnafu)?,
+            )),
             _ => UnexpectedStructureSnafu {
                 type_name: "Inventory",
                 target_structure: "plist::Array",
@@ -1198,17 +1234,12 @@ impl Inventory {
     }
 
     pub fn to_value(&self) -> Result<plist::Value> {
-        Ok(plist::Value::Array(
-            self.0
-                .iter()
-                .map(|slot| slot.to_value())
-                .collect::<Result<Vec<_>>>()?,
-        ))
+        Ok(plist::Value::Array(self.0.to_values()?))
     }
 }
 
 impl Deref for Inventory {
-    type Target = [Slot; Self::NUM_SLOTS];
+    type Target = Slots<{ Self::NUM_SLOTS }>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -1230,7 +1261,7 @@ impl IntoIterator for Inventory {
     type Item = Slot;
     type IntoIter = std::array::IntoIter<Self::Item, { Self::NUM_SLOTS }>;
     fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
+        self.0.0.into_iter()
     }
 }
 
@@ -1241,7 +1272,7 @@ mod tests {
             DynamicObject, InteractionObject, InteractionObjectType, UniqueID,
             workbench::{Workbench, WorkbenchType},
         },
-        Extra, Inventory, Item, ItemType, PigmentColor, Slot,
+        Extra, Inventory, Item, ItemType, PigmentColor, Slot, Slots,
     };
     use crate::util::plist::{diff_plist_keys, to_xml_plist};
 
@@ -1327,7 +1358,7 @@ mod tests {
             data_b: 0,
             selected_sub_item_index: 0,
             padding: 0,
-            extra: Some(Extra::Basket(basket_items)),
+            extra: Some(Extra::Basket(Slots(basket_items))),
         };
 
         let serialized = item.to_value().unwrap();

@@ -5,7 +5,7 @@ use super::{
             plist::to_xml_plist,
             serde::{deserialize_some, serialize_some},
         },
-        item::{ItemError, ItemType, Slot},
+        item::{ItemError, ItemType, Slot, Slots},
     },
     InteractionObject,
 };
@@ -48,8 +48,8 @@ impl From<ChestType> for u8 {
 
 pub const NUM_STANDARD_SLOTS: usize = 4 * 4;
 pub const NUM_SHELF_SLOTS: usize = 2 * 2;
-type StandardSlots = [Slot; NUM_STANDARD_SLOTS];
-type ShelfSlots = [Slot; NUM_SHELF_SLOTS];
+type StandardSlots = Slots<NUM_STANDARD_SLOTS>;
+type ShelfSlots = Slots<NUM_SHELF_SLOTS>;
 
 #[derive(Debug, Snafu)]
 pub enum ChestError {
@@ -57,12 +57,6 @@ pub enum ChestError {
     IncompleteShelfRenderItems,
     #[snafu(display("Incomplete shelf_item_data_bs array"))]
     IncompleteItemDataBs,
-    #[snafu(display("Num slots mismatch: expected {expected}, got {got} for type {chest_type:?}"))]
-    NumSlotsMismatch {
-        expected: usize,
-        got: usize,
-        chest_type: ChestType,
-    },
     #[snafu(display("Get save_item_slot when portal chest shouldn't have one"))]
     PortalChestHaveSlots,
     #[snafu(display("No save_item_slot when chest type {chest_type:?} should have one"))]
@@ -103,63 +97,57 @@ pub enum ChestSlots {
 }
 
 impl ChestSlots {
+    pub fn chest_type(&self) -> ChestType {
+        match self {
+            Self::Standard(_) => ChestType::Standard,
+            Self::Safe(_) => ChestType::Safe,
+            Self::Shelf { .. } => ChestType::Shelf,
+            Self::Gold(_) => ChestType::Gold,
+            Self::Portal => ChestType::Portal,
+            Self::Cabinet { .. } => ChestType::Cabinet,
+            Self::Feeder(_) => ChestType::Feeder,
+        }
+    }
+
     pub fn from_chest_type_and_slots(
         chest_type: ChestType,
-        slots: Option<Vec<Slot>>,
+        slot_values: Option<Vec<plist::Value>>,
         render_items: Option<[ItemType; NUM_SHELF_SLOTS]>,
         item_data_bs: Option<[u16; NUM_SHELF_SLOTS]>,
     ) -> Result<Self> {
-        match (slots, chest_type) {
+        match (slot_values, chest_type) {
             (
-                Some(slots),
+                Some(slot_values),
                 ChestType::Standard | ChestType::Safe | ChestType::Gold | ChestType::Feeder,
             ) => {
-                let slots: std::result::Result<[Slot; NUM_STANDARD_SLOTS], Vec<Slot>> =
-                    slots.try_into();
-                match slots {
-                    Ok(slots) => {
-                        Ok(match chest_type {
-                            ChestType::Standard => Self::Standard(slots),
-                            ChestType::Safe => Self::Safe(slots),
-                            ChestType::Gold => Self::Gold(slots),
-                            ChestType::Feeder => Self::Feeder(slots),
-                            _ => unreachable!(), // bad design
-                        })
-                    }
-                    Err(slots) => NumSlotsMismatchSnafu {
-                        expected: NUM_STANDARD_SLOTS,
-                        got: slots.len(),
-                        chest_type,
-                    }
-                    .fail(),
-                }
+                let slots = Slots::from_values(slot_values)
+                    .map_err(Box::new)
+                    .context(LoadSlotsSnafu)?;
+                Ok(match chest_type {
+                    ChestType::Standard => Self::Standard(slots),
+                    ChestType::Safe => Self::Safe(slots),
+                    ChestType::Gold => Self::Gold(slots),
+                    ChestType::Feeder => Self::Feeder(slots),
+                    _ => unreachable!(), // bad design
+                })
             }
-            (Some(slots), ChestType::Shelf | ChestType::Cabinet) => {
-                let slots: std::result::Result<[Slot; NUM_SHELF_SLOTS], Vec<Slot>> =
-                    slots.try_into();
-                match slots {
-                    Ok(slots) => {
-                        Ok(match chest_type {
-                            ChestType::Shelf => Self::Shelf {
-                                render_items,
-                                item_data_bs,
-                                slots,
-                            },
-                            ChestType::Cabinet => Self::Cabinet {
-                                render_items,
-                                item_data_bs,
-                                slots,
-                            },
-                            _ => unreachable!(), // bad design
-                        })
-                    }
-                    Err(slots) => NumSlotsMismatchSnafu {
-                        expected: NUM_SHELF_SLOTS,
-                        got: slots.len(),
-                        chest_type,
-                    }
-                    .fail(),
-                }
+            (Some(slot_values), ChestType::Shelf | ChestType::Cabinet) => {
+                let slots = Slots::from_values(slot_values)
+                    .map_err(Box::new)
+                    .context(LoadSlotsSnafu)?;
+                Ok(match chest_type {
+                    ChestType::Shelf => Self::Shelf {
+                        render_items,
+                        item_data_bs,
+                        slots,
+                    },
+                    ChestType::Cabinet => Self::Cabinet {
+                        render_items,
+                        item_data_bs,
+                        slots,
+                    },
+                    _ => unreachable!(), // bad design
+                })
             }
             (slots, ChestType::Portal) => match slots {
                 Some(_) => PortalChestHaveSlotsSnafu.fail(),
@@ -180,39 +168,39 @@ impl ChestSlots {
     #[allow(clippy::type_complexity)]
     fn to_chest_type_and_slots(
         &self,
-    ) -> (
+    ) -> Result<(
         ChestType,
-        Option<Vec<Slot>>,
+        Option<Vec<plist::Value>>,
         Option<[ItemType; NUM_SHELF_SLOTS]>,
         Option<[u16; NUM_SHELF_SLOTS]>,
-    ) {
-        match self {
-            Self::Standard(s) => (ChestType::Standard, Some(s.to_vec()), None, None),
-            Self::Safe(s) => (ChestType::Safe, Some(s.to_vec()), None, None),
+    )> {
+        let chest_type = self.chest_type();
+        let slot_values = match self {
+            Self::Standard(s) | Self::Safe(s) | Self::Gold(s) | Self::Feeder(s) => {
+                Some(s.to_values())
+            }
+            Self::Shelf { slots, .. } | Self::Cabinet { slots, .. } => Some(slots.to_values()),
+            Self::Portal => None,
+        }
+        .transpose()
+        .map_err(Box::new)
+        .context(SaveSlotsSnafu)?;
+        let (render_items, item_data_bs) = match self {
+            Self::Standard(_) | Self::Safe(_) | Self::Gold(_) | Self::Portal | Self::Feeder(_) => {
+                (None, None)
+            }
             Self::Shelf {
                 render_items,
                 item_data_bs,
-                slots,
-            } => (
-                ChestType::Shelf,
-                Some(slots.to_vec()),
-                *render_items,
-                *item_data_bs,
-            ),
-            Self::Gold(s) => (ChestType::Gold, Some(s.to_vec()), None, None),
-            Self::Portal => (ChestType::Portal, None, None, None),
-            Self::Cabinet {
+                ..
+            }
+            | Self::Cabinet {
                 render_items,
                 item_data_bs,
-                slots,
-            } => (
-                ChestType::Cabinet,
-                Some(slots.to_vec()),
-                *render_items,
-                *item_data_bs,
-            ),
-            Self::Feeder(s) => (ChestType::Feeder, Some(s.to_vec()), None, None),
-        }
+                ..
+            } => (*render_items, *item_data_bs),
+        };
+        Ok((chest_type, slot_values, render_items, item_data_bs))
     }
 
     pub fn as_slots(&self) -> Option<&[Slot]> {
@@ -224,18 +212,6 @@ impl ChestSlots {
                 Some(slots.as_slice())
             }
             ChestSlots::Portal => None,
-        }
-    }
-
-    pub fn chest_type(&self) -> ChestType {
-        match self {
-            Self::Standard(_) => ChestType::Standard,
-            Self::Safe(_) => ChestType::Safe,
-            Self::Shelf { .. } => ChestType::Shelf,
-            Self::Gold(_) => ChestType::Gold,
-            Self::Portal => ChestType::Portal,
-            Self::Cabinet { .. } => ChestType::Cabinet,
-            Self::Feeder(_) => ChestType::Feeder,
         }
     }
 }
@@ -359,21 +335,9 @@ impl Chest {
         plist::from_bytes(&decompressed).context(DeserializeSlotsSnafu)
     }
 
-    pub(crate) fn parse_raw_slots(raw_slots: Vec<plist::Value>) -> Result<Vec<Slot>> {
-        raw_slots
-            .into_iter()
-            .map(|raw_slot| Slot::try_from_value(raw_slot))
-            .collect::<std::result::Result<Vec<Slot>, ItemError>>()
-            .map_err(Box::new)
-            .context(LoadSlotsSnafu)
-    }
-
     pub(crate) fn from_meta_and_slots(meta: ChestMeta, slot_bytes: Option<&[u8]>) -> Result<Self> {
-        let slots = slot_bytes
-            .map(|bytes| -> Result<Vec<Slot>> {
-                let raw_slots = Self::parse_slot_bytes(bytes)?;
-                Chest::parse_raw_slots(raw_slots)
-            })
+        let slot_values = slot_bytes
+            .map(|bytes| -> Result<Vec<plist::Value>> { Self::parse_slot_bytes(bytes) })
             .transpose()?;
         let shelf_render_items = match (
             meta.shelf_render_items_0,
@@ -403,7 +367,7 @@ impl Chest {
 
         let slots = ChestSlots::from_chest_type_and_slots(
             meta.chest_type,
-            slots,
+            slot_values,
             shelf_render_items,
             shelf_item_data_bs,
         )?;
@@ -417,7 +381,7 @@ impl Chest {
 
     pub(crate) fn to_meta_and_slots(&self) -> Result<(ChestMeta, Option<Vec<u8>>)> {
         let (chest_type, save_item_slots, shelf_render_items, shelf_item_data_bs) =
-            self.slots.to_chest_type_and_slots();
+            self.slots.to_chest_type_and_slots()?;
         let (r0, r1, r2, r3) = match shelf_render_items {
             Some([a, b, c, d]) => (Some(a), Some(b), Some(c), Some(d)),
             None => (None, None, None, None),
@@ -426,16 +390,11 @@ impl Chest {
             Some([a, b, c, d]) => (Some(a), Some(b), Some(c), Some(d)),
             None => (None, None, None, None),
         };
-        let slot_bytes = match &save_item_slots {
-            Some(slots) => {
-                let values = slots
-                    .iter()
-                    .map(|slot| slot.to_value())
-                    .collect::<std::result::Result<Vec<_>, _>>()
-                    .map_err(Box::new)
-                    .context(SaveSlotsSnafu)?;
+        let slot_bytes = match save_item_slots {
+            Some(slot_values) => {
                 let compressed = compress(
-                    &to_xml_plist(&plist::Value::Array(values)).context(SerializeSlotsSnafu)?,
+                    &to_xml_plist(&plist::Value::Array(slot_values))
+                        .context(SerializeSlotsSnafu)?,
                 )
                 .context(CompressSlotsSnafu)?;
                 Some(compressed)
@@ -461,30 +420,20 @@ impl Chest {
     }
 
     pub(crate) fn from_chest_item(chest_item: ChestItem) -> Result<Self> {
-        let slots = match chest_item.save_item_slots {
-            Some(raw_slots) => Some(Chest::parse_raw_slots(raw_slots)?),
-            None => None,
-        };
-
         Ok(Self {
             obj: chest_item.obj,
             save_time: chest_item.save_time,
-            slots: ChestSlots::from_chest_type_and_slots(chest_item.chest_type, slots, None, None)?,
+            slots: ChestSlots::from_chest_type_and_slots(
+                chest_item.chest_type,
+                chest_item.save_item_slots,
+                None,
+                None,
+            )?,
         })
     }
 
     pub(crate) fn to_chest_item(&self) -> Result<ChestItem> {
-        let (chest_type, slots, _, _) = self.slots.to_chest_type_and_slots();
-        let save_item_slots = slots
-            .map(|slots| {
-                slots
-                    .iter()
-                    .map(|slot| slot.to_value())
-                    .collect::<std::result::Result<Vec<_>, _>>()
-            })
-            .transpose()
-            .map_err(Box::new)
-            .context(SaveSlotsSnafu)?;
+        let (chest_type, save_item_slots, _, _) = self.slots.to_chest_type_and_slots()?;
         Ok(ChestItem {
             obj: self.obj.clone(),
             chest_type,
