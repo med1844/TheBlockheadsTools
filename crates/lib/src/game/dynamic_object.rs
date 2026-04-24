@@ -23,6 +23,30 @@ pub enum DynamicObjectError {
         id: u16,
         source: num_enum::TryFromPrimitiveError<DynamicObjectType>,
     },
+    #[snafu(display("Failed to deserialize plist dictionary to {target_type}, dict: {dict:?}"))]
+    DeserializeDictionary {
+        source: plist::Error,
+        target_type: &'static str,
+        dict: plist::Value,
+    },
+    #[snafu(display("Failed to serialize {source_type} to plist dictionary"))]
+    SerializeDictionary {
+        source: plist::Error,
+        source_type: &'static str,
+    },
+    #[snafu(display("Failed to load chest"))]
+    LoadChest { source: chest::ChestError },
+    #[snafu(display("Failed to save chest"))]
+    SaveChest { source: chest::ChestError },
+    #[snafu(display("Can't load value as InteractionObjectType: {value:?}"))]
+    UnknownInteractionObjectType {
+        value: plist::Value,
+        source: plist::Error,
+    },
+    #[snafu(display("Can't understand dynamicObjectSaveDict with {obj_type:?} yet"))]
+    UnsupportedInteractionObjectType { obj_type: InteractionObjectType },
+    #[snafu(display("Can't load dynamicObjectSaveDict as known type: {dict:?}"))]
+    DynObjSaveDictNoTypeMatch { dict: plist::Dictionary },
 }
 
 type Result<T> = std::result::Result<T, DynamicObjectError>;
@@ -302,6 +326,77 @@ pub mod plant;
 pub mod train;
 pub mod tree;
 pub mod workbench;
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum AnyDynamicObject {
+    Chest(Box<chest::Chest>),
+    Workbench(Box<workbench::Workbench>),
+    Bed(Box<craft::Bed>),
+}
+
+impl AnyDynamicObject {
+    pub fn try_from_save_dict(dict: plist::Dictionary) -> Result<Self> {
+        if dict.contains_key("chestType") {
+            let dict = plist::Value::Dictionary(dict);
+            let chest_item = plist::from_value(&dict).context(DeserializeDictionarySnafu {
+                target_type: "ChestItem",
+                dict,
+            })?;
+            Ok(Self::Chest(Box::new(
+                chest::Chest::from_chest_item(chest_item).context(LoadChestSnafu)?,
+            )))
+        } else if dict.contains_key("workbenchType") {
+            let dict = plist::Value::Dictionary(dict);
+            let workbench = plist::from_value(&dict).context(DeserializeDictionarySnafu {
+                target_type: "Workbench",
+                dict,
+            })?;
+            Ok(Self::Workbench(Box::new(workbench)))
+        } else if let Some(value) = dict.get("interactionObjectType") {
+            let interaction_obj_type: InteractionObjectType =
+                plist::from_value(value).context(UnknownInteractionObjectTypeSnafu {
+                    value: value.to_owned(),
+                })?;
+            match interaction_obj_type {
+                InteractionObjectType::Bed => {
+                    let dict = plist::Value::Dictionary(dict);
+                    let bed = plist::from_value(&dict).context(DeserializeDictionarySnafu {
+                        target_type: "Bed",
+                        dict,
+                    })?;
+                    Ok(Self::Bed(Box::new(bed)))
+                }
+                _ => UnsupportedInteractionObjectTypeSnafu {
+                    obj_type: interaction_obj_type,
+                }
+                .fail(),
+            }
+        } else {
+            DynObjSaveDictNoTypeMatchSnafu { dict }.fail()
+        }
+    }
+
+    pub fn to_save_dict(&self) -> Result<plist::Value> {
+        match self {
+            Self::Chest(chest) => {
+                let chest_item = chest.to_chest_item().context(SaveChestSnafu)?;
+                Ok(
+                    plist::to_value(&chest_item).context(SerializeDictionarySnafu {
+                        source_type: "ChestItem",
+                    })?,
+                )
+            }
+            Self::Workbench(workbench) => Ok(plist::to_value(workbench).context(
+                SerializeDictionarySnafu {
+                    source_type: "Workbench",
+                },
+            )?),
+            Self::Bed(bed) => Ok(
+                plist::to_value(bed).context(SerializeDictionarySnafu { source_type: "Bed" })?
+            ),
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {

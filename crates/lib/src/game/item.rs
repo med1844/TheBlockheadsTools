@@ -3,21 +3,13 @@ use super::{
         gzip::{compress_into, decompress},
         plist::to_xml_plist,
     },
-    dynamic_object::{
-        InteractionObjectType,
-        chest::{Chest, ChestError, ChestItem},
-        craft::Bed,
-        workbench::Workbench,
-    },
+    dynamic_object::{AnyDynamicObject, DynamicObjectError},
 };
 use num_enum::TryFromPrimitive;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use snafu::prelude::*;
-use std::{
-    fmt::Display,
-    ops::{Deref, DerefMut},
-};
+use std::ops::{Deref, DerefMut};
 use strum_macros::IntoStaticStr;
 
 #[derive(Debug, Snafu)]
@@ -32,43 +24,22 @@ pub enum ItemError {
         id: u8,
         source: num_enum::TryFromPrimitiveError<PigmentColor>,
     },
-    #[snafu(display("Failed to deserialize extra"))]
+    #[snafu(display("Failed to deserialize extra bytes as plist::Dictionary"))]
     DeserializeExtra { source: plist::Error },
-    #[snafu(display("Failed to serialize extra"))]
+    #[snafu(display("Failed to serialize extra plist::Dictionary to bytes"))]
     SerializeExtra { source: plist::Error },
-    #[snafu(display("Failed to save extra"))]
-    SaveExtra { source: Box<ItemError> },
     #[snafu(display("Failed to load subItem slots"))]
     LoadSubItems { source: Box<ItemError> },
     #[snafu(display("Failed to save subItem slots"))]
     SaveSubItems { source: Box<ItemError> },
-    #[snafu(display("Failed to deserialize chest data in item"))]
-    DeserializeChestItem { source: plist::Error },
-    #[snafu(display("Failed to serialize chest data in item"))]
-    SerializeChestItem { source: plist::Error },
-    #[snafu(display("Failed to load chest"))]
-    LoadChest { source: ChestError },
-    #[snafu(display("Failed to save chest"))]
-    SaveChest { source: ChestError },
-    #[snafu(display("Failed to deserialize workbench"))]
-    DeserializeWorkbench { source: plist::Error },
-    #[snafu(display("Failed to serialize workbench"))]
-    SerializeWorkbench { source: plist::Error },
-    #[snafu(display("Can't parse dynamicObjectSaveDict as known type: {dict:?}"))]
-    DynObjSaveDictNoTypeMatch { dict: plist::Dictionary },
-    #[snafu(display("Can't load value as InteractionObjectType: {value:?}"))]
-    UnknownInteractionObjectType {
-        value: plist::Value,
-        source: plist::Error,
-    },
-    #[snafu(display("Can't understand dynamicObjectSaveDict with {obj_type:?} yet"))]
-    UnsupportedInteractionObjectType { obj_type: InteractionObjectType },
+    #[snafu(display("Failed to load dynamicObjectSaveDict as AnyDynamicObject"))]
+    LoadDynObjSaveDict { source: DynamicObjectError },
+    #[snafu(display("Failed to save AnyDynamicObject to dynamicObjectSaveDict"))]
+    SaveDynObjSaveDict { source: DynamicObjectError },
     #[snafu(display(
         "Item data too short: expected at least 8 bytes, got {got} bytes, data: {data:?}"
     ))]
     ItemDataTooShort { got: usize, data: Vec<u8> },
-    #[snafu(display("Failed to serialize bed"))]
-    SerializeBed { source: plist::Error },
     #[snafu(display("Failed to decompress item extra as gzip"))]
     DecompressExtraBytes { source: std::io::Error },
     #[snafu(display("Failed to compress item extra as gzip"))]
@@ -83,9 +54,9 @@ pub enum ItemError {
     },
     #[snafu(display("Failed to load slots in inventory"))]
     LoadInventory { source: Box<ItemError> },
-    #[snafu(display("Failed to save {i}-th slot in inventory"))]
-    SaveInventory { source: Box<ItemError>, i: usize },
-    #[snafu(display("Failed to save {i}-th slot"))]
+    #[snafu(display("Failed to save slots in inventory"))]
+    SaveInventory { source: Box<ItemError> },
+    #[snafu(display("Failed to load {i}-th slot"))]
     LoadSlots { source: Box<ItemError>, i: usize },
     #[snafu(display("Failed to save {i}-th slot"))]
     SaveSlots { source: Box<ItemError>, i: usize },
@@ -537,194 +508,6 @@ pub enum ItemType {
     LuminousPlaster = 1105,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum Extra {
-    Basket(Slots<{ Self::NUM_SLOT_BASKET }>),
-    Chest(Box<Chest>),
-    Workbench(Box<Workbench>),
-    Bed(Bed),
-}
-
-impl Extra {
-    pub const NUM_SLOT_BASKET: usize = 4;
-
-    fn from_sub_items(sub_items: Vec<plist::Value>) -> Result<Self> {
-        Ok(Self::Basket(
-            Slots::from_values(sub_items)
-                .map_err(Box::new)
-                .context(LoadSubItemsSnafu)?,
-        ))
-    }
-
-    fn from_dyn_obj_save_dict(dict: plist::Dictionary) -> Result<Self> {
-        if dict.contains_key("chestType") {
-            let dict = plist::Value::Dictionary(dict);
-            let chest_item: ChestItem = plist::from_value(&dict).context(DeserializeExtraSnafu)?;
-            Ok(Self::Chest(Box::new(
-                Chest::from_chest_item(chest_item).context(LoadChestSnafu)?,
-            )))
-        } else if dict.contains_key("workbenchType") {
-            let dict = plist::Value::Dictionary(dict);
-            let workbench: Workbench = plist::from_value(&dict).context(DeserializeExtraSnafu)?;
-            Ok(Self::Workbench(Box::new(workbench)))
-        } else if let Some(value) = dict.get("interactionObjectType") {
-            let interaction_obj_type: InteractionObjectType =
-                plist::from_value(value).context(UnknownInteractionObjectTypeSnafu {
-                    value: value.to_owned(),
-                })?;
-            match interaction_obj_type {
-                InteractionObjectType::Bed => {
-                    let bed: Bed = plist::from_value(&plist::Value::Dictionary(dict))
-                        .context(DeserializeExtraSnafu)?;
-                    Ok(Self::Bed(bed))
-                }
-                _ => UnsupportedInteractionObjectTypeSnafu {
-                    obj_type: interaction_obj_type,
-                }
-                .fail(),
-            }
-        } else {
-            DynObjSaveDictNoTypeMatchSnafu { dict }.fail()
-        }
-    }
-
-    fn to_sub_items(&self) -> Result<Option<Vec<plist::Value>>> {
-        match self {
-            Extra::Basket(slots) => Ok(Some(
-                slots
-                    .to_values()
-                    .map_err(Box::new)
-                    .context(SaveSubItemsSnafu)?,
-            )),
-            Extra::Chest(_) | Extra::Workbench(_) | Extra::Bed(_) => Ok(None),
-        }
-    }
-
-    fn to_dyn_obj_save_dict(&self) -> Result<Option<plist::Value>> {
-        match self {
-            Extra::Chest(chest) => {
-                let chest_item = chest.to_chest_item().context(SaveChestSnafu)?;
-                Ok(Some(
-                    plist::to_value(&chest_item).context(SerializeChestItemSnafu)?,
-                ))
-            }
-            Extra::Workbench(workbench) => Ok(Some(
-                plist::to_value(workbench).context(SerializeWorkbenchSnafu)?,
-            )),
-            Extra::Bed(bed) => Ok(Some(plist::to_value(bed).context(SerializeBedSnafu)?)),
-            Extra::Basket(_) => Ok(None),
-        }
-    }
-
-    fn from_binary_item_dict(dict: plist::Dictionary) -> Result<Self> {
-        if let Some(value) = dict.get("s") {
-            let sub_item_values = match value.clone() {
-                plist::Value::Array(values) => values,
-                _ => UnexpectedStructureSnafu {
-                    type_name: "subItems",
-                    target_structure: "plist::Array",
-                    value: value.clone(),
-                }
-                .fail()?,
-            };
-            Self::from_sub_items(sub_item_values)
-        } else if let Some(value) = dict.get("d") {
-            let dict = match value.to_owned() {
-                plist::Value::Dictionary(dict) => dict,
-                _ => UnexpectedStructureSnafu {
-                    type_name: "dynamicObjectSaveDict",
-                    target_structure: "plist::Array",
-                    value: value.clone(),
-                }
-                .fail()?,
-            };
-            Self::from_dyn_obj_save_dict(dict)
-        } else {
-            DynObjSaveDictNoTypeMatchSnafu { dict }.fail()
-        }
-    }
-
-    fn to_binary_item_dict(&self) -> Result<plist::Dictionary> {
-        let mut dict = plist::Dictionary::new();
-        if let Some(sub_item_values) = self.to_sub_items()? {
-            dict.insert("s".to_string(), plist::Value::Array(sub_item_values));
-        }
-        if let Some(dyn_obj_save_dict_value) = self.to_dyn_obj_save_dict()? {
-            dict.insert("d".to_string(), dyn_obj_save_dict_value);
-        }
-        Ok(dict)
-    }
-}
-
-struct AsDisplay<'a, T>(&'a T);
-
-impl<'a, T: Display> std::fmt::Debug for AsDisplay<'a, T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Display::fmt(self.0, f)
-    }
-}
-
-struct ListDisplay<'a, T>(&'a [T]);
-impl<'a, T: Display> Display for ListDisplay<'a, T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_list()
-            .entries(self.0.iter().map(AsDisplay))
-            .finish()
-    }
-}
-
-impl Display for Extra {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Extra::Basket(slots) => f.debug_list().entries(slots.iter().map(AsDisplay)).finish(),
-            Extra::Chest(chest) => {
-                use crate::game::dynamic_object::chest::{ChestSlots, ChestType};
-                let mut builder = f.debug_struct("ChestData");
-                match &chest.slots {
-                    ChestSlots::Standard(slots) => builder
-                        .field("type", &ChestType::Standard)
-                        .field("items", &AsDisplay(&ListDisplay(slots.as_slice()))),
-                    ChestSlots::Safe(slots) => builder
-                        .field("type", &ChestType::Safe)
-                        .field("items", &AsDisplay(&ListDisplay(slots.as_slice()))),
-                    ChestSlots::Gold(slots) => builder
-                        .field("type", &ChestType::Gold)
-                        .field("items", &AsDisplay(&ListDisplay(slots.as_slice()))),
-                    ChestSlots::Feeder(slots) => builder
-                        .field("type", &ChestType::Feeder)
-                        .field("items", &AsDisplay(&ListDisplay(slots.as_slice()))),
-                    ChestSlots::Portal => builder.field("type", &ChestType::Portal),
-                    ChestSlots::Shelf {
-                        render_items,
-                        slots,
-                        ..
-                    } => {
-                        builder.field("type", &ChestType::Shelf);
-                        if let Some(items) = render_items {
-                            builder.field("render_items", items);
-                        }
-                        builder.field("items", &AsDisplay(&ListDisplay(slots.as_slice())))
-                    }
-                    ChestSlots::Cabinet {
-                        render_items,
-                        slots,
-                        ..
-                    } => {
-                        builder.field("type", &ChestType::Cabinet);
-                        if let Some(items) = render_items {
-                            builder.field("render_items", items);
-                        }
-                        builder.field("items", &AsDisplay(&ListDisplay(slots.as_slice())))
-                    }
-                };
-                builder.finish()
-            }
-            Extra::Workbench(workbench) => std::fmt::Debug::fmt(workbench, f),
-            Extra::Bed(bed) => std::fmt::Debug::fmt(bed, f),
-        }
-    }
-}
-
 /// Item as stored in dynamic world XML (DroppedItem, etc.)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -739,7 +522,7 @@ pub(crate) struct ItemXml {
         serialize_with = "crate::util::serde::serialize_some",
         skip_serializing_if = "Option::is_none"
     )]
-    pub sub_items: Option<Vec<plist::Value>>,
+    pub sub_items: Option<plist::Value>,
 
     #[serde(
         default,
@@ -757,10 +540,65 @@ pub struct Item {
     pub data_b: u16,
     pub selected_sub_item_index: u8,
     pub padding: u8,
-    pub extra: Option<Extra>,
+    pub sub_items: Option<Slots<{ Self::MAX_SUB_ITEMS }>>,
+    pub dynamic_object: Option<AnyDynamicObject>,
 }
 
 impl Item {
+    pub const MAX_SUB_ITEMS: usize = 4;
+
+    fn from_sub_item_values(value: plist::Value) -> Result<Slots<{ Self::MAX_SUB_ITEMS }>> {
+        let sub_item_values = match value.clone() {
+            plist::Value::Array(values) => values,
+            _ => UnexpectedStructureSnafu {
+                type_name: "subItems",
+                target_structure: "plist::Array",
+                value: value.clone(),
+            }
+            .fail()?,
+        };
+        Slots::from_values(sub_item_values)
+            .map_err(Box::new)
+            .context(LoadSubItemsSnafu)
+    }
+
+    fn to_sub_item_values(&self) -> Result<Option<plist::Value>> {
+        Ok(match self.sub_items.as_ref() {
+            Some(sub_items) => Some(plist::Value::Array(
+                sub_items
+                    .to_values()
+                    .map_err(Box::new)
+                    .context(SaveSubItemsSnafu)?,
+            )),
+            None => None,
+        })
+    }
+
+    fn from_dyn_obj_save_dict(value: plist::Value) -> Result<AnyDynamicObject> {
+        let dict = match value {
+            plist::Value::Dictionary(dict) => dict,
+            _ => UnexpectedStructureSnafu {
+                type_name: "dynamicObjectSaveDict",
+                target_structure: "plist::Array",
+                value: value.clone(),
+            }
+            .fail()?,
+        };
+        AnyDynamicObject::try_from_save_dict(dict).context(LoadDynObjSaveDictSnafu)
+    }
+
+    fn to_dynamic_object_save_dict(&self) -> Result<Option<plist::Value>> {
+        match self.dynamic_object.as_ref() {
+            Some(dynamic_object) => Some(
+                dynamic_object
+                    .to_save_dict()
+                    .context(SaveDynObjSaveDictSnafu),
+            )
+            .transpose(),
+            None => Ok(None),
+        }
+    }
+
     fn try_from_bytes(data: Vec<u8>) -> Result<Self> {
         let bytes = data.as_slice();
         if bytes.len() < 8 {
@@ -781,22 +619,27 @@ impl Item {
         let mut compressed_extra = data;
         compressed_extra.drain(0..8);
 
-        let extra = if compressed_extra.is_empty() {
-            None
-        } else {
+        let mut sub_items = None;
+        let mut dynamic_object = None;
+        if !compressed_extra.is_empty() {
             let extra_bytes = decompress(&compressed_extra).context(DecompressExtraBytesSnafu)?;
-            let dict =
+            let dict: plist::Dictionary =
                 plist::from_reader_xml(extra_bytes.as_slice()).context(DeserializeExtraSnafu)?;
-            let extra = Extra::from_binary_item_dict(dict)?;
-            Some(extra)
-        };
+            if let Some(value) = dict.get("s") {
+                sub_items = Some(Self::from_sub_item_values(value.to_owned())?);
+            }
+            if let Some(value) = dict.get("d") {
+                dynamic_object = Some(Self::from_dyn_obj_save_dict(value.to_owned())?);
+            }
+        }
         Ok(Self {
             type_id,
             data_a,
             data_b,
             selected_sub_item_index,
             padding,
-            extra,
+            sub_items,
+            dynamic_object,
         })
     }
 
@@ -820,15 +663,30 @@ impl Item {
         buffer.extend_from_slice(&self.data_b.to_le_bytes());
         buffer.push(self.selected_sub_item_index);
         buffer.push(self.padding);
-        if let Some(extra) = self.extra.as_ref() {
-            let value = extra
-                .to_binary_item_dict()
-                .map_err(Box::new)
-                .context(SaveExtraSnafu)?;
-            let serialized_extra =
-                to_xml_plist(&plist::Value::Dictionary(value)).context(SerializeExtraSnafu)?;
-            compress_into(&serialized_extra, &mut buffer).context(CompressExtraBytesSnafu)?;
+
+        let mut dict = plist::Dictionary::new();
+        if let Some(sub_items) = self.sub_items.as_ref() {
+            dict.insert(
+                "s".to_string(),
+                plist::Value::Array(
+                    sub_items
+                        .to_values()
+                        .map_err(Box::new)
+                        .context(SaveSubItemsSnafu)?,
+                ),
+            );
         }
+        if let Some(obj) = self.dynamic_object.as_ref() {
+            dict.insert(
+                "d".to_string(),
+                obj.to_save_dict().context(SaveDynObjSaveDictSnafu)?,
+            );
+        }
+
+        let serialized_extra =
+            to_xml_plist(&plist::Value::Dictionary(dict)).context(SerializeExtraSnafu)?;
+        compress_into(&serialized_extra, &mut buffer).context(CompressExtraBytesSnafu)?;
+
         Ok(buffer)
     }
 
@@ -850,93 +708,6 @@ pub enum PigmentColor {
     EmeraldGreen = 6,
     TyrianPurple = 7,
     CopperBlue = 8,
-}
-
-fn item_type_to_str(item_type: Result<ItemType>) -> String {
-    item_type
-        .map(|item_type| {
-            let item_type_str: &'static str = item_type.into();
-            item_type_str.to_string()
-        })
-        .unwrap_or_else(|e| e.to_string())
-}
-
-pub trait ItemView {
-    fn type_id(&self) -> u16;
-    fn fmt_extra(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
-    fn has_extra(&self) -> bool;
-}
-
-pub fn fmt_item_display<T: ItemView + ?Sized>(
-    item: &T,
-    f: &mut std::fmt::Formatter<'_>,
-) -> std::fmt::Result {
-    let type_id = item.type_id();
-    let item_type = ItemType::try_from(type_id).context(InvalidItemTypeIdSnafu { id: type_id });
-    let type_name = item_type_to_str(item_type);
-    if item.has_extra() {
-        f.write_str(&type_name)?;
-        f.write_str("(")?;
-        item.fmt_extra(f)?;
-        f.write_str(")")
-    } else {
-        f.write_str(&type_name)
-    }
-}
-
-pub trait SlotView {
-    fn len(&self) -> usize;
-    fn item_type_id(&self, index: usize) -> u16;
-    fn item_has_extra(&self, index: usize) -> bool;
-    fn fmt_item(&self, index: usize, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
-    fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-}
-
-struct SlotItemDisplay<'a, S: SlotView + ?Sized> {
-    slot: &'a S,
-    index: usize,
-}
-
-impl<'a, S: SlotView + ?Sized> std::fmt::Debug for SlotItemDisplay<'a, S> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.slot.fmt_item(self.index, f)
-    }
-}
-
-pub fn fmt_slot_display<S: SlotView + ?Sized>(
-    slot: &S,
-    f: &mut std::fmt::Formatter<'_>,
-) -> std::fmt::Result {
-    if !slot.is_empty() {
-        let count = slot.len();
-        let first_type = slot.item_type_id(0);
-
-        let all_same_type = (0..count).all(|i| slot.item_type_id(i) == first_type);
-        let any_extra = (0..count).any(|i| slot.item_has_extra(i));
-        let is_stacked = count > 1;
-
-        let item_type =
-            ItemType::try_from(first_type).context(InvalidItemTypeIdSnafu { id: first_type });
-        let type_name = item_type_to_str(item_type);
-
-        match (all_same_type, any_extra, is_stacked) {
-            (true, false, _) => {
-                write!(f, "{} {}", count, type_name)
-            }
-            (_, _, false) => slot.fmt_item(0, f),
-            _ => {
-                let mut list = f.debug_list();
-                for i in 0..count {
-                    list.entry(&SlotItemDisplay { slot, index: i });
-                }
-                list.finish()
-            }
-        }
-    } else {
-        f.write_str("Empty")
-    }
 }
 
 impl Item {
@@ -1003,10 +774,6 @@ impl Item {
         *self.color_raw_mut() = Self::encode_colors(colors);
     }
 
-    pub fn extra(&self) -> &Option<Extra> {
-        &self.extra
-    }
-
     pub fn new(item_type: ItemType) -> Self {
         Self {
             type_id: item_type as u16,
@@ -1014,21 +781,20 @@ impl Item {
             data_b: 0,
             selected_sub_item_index: 0,
             padding: 0,
-            extra: None,
+            sub_items: None,
+            dynamic_object: None,
         }
     }
 
-    /// Build Item from its XML representation (defaults selectedSubItemIndex/padding to 0)
     pub(crate) fn from_xml(xml: ItemXml) -> Result<Self> {
-        let extra = if let Some(sub_items) = xml.sub_items {
-            Some(Extra::from_sub_items(sub_items)?)
-        } else if let Some(value) = xml.dynamic_object_save_dict
-            && let plist::Value::Dictionary(dict) = value
-        {
-            Some(Extra::from_dyn_obj_save_dict(dict)?)
-        } else {
-            None
-        };
+        let mut sub_items = None;
+        let mut dynamic_object = None;
+        if let Some(sub_item_values) = xml.sub_items {
+            sub_items = Some(Self::from_sub_item_values(sub_item_values)?);
+        }
+        if let Some(dict) = xml.dynamic_object_save_dict {
+            dynamic_object = Some(Self::from_dyn_obj_save_dict(dict)?);
+        }
 
         Ok(Self {
             type_id: xml.item_type,
@@ -1036,16 +802,14 @@ impl Item {
             data_b: xml.data_b,
             selected_sub_item_index: 0,
             padding: 0,
-            extra,
+            sub_items,
+            dynamic_object,
         })
     }
 
-    /// Convert Item to XML representation (drops selectedSubItemIndex/padding)
     pub(crate) fn to_xml(&self) -> Result<ItemXml> {
-        let (sub_items, dynamic_object_save_dict) = match &self.extra {
-            Some(extra) => (extra.to_sub_items()?, extra.to_dyn_obj_save_dict()?),
-            None => (None, None),
-        };
+        let sub_items = self.to_sub_item_values()?;
+        let dynamic_object_save_dict = self.to_dynamic_object_save_dict()?;
 
         Ok(ItemXml {
             item_type: self.type_id,
@@ -1054,30 +818,6 @@ impl Item {
             sub_items,
             dynamic_object_save_dict,
         })
-    }
-}
-
-impl ItemView for Item {
-    fn type_id(&self) -> u16 {
-        self.type_id
-    }
-
-    fn has_extra(&self) -> bool {
-        self.extra.is_some()
-    }
-
-    fn fmt_extra(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(extra) = &self.extra {
-            Display::fmt(extra, f)
-        } else {
-            Ok(())
-        }
-    }
-}
-
-impl Display for Item {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        fmt_item_display(self, f)
     }
 }
 
@@ -1131,30 +871,6 @@ impl Deref for Slot {
 impl DerefMut for Slot {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
-    }
-}
-
-impl SlotView for Slot {
-    fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    fn item_type_id(&self, index: usize) -> u16 {
-        self.0[index].type_id
-    }
-
-    fn item_has_extra(&self, index: usize) -> bool {
-        self.0[index].extra.is_some()
-    }
-
-    fn fmt_item(&self, index: usize, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Display::fmt(&self.0[index], f)
-    }
-}
-
-impl Display for Slot {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        fmt_slot_display(self, f)
     }
 }
 
@@ -1234,7 +950,12 @@ impl Inventory {
     }
 
     pub fn to_value(&self) -> Result<plist::Value> {
-        Ok(plist::Value::Array(self.0.to_values()?))
+        Ok(plist::Value::Array(
+            self.0
+                .to_values()
+                .map_err(Box::new)
+                .context(SaveInventorySnafu)?,
+        ))
     }
 }
 
@@ -1251,12 +972,6 @@ impl DerefMut for Inventory {
     }
 }
 
-impl Display for Inventory {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_list().entries(self.iter().map(AsDisplay)).finish()
-    }
-}
-
 impl IntoIterator for Inventory {
     type Item = Slot;
     type IntoIter = std::array::IntoIter<Self::Item, { Self::NUM_SLOTS }>;
@@ -1269,10 +984,10 @@ impl IntoIterator for Inventory {
 mod tests {
     use super::{
         super::dynamic_object::{
-            DynamicObject, InteractionObject, InteractionObjectType, UniqueID,
+            AnyDynamicObject, DynamicObject, InteractionObject, InteractionObjectType, UniqueID,
             workbench::{Workbench, WorkbenchType},
         },
-        Extra, Inventory, Item, ItemType, PigmentColor, Slot, Slots,
+        Inventory, Item, ItemType, PigmentColor, Slot, Slots,
     };
     use crate::util::plist::{diff_plist_keys, to_xml_plist};
 
@@ -1284,7 +999,8 @@ mod tests {
             data_b: 0,
             selected_sub_item_index: 0,
             padding: 0,
-            extra: None,
+            sub_items: None,
+            dynamic_object: None,
         };
 
         let colors = [
@@ -1307,7 +1023,8 @@ mod tests {
                 data_b: 20,
                 selected_sub_item_index: 1,
                 padding: 0,
-                extra: None,
+                sub_items: None,
+                dynamic_object: None,
             },
             Item {
                 type_id: ItemType::SteelPickaxe as u16,
@@ -1315,7 +1032,8 @@ mod tests {
                 data_b: 0,
                 selected_sub_item_index: 0,
                 padding: 0,
-                extra: None,
+                sub_items: None,
+                dynamic_object: None,
             },
         ];
 
@@ -1334,7 +1052,8 @@ mod tests {
             data_b: 0,
             selected_sub_item_index: 0,
             padding: 0,
-            extra: None,
+            sub_items: None,
+            dynamic_object: None,
         };
         assert!(item.item_type().is_err());
     }
@@ -1347,7 +1066,8 @@ mod tests {
             data_b: 0,
             selected_sub_item_index: 0,
             padding: 0,
-            extra: None,
+            sub_items: None,
+            dynamic_object: None,
         };
         let mut basket_items = [const { Slot(vec![]) }; 4];
         basket_items[0] = Slot(vec![item_in_basket]);
@@ -1358,7 +1078,8 @@ mod tests {
             data_b: 0,
             selected_sub_item_index: 0,
             padding: 0,
-            extra: Some(Extra::Basket(Slots(basket_items))),
+            sub_items: Some(Slots(basket_items)),
+            dynamic_object: None,
         };
 
         let serialized = item.to_value().unwrap();
@@ -1374,7 +1095,8 @@ mod tests {
             data_b: 0,
             selected_sub_item_index: 0,
             padding: 0,
-            extra: None,
+            sub_items: None,
+            dynamic_object: None,
         };
         let slot = Slot(vec![item]);
         let serialized = slot.to_value().unwrap();
@@ -1388,58 +1110,55 @@ mod tests {
 <!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
 <plist version=\"1.0\">
 <dict>
-        <key>d</key>
-        <dict>
-                <key>chestType</key>
-                <integer>0</integer>
-                <key>flipped</key>
-                <false/>
-                <key>floatPos</key>
-                <array>
-                        <real>11191.5</real>
-                        <real>670</real>
-                </array>
-                <key>interactionObjectType</key>
-                <integer>2</integer>
-                <key>isInUse</key>
-                <false/>
-                <key>ownerID</key>
-                <string>server</string>
-                <key>paintColor</key>
-                <integer>0</integer>
-                <key>pos_x</key>
-                <integer>11191</integer>
-                <key>pos_y</key>
-                <integer>670</integer>
-                <key>saveItemSlots</key>
-                <array>
-                        <array/>
-                        <array/>
-                        <array/>
-                        <array/>
-                        <array/>
-                        <array/>
-                        <array/>
-                        <array/>
-                        <array/>
-                        <array/>
-                        <array/>
-                        <array/>
-                        <array/>
-                        <array/>
-                        <array/>
-                        <array/>
-                </array>
-                <key>saveTime</key>
-                <real>5018.8335087001324</real>
-                <key>uniqueID</key>
-                <integer>5952</integer>
-        </dict>
+        <key>chestType</key>
+        <integer>0</integer>
+        <key>flipped</key>
+        <false/>
+        <key>floatPos</key>
+        <array>
+                <real>11191.5</real>
+                <real>670</real>
+        </array>
+        <key>interactionObjectType</key>
+        <integer>2</integer>
+        <key>isInUse</key>
+        <false/>
+        <key>ownerID</key>
+        <string>server</string>
+        <key>paintColor</key>
+        <integer>0</integer>
+        <key>pos_x</key>
+        <integer>11191</integer>
+        <key>pos_y</key>
+        <integer>670</integer>
+        <key>saveItemSlots</key>
+        <array>
+                <array/>
+                <array/>
+                <array/>
+                <array/>
+                <array/>
+                <array/>
+                <array/>
+                <array/>
+                <array/>
+                <array/>
+                <array/>
+                <array/>
+                <array/>
+                <array/>
+                <array/>
+                <array/>
+        </array>
+        <key>saveTime</key>
+        <real>5018.8335087001324</real>
+        <key>uniqueID</key>
+        <integer>5952</integer>
 </dict>
 </plist>";
         let dict = plist::from_reader_xml(xml.as_bytes()).unwrap();
-        let extra = Extra::from_binary_item_dict(dict).unwrap();
-        assert!(matches!(extra, Extra::Chest(..)));
+        let dyn_obj = AnyDynamicObject::try_from_save_dict(dict).unwrap();
+        assert!(matches!(dyn_obj, AnyDynamicObject::Chest(..)));
     }
 
     #[test]
@@ -1448,58 +1167,55 @@ mod tests {
 <!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
 <plist version=\"1.0\">
 <dict>
-        <key>d</key>
-        <dict>
-                <key>chestType</key>
-                <integer>2</integer>
-                <key>flipped</key>
-                <false/>
-                <key>floatPos</key>
+        <key>chestType</key>
+        <integer>2</integer>
+        <key>flipped</key>
+        <false/>
+        <key>floatPos</key>
+        <array>
+                <real>11191.5</real>
+                <real>668</real>
+        </array>
+        <key>interactionObjectType</key>
+        <integer>2</integer>
+        <key>isInUse</key>
+        <false/>
+        <key>ownerID</key>
+        <string>server</string>
+        <key>paintColor</key>
+        <integer>0</integer>
+        <key>pos_x</key>
+        <integer>11191</integer>
+        <key>pos_y</key>
+        <integer>668</integer>
+        <key>saveItemSlots</key>
+        <array>
                 <array>
-                        <real>11191.5</real>
-                        <real>668</real>
+                        <data>
+                        8wAAAAAAAAA=
+                        </data>
                 </array>
-                <key>interactionObjectType</key>
-                <integer>2</integer>
-                <key>isInUse</key>
-                <false/>
-                <key>ownerID</key>
-                <string>server</string>
-                <key>paintColor</key>
-                <integer>0</integer>
-                <key>pos_x</key>
-                <integer>11191</integer>
-                <key>pos_y</key>
-                <integer>668</integer>
-                <key>saveItemSlots</key>
                 <array>
-                        <array>
-                                <data>
-                                8wAAAAAAAAA=
-                                </data>
-                        </array>
-                        <array>
-                                <data>
-                                +QAAAAAAAAA=
-                                </data>
-                        </array>
-                        <array>
-                                <data>
-                                LgQAAAAAAAA=
-                                </data>
-                        </array>
-                        <array/>
+                        <data>
+                        +QAAAAAAAAA=
+                        </data>
                 </array>
-                <key>saveTime</key>
-                <real>5034.406163521111</real>
-                <key>uniqueID</key>
-                <integer>836</integer>
-        </dict>
+                <array>
+                        <data>
+                        LgQAAAAAAAA=
+                        </data>
+                </array>
+                <array/>
+        </array>
+        <key>saveTime</key>
+        <real>5034.406163521111</real>
+        <key>uniqueID</key>
+        <integer>836</integer>
 </dict>
 </plist>";
         let dict = plist::from_reader_xml(xml.as_bytes()).unwrap();
-        let extra = Extra::from_binary_item_dict(dict).unwrap();
-        assert!(matches!(extra, Extra::Chest(..)));
+        let dyn_obj = AnyDynamicObject::try_from_save_dict(dict).unwrap();
+        assert!(matches!(dyn_obj, AnyDynamicObject::Chest(..)));
     }
 
     #[test]
@@ -1508,39 +1224,36 @@ mod tests {
 <!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
 <plist version=\"1.0\">
 <dict>
-        <key>d</key>
-        <dict>
-                <key>chestType</key>
-                <integer>4</integer>
-                <key>flipped</key>
-                <false/>
-                <key>floatPos</key>
-                <array>
-                        <real>11193.5</real>
-                        <real>668</real>
-                </array>
-                <key>interactionObjectType</key>
-                <integer>2</integer>
-                <key>isInUse</key>
-                <false/>
-                <key>ownerID</key>
-                <string>server</string>
-                <key>paintColor</key>
-                <integer>0</integer>
-                <key>pos_x</key>
-                <integer>11193</integer>
-                <key>pos_y</key>
-                <integer>668</integer>
-                <key>saveTime</key>
-                <real>5061.7033485174179</real>
-                <key>uniqueID</key>
-                <integer>838</integer>
-        </dict>
+        <key>chestType</key>
+        <integer>4</integer>
+        <key>flipped</key>
+        <false/>
+        <key>floatPos</key>
+        <array>
+                <real>11193.5</real>
+                <real>668</real>
+        </array>
+        <key>interactionObjectType</key>
+        <integer>2</integer>
+        <key>isInUse</key>
+        <false/>
+        <key>ownerID</key>
+        <string>server</string>
+        <key>paintColor</key>
+        <integer>0</integer>
+        <key>pos_x</key>
+        <integer>11193</integer>
+        <key>pos_y</key>
+        <integer>668</integer>
+        <key>saveTime</key>
+        <real>5061.7033485174179</real>
+        <key>uniqueID</key>
+        <integer>838</integer>
 </dict>
 </plist>";
         let dict = plist::from_reader_xml(xml.as_bytes()).unwrap();
-        let extra = Extra::from_binary_item_dict(dict).unwrap();
-        assert!(matches!(extra, Extra::Chest(..)));
+        let dyn_obj = AnyDynamicObject::try_from_save_dict(dict).unwrap();
+        assert!(matches!(dyn_obj, AnyDynamicObject::Chest(..)));
     }
 
     #[test]
@@ -1897,7 +1610,8 @@ mod tests {
             data_b: 0,
             selected_sub_item_index: 0,
             padding: 0,
-            extra: Some(Extra::Workbench(Box::new(wb_data))),
+            sub_items: None,
+            dynamic_object: Some(AnyDynamicObject::Workbench(Box::new(wb_data))),
         };
 
         let serialized = item.to_value().unwrap();
