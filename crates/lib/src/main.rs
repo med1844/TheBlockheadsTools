@@ -58,7 +58,7 @@ fn main() -> Result<(), Whatever> {
             && chunk_coord == "430_16"
             && let Ok(type_id) = type_id_str.parse::<usize>()
             && type_id < 64
-            && type_id == 30
+            && type_id == 17
             && let Ok(dict) = plist::from_bytes::<plist::Dictionary>(v)
             && let Some(dyn_objs) = dict.get("dynamicObjects").and_then(|v| v.as_array())
             && !dyn_objs.is_empty()

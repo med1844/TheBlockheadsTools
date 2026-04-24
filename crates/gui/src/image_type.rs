@@ -547,14 +547,32 @@ pub enum ImageType {
 
 impl ImageType {
     pub const PIXEL_PER_TILE: usize = 16;
-    pub const TILE_PER_ROW: usize = 32;
-    pub const PIXEL_PER_EDGE: usize = Self::PIXEL_PER_TILE * Self::TILE_PER_ROW;
+    pub const TILE_PER_EDGE: usize = 32;
+    pub const PIXEL_PER_EDGE: usize = Self::PIXEL_PER_TILE * Self::TILE_PER_EDGE;
     pub const TILE_SIZE: f32 = Self::PIXEL_PER_TILE as f32 / Self::PIXEL_PER_EDGE as f32;
+    const EPSILON: f32 = 1e-6;
 
-    pub fn to_tile_xy(self) -> (u32, u32) {
+    pub fn to_tile_xy(self) -> (u8, u8) {
         let tile_index = self as u32;
-        let tile_x = tile_index % Self::TILE_PER_ROW as u32;
-        let tile_y = tile_index / Self::TILE_PER_ROW as u32;
-        (tile_x, tile_y)
+        let tile_x = tile_index % Self::TILE_PER_EDGE as u32;
+        let tile_y = tile_index / Self::TILE_PER_EDGE as u32;
+        (tile_x as u8, tile_y as u8)
+    }
+
+    // assumes self is the bottom-left tile
+    pub fn uv_min_max(self, w: u8, h: u8) -> [[f32; 2]; 2] {
+        let (u_min_tile, v_max_tile) = self.to_tile_xy();
+        let v_min_tile = v_max_tile + 1 - h;
+
+        let u_min = (u_min_tile as f32) * Self::TILE_SIZE;
+        let v_min = (v_min_tile as f32) * Self::TILE_SIZE;
+        let [u_max, v_max] = [
+            u_min + w as f32 * Self::TILE_SIZE,
+            v_min + h as f32 * Self::TILE_SIZE,
+        ];
+        [
+            [u_min, v_min].map(|v| v + Self::EPSILON),
+            [u_max, v_max].map(|v| v - Self::EPSILON),
+        ]
     }
 }

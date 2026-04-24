@@ -1,9 +1,36 @@
 use super::{
-    super::item::ItemType, DynamicObject, InteractionObject, deserialize_some, serialize_some,
+    super::item::ItemType, ArtificialLight, DynamicObject, InteractionObject, deserialize_some,
+    serialize_some,
 };
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::ops::{Deref, DerefMut};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr)]
+#[repr(i8)]
+// Where does the torch connects to
+pub enum TorchConnectionType {
+    Bg = -2,
+    Left = -1,
+    Ground = 0,
+    Right = 1,
+    Mg = 2,
+    // source code in torchConnectionTypeForPos suggests existence of 3 and 5
+    // 3 likely means column, 5 likely means top for chandeliers
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Torch {
+    #[serde(flatten)]
+    obj: DynamicObject,
+    pub light_dict: ArtificialLight,
+    pub connection_type: TorchConnectionType,
+    pub item_type: ItemType,
+    pub data_a: u16,
+    pub data_b: u16,
+}
+inherit!(Torch -> DynamicObject, obj);
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

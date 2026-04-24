@@ -6,7 +6,7 @@ use super::{
         chest::{Chest, ChestError, ChestMeta},
         craft::{
             Bed, Boat, Column, Door, ElevatorMotor, ElevatorShaft, Ladder, Rail, Sign, Stairs,
-            TradePortal, TradingPost, Window, Wire,
+            Torch, TradePortal, TradingPost, Window, Wire,
         },
         dropped_item::{DroppedItem, DroppedItemXml},
         plant::{
@@ -83,7 +83,7 @@ pub struct ChunkDynamicObjects {
     pub dodo: DynamicObjectList<Dodo>,
     pub dropped_item: DynamicObjectList<DroppedItem>,
     pub fire: Vec<u8>,
-    pub torch: Vec<u8>,
+    pub torch: DynamicObjectList<Torch>,
     pub glow_block: Vec<u8>,
     pub ladder: DynamicObjectList<Ladder>,
     pub door: DynamicObjectList<Door>,
@@ -147,7 +147,7 @@ impl ChunkDynamicObjects {
             + self.dodo.num_obj()
             + self.dropped_item.num_obj()
             // + self.fire.num_obj()
-            // + self.torch.num_obj()
+            + self.torch.num_obj()
             // + self.glow_block.num_obj()
             + self.ladder.num_obj()
             + self.door.num_obj()
@@ -157,7 +157,7 @@ impl ChunkDynamicObjects {
             // + self.gather_block.num_obj()
             + self.carrot_plant.num_obj()
             + self.donkey.num_obj()
-            // + self.egg.num_obj()
+            + self.egg.num_obj()
             + self.window.num_obj()
             + self.boat.num_obj()
             + self.chilli_plant.num_obj()
@@ -172,7 +172,7 @@ impl ChunkDynamicObjects {
             + self.steam_locomotive.num_obj()
             + self.freight_car.num_obj()
             + self.passenger_car.num_obj()
-            // + self.workbench.num_obj()
+            + self.workbench.num_obj()
             + self.chest.num_obj()
             + self.sign.num_obj()
             + self.trading_post.num_obj()
@@ -346,7 +346,7 @@ impl DynamicWorld {
                         .collect::<Result<DynamicObjectList<DroppedItem>>>()?;
                 }
                 DynamicObjectType::Fire => entry.fire = v.to_vec(),
-                DynamicObjectType::Torch => entry.torch = v.to_vec(),
+                DynamicObjectType::Torch => entry.torch = load(v, obj_ty, coord)?,
                 DynamicObjectType::GlowBlock => entry.glow_block = v.to_vec(),
                 DynamicObjectType::Ladder => entry.ladder = load(v, obj_ty, coord)?,
                 DynamicObjectType::Door => entry.door = load(v, obj_ty, coord)?,
@@ -614,7 +614,7 @@ mod tests {
             .collect::<Result<DynamicObjectList<_>, _>>()
             .unwrap();
         monster.fire = vec![16, 0xAA, 0xBB];
-        monster.torch = vec![17, 0xAA, 0xBB];
+        monster.torch = read_test_xml(DynamicObjectType::Torch);
         monster.glow_block = vec![18, 0xAA, 0xBB];
         monster.ladder = read_test_xml(DynamicObjectType::Ladder);
         monster.door = read_test_xml(DynamicObjectType::Door);

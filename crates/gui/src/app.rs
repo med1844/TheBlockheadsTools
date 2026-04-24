@@ -735,7 +735,7 @@ impl EditorApp {
                 Dodo => {}
                 DroppedItem => {}
                 Fire => {}
-                Torch => {}
+                Torch => draw_window(title, dw_chunk.torch.get_mut(id.index), ctx),
                 GlowBlock => {}
                 Ladder => draw_window(title, dw_chunk.ladder.get_mut(id.index), ctx),
                 Door => draw_window(title, dw_chunk.door.get_mut(id.index), ctx),

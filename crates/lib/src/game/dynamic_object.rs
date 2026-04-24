@@ -477,7 +477,7 @@ mod tests {
         animal::{CaveTroll, ClownFish, Dodo, Donkey, DropBear, Egg, Scorpion, Shark, Yak},
         craft::{
             Bed, Boat, Column, Door, ElevatorMotor, ElevatorShaft, Ladder, Rail, Sign, Stairs,
-            TradePortal, TradingPost, Window, Wire,
+            Torch, TradePortal, TradingPost, Window, Wire,
         },
         plant::{
             CarrotPlant, ChilliPlant, CornPlant, FlaxPlant, KelpPlant, SunflowerPlant, TomatoPlant,
@@ -536,7 +536,7 @@ mod tests {
         check_round_trip::<Dodo>(DynamicObjectType::Dodo).unwrap();
         // check_round_trip::<DroppedItem>(DynamicObjectType::DroppedItem).unwrap();
         // check_round_trip::<Fire>(DynamicObjectType::Fire).unwrap();
-        // check_round_trip::<Torch>(DynamicObjectType::Torch).unwrap();
+        check_round_trip::<Torch>(DynamicObjectType::Torch).unwrap();
         // check_round_trip::<GlowBlock>(DynamicObjectType::GlowBlock).unwrap();
         check_round_trip::<Ladder>(DynamicObjectType::Ladder).unwrap();
         check_round_trip::<Door>(DynamicObjectType::Door).unwrap();

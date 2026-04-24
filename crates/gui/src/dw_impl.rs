@@ -4,7 +4,8 @@ use super::{
         VoxelType,
         dw::{
             BuildDwMesh, BuildDwMeshError, CoordOutOfBoundSnafu, DwBlock, DwChunkBufBuilder,
-            DwFace, DwIcon, FaceDirection, InvalidItemTypeForDoorSnafu, InvalidWorkbenchLevelSnafu,
+            DwFace, DwIcon, DwQuad, FaceDirection, InvalidItemTypeForDoorSnafu,
+            InvalidItemTypeForTorchSnafu, InvalidWorkbenchLevelSnafu,
         },
     },
     image_type::ImageType,
@@ -19,7 +20,7 @@ use the_blockheads_tools_lib::game::{
         UniqueID,
         animal::{DodoBreed, Egg},
         chest::{Chest, ChestType},
-        craft::{Door, Ladder},
+        craft::{Door, Ladder, Torch, TorchConnectionType},
         plant::{CarrotPlant, CornPlant, KelpPlant, NormalPlant, Plant, TomatoPlant},
         tree::{
             AppleTree, CactusTree, CherryTree, CoconutTree, CoffeeTree, GemTree, LimeTree,
@@ -519,6 +520,170 @@ impl BuildDwMesh for CornPlant {
     }
 }
 
+impl ToRow for TorchConnectionType {
+    fn to_row(&mut self, ui: &mut egui::Ui) {
+        egui::ComboBox::from_id_salt("torch_connection_type_combo_box")
+            .selected_text(format!("{:?}", self))
+            .show_ui(ui, |ui| {
+                ui.selectable_value(self, Self::Bg, "Background");
+                ui.selectable_value(self, Self::Left, "Left");
+                ui.selectable_value(self, Self::Ground, "Ground");
+                ui.selectable_value(self, Self::Right, "Right");
+                ui.selectable_value(self, Self::Mg, "Middleground");
+            });
+    }
+}
+
+impl ToGrid for Torch {
+    fn to_grid(&mut self, ui: &mut egui::Ui) {
+        self.light_dict.add_row("lightDict", ui);
+        self.connection_type.add_row("connectionType", ui);
+        self.item_type.add_row("itemType", ui);
+        self.data_a.add_row("dataA", ui);
+        self.data_b.add_row("dataB", ui);
+    }
+}
+
+impl InfoUi for Torch {
+    fn info(&mut self, ui: &mut egui::Ui) {
+        let obj = self.deref_mut();
+        obj.info(ui);
+
+        ui.vertical(|ui| {
+            ui.heading("Torch");
+            ui.separator();
+            self.add_grid("torch_grid", ui);
+        });
+    }
+}
+
+struct FrontTorchFace {
+    bottom_left: [f32; 3],
+    uv_min_max: [[f32; 2]; 2],
+}
+
+impl FrontTorchFace {
+    const THETA: f32 = 0.3;
+}
+
+impl DwQuad for FrontTorchFace {
+    fn quad(&self) -> [[f32; 3]; 4] {
+        let [x, y, z] = self.bottom_left;
+        let [w, h] = [1.0; 2];
+        [
+            [x, y, z],
+            [x + w, y, z],
+            [x + w, y + h * Self::THETA.cos(), z + h * Self::THETA.sin()],
+            [x, y + h * Self::THETA.cos(), z + h * Self::THETA.sin()],
+        ]
+    }
+
+    fn normal(&self) -> [f32; 3] {
+        [0.0, -Self::THETA.sin(), Self::THETA.cos()]
+    }
+
+    fn uv_min_max(&self) -> [[f32; 2]; 2] {
+        self.uv_min_max
+    }
+}
+
+struct RotatedTorchFace {
+    bottom_left: [f32; 3],
+    uv_min_max: [[f32; 2]; 2],
+    theta: f32,
+}
+
+impl RotatedTorchFace {
+    const THETA: f32 = 0.6;
+}
+
+impl DwQuad for RotatedTorchFace {
+    fn quad(&self) -> [[f32; 3]; 4] {
+        let [b, l, z] = self.bottom_left;
+        let [w, h] = [1.0; 2];
+        let [w_2, h_2] = [w / 2.0, h / 2.0];
+        let rotation_mat = glam::Mat2::from_angle(self.theta);
+        [[-w_2, -h_2], [w_2, -h_2], [w_2, h_2], [-w_2, h_2]].map(|[x, y]| {
+            // rotated radius
+            let [rw_2, rh_2] = rotation_mat.mul_vec2(glam::Vec2::new(x, y)).to_array();
+            [b + rw_2, l + rh_2, z]
+        })
+    }
+
+    fn normal(&self) -> [f32; 3] {
+        [0.0, 0.0, 1.0]
+    }
+
+    fn uv_min_max(&self) -> [[f32; 2]; 2] {
+        self.uv_min_max
+    }
+}
+
+impl BuildDwMesh for Torch {
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        let image_type = match self.item_type {
+            ItemType::Torch => ImageType::BasicTorch0,
+            ItemType::IceTorch => ImageType::IceTorch0,
+            ItemType::OilLantern => ImageType::ClayLantern0,
+            ItemType::SteelLantern => ImageType::SteelLantern0,
+            ItemType::SteelDownlight => ImageType::SteelDownlight,
+            ItemType::SteelUplight => ImageType::SteelUplight,
+            _ => InvalidItemTypeForTorchSnafu {
+                item_type: self.item_type,
+                torch: self.clone(),
+            }
+            .fail()?,
+        };
+        let [x, y] = self.float_pos;
+        match self.connection_type {
+            TorchConnectionType::Bg => {
+                builder.add_quad(FrontTorchFace {
+                    bottom_left: [x - 0.5, y, 1.0],
+                    uv_min_max: image_type.uv_min_max(1, 1),
+                });
+            }
+            TorchConnectionType::Left => {
+                builder.add_quad(RotatedTorchFace {
+                    bottom_left: [
+                        x - (1.0 - RotatedTorchFace::THETA.sin()) / 2.0,
+                        y + 0.5,
+                        2.0,
+                    ],
+                    uv_min_max: image_type.uv_min_max(1, 1),
+                    theta: -RotatedTorchFace::THETA,
+                });
+            }
+            TorchConnectionType::Ground => {
+                builder.add_face(DwFace::new_sprite(
+                    image_type,
+                    [0.5, 0.0],
+                    self.float_pos,
+                    [1, 1],
+                    2.0,
+                ));
+            }
+            TorchConnectionType::Right => {
+                builder.add_quad(RotatedTorchFace {
+                    bottom_left: [
+                        x + (1.0 - RotatedTorchFace::THETA.sin()) / 2.0,
+                        y + 0.5,
+                        2.0,
+                    ],
+                    uv_min_max: image_type.uv_min_max(1, 1),
+                    theta: RotatedTorchFace::THETA,
+                });
+            }
+            TorchConnectionType::Mg => {
+                builder.add_quad(FrontTorchFace {
+                    bottom_left: [x - 0.5, y, 2.0],
+                    uv_min_max: image_type.uv_min_max(1, 1),
+                });
+            }
+        }
+        Ok(())
+    }
+}
+
 impl ToRow for ItemType {
     fn to_row(&mut self, ui: &mut egui::Ui) {
         // ItemType contains TOO MANY types, might need dedicated selector.
@@ -593,6 +758,7 @@ impl BuildDwMesh for Door {
             ItemType::IronTrapdoor => ImageType::IronDoorTop,
             _ => InvalidItemTypeForDoorSnafu {
                 item_type: self.item_type,
+                door: self.clone(),
             }
             .fail()?,
         };
