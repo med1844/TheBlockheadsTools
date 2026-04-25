@@ -2,7 +2,7 @@ use super::{
     coord::{ChunkCoord, CoordError},
     dynamic_object::{
         DynamicObjectList, DynamicObjectType,
-        animal::{CaveTroll, ClownFish, Dodo, Donkey, DropBear, Scorpion, Shark, Yak},
+        animal::{CaveTroll, ClownFish, Dodo, Donkey, DropBear, Egg, Scorpion, Shark, Yak},
         chest::{Chest, ChestError, ChestMeta},
         craft::{
             Bed, Boat, Column, Door, ElevatorMotor, ElevatorShaft, Ladder, Rail, Sign, Stairs,
@@ -93,7 +93,7 @@ pub struct ChunkDynamicObjects {
     pub gather_block: Vec<u8>,
     pub carrot_plant: DynamicObjectList<CarrotPlant>,
     pub donkey: DynamicObjectList<Donkey>,
-    pub egg: Vec<u8>,
+    pub egg: DynamicObjectList<Egg>,
     pub window: DynamicObjectList<Window>,
     pub boat: DynamicObjectList<Boat>,
     pub chilli_plant: DynamicObjectList<ChilliPlant>,
@@ -356,7 +356,7 @@ impl DynamicWorld {
                 DynamicObjectType::GatherBlock => entry.gather_block = v.to_vec(),
                 DynamicObjectType::CarrotPlant => entry.carrot_plant = load(v, obj_ty, coord)?,
                 DynamicObjectType::Donkey => entry.donkey = load(v, obj_ty, coord)?,
-                DynamicObjectType::Egg => entry.egg = v.to_vec(),
+                DynamicObjectType::Egg => entry.egg = load(v, obj_ty, coord)?,
                 DynamicObjectType::Window => entry.window = load(v, obj_ty, coord)?,
                 DynamicObjectType::Boat => entry.boat = load(v, obj_ty, coord)?,
                 DynamicObjectType::ChilliPlant => entry.chilli_plant = load(v, obj_ty, coord)?,
@@ -624,7 +624,7 @@ mod tests {
         monster.gather_block = vec![26, 0xAA, 0xBB];
         monster.carrot_plant = read_test_xml(DynamicObjectType::CarrotPlant);
         monster.donkey = read_test_xml(DynamicObjectType::Donkey);
-        monster.egg = vec![30, 0xAA, 0xBB];
+        monster.egg = read_test_xml(DynamicObjectType::Egg);
         monster.window = read_test_xml(DynamicObjectType::Window);
         monster.boat = read_test_xml(DynamicObjectType::Boat);
         monster.chilli_plant = read_test_xml(DynamicObjectType::ChilliPlant);

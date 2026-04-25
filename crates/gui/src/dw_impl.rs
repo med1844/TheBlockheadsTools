@@ -17,6 +17,7 @@ use the_blockheads_tools_lib::game::{
     dynamic_object::{
         ArtificialLight, DynamicObject, InteractionObject, InteractionObjectType, LightDirection,
         UniqueID,
+        animal::{DodoBreed, Egg},
         chest::{Chest, ChestType},
         craft::{Door, Ladder},
         plant::{CarrotPlant, CornPlant, KelpPlant, NormalPlant, Plant, TomatoPlant},
@@ -651,6 +652,77 @@ impl BuildDwMesh for CarrotPlant {
             [1, 2],
             2.0,
         ));
+        Ok(())
+    }
+}
+
+impl ToRow for DodoBreed {
+    fn to_row(&mut self, ui: &mut egui::Ui) {
+        egui::ComboBox::from_id_salt("dodo_breed_combo_box")
+            .selected_text(format!("{:?}", self))
+            .show_ui(ui, |ui| {
+                ui.selectable_value(self, Self::Standard, "Standard");
+                ui.selectable_value(self, Self::Stone, "Stone");
+                ui.selectable_value(self, Self::Limestone, "Limestone");
+                ui.selectable_value(self, Self::Sandstone, "Sandstone");
+                ui.selectable_value(self, Self::Marble, "Marble");
+                ui.selectable_value(self, Self::RedMarble, "RedMarble");
+                ui.selectable_value(self, Self::Lapis, "Lapis");
+                ui.selectable_value(self, Self::Dirt, "Dirt");
+                ui.selectable_value(self, Self::Compost, "Compost");
+                ui.selectable_value(self, Self::Wood, "Wood");
+                ui.selectable_value(self, Self::Gravel, "Gravel");
+                ui.selectable_value(self, Self::Sand, "Sand");
+                ui.selectable_value(self, Self::BlackSand, "BlackSand");
+                ui.selectable_value(self, Self::Glass, "Glass");
+                ui.selectable_value(self, Self::BlackGlass, "BlackGlass");
+                ui.selectable_value(self, Self::Clay, "Clay");
+                ui.selectable_value(self, Self::RedBrick, "RedBrick");
+                ui.selectable_value(self, Self::Flint, "Flint");
+                ui.selectable_value(self, Self::Coal, "Coal");
+                ui.selectable_value(self, Self::Oil, "Oil");
+                ui.selectable_value(self, Self::Fuel, "Fuel");
+                ui.selectable_value(self, Self::Copper, "Copper");
+                ui.selectable_value(self, Self::Tin, "Tin");
+                ui.selectable_value(self, Self::Iron, "Iron");
+                ui.selectable_value(self, Self::Gold, "Gold");
+                ui.selectable_value(self, Self::Titanium, "Titanium");
+                ui.selectable_value(self, Self::Platinum, "Platinum");
+                ui.selectable_value(self, Self::Amethyst, "Amethyst");
+                ui.selectable_value(self, Self::Sapphire, "Sapphire");
+                ui.selectable_value(self, Self::Emerald, "Emerald");
+                ui.selectable_value(self, Self::Ruby, "Ruby");
+                ui.selectable_value(self, Self::Diamond, "Diamond");
+                ui.selectable_value(self, Self::Rainbow, "Rainbow");
+            });
+    }
+}
+
+impl ToGrid for Egg {
+    fn to_grid(&mut self, ui: &mut egui::Ui) {
+        self.genes_dict.breed.add_row("breed", ui);
+        self.hatch_timer.add_row("hatchTimer", ui);
+        self.save_time.add_row("saveTime", ui);
+    }
+}
+
+impl InfoUi for Egg {
+    fn info(&mut self, ui: &mut egui::Ui) {
+        let obj = self.deref_mut();
+        obj.info(ui);
+
+        ui.vertical(|ui| {
+            ui.heading("Egg");
+            ui.separator();
+            self.add_grid("egg_grid", ui);
+        });
+    }
+}
+
+impl BuildDwMesh for Egg {
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        // TODO add render egg with real breed textures
+        builder.add_icon(DwIcon::new(self.float_pos, ItemType::DodoEgg));
         Ok(())
     }
 }

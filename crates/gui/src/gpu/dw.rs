@@ -55,9 +55,10 @@ pub struct DwIcon {
 
 impl DwIcon {
     pub fn new(position: [f32; 2], item_type: ItemType) -> Self {
+        let [x, y] = position;
         Self {
-            position,
-            item_type: item_type,
+            position: [x, y + 0.5],
+            item_type,
         }
     }
 
@@ -704,6 +705,7 @@ impl DwChunkBuf {
         add(chunk.ladder.iter(), Ladder, &mut builder);
         add(chunk.door.iter(), Door, &mut builder);
         add(chunk.carrot_plant.iter(), CarrotPlant, &mut builder);
+        add(chunk.egg.iter(), Egg, &mut builder);
         add(chunk.kelp_plant.iter(), KelpPlant, &mut builder);
         add(chunk.lime_tree.iter(), LimeTree, &mut builder);
         add(chunk.workbench.iter(), Workbench, &mut builder);

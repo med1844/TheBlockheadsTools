@@ -663,10 +663,9 @@ impl EditorApp {
                 .show(ctx, |ui| {
                     let e = snafu::Report::from_error(e);
                     ui.heading("Error message");
-                    egui::ScrollArea::vertical()
-                        .show(ui, |ui| {
-                            ui.label(format!("{}", e));
-                        });
+                    egui::ScrollArea::vertical().show(ui, |ui| {
+                        ui.label(format!("{}", e));
+                    });
                 });
             if !open {
                 self.load_err = None;
@@ -741,7 +740,7 @@ impl EditorApp {
                 GatherBlock => {}
                 CarrotPlant => draw_window(title, dw_chunk.carrot_plant.get_mut(id.index), ctx),
                 Donkey => {}
-                Egg => {}
+                Egg => draw_window(title, dw_chunk.egg.get_mut(id.index), ctx),
                 Window => {}
                 Boat => {}
                 ChilliPlant => {}

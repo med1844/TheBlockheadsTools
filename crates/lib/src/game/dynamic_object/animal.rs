@@ -99,3 +99,57 @@ pub struct DropBear {
     pub provoke_meter: f32,
 }
 inherit!(DropBear -> Animal, animal);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr)]
+#[repr(u16)]
+pub enum DodoBreed {
+    Standard = 0,
+    Stone = 1,
+    Limestone = 2,
+    Sandstone = 3,
+    Marble = 4,
+    RedMarble = 5,
+    Lapis = 6,
+    Dirt = 7,
+    Compost = 8,
+    Wood = 9,
+    Gravel = 10,
+    Sand = 11,
+    BlackSand = 12,
+    Glass = 13,
+    BlackGlass = 14,
+    Clay = 15,
+    RedBrick = 16,
+    Flint = 17,
+    Coal = 18,
+    Oil = 19,
+    Fuel = 20,
+    Copper = 21,
+    Tin = 22,
+    Iron = 23,
+    Gold = 24,
+    Titanium = 25,
+    Platinum = 26,
+    Amethyst = 27,
+    Sapphire = 28,
+    Emerald = 29,
+    Ruby = 30,
+    Diamond = 31,
+    Rainbow = 32,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DodoGenes {
+    pub breed: DodoBreed,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Egg {
+    #[serde(flatten)]
+    obj: DynamicObject,
+    pub genes_dict: DodoGenes,
+    pub hatch_timer: f32,
+    pub save_time: f32,
+}
+inherit!(Egg -> DynamicObject, obj);

@@ -358,6 +358,7 @@ pub enum AnyDynamicObject {
     Ladder(Box<craft::Ladder>),           // ID = 19
     Door(Box<craft::Door>),               // ID = 20
     Bed(Box<craft::Bed>),                 // ID = 23
+    Egg(Box<animal::Egg>),                // ID = 30
     Workbench(Box<workbench::Workbench>), // ID = 45
     Chest(Box<chest::Chest>),             // ID = 46
 }
@@ -427,6 +428,13 @@ impl AnyDynamicObject {
                 }
                 .fail(),
             }
+        } else if dict.contains_key("hatchTimer") {
+            let dict = plist::Value::Dictionary(dict);
+            let egg = plist::from_value(&dict).context(DeserializeDictionarySnafu {
+                target_type: "Egg",
+                dict,
+            })?;
+            Ok(Self::Egg(egg))
         } else {
             DynObjSaveDictNoTypeMatchSnafu { dict }.fail()
         }
@@ -442,6 +450,9 @@ impl AnyDynamicObject {
             })?,
             Self::Bed(bed) => {
                 plist::to_value(bed).context(SerializeDictionarySnafu { source_type: "Bed" })?
+            }
+            Self::Egg(egg) => {
+                plist::to_value(egg).context(SerializeDictionarySnafu { source_type: "Egg" })?
             }
             Self::Workbench(workbench) => {
                 plist::to_value(workbench).context(SerializeDictionarySnafu {
@@ -463,7 +474,7 @@ impl AnyDynamicObject {
 mod tests {
     use super::{
         DynamicObjectList, DynamicObjectType,
-        animal::{CaveTroll, ClownFish, Dodo, Donkey, DropBear, Scorpion, Shark, Yak},
+        animal::{CaveTroll, ClownFish, Dodo, Donkey, DropBear, Egg, Scorpion, Shark, Yak},
         craft::{
             Bed, Boat, Column, Door, ElevatorMotor, ElevatorShaft, Ladder, Rail, Sign, Stairs,
             TradePortal, TradingPost, Window, Wire,
@@ -535,7 +546,7 @@ mod tests {
         // check_round_trip::<GatherBlock>(DynamicObjectType::GatherBlock).unwrap();
         check_round_trip::<CarrotPlant>(DynamicObjectType::CarrotPlant).unwrap();
         check_round_trip::<Donkey>(DynamicObjectType::Donkey).unwrap();
-        // check_round_trip::<Egg>(DynamicObjectType::Egg).unwrap();
+        check_round_trip::<Egg>(DynamicObjectType::Egg).unwrap();
         check_round_trip::<Window>(DynamicObjectType::Window).unwrap();
         check_round_trip::<Boat>(DynamicObjectType::Boat).unwrap();
         check_round_trip::<ChilliPlant>(DynamicObjectType::ChilliPlant).unwrap();
