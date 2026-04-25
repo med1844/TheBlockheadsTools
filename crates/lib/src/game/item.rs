@@ -891,6 +891,14 @@ impl DerefMut for Slot {
 pub struct Slots<const N: usize>([Slot; N]);
 
 impl<const N: usize> Slots<N> {
+    pub fn new(slots: [Slot; N]) -> Self {
+        Self(slots)
+    }
+
+    pub fn into_inner(self) -> [Slot; N] {
+        self.0
+    }
+
     pub fn from_values(values: Vec<plist::Value>) -> Result<Self> {
         if values.len() != N {
             return NumSlotsMismatchSnafu {

@@ -3,7 +3,7 @@ from the_blockheads_tools_py import (
     ItemType,
     PigmentColor,
     Slot,
-    BasketSlots,
+    Slots,
     Chest,
     StandardChest,
     SafeChest,
@@ -129,9 +129,9 @@ def test_slot():
     assert last_item is slot[1]
 
 
-def test_basket_extra():
+def test_basket_slots():
     # Test creation
-    basket = BasketSlots()
+    basket = Slots()
     assert len(basket) == 4
     assert isinstance(basket[0], Slot)
     assert len(basket[0]) == 0
@@ -149,26 +149,27 @@ def test_basket_extra():
     assert basket[0][0].item_type == ItemType.Mango
 
     # Test Item with Extra
-    container_item = Item(ItemType.Basket, extra=basket)
-    assert container_item.extra is basket
+    container_item = Item(ItemType.Basket, sub_items=basket)
+    assert container_item.sub_items is basket
 
     # Match dispatch test
-    match container_item.extra:
-        case BasketSlots() as basket:
+    match container_item.sub_items:
+        case Slots() as basket:
             assert len(basket) == 4
         case _:
-            pytest.fail("Should have matched BasketSlots")
+            pytest.fail("Should have matched Slots")
 
 
 def test_item_repr():
     item = Item(ItemType.Flint)
     r = repr(item)
     assert "type_id=3" in r
-    assert "extra=None" in r
+    assert "sub_items=None" in r
+    assert "dynamic_object=None" in r
 
-    basket = BasketSlots()
-    item_with_basket = Item(ItemType.Basket, extra=basket)
-    assert "BasketSlots" in repr(item_with_basket)
+    basket = Slots()
+    item_with_basket = Item(ItemType.Basket, sub_items=basket)
+    assert "Slots" in repr(item_with_basket)
 
 
 def test_chest_basic():
@@ -214,14 +215,14 @@ def test_chest_identity_and_mutation():
 
 def test_chest_dispatch():
     chest = GoldChest()
-    item = Item(ItemType.GoldenChest, extra=chest)
+    item = Item(ItemType.GoldenChest, dynamic_object=chest)
 
-    assert isinstance(item.extra, Chest)
-    assert isinstance(item.extra, GoldChest)
-    assert item.extra is chest
+    assert isinstance(item.dynamic_object, Chest)
+    assert isinstance(item.dynamic_object, GoldChest)
+    assert item.dynamic_object is chest
 
     # Match dispatch
-    match item.extra:
+    match item.dynamic_object:
         case GoldChest(owner_id=owner):
             assert owner is None
         case _:
@@ -254,40 +255,40 @@ def test_chest_roundtrip():
     std_chest.float_pos = [1.0, 2.0]
     std_chest[0] = Slot([Item(ItemType.Apple)])
 
-    container1 = Item(ItemType.Chest, extra=std_chest)
-    assert type(container1.extra) is StandardChest
-    assert container1.extra.owner_id == "std_owner"
-    assert container1.extra.paint_color == 1
-    assert container1.extra[0][0].item_type == ItemType.Apple
+    container1 = Item(ItemType.Chest, dynamic_object=std_chest)
+    assert type(container1.dynamic_object) is StandardChest
+    assert container1.dynamic_object.owner_id == "std_owner"
+    assert container1.dynamic_object.paint_color == 1
+    assert container1.dynamic_object[0][0].item_type == ItemType.Apple
 
     # 2. SafeChest
     safe_chest = SafeChest(owner_id="safe_owner")
     safe_chest.paint_color = 2
     safe_chest[15] = Slot([Item(ItemType.Mango)])
 
-    container2 = Item(ItemType.Safe, extra=safe_chest)
-    assert type(container2.extra) is SafeChest
-    assert container2.extra.owner_id == "safe_owner"
-    assert container2.extra.paint_color == 2
-    assert container2.extra[15][0].item_type == ItemType.Mango
+    container2 = Item(ItemType.Safe, dynamic_object=safe_chest)
+    assert type(container2.dynamic_object) is SafeChest
+    assert container2.dynamic_object.owner_id == "safe_owner"
+    assert container2.dynamic_object.paint_color == 2
+    assert container2.dynamic_object[15][0].item_type == ItemType.Mango
 
     # 3. GoldChest
     gold_chest = GoldChest(owner_id="gold_owner")
     gold_chest[5] = Slot([Item(ItemType.Diamond)])
 
-    container3 = Item(ItemType.GoldenChest, extra=gold_chest)
-    assert type(container3.extra) is GoldChest
-    assert container3.extra.owner_id == "gold_owner"
-    assert container3.extra[5][0].item_type == ItemType.Diamond
+    container3 = Item(ItemType.GoldenChest, dynamic_object=gold_chest)
+    assert type(container3.dynamic_object) is GoldChest
+    assert container3.dynamic_object.owner_id == "gold_owner"
+    assert container3.dynamic_object[5][0].item_type == ItemType.Diamond
 
     # 4. FeederChest
     feeder_chest = FeederChest(owner_id="feeder_owner")
     feeder_chest[8] = Slot([Item(ItemType.DodoEgg)])
 
-    container4 = Item(ItemType.FeederChest, extra=feeder_chest)
-    assert type(container4.extra) is FeederChest
-    assert container4.extra.owner_id == "feeder_owner"
-    assert container4.extra[8][0].item_type == ItemType.DodoEgg
+    container4 = Item(ItemType.FeederChest, dynamic_object=feeder_chest)
+    assert type(container4.dynamic_object) is FeederChest
+    assert container4.dynamic_object.owner_id == "feeder_owner"
+    assert container4.dynamic_object[8][0].item_type == ItemType.DodoEgg
 
     # 5. ShelfChest
     shelf_chest = ShelfChest()
@@ -295,12 +296,12 @@ def test_chest_roundtrip():
     shelf_chest.item_data_bs = [1, 2, 3, 4]
     shelf_chest[0] = Slot([Item(ItemType.Apple)])
 
-    container5 = Item(ItemType.Shelf, extra=shelf_chest)
-    assert type(container5.extra) is ShelfChest
-    assert container5.extra.render_items is not None
-    assert container5.extra.render_items[0] == ItemType.Apple
-    assert container5.extra.item_data_bs == [1, 2, 3, 4]
-    assert container5.extra[0][0].item_type == ItemType.Apple
+    container5 = Item(ItemType.Shelf, dynamic_object=shelf_chest)
+    assert type(container5.dynamic_object) is ShelfChest
+    assert container5.dynamic_object.render_items is not None
+    assert container5.dynamic_object.render_items[0] == ItemType.Apple
+    assert container5.dynamic_object.item_data_bs == [1, 2, 3, 4]
+    assert container5.dynamic_object[0][0].item_type == ItemType.Apple
 
     # 6. Cabinet
     cabinet = Cabinet()
@@ -308,12 +309,12 @@ def test_chest_roundtrip():
     cabinet.item_data_bs = [10, 20, 30, 40]
     cabinet[3] = Slot([Item(ItemType.Mango)])
 
-    container6 = Item(ItemType.DisplayCabinet, extra=cabinet)
-    assert type(container6.extra) is Cabinet
-    assert container6.extra.render_items is not None
-    assert container6.extra.render_items[0] == ItemType.Mango
-    assert container6.extra.item_data_bs == [10, 20, 30, 40]
-    assert container6.extra[3][0].item_type == ItemType.Mango
+    container6 = Item(ItemType.DisplayCabinet, dynamic_object=cabinet)
+    assert type(container6.dynamic_object) is Cabinet
+    assert container6.dynamic_object.render_items is not None
+    assert container6.dynamic_object.render_items[0] == ItemType.Mango
+    assert container6.dynamic_object.item_data_bs == [10, 20, 30, 40]
+    assert container6.dynamic_object[3][0].item_type == ItemType.Mango
 
     # 7. PortalChest
     portal = PortalChest(owner_id="portal_master")
@@ -324,11 +325,11 @@ def test_chest_roundtrip():
     portal.float_pos = [10.5, 20.5]
     portal.unique_id = 0xDEADBEEFCAFEBABE
 
-    container7 = Item(ItemType.PortalChest, extra=portal)
+    container7 = Item(ItemType.PortalChest, dynamic_object=portal)
 
-    assert type(container7.extra) is PortalChest
-    assert container7.extra.unique_id == 0xDEADBEEFCAFEBABE
-    assert container7.extra.owner_id == "portal_master"
+    assert type(container7.dynamic_object) is PortalChest
+    assert container7.dynamic_object.unique_id == 0xDEADBEEFCAFEBABE
+    assert container7.dynamic_object.owner_id == "portal_master"
 
 
 def test_workbench_basic():
@@ -365,12 +366,12 @@ def test_workbench_properties():
 
 def test_workbench_integration():
     wb = Workbench(WorkbenchType.Easel)
-    item = Item(ItemType.Easel, extra=wb)
+    item = Item(ItemType.Easel, dynamic_object=wb)
 
-    assert isinstance(item.extra, Workbench)
-    assert item.extra.workbench_type == WorkbenchType.Easel
+    assert isinstance(item.dynamic_object, Workbench)
+    assert item.dynamic_object.workbench_type == WorkbenchType.Easel
 
-    match item.extra:
+    match item.dynamic_object:
         case Workbench(workbench_type=wt):
             assert wt == WorkbenchType.Easel
         case _:

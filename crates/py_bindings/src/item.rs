@@ -1,15 +1,11 @@
 use super::{lib, ItemSnafu};
 use lib::game::{
     dynamic_object::{
-        blockhead::Inventory,
         chest::{Chest, ChestSlots, ChestType, NUM_SHELF_SLOTS, NUM_STANDARD_SLOTS},
         workbench::{Workbench, WorkbenchType},
-        DynamicObject, InteractionObject, InteractionObjectType, UniqueID,
+        AnyDynamicObject, DynamicObject, InteractionObject, InteractionObjectType, UniqueID,
     },
-    item::{
-        fmt_item_display, fmt_slot_display, Extra, Item, ItemType, ItemView, PigmentColor, Slot,
-        SlotView,
-    },
+    item::{Inventory, Item, ItemType, PigmentColor, Slot, Slots},
 };
 use num_enum::TryFromPrimitive;
 use pyo3::exceptions::{PyIndexError, PyValueError};
@@ -563,37 +559,37 @@ impl From<PigmentColorPy> for PigmentColor {
     }
 }
 
-#[pyclass(name = "BasketSlots")]
-pub struct BasketSlotsPy {
+#[pyclass(name = "Slots")]
+pub struct SlotsPy {
     slots: Vec<Py<SlotPy>>,
 }
 
-impl std::fmt::Debug for BasketSlotsPy {
+impl std::fmt::Debug for SlotsPy {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("BasketSlotsPy")
+        f.debug_struct("SlotsPy")
             .field("slots", &"<slots>")
             .finish()
     }
 }
 
 #[pymethods]
-impl BasketSlotsPy {
+impl SlotsPy {
     #[new]
     #[pyo3(signature = (slots=None))]
     fn new(slots: Option<Vec<Py<SlotPy>>>) -> PyResult<Self> {
         match slots {
             Some(slots) => {
-                if slots.len() != Extra::NUM_SLOT_BASKET {
+                if slots.len() != Item::MAX_SUB_ITEMS {
                     return Err(PyValueError::new_err(format!(
                         "BasketSlots must have exactly {} slots",
-                        Extra::NUM_SLOT_BASKET
+                        Item::MAX_SUB_ITEMS
                     )));
                 }
                 Ok(Self { slots })
             }
             None => Python::attach(|py| {
-                let mut slots = Vec::with_capacity(Extra::NUM_SLOT_BASKET);
-                for _ in 0..Extra::NUM_SLOT_BASKET {
+                let mut slots = Vec::with_capacity(Item::MAX_SUB_ITEMS);
+                for _ in 0..Item::MAX_SUB_ITEMS {
                     slots.push(Py::new(py, SlotPy::default())?);
                 }
                 Ok(Self { slots })
@@ -641,7 +637,7 @@ impl BasketSlotsPy {
                     .unwrap_or_else(|_| "<repr error>".to_string())
             })
             .collect();
-        format!("BasketSlots(slots=[{}])", slots_repr.join(", "))
+        format!("Slots(slots=[{}])", slots_repr.join(", "))
     }
 
     fn __str__(&self, py: Python<'_>) -> String {
@@ -659,33 +655,86 @@ impl BasketSlotsPy {
     }
 }
 
-#[pyclass(subclass, name = "Chest")]
-pub struct ChestPy {
+#[pyclass(subclass, name = "DynamicObject")]
+pub struct DynamicObjectPy {
+    #[pyo3(get, set)]
+    pub float_pos: [f32; 2],
+    #[pyo3(get, set)]
+    pub pos_x: u32,
+    #[pyo3(get, set)]
+    pub pos_y: u16,
+    #[pyo3(get, set)]
+    pub unique_id: u64,
     #[pyo3(get, set)]
     pub owner_id: Option<String>,
+}
+
+#[pymethods]
+impl DynamicObjectPy {
+    #[new]
+    #[pyo3(signature = (float_pos=[0.0, 0.0], pos_x=0, pos_y=0, unique_id=0, owner_id=None))]
+    fn new(
+        float_pos: [f32; 2],
+        pos_x: u32,
+        pos_y: u16,
+        unique_id: u64,
+        owner_id: Option<String>,
+    ) -> Self {
+        Self {
+            float_pos,
+            pos_x,
+            pos_y,
+            unique_id,
+            owner_id,
+        }
+    }
+}
+
+#[pyclass(extends=DynamicObjectPy, subclass, name = "InteractionObject")]
+pub struct InteractionObjectPy {
+    #[pyo3(get, set)]
+    pub interaction_object_type: u8,
     #[pyo3(get, set)]
     pub is_in_use: bool,
     #[pyo3(get, set)]
     pub flipped: bool,
     #[pyo3(get, set)]
     pub paint_color: u16,
-    #[pyo3(get, set)]
-    pub pos_x: u64,
-    #[pyo3(get, set)]
-    pub pos_y: u16,
-    #[pyo3(get, set)]
-    pub float_pos: [f32; 2],
-    #[pyo3(get, set)]
-    pub unique_id: u64,
 }
+
+#[pymethods]
+impl InteractionObjectPy {
+    #[new]
+    #[pyo3(signature = (interaction_object_type=0, is_in_use=false, flipped=false, paint_color=0, float_pos=[0.0, 0.0], pos_x=0, pos_y=0, unique_id=0, owner_id=None))]
+    #[allow(clippy::too_many_arguments)]
+    fn new(
+        interaction_object_type: u8,
+        is_in_use: bool,
+        flipped: bool,
+        paint_color: u16,
+        float_pos: [f32; 2],
+        pos_x: u32,
+        pos_y: u16,
+        unique_id: u64,
+        owner_id: Option<String>,
+    ) -> pyo3::PyClassInitializer<Self> {
+        let base = DynamicObjectPy::new(float_pos, pos_x, pos_y, unique_id, owner_id);
+        pyo3::PyClassInitializer::from(base).add_subclass(Self {
+            interaction_object_type,
+            is_in_use,
+            flipped,
+            paint_color,
+        })
+    }
+}
+
+#[pyclass(extends=InteractionObjectPy, subclass, name = "Chest")]
+pub struct ChestPy {}
 
 #[pymethods]
 impl ChestPy {
     fn __repr__(&self) -> String {
-        format!(
-            "Chest(owner_id={:?}, pos_x={}, pos_y={})",
-            self.owner_id, self.pos_x, self.pos_y
-        )
+        "Chest()".to_string()
     }
 
     fn __str__(&self) -> String {
@@ -695,10 +744,7 @@ impl ChestPy {
 
 impl std::fmt::Debug for ChestPy {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Chest")
-            .field("owner_id", &self.owner_id)
-            .field("unique_id", &self.unique_id)
-            .finish()
+        f.debug_struct("Chest").finish()
     }
 }
 
@@ -717,7 +763,7 @@ macro_rules! define_standard_chest {
                 py: Python<'_>,
                 slots: Option<Vec<Py<SlotPy>>>,
                 owner_id: Option<String>,
-            ) -> PyResult<(Self, ChestPy)> {
+            ) -> PyResult<pyo3::PyClassInitializer<Self>> {
                 let slots = if let Some(s) = slots {
                     if s.len() != NUM_STANDARD_SLOTS {
                         return Err(pyo3::exceptions::PyValueError::new_err(
@@ -729,18 +775,18 @@ macro_rules! define_standard_chest {
                     std::array::from_fn(|_| Py::new(py, SlotPy::default()).unwrap())
                 };
 
-                let base = ChestPy {
-                    owner_id,
+                let dyn_obj = DynamicObjectPy::new([0.0, 0.0], 0, 0, 0, owner_id);
+                let int_obj = InteractionObjectPy {
+                    interaction_object_type: InteractionObjectType::Chest as u8,
                     is_in_use: false,
                     flipped: false,
                     paint_color: 0,
-                    pos_x: 0,
-                    pos_y: 0,
-                    float_pos: [0.0, 0.0],
-                    unique_id: 0,
                 };
-
-                Ok((Self { slots }, base))
+                let base = ChestPy {};
+                Ok(pyo3::PyClassInitializer::from(dyn_obj)
+                    .add_subclass(int_obj)
+                    .add_subclass(base)
+                    .add_subclass(Self { slots }))
             }
 
             fn __len__(&self) -> usize {
@@ -799,7 +845,7 @@ macro_rules! define_shelf_chest {
                 render_items: Option<Vec<ItemTypePy>>,
                 item_data_bs: Option<Vec<u16>>,
                 owner_id: Option<String>,
-            ) -> PyResult<(Self, ChestPy)> {
+            ) -> PyResult<pyo3::PyClassInitializer<Self>> {
                 let slots = if let Some(s) = slots {
                     if s.len() != NUM_SHELF_SLOTS {
                         return Err(pyo3::exceptions::PyValueError::new_err(
@@ -833,25 +879,23 @@ macro_rules! define_shelf_chest {
                     None
                 };
 
-                let base = ChestPy {
-                    owner_id,
+                let dyn_obj = DynamicObjectPy::new([0.0, 0.0], 0, 0, 0, owner_id);
+                let int_obj = InteractionObjectPy {
+                    interaction_object_type: InteractionObjectType::Chest as u8,
                     is_in_use: false,
                     flipped: false,
                     paint_color: 0,
-                    pos_x: 0,
-                    pos_y: 0,
-                    float_pos: [0.0, 0.0],
-                    unique_id: 0,
                 };
+                let base = ChestPy {};
 
-                Ok((
-                    Self {
+                Ok(pyo3::PyClassInitializer::from(dyn_obj)
+                    .add_subclass(int_obj)
+                    .add_subclass(base)
+                    .add_subclass(Self {
                         slots,
                         render_items,
                         item_data_bs,
-                    },
-                    base,
-                ))
+                    }))
             }
 
             fn __len__(&self) -> usize {
@@ -894,87 +938,93 @@ pub struct PortalChestPy {}
 impl PortalChestPy {
     #[new]
     #[pyo3(signature = (owner_id=None))]
-    fn new(owner_id: Option<String>) -> PyResult<(Self, ChestPy)> {
-        let base = ChestPy {
-            owner_id,
+    fn new(owner_id: Option<String>) -> PyResult<pyo3::PyClassInitializer<Self>> {
+        let dyn_obj = DynamicObjectPy::new([0.0, 0.0], 0, 0, 0, owner_id);
+        let int_obj = InteractionObjectPy {
+            interaction_object_type: InteractionObjectType::Chest as u8,
             is_in_use: false,
             flipped: false,
             paint_color: 0,
-            pos_x: 0,
-            pos_y: 0,
-            float_pos: [0.0, 0.0],
-            unique_id: 0,
         };
-        Ok((Self {}, base))
+        let base = ChestPy {};
+        Ok(pyo3::PyClassInitializer::from(dyn_obj)
+            .add_subclass(int_obj)
+            .add_subclass(base)
+            .add_subclass(Self {}))
     }
 }
 
 impl ChestPy {
     pub fn inflate(py: Python<'_>, chest: Chest) -> PyResult<Py<PyAny>> {
-        let base = ChestPy {
-            owner_id: chest.owner_id.clone(),
+        let dyn_obj = DynamicObjectPy::new(
+            [chest.float_pos[0], chest.float_pos[1]],
+            chest.pos_x,
+            chest.pos_y,
+            *chest.unique_id.inner(),
+            chest.owner_id.clone(),
+        );
+        let int_obj = InteractionObjectPy {
+            interaction_object_type: chest.interaction_object_type as u8,
             is_in_use: chest.is_in_use,
             flipped: chest.flipped,
             paint_color: chest.paint_color,
-            pos_x: chest.pos_x,
-            pos_y: chest.pos_y,
-            float_pos: [chest.float_pos[0], chest.float_pos[1]],
-            unique_id: *chest.unique_id.inner(),
         };
+        let base = ChestPy {};
+
+        let init = pyo3::PyClassInitializer::from(dyn_obj)
+            .add_subclass(int_obj)
+            .add_subclass(base);
 
         match chest.slots {
             ChestSlots::Standard(slots) => {
-                let slots = Self::inflate_standard(py, slots)?;
-                let init =
-                    pyo3::PyClassInitializer::from(base).add_subclass(StandardChestPy { slots });
-                Ok(Py::new(py, init)?.into_any())
+                let slots = Self::inflate_standard(py, slots.into_inner())?;
+                Ok(Py::new(py, init.add_subclass(StandardChestPy { slots }))?.into_any())
             }
             ChestSlots::Safe(slots) => {
-                let slots = Self::inflate_standard(py, slots)?;
-                let init = pyo3::PyClassInitializer::from(base).add_subclass(SafeChestPy { slots });
-                Ok(Py::new(py, init)?.into_any())
+                let slots = Self::inflate_standard(py, slots.into_inner())?;
+                Ok(Py::new(py, init.add_subclass(SafeChestPy { slots }))?.into_any())
             }
             ChestSlots::Gold(slots) => {
-                let slots = Self::inflate_standard(py, slots)?;
-                let init = pyo3::PyClassInitializer::from(base).add_subclass(GoldChestPy { slots });
-                Ok(Py::new(py, init)?.into_any())
+                let slots = Self::inflate_standard(py, slots.into_inner())?;
+                Ok(Py::new(py, init.add_subclass(GoldChestPy { slots }))?.into_any())
             }
             ChestSlots::Feeder(slots) => {
-                let slots = Self::inflate_standard(py, slots)?;
-                let init =
-                    pyo3::PyClassInitializer::from(base).add_subclass(FeederChestPy { slots });
-                Ok(Py::new(py, init)?.into_any())
+                let slots = Self::inflate_standard(py, slots.into_inner())?;
+                Ok(Py::new(py, init.add_subclass(FeederChestPy { slots }))?.into_any())
             }
             ChestSlots::Shelf {
                 slots,
                 render_items,
                 item_data_bs,
             } => {
-                let slots = Self::inflate_shelf(py, slots)?;
-                let init = pyo3::PyClassInitializer::from(base).add_subclass(ShelfChestPy {
-                    slots,
-                    render_items: render_items.map(|ri| ri.map(|i| i.into())),
-                    item_data_bs,
-                });
-                Ok(Py::new(py, init)?.into_any())
+                let slots = Self::inflate_shelf(py, slots.into_inner())?;
+                Ok(Py::new(
+                    py,
+                    init.add_subclass(ShelfChestPy {
+                        slots,
+                        render_items: render_items.map(|ri| ri.map(|i| i.into())),
+                        item_data_bs,
+                    }),
+                )?
+                .into_any())
             }
             ChestSlots::Cabinet {
                 slots,
                 render_items,
                 item_data_bs,
             } => {
-                let slots = Self::inflate_shelf(py, slots)?;
-                let init = pyo3::PyClassInitializer::from(base).add_subclass(CabinetPy {
-                    slots,
-                    render_items: render_items.map(|ri| ri.map(|i| i.into())),
-                    item_data_bs,
-                });
-                Ok(Py::new(py, init)?.into_any())
+                let slots = Self::inflate_shelf(py, slots.into_inner())?;
+                Ok(Py::new(
+                    py,
+                    init.add_subclass(CabinetPy {
+                        slots,
+                        render_items: render_items.map(|ri| ri.map(|i| i.into())),
+                        item_data_bs,
+                    }),
+                )?
+                .into_any())
             }
-            ChestSlots::Portal => {
-                let init = pyo3::PyClassInitializer::from(base).add_subclass(PortalChestPy {});
-                Ok(Py::new(py, init)?.into_any())
-            }
+            ChestSlots::Portal => Ok(Py::new(py, init.add_subclass(PortalChestPy {}))?.into_any()),
         }
     }
 
@@ -998,25 +1048,27 @@ impl ChestPy {
 
     pub fn deflate(py: Python<'_>, py_obj: Py<PyAny>) -> PyResult<Chest> {
         let any = py_obj.bind(py);
-        let base_ref = any.extract::<pyo3::PyRef<ChestPy>>()?;
+        let _base_ref = any.extract::<pyo3::PyRef<ChestPy>>()?;
+        let int_ref = any.extract::<pyo3::PyRef<InteractionObjectPy>>()?;
+        let dyn_ref = any.extract::<pyo3::PyRef<DynamicObjectPy>>()?;
 
         let slots = if let Ok(c) = any.extract::<pyo3::PyRef<StandardChestPy>>() {
-            ChestSlots::Standard(Self::deflate_standard(py, &c.slots))
+            ChestSlots::Standard(Slots::new(Self::deflate_standard(py, &c.slots)))
         } else if let Ok(c) = any.extract::<pyo3::PyRef<SafeChestPy>>() {
-            ChestSlots::Safe(Self::deflate_standard(py, &c.slots))
+            ChestSlots::Safe(Slots::new(Self::deflate_standard(py, &c.slots)))
         } else if let Ok(c) = any.extract::<pyo3::PyRef<GoldChestPy>>() {
-            ChestSlots::Gold(Self::deflate_standard(py, &c.slots))
+            ChestSlots::Gold(Slots::new(Self::deflate_standard(py, &c.slots)))
         } else if let Ok(c) = any.extract::<pyo3::PyRef<FeederChestPy>>() {
-            ChestSlots::Feeder(Self::deflate_standard(py, &c.slots))
+            ChestSlots::Feeder(Slots::new(Self::deflate_standard(py, &c.slots)))
         } else if let Ok(c) = any.extract::<pyo3::PyRef<ShelfChestPy>>() {
             ChestSlots::Shelf {
-                slots: Self::deflate_shelf(py, &c.slots),
+                slots: Slots::new(Self::deflate_shelf(py, &c.slots)),
                 render_items: c.render_items.map(|ri| ri.map(|i| i.into())),
                 item_data_bs: c.item_data_bs,
             }
         } else if let Ok(c) = any.extract::<pyo3::PyRef<CabinetPy>>() {
             ChestSlots::Cabinet {
-                slots: Self::deflate_shelf(py, &c.slots),
+                slots: Slots::new(Self::deflate_shelf(py, &c.slots)),
                 render_items: c.render_items.map(|ri| ri.map(|i| i.into())),
                 item_data_bs: c.item_data_bs,
             }
@@ -1031,16 +1083,16 @@ impl ChestPy {
         Ok(Chest::new(
             InteractionObject::new(
                 DynamicObject {
-                    float_pos: [base_ref.float_pos[0], base_ref.float_pos[1]],
-                    pos_x: base_ref.pos_x,
-                    pos_y: base_ref.pos_y,
-                    unique_id: UniqueID::new(base_ref.unique_id),
-                    owner_id: base_ref.owner_id.clone(),
+                    float_pos: [dyn_ref.float_pos[0], dyn_ref.float_pos[1]],
+                    pos_x: dyn_ref.pos_x,
+                    pos_y: dyn_ref.pos_y,
+                    unique_id: UniqueID::new(dyn_ref.unique_id),
+                    owner_id: dyn_ref.owner_id.clone(),
                 },
                 InteractionObjectType::Chest,
-                base_ref.is_in_use,
-                base_ref.flipped,
-                base_ref.paint_color,
+                int_ref.is_in_use,
+                int_ref.flipped,
+                int_ref.paint_color,
             ),
             0.0, // dummy save_time
             slots,
@@ -1056,29 +1108,13 @@ impl ChestPy {
     }
 }
 
-#[pyclass(name = "Workbench")]
+#[pyclass(extends=InteractionObjectPy, subclass, name = "Workbench")]
 #[derive(Debug)]
 pub struct WorkbenchPy {
     #[pyo3(get, set)]
     pub workbench_type: WorkbenchTypePy,
     #[pyo3(get, set)]
     pub level: u8,
-    #[pyo3(get, set)]
-    pub owner_id: Option<String>,
-    #[pyo3(get, set)]
-    pub is_in_use: bool,
-    #[pyo3(get, set)]
-    pub flipped: bool,
-    #[pyo3(get, set)]
-    pub paint_color: u16,
-    #[pyo3(get, set)]
-    pub pos_x: u64,
-    #[pyo3(get, set)]
-    pub pos_y: u16,
-    #[pyo3(get, set)]
-    pub float_pos: [f32; 2],
-    #[pyo3(get, set)]
-    pub unique_id: u64,
     #[pyo3(get, set)]
     pub available_electricity: u64,
     #[pyo3(get, set)]
@@ -1109,102 +1145,124 @@ pub struct WorkbenchPy {
 
 impl WorkbenchPy {
     pub fn inflate(py: Python<'_>, workbench: Workbench) -> PyResult<Py<Self>> {
-        Py::new(
-            py,
-            Self {
-                workbench_type: workbench.workbench_type.into(),
-                level: workbench.level,
-                owner_id: workbench.owner_id.clone(),
-                is_in_use: workbench.is_in_use,
-                flipped: workbench.flipped,
-                paint_color: workbench.paint_color,
-                pos_x: workbench.pos_x,
-                pos_y: workbench.pos_y,
-                float_pos: [workbench.float_pos[0], workbench.float_pos[1]],
-                unique_id: *workbench.unique_id.inner(),
+        let dyn_obj = DynamicObjectPy::new(
+            [workbench.float_pos[0], workbench.float_pos[1]],
+            workbench.pos_x,
+            workbench.pos_y,
+            *workbench.unique_id.inner(),
+            workbench.owner_id.clone(),
+        );
+        let int_obj = InteractionObjectPy {
+            interaction_object_type: workbench.interaction_object_type as u8,
+            is_in_use: workbench.is_in_use,
+            flipped: workbench.flipped,
+            paint_color: workbench.paint_color,
+        };
+        let bench = Self {
+            workbench_type: workbench.workbench_type.into(),
+            level: workbench.level,
 
-                available_electricity: workbench.available_electricity,
-                craft_progress_count: workbench.craft_progress_count,
-                fire_spread_timer: workbench.fire_spread_timer,
-                fuel_fraction: workbench.fuel_fraction,
-                has_fuel: workbench.has_fuel,
-                hurry_cost: workbench.hurry_cost,
-                hurry_seconds: workbench.hurry_seconds,
-                hurry_timer: workbench.hurry_timer,
-                hurrying: workbench.hurrying,
-                last_world_time: workbench.last_world_time,
-                save_time: workbench.save_time,
-                selected_index: workbench.selected_index,
-                x_scroll: workbench.x_scroll,
-            },
-        )
+            available_electricity: workbench.available_electricity,
+            craft_progress_count: workbench.craft_progress_count,
+            fire_spread_timer: workbench.fire_spread_timer,
+            fuel_fraction: workbench.fuel_fraction,
+            has_fuel: workbench.has_fuel,
+            hurry_cost: workbench.hurry_cost,
+            hurry_seconds: workbench.hurry_seconds,
+            hurry_timer: workbench.hurry_timer,
+            hurrying: workbench.hurrying,
+            last_world_time: workbench.last_world_time,
+            save_time: workbench.save_time,
+            selected_index: workbench.selected_index,
+            x_scroll: workbench.x_scroll,
+        };
+
+        let init = pyo3::PyClassInitializer::from(dyn_obj)
+            .add_subclass(int_obj)
+            .add_subclass(bench);
+
+        Py::new(py, init)
     }
 
-    pub fn deflate(&self) -> Workbench {
-        Workbench::new(
+    pub fn deflate(py: Python<'_>, py_obj: Py<PyAny>) -> PyResult<Workbench> {
+        let any = py_obj.bind(py);
+        let slf = any.extract::<pyo3::PyRef<WorkbenchPy>>()?;
+        let int_ref = any.extract::<pyo3::PyRef<InteractionObjectPy>>()?;
+        let dyn_ref = any.extract::<pyo3::PyRef<DynamicObjectPy>>()?;
+
+        Ok(Workbench::new(
             InteractionObject::new(
                 DynamicObject {
-                    float_pos: [self.float_pos[0], self.float_pos[1]],
-                    pos_x: self.pos_x,
-                    pos_y: self.pos_y,
-                    unique_id: UniqueID::new(self.unique_id),
-                    owner_id: self.owner_id.clone(),
+                    float_pos: [dyn_ref.float_pos[0], dyn_ref.float_pos[1]],
+                    pos_x: dyn_ref.pos_x,
+                    pos_y: dyn_ref.pos_y,
+                    unique_id: UniqueID::new(dyn_ref.unique_id),
+                    owner_id: dyn_ref.owner_id.clone(),
                 },
                 InteractionObjectType::Workbench,
-                self.is_in_use,
-                self.flipped,
-                self.paint_color,
+                int_ref.is_in_use,
+                int_ref.flipped,
+                int_ref.paint_color,
             ),
-            self.available_electricity,
-            self.craft_progress_count,
-            self.fire_spread_timer,
-            self.fuel_fraction,
-            self.has_fuel,
-            self.hurry_cost,
-            self.hurry_seconds,
-            self.hurry_timer,
-            self.hurrying,
-            self.last_world_time,
-            self.level,
-            self.save_time,
-            self.selected_index,
-            self.workbench_type.into(),
-            self.x_scroll,
+            slf.available_electricity,
+            slf.craft_progress_count,
+            slf.fire_spread_timer,
+            slf.fuel_fraction,
+            slf.has_fuel,
+            slf.hurry_cost,
+            slf.hurry_seconds,
+            slf.hurry_timer,
+            slf.hurrying,
+            slf.last_world_time,
+            slf.level,
+            slf.save_time,
+            slf.selected_index,
+            slf.workbench_type.into(),
+            slf.x_scroll,
             None, // TODO add artificial dict
-        )
+        ))
     }
 
-    pub fn clone_ref(&self, py: Python<'_>) -> Py<Self> {
-        Py::new(
-            py,
-            Self {
-                workbench_type: self.workbench_type,
-                level: self.level,
-                owner_id: self.owner_id.clone(),
-                is_in_use: self.is_in_use,
-                flipped: self.flipped,
-                paint_color: self.paint_color,
-                pos_x: self.pos_x,
-                pos_y: self.pos_y,
-                float_pos: self.float_pos,
-                unique_id: self.unique_id,
+    pub fn clone_ref(py: Python<'_>, py_obj: Py<PyAny>) -> PyResult<Py<Self>> {
+        let any = py_obj.bind(py);
+        let slf = any.extract::<pyo3::PyRef<WorkbenchPy>>()?;
+        let int_ref = any.extract::<pyo3::PyRef<InteractionObjectPy>>()?;
+        let dyn_ref = any.extract::<pyo3::PyRef<DynamicObjectPy>>()?;
+        let dyn_obj = DynamicObjectPy::new(
+            [dyn_ref.float_pos[0], dyn_ref.float_pos[1]],
+            dyn_ref.pos_x,
+            dyn_ref.pos_y,
+            dyn_ref.unique_id,
+            dyn_ref.owner_id.clone(),
+        );
+        let int_obj = InteractionObjectPy {
+            interaction_object_type: int_ref.interaction_object_type,
+            is_in_use: int_ref.is_in_use,
+            flipped: int_ref.flipped,
+            paint_color: int_ref.paint_color,
+        };
+        let bench = Self {
+            workbench_type: slf.workbench_type,
+            level: slf.level,
 
-                available_electricity: self.available_electricity,
-                craft_progress_count: self.craft_progress_count,
-                fire_spread_timer: self.fire_spread_timer,
-                fuel_fraction: self.fuel_fraction,
-                has_fuel: self.has_fuel,
-                hurry_cost: self.hurry_cost,
-                hurry_seconds: self.hurry_seconds,
-                hurry_timer: self.hurry_timer,
-                hurrying: self.hurrying,
-                last_world_time: self.last_world_time,
-                save_time: self.save_time,
-                selected_index: self.selected_index,
-                x_scroll: self.x_scroll,
-            },
-        )
-        .unwrap()
+            available_electricity: slf.available_electricity,
+            craft_progress_count: slf.craft_progress_count,
+            fire_spread_timer: slf.fire_spread_timer,
+            fuel_fraction: slf.fuel_fraction,
+            has_fuel: slf.has_fuel,
+            hurry_cost: slf.hurry_cost,
+            hurry_seconds: slf.hurry_seconds,
+            hurry_timer: slf.hurry_timer,
+            hurrying: slf.hurrying,
+            last_world_time: slf.last_world_time,
+            save_time: slf.save_time,
+            selected_index: slf.selected_index,
+            x_scroll: slf.x_scroll,
+        };
+        let init = pyo3::PyClassInitializer::from(dyn_obj)
+            .add_subclass(int_obj)
+            .add_subclass(bench);
+        Ok(Py::new(py, init).unwrap())
     }
 }
 
@@ -1213,221 +1271,49 @@ impl WorkbenchPy {
     #[new]
     #[pyo3(signature = (workbench_type=WorkbenchTypePy::Workbench, level=1, owner_id=None))]
     fn new(
-        py: Python<'_>,
         workbench_type: WorkbenchTypePy,
         level: u8,
         owner_id: Option<String>,
-    ) -> PyResult<Py<Self>> {
-        Py::new(
-            py,
-            Self {
-                workbench_type,
-                level,
-                owner_id,
-                is_in_use: false,
-                flipped: false,
-                paint_color: 0,
-                pos_x: 0,
-                pos_y: 0,
-                float_pos: [0.0, 0.0],
-                unique_id: 0,
+    ) -> PyResult<pyo3::PyClassInitializer<Self>> {
+        let dyn_obj = DynamicObjectPy::new([0.0, 0.0], 0, 0, 0, owner_id);
+        let int_obj = InteractionObjectPy {
+            interaction_object_type: InteractionObjectType::Workbench as u8,
+            is_in_use: false,
+            flipped: false,
+            paint_color: 0,
+        };
+        let bench = Self {
+            workbench_type,
+            level,
 
-                available_electricity: 0,
-                craft_progress_count: 0.0,
-                fire_spread_timer: 0.0,
-                fuel_fraction: 0.0,
-                has_fuel: false,
-                hurry_cost: 0,
-                hurry_seconds: 0.0,
-                hurry_timer: 0.0,
-                hurrying: false,
-                last_world_time: 0.0,
-                save_time: 0.0,
-                selected_index: 0,
-                x_scroll: 0.0,
-            },
-        )
+            available_electricity: 0,
+            craft_progress_count: 0.0,
+            fire_spread_timer: 0.0,
+            fuel_fraction: 0.0,
+            has_fuel: false,
+            hurry_cost: 0,
+            hurry_seconds: 0.0,
+            hurry_timer: 0.0,
+            hurrying: false,
+            last_world_time: 0.0,
+            save_time: 0.0,
+            selected_index: 0,
+            x_scroll: 0.0,
+        };
+        Ok(pyo3::PyClassInitializer::from(dyn_obj)
+            .add_subclass(int_obj)
+            .add_subclass(bench))
     }
 
     fn __repr__(&self) -> String {
         format!(
-            "WorkbenchExtra(type={:?}, level={}, owner_id={:?}, pos_x={}, pos_y={})",
-            self.workbench_type, self.level, self.owner_id, self.pos_x, self.pos_y
+            "Workbench(type={:?}, level={})",
+            self.workbench_type, self.level
         )
     }
 
     fn __str__(&self) -> String {
         format!("{:?}", self)
-    }
-}
-
-#[derive(FromPyObject, IntoPyObject)]
-pub enum ItemExtraPy {
-    #[pyo3(transparent)]
-    Basket(Py<BasketSlotsPy>),
-    #[pyo3(transparent)]
-    Chest(Py<PyAny>),
-    #[pyo3(transparent)]
-    Workbench(Py<WorkbenchPy>),
-}
-
-impl ItemExtraPy {
-    pub fn clone_ref(&self, py: Python<'_>) -> Self {
-        match self {
-            Self::Basket(b) => Self::Basket(b.clone_ref(py)),
-            Self::Chest(c) => Self::Chest(c.clone_ref(py)),
-            Self::Workbench(w) => Self::Workbench(w.clone_ref(py)),
-        }
-    }
-}
-
-impl std::fmt::Debug for ItemExtraPy {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Python::attach(|py| match self {
-            Self::Basket(basket_py) => f
-                .debug_tuple("BasketSlots")
-                .field(&basket_py.bind(py).borrow())
-                .finish(),
-            Self::Chest(chest_py) => f
-                .debug_tuple("Chest")
-                // Cannot easily borrow Chest subclasses here, just print repr
-                .field(
-                    &chest_py
-                        .bind(py)
-                        .repr()
-                        .map(|s| s.to_string())
-                        .unwrap_or_default(),
-                )
-                .finish(),
-            Self::Workbench(bench_py) => f
-                .debug_tuple("Workbench")
-                .field(&bench_py.bind(py).borrow())
-                .finish(),
-        })
-    }
-}
-
-impl ItemExtraPy {
-    pub fn inflate(py: Python<'_>, extra: Extra) -> PyResult<Self> {
-        match extra {
-            Extra::Basket(items) => {
-                let py_items = items
-                    .into_iter()
-                    .map(|si| SlotPy::inflate(py, si))
-                    .collect::<PyResult<Vec<_>>>()?;
-                Ok(Self::Basket(Py::new(
-                    py,
-                    BasketSlotsPy { slots: py_items },
-                )?))
-            }
-            Extra::Chest(chest) => Ok(Self::Chest(ChestPy::inflate(py, *chest)?)),
-            Extra::Workbench(bench) => Ok(Self::Workbench(WorkbenchPy::inflate(py, *bench)?)),
-        }
-    }
-
-    pub fn deflate(&self, py: Python<'_>) -> Extra {
-        match self {
-            Self::Basket(basket_py) => {
-                let basket = basket_py.bind(py).borrow();
-                let mut items = [const { Slot(vec![]) }; Extra::NUM_SLOT_BASKET];
-                for (i, si) in basket.slots.iter().enumerate() {
-                    items[i] = si.bind(py).borrow().deflate(py);
-                }
-                Extra::Basket(items)
-            }
-            Self::Chest(chest_py) => {
-                // Call ChestPy::deflate
-                Extra::Chest(Box::new(
-                    ChestPy::deflate(py, chest_py.clone_ref(py)).expect("Failed to deflate chest"),
-                ))
-            }
-            Self::Workbench(bench_py) => {
-                let bench = bench_py.bind(py).borrow();
-                Extra::Workbench(Box::new(bench.deflate()))
-            }
-        }
-    }
-}
-
-struct ItemPyView<'a> {
-    item: &'a ItemPy,
-    py: Python<'a>,
-}
-
-impl<'a> ItemView for ItemPyView<'a> {
-    fn type_id(&self) -> u16 {
-        self.item.type_id
-    }
-
-    fn has_extra(&self) -> bool {
-        self.item.extra.is_some()
-    }
-
-    fn fmt_extra(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(extra) = &self.item.extra {
-            let extra_str = match extra {
-                ItemExtraPy::Basket(b) => b
-                    .bind(self.py)
-                    .str()
-                    .map(|s| s.to_string())
-                    .unwrap_or_default(),
-                ItemExtraPy::Chest(c) => c
-                    .bind(self.py)
-                    .str()
-                    .map(|s| s.to_string())
-                    .unwrap_or_default(),
-                ItemExtraPy::Workbench(w) => w
-                    .bind(self.py)
-                    .str()
-                    .map(|s| s.to_string())
-                    .unwrap_or_default(),
-            };
-            f.write_str(&extra_str)
-        } else {
-            Ok(())
-        }
-    }
-}
-
-struct SlotPyView<'a> {
-    slot: &'a SlotPy,
-    py: Python<'a>,
-}
-
-impl<'a> SlotView for SlotPyView<'a> {
-    fn len(&self) -> usize {
-        self.slot.items.len()
-    }
-    fn item_type_id(&self, index: usize) -> u16 {
-        self.slot.items[index].bind(self.py).borrow().type_id
-    }
-    fn item_has_extra(&self, index: usize) -> bool {
-        self.slot.items[index]
-            .bind(self.py)
-            .borrow()
-            .extra
-            .is_some()
-    }
-    fn fmt_item(&self, index: usize, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let item = self.slot.items[index].bind(self.py).borrow();
-        fmt_item_display(
-            &ItemPyView {
-                item: &item,
-                py: self.py,
-            },
-            f,
-        )
-    }
-}
-
-struct DisplayWrapper<'a, T: ?Sized>(
-    &'a T,
-    fn(&T, &mut std::fmt::Formatter<'_>) -> std::fmt::Result,
-);
-
-impl<'a, T: ?Sized> std::fmt::Display for DisplayWrapper<'a, T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        (self.1)(self.0, f)
     }
 }
 
@@ -1443,7 +1329,8 @@ pub struct ItemPy {
     pub selected_sub_item_index: u8,
     #[pyo3(get, set)]
     pub padding: u8,
-    pub extra: Option<ItemExtraPy>,
+    pub sub_items: Option<Py<SlotsPy>>,
+    pub dynamic_object: Option<Py<PyAny>>,
 }
 
 impl std::fmt::Debug for ItemPy {
@@ -1454,17 +1341,34 @@ impl std::fmt::Debug for ItemPy {
             .field("data_b", &self.data_b)
             .field("sub_index", &self.selected_sub_item_index)
             .field("padding", &self.padding)
-            .field("extra", &self.extra)
+            .field("sub_items", &"<sub_items>")
+            .field("dynamic_object", &"<dynamic_object>")
             .finish()
     }
 }
 
 impl ItemPy {
     pub fn inflate(py: Python<'_>, item: Item) -> PyResult<Py<Self>> {
-        let extra = match item.extra {
-            Some(e) => Some(ItemExtraPy::inflate(py, e)?),
+        let sub_items = match item.sub_items {
+            Some(si) => {
+                let py_items = si
+                    .into_inner()
+                    .into_iter()
+                    .map(|s| SlotPy::inflate(py, s))
+                    .collect::<PyResult<Vec<_>>>()?;
+                Some(Py::new(py, SlotsPy::new(Some(py_items))?)?)
+            }
             None => None,
         };
+
+        let dynamic_object = match item.dynamic_object {
+            Some(AnyDynamicObject::Chest(chest)) => Some(ChestPy::inflate(py, *chest)?),
+            Some(AnyDynamicObject::Workbench(bench)) => {
+                Some(WorkbenchPy::inflate(py, *bench)?.into_any())
+            }
+            _ => None,
+        };
+
         Py::new(
             py,
             Self {
@@ -1473,20 +1377,46 @@ impl ItemPy {
                 data_b: item.data_b,
                 selected_sub_item_index: item.selected_sub_item_index,
                 padding: item.padding,
-                extra,
+                sub_items,
+                dynamic_object,
             },
         )
     }
 
     pub fn deflate(&self, py: Python<'_>) -> Item {
-        let extra = self.extra.as_ref().map(|e| e.deflate(py));
+        let sub_items = self.sub_items.as_ref().map(|si| {
+            let slots_py = si.bind(py).borrow();
+            let mut slots = [const { Slot(vec![]) }; Item::MAX_SUB_ITEMS];
+            for (i, slot) in slots_py.slots.iter().enumerate() {
+                if i < Item::MAX_SUB_ITEMS {
+                    slots[i] = slot.bind(py).borrow().deflate(py);
+                }
+            }
+            Slots::new(slots)
+        });
+
+        let dynamic_object = self.dynamic_object.as_ref().and_then(|obj| {
+            if obj.bind(py).is_instance_of::<ChestPy>() {
+                Some(AnyDynamicObject::Chest(Box::new(
+                    ChestPy::deflate(py, obj.clone_ref(py)).ok()?,
+                )))
+            } else if obj.bind(py).is_instance_of::<WorkbenchPy>() {
+                Some(AnyDynamicObject::Workbench(Box::new(
+                    WorkbenchPy::deflate(py, obj.clone_ref(py)).ok()?,
+                )))
+            } else {
+                None
+            }
+        });
+
         Item {
             type_id: self.type_id,
             data_a: self.data_a,
             data_b: self.data_b,
             selected_sub_item_index: self.selected_sub_item_index,
             padding: self.padding,
-            extra,
+            sub_items,
+            dynamic_object,
         }
     }
 }
@@ -1499,7 +1429,8 @@ impl From<Item> for ItemPy {
             data_b: item.data_b,
             selected_sub_item_index: item.selected_sub_item_index,
             padding: item.padding,
-            extra: None,
+            sub_items: None,
+            dynamic_object: None,
         }
     }
 }
@@ -1507,10 +1438,15 @@ impl From<Item> for ItemPy {
 #[pymethods]
 impl ItemPy {
     #[new]
-    #[pyo3(signature = (item_type, extra=None))]
-    fn new(item_type: ItemTypePy, extra: Option<ItemExtraPy>) -> Self {
+    #[pyo3(signature = (item_type, sub_items=None, dynamic_object=None))]
+    fn new(
+        item_type: ItemTypePy,
+        sub_items: Option<Py<SlotsPy>>,
+        dynamic_object: Option<Py<PyAny>>,
+    ) -> Self {
         let mut s = Self::from(Item::new(item_type.into()));
-        s.extra = extra;
+        s.sub_items = sub_items;
+        s.dynamic_object = dynamic_object;
         s
     }
 
@@ -1557,49 +1493,52 @@ impl ItemPy {
     }
 
     #[getter]
-    fn get_extra(&self, py: Python<'_>) -> Option<ItemExtraPy> {
-        self.extra.as_ref().map(|e| e.clone_ref(py))
+    fn get_sub_items(&self, py: Python<'_>) -> Option<Py<SlotsPy>> {
+        self.sub_items.as_ref().map(|e| e.clone_ref(py))
     }
 
     #[setter]
-    fn set_extra(&mut self, extra: Option<ItemExtraPy>) {
-        self.extra = extra;
+    fn set_sub_items(&mut self, sub_items: Option<Py<SlotsPy>>) {
+        self.sub_items = sub_items;
+    }
+
+    #[getter]
+    fn get_dynamic_object(&self, py: Python<'_>) -> Option<Py<PyAny>> {
+        self.dynamic_object.as_ref().map(|e| e.clone_ref(py))
+    }
+
+    #[setter]
+    fn set_dynamic_object(&mut self, dynamic_object: Option<Py<PyAny>>) {
+        self.dynamic_object = dynamic_object;
     }
 
     fn __repr__(&self, py: Python<'_>) -> String {
-        let extra_repr = match &self.extra {
-            Some(e) => match e {
-                ItemExtraPy::Basket(b) => b
-                    .bind(py)
-                    .repr()
-                    .map(|s| s.to_string())
-                    .unwrap_or_else(|_| "<repr error>".to_string()),
-                ItemExtraPy::Chest(c) => c
-                    .bind(py)
-                    .repr()
-                    .map(|s| s.to_string())
-                    .unwrap_or_else(|_| "<repr error>".to_string()),
-                ItemExtraPy::Workbench(w) => w
-                    .bind(py)
-                    .repr()
-                    .map(|s| s.to_string())
-                    .unwrap_or_else(|_| "<repr error>".to_string()),
-            },
+        let sub_items_repr = match &self.sub_items {
+            Some(b) => b
+                .bind(py)
+                .repr()
+                .map(|s| s.to_string())
+                .unwrap_or_else(|_| "<repr error>".to_string()),
+            None => "None".to_string(),
+        };
+        let dyn_repr = match &self.dynamic_object {
+            Some(c) => c
+                .bind(py)
+                .repr()
+                .map(|s| s.to_string())
+                .unwrap_or_else(|_| "<repr error>".to_string()),
             None => "None".to_string(),
         };
         format!(
-            "Item(type_id={}, data_a={}, data_b={}, sub_index={}, padding={}, extra={})",
+            "Item(type_id={}, data_a={}, data_b={}, sub_index={}, padding={}, sub_items={}, dynamic_object={})",
             self.type_id,
             self.data_a,
             self.data_b,
             self.selected_sub_item_index,
             self.padding,
-            extra_repr
+            sub_items_repr,
+            dyn_repr
         )
-    }
-
-    fn __str__(&self, py: Python<'_>) -> String {
-        DisplayWrapper(&ItemPyView { item: self, py }, fmt_item_display).to_string()
     }
 }
 
@@ -1767,10 +1706,6 @@ impl SlotPy {
             .collect();
         format!("Slot(items=[{}])", items_repr.join(", "))
     }
-
-    fn __str__(&self, py: Python<'_>) -> String {
-        DisplayWrapper(&SlotPyView { slot: self, py }, fmt_slot_display).to_string()
-    }
 }
 
 #[pyclass(name = "Inventory")]
@@ -1795,7 +1730,7 @@ impl InventoryPy {
                 slots[i] = slot_py.bind(py).borrow().deflate(py);
             }
         }
-        Inventory::new(slots)
+        Inventory::new(Slots::new(slots))
     }
 
     pub fn clone_ref(&self, py: Python<'_>) -> Py<Self> {

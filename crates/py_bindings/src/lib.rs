@@ -79,7 +79,7 @@ fn the_blockheads_tools_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<item::PigmentColorPy>()?;
     m.add_class::<item::ItemPy>()?;
     m.add_class::<item::SlotPy>()?;
-    m.add_class::<item::BasketSlotsPy>()?;
+    m.add_class::<item::SlotsPy>()?;
     m.add_class::<item::InventoryPy>()?;
     m.add_class::<item::ChestPy>()?;
     m.add_class::<item::StandardChestPy>()?;
