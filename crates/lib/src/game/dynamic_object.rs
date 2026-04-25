@@ -28,7 +28,7 @@ pub enum DynamicObjectError {
     DeserializeDictionary {
         source: plist::Error,
         target_type: &'static str,
-        dict: plist::Value,
+        dict: Box<plist::Value>,
     },
     #[snafu(display("Failed to serialize {source_type} to plist dictionary"))]
     SerializeDictionary {
@@ -41,7 +41,7 @@ pub enum DynamicObjectError {
     SaveChest { source: chest::ChestError },
     #[snafu(display("Can't load value as InteractionObjectType: {value:?}"))]
     UnknownInteractionObjectType {
-        value: plist::Value,
+        value: Box<plist::Value>,
         source: plist::Error,
     },
     #[snafu(display(
@@ -49,11 +49,11 @@ pub enum DynamicObjectError {
     ))]
     UnsupportedInteractionObjectType {
         obj_type: InteractionObjectType,
-        value: plist::Value,
+        value: Box<plist::Value>,
     },
     #[snafu(display("Can't load value as ItemType: {value:?}"))]
     UnknownItemType {
-        value: plist::Value,
+        value: Box<plist::Value>,
         source: plist::Error,
     },
     #[snafu(display(
@@ -61,10 +61,10 @@ pub enum DynamicObjectError {
     ))]
     UnsupportedItemType {
         item_type: ItemType,
-        value: plist::Value,
+        value: Box<plist::Value>,
     },
     #[snafu(display("Can't load dynamicObjectSaveDict as known type: {dict:?}"))]
-    DynObjSaveDictNoTypeMatch { dict: plist::Dictionary },
+    DynObjSaveDictNoTypeMatch { dict: Box<plist::Dictionary> },
 }
 
 type Result<T> = std::result::Result<T, DynamicObjectError>;
@@ -397,7 +397,7 @@ impl AnyDynamicObject {
                 }
                 _ => UnsupportedInteractionObjectTypeSnafu {
                     obj_type: interaction_obj_type,
-                    value: dict,
+                    value: plist::Value::Dictionary(dict),
                 }
                 .fail(),
             }
@@ -424,7 +424,7 @@ impl AnyDynamicObject {
                 }
                 _ => UnsupportedItemTypeSnafu {
                     item_type,
-                    value: dict,
+                    value: plist::Value::Dictionary(dict),
                 }
                 .fail(),
             }

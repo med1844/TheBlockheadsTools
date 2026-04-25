@@ -10,6 +10,7 @@ pub struct CompositeRenderer {
 }
 
 impl CompositeRenderer {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         device: &wgpu::Device,
         g_buffer: &GeometryBuffer,

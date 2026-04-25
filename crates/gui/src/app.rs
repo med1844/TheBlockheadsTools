@@ -544,14 +544,14 @@ impl EditorApp {
         }
 
         // Wrap camera X cyclically when cyclic mode is enabled and a world is loaded
-        if self.render_settings.enable_cyclic {
-            if let Some(world_db) = self.world_db.as_ref() {
-                let world_block_width = (world_db.main.world_v2.world_width_macro as f32)
-                    * Chunk::NUM_BLOCK_PER_ROW as f32;
-                if world_block_width > 0.0 {
-                    let x = &mut self.camera.world_offset_mut().x;
-                    *x = x.rem_euclid(world_block_width);
-                }
+        if self.render_settings.enable_cyclic
+            && let Some(world_db) = self.world_db.as_ref()
+        {
+            let world_block_width =
+                (world_db.main.world_v2.world_width_macro as f32) * Chunk::NUM_BLOCK_PER_ROW as f32;
+            if world_block_width > 0.0 {
+                let x = &mut self.camera.world_offset_mut().x;
+                *x = x.rem_euclid(world_block_width);
             }
         }
     }
@@ -572,11 +572,11 @@ impl EditorApp {
 
             if let Some(block_coord) = hover_on_block_coord {
                 if let Some(id) = {
-                    self.interaction_state
+                    *self
+                        .interaction_state
                         .hover_on_dyn_obj_id
                         .lock()
                         .expect("should lock")
-                        .clone()
                 } {
                     let chunk_coord = block_coord.into();
                     self.interaction_state.set_hover_on_obj(chunk_coord, id);

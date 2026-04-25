@@ -936,8 +936,7 @@ impl InfoUi for Workbench {
 
 impl BuildDwMesh for Workbench {
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
-        let block_coord =
-            BlockCoord::new(self.pos_x as u32, self.pos_y).context(CoordOutOfBoundSnafu)?;
+        let block_coord = BlockCoord::new(self.pos_x, self.pos_y).context(CoordOutOfBoundSnafu)?;
         match self.workbench_type {
             WorkbenchType::Undefined => {
                 builder.add_icon(DwIcon::new(self.float_pos, ItemType::Unknown))
@@ -1158,8 +1157,7 @@ impl InfoUi for Chest {
 
 impl BuildDwMesh for Chest {
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
-        let block_coord =
-            BlockCoord::new(self.pos_x as u32, self.pos_y).context(CoordOutOfBoundSnafu)?;
+        let block_coord = BlockCoord::new(self.pos_x, self.pos_y).context(CoordOutOfBoundSnafu)?;
         match self.slots.chest_type() {
             ChestType::Standard => {
                 builder.add_block(DwBlock::new(block_coord, VoxelType::StandardChest))

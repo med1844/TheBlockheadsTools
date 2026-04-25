@@ -50,7 +50,7 @@ pub enum ItemError {
     UnexpectedStructure {
         type_name: &'static str,
         target_structure: &'static str,
-        value: plist::Value,
+        value: Box<plist::Value>,
     },
     #[snafu(display("Failed to load slots in inventory"))]
     LoadInventory { source: Box<ItemError> },
@@ -561,7 +561,7 @@ impl Item {
             }
             .fail()?,
         };
-        (sub_item_values.len() > 0)
+        (!sub_item_values.is_empty())
             .then_some(
                 Slots::from_values(sub_item_values)
                     .map_err(Box::new)

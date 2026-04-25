@@ -214,7 +214,7 @@ pub(crate) enum VoxelUv {
 }
 
 impl VoxelUv {
-    pub(crate) fn to_faces(&self) -> [ImageType; 6] {
+    pub(crate) fn face_images(&self) -> [ImageType; 6] {
         // [PX, NX, PY, NY, PZ, NZ]
         match self {
             VoxelUv::All(image_type) => [*image_type; 6],
@@ -778,7 +778,7 @@ impl VoxelType {
                 VoxelType::try_from(voxel_type_id)
                     .unwrap_or(VoxelType::Unknown)
                     .uv()
-                    .to_faces()
+                    .face_images()
             })
             .collect()
     }

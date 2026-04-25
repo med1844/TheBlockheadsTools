@@ -66,7 +66,7 @@ impl DwIcon {
         DwIconInstanceRaw {
             position: self.position,
             item_type: self.item_type as u32,
-            raw_id: id.to_raw_id(),
+            raw_id: id.raw_id(),
             chunk_x: coord.x(),
             chunk_y: coord.y() as u32,
         }
@@ -195,7 +195,7 @@ impl DwFace {
         let [u_min, v_min] = self.uv_min;
         let [u_max, v_max] = self.uv_max;
 
-        let raw_id = id.to_raw_id();
+        let raw_id = id.raw_id();
         let chunk_x = chunk_coord.x();
         let chunk_y = chunk_coord.y() as u32;
 
@@ -205,7 +205,7 @@ impl DwFace {
                     raw_id,
                     chunk_x,
                     chunk_y,
-                    position: bottom_left.map(|v| v as f32),
+                    position: bottom_left.map(|v| v),
                     normal,
                     tex_coords: [u_min, v_max],
                 },
@@ -213,7 +213,7 @@ impl DwFace {
                     raw_id,
                     chunk_x,
                     chunk_y,
-                    position: bottom_right.map(|v| v as f32),
+                    position: bottom_right.map(|v| v),
                     normal,
                     tex_coords: [u_max, v_max],
                 },
@@ -221,7 +221,7 @@ impl DwFace {
                     raw_id,
                     chunk_x,
                     chunk_y,
-                    position: top_right.map(|v| v as f32),
+                    position: top_right.map(|v| v),
                     normal,
                     tex_coords: [u_max, v_min],
                 },
@@ -229,7 +229,7 @@ impl DwFace {
                     raw_id,
                     chunk_x,
                     chunk_y,
-                    position: top_left.map(|v| v as f32),
+                    position: top_left.map(|v| v),
                     normal,
                     tex_coords: [u_min, v_min],
                 },
@@ -293,11 +293,9 @@ impl ChunkDwBlock {
 
         let dw_face = DwFace::from_tile_map(
             match face_direction {
-                FaceDirection::Up { .. } => uv.up(),
-                FaceDirection::Down { .. } => uv.down(),
-                FaceDirection::Left { .. } | FaceDirection::Right { .. } | FaceDirection::Front => {
-                    uv.side()
-                }
+                FaceDirection::Up => uv.up(),
+                FaceDirection::Down => uv.down(),
+                FaceDirection::Left | FaceDirection::Right | FaceDirection::Front => uv.side(),
             },
             face_direction,
             match face_direction {
@@ -340,7 +338,7 @@ impl ChunkDwBlock {
 
             // SAFETY: x, y is 1 in mask, meaning block_at result must have is_some() == true.
             let (block, id) = self.block_at(coord).unwrap();
-            Self::add_face(face, &chunk_coord, block, id, builder);
+            Self::add_face(face, chunk_coord, block, id, builder);
         }
     }
 
@@ -534,7 +532,7 @@ pub struct DwChunkObjId {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable, Default)]
 pub struct DwChunkObjIdUniform([u32; 4]);
 
 impl DwChunkObjId {
@@ -563,14 +561,8 @@ impl DwChunkObjId {
         Self { obj_type, index }
     }
 
-    pub fn to_raw_id(&self) -> u32 {
+    pub fn raw_id(&self) -> u32 {
         (self.obj_type as u32) << Self::MAX_INDEX_BITS | self.index as u32
-    }
-}
-
-impl Default for DwChunkObjIdUniform {
-    fn default() -> Self {
-        Self([0; 4])
     }
 }
 
@@ -579,7 +571,7 @@ impl From<Option<(DwChunkObjId, ChunkCoord)>> for DwChunkObjIdUniform {
         let mut uniform = [0; 4];
         if let Some((id, chunk_coord)) = value {
             uniform[0] = 1;
-            uniform[1] = id.to_raw_id();
+            uniform[1] = id.raw_id();
             uniform[2] = chunk_coord.x_u32();
             uniform[3] = chunk_coord.y_u32();
         }
