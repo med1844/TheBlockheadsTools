@@ -1,5 +1,6 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+    "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
 	<key>dynamicObjects</key>
@@ -18,7 +19,7 @@
 				<key>chestType</key>
 				<integer>2</integer>
 				<key>flipped</key>
-				<false/>
+				<false />
 				<key>floatPos</key>
 				<array>
 					<real>11191.5</real>
@@ -27,7 +28,7 @@
 				<key>interactionObjectType</key>
 				<integer>2</integer>
 				<key>isInUse</key>
-				<false/>
+				<false />
 				<key>paintColor</key>
 				<integer>0</integer>
 				<key>pos_x</key>
@@ -51,7 +52,7 @@
 						LgQAAAAAAAA=
 						</data>
 					</array>
-					<array/>
+					<array />
 				</array>
 				<key>saveTime</key>
 				<real>5118.8562386110425</real>
@@ -70,7 +71,7 @@
 			<key>floatPos[VY]</key>
 			<real>648.25</real>
 			<key>hovers</key>
-			<false/>
+			<false />
 			<key>itemType</key>
 			<integer>161</integer>
 			<key>pos_x</key>
@@ -101,7 +102,7 @@
 			<key>floatPos[VY]</key>
 			<real>648.25</real>
 			<key>hovers</key>
-			<false/>
+			<false />
 			<key>itemType</key>
 			<integer>12</integer>
 			<key>pos_x</key>
@@ -110,9 +111,9 @@
 			<integer>648</integer>
 			<key>subItems</key>
 			<array>
-				<array/>
-				<array/>
-				<array/>
+				<array />
+				<array />
+				<array />
 				<array>
 					<data>
 					FgEAAAAAAAw=
@@ -136,7 +137,7 @@
 				<key>chestType</key>
 				<integer>0</integer>
 				<key>flipped</key>
-				<false/>
+				<false />
 				<key>floatPos</key>
 				<array>
 					<real>11192.5</real>
@@ -145,7 +146,7 @@
 				<key>interactionObjectType</key>
 				<integer>2</integer>
 				<key>isInUse</key>
-				<false/>
+				<false />
 				<key>paintColor</key>
 				<integer>0</integer>
 				<key>pos_x</key>
@@ -154,26 +155,26 @@
 				<integer>670</integer>
 				<key>saveItemSlots</key>
 				<array>
-					<array/>
-					<array/>
-					<array/>
-					<array/>
-					<array/>
-					<array/>
+					<array />
+					<array />
+					<array />
+					<array />
+					<array />
+					<array />
 					<array>
 						<data>
 						GwDkAOMAAAA=
 						</data>
 					</array>
-					<array/>
-					<array/>
-					<array/>
-					<array/>
-					<array/>
-					<array/>
-					<array/>
-					<array/>
-					<array/>
+					<array />
+					<array />
+					<array />
+					<array />
+					<array />
+					<array />
+					<array />
+					<array />
+					<array />
 				</array>
 				<key>saveTime</key>
 				<real>5148.4229157045484</real>
@@ -192,7 +193,7 @@
 			<key>floatPos[VY]</key>
 			<real>648.25</real>
 			<key>hovers</key>
-			<false/>
+			<false />
 			<key>itemType</key>
 			<integer>1043</integer>
 			<key>pos_x</key>
@@ -201,6 +202,103 @@
 			<integer>648</integer>
 			<key>uniqueID</key>
 			<integer>8769</integer>
+		</dict>
+		<dict>
+			<key>bounceTimer</key>
+			<real>2.2993350028991699</real>
+			<key>creationTime</key>
+			<real>34991.965911619365</real>
+			<key>dataA</key>
+			<integer>185</integer>
+			<key>dataB</key>
+			<integer>227</integer>
+			<key>fallSpeed</key>
+			<real>-0.05000000074505806</real>
+			<key>floatPos</key>
+			<array>
+				<real>13663.5</real>
+				<real>545.5</real>
+			</array>
+			<key>floatPos[VX]</key>
+			<real>13663.5</real>
+			<key>floatPos[VY]</key>
+			<real>545.5</real>
+			<key>hovers</key>
+			<true />
+			<key>itemType</key>
+			<integer>27</integer>
+			<key>pos_x</key>
+			<integer>13663</integer>
+			<key>pos_y</key>
+			<integer>545</integer>
+			<key>subItems</key>
+			<array />
+			<key>uniqueID</key>
+			<integer>47339</integer>
+		</dict>
+		<dict>
+			<key>bounceTimer</key>
+			<real>2.2993350028991699</real>
+			<key>creationTime</key>
+			<real>34991.965911619365</real>
+			<key>dataA</key>
+			<integer>187</integer>
+			<key>dataB</key>
+			<integer>234</integer>
+			<key>fallSpeed</key>
+			<real>-0.05000000074505806</real>
+			<key>floatPos</key>
+			<array>
+				<real>13663.5</real>
+				<real>551.5</real>
+			</array>
+			<key>floatPos[VX]</key>
+			<real>13663.5</real>
+			<key>floatPos[VY]</key>
+			<real>551.5</real>
+			<key>hovers</key>
+			<true />
+			<key>itemType</key>
+			<integer>27</integer>
+			<key>pos_x</key>
+			<integer>13663</integer>
+			<key>pos_y</key>
+			<integer>551</integer>
+			<key>subItems</key>
+			<array />
+			<key>uniqueID</key>
+			<integer>47362</integer>
+		</dict>
+		<dict>
+			<key>bounceTimer</key>
+			<real>1.5334019660949707</real>
+			<key>creationTime</key>
+			<real>35783.823200590909</real>
+			<key>dataA</key>
+			<integer>180</integer>
+			<key>dataB</key>
+			<integer>239</integer>
+			<key>fallSpeed</key>
+			<real>-0.05000000074505806</real>
+			<key>floatPos</key>
+			<array>
+				<real>13657.5</real>
+				<real>545.5</real>
+			</array>
+			<key>floatPos[VX]</key>
+			<real>13657.5</real>
+			<key>floatPos[VY]</key>
+			<real>545.5</real>
+			<key>hovers</key>
+			<true />
+			<key>itemType</key>
+			<integer>60</integer>
+			<key>pos_x</key>
+			<integer>13657</integer>
+			<key>pos_y</key>
+			<integer>545</integer>
+			<key>uniqueID</key>
+			<integer>48602</integer>
 		</dict>
 	</array>
 </dict>

@@ -663,7 +663,10 @@ impl EditorApp {
                 .show(ctx, |ui| {
                     let e = snafu::Report::from_error(e);
                     ui.heading("Error message");
-                    ui.label(format!("{}", e));
+                    egui::ScrollArea::vertical()
+                        .show(ui, |ui| {
+                            ui.label(format!("{}", e));
+                        });
                 });
             if !open {
                 self.load_err = None;

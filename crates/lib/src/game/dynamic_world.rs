@@ -8,7 +8,7 @@ use super::{
             Bed, Boat, Column, Door, ElevatorMotor, ElevatorShaft, Ladder, Rail, Sign, Stairs,
             TradePortal, TradingPost, Window, Wire,
         },
-        dropped_item::DroppedItem,
+        dropped_item::{DroppedItem, DroppedItemXml},
         plant::{
             CarrotPlant, ChilliPlant, CornPlant, FlaxPlant, KelpPlant, SunflowerPlant, TomatoPlant,
             TulipPlant, VinePlant, WheatPlant,
@@ -20,6 +20,7 @@ use super::{
         },
         workbench::Workbench,
     },
+    item::ItemError,
 };
 use lmdb_rs::{
     codec::types::{Bytes, Str},
@@ -236,6 +237,17 @@ pub enum DynamicWorldError {
     },
     #[snafu(display("Failed to parse chunk coord {coord}"))]
     ParseChunkCoordFromStr { coord: String, source: CoordError },
+    #[snafu(display("Failed to load dropped item in chunk {coord}: {xml}"))]
+    LoadDroppedItem {
+        coord: ChunkCoord,
+        xml: String,
+        source: ItemError,
+    },
+    #[snafu(display("Failed to save dropped item in chunk {coord}"))]
+    SaveDroppedItem {
+        coord: ChunkCoord,
+        source: ItemError,
+    },
 }
 
 type Result<T> = std::result::Result<T, DynamicWorldError>;
@@ -294,7 +306,7 @@ impl DynamicWorld {
                 dyn_obj_type: DynamicObjectType,
                 coord: ChunkCoord,
             ) -> Result<T> {
-                plist::from_bytes(bytes).context(DeserializeObjectSnafu {
+                plist::from_reader_xml(bytes).context(DeserializeObjectSnafu {
                     object_type: dyn_obj_type,
                     coord,
                 })
@@ -316,7 +328,23 @@ impl DynamicWorld {
                 }
                 DynamicObjectType::CornPlant => entry.corn_plant = load(v, obj_ty, coord)?,
                 DynamicObjectType::Dodo => entry.dodo = load(v, obj_ty, coord)?,
-                DynamicObjectType::DroppedItem => entry.dropped_item = load(v, obj_ty, coord)?,
+                DynamicObjectType::DroppedItem => {
+                    let dropped_item_xml: DynamicObjectList<DroppedItemXml> =
+                        plist::from_reader_xml(v).context(DeserializeObjectSnafu {
+                            object_type: obj_ty,
+                            coord,
+                        })?;
+                    entry.dropped_item = dropped_item_xml
+                        .into_iter()
+                        .map(|xml| {
+                            DroppedItem::try_from_xml(xml).context(LoadDroppedItemSnafu {
+                                coord,
+                                // SAFETY: can be deserialized to DynamicObjectList means it's valid xml and thus &str
+                                xml: str::from_utf8(v).unwrap().to_string(),
+                            })
+                        })
+                        .collect::<Result<DynamicObjectList<DroppedItem>>>()?;
+                }
                 DynamicObjectType::Fire => entry.fire = v.to_vec(),
                 DynamicObjectType::Torch => entry.torch = v.to_vec(),
                 DynamicObjectType::GlowBlock => entry.glow_block = v.to_vec(),
@@ -427,7 +455,16 @@ impl DynamicWorld {
             put(db, wtxn, &coord_str, SunflowerPlant, &obj.sunflower_plant)?;
             put(db, wtxn, &coord_str, CornPlant, &obj.corn_plant)?;
             put(db, wtxn, &coord_str, Dodo, &obj.dodo)?;
-            put(db, wtxn, &coord_str, DroppedItem, &obj.dropped_item)?;
+            let dropped_item_xml = obj
+                .dropped_item
+                .iter()
+                .map(|dropped_item| -> Result<DroppedItemXml> {
+                    dropped_item
+                        .to_xml()
+                        .context(SaveDroppedItemSnafu { coord: *coord })
+                })
+                .collect::<Result<DynamicObjectList<DroppedItemXml>>>()?;
+            put(db, wtxn, &coord_str, DroppedItem, &dropped_item_xml)?;
             put(db, wtxn, &coord_str, Fire, &obj.fire)?;
             put(db, wtxn, &coord_str, Torch, &obj.torch)?;
             put(db, wtxn, &coord_str, GlowBlock, &obj.glow_block)?;
@@ -499,13 +536,16 @@ impl DynamicWorld {
 
 #[cfg(test)]
 mod tests {
-    use super::{ChunkDynamicObjects, DynamicObjectType, DynamicWorld};
-    use crate::game::{
-        coord::ChunkCoord,
-        dynamic_object::{
-            DynamicObjectList,
-            chest::{Chest, ChestMeta},
+    use super::{
+        super::{
+            coord::ChunkCoord,
+            dynamic_object::{
+                DynamicObjectList,
+                chest::{Chest, ChestMeta},
+                dropped_item::{DroppedItem, DroppedItemXml},
+            },
         },
+        ChunkDynamicObjects, DynamicObjectType, DynamicWorld,
     };
     use lmdb_rs::{
         arch::DynArch,
@@ -566,7 +606,13 @@ mod tests {
         monster.sunflower_plant = read_test_xml(DynamicObjectType::SunflowerPlant);
         monster.corn_plant = read_test_xml(DynamicObjectType::CornPlant);
         monster.dodo = read_test_xml(DynamicObjectType::Dodo);
-        monster.dropped_item = read_test_xml(DynamicObjectType::DroppedItem);
+        let dropped_item_xml: DynamicObjectList<DroppedItemXml> =
+            read_test_xml(DynamicObjectType::DroppedItem);
+        monster.dropped_item = dropped_item_xml
+            .into_iter()
+            .map(DroppedItem::try_from_xml)
+            .collect::<Result<DynamicObjectList<_>, _>>()
+            .unwrap();
         monster.fire = vec![16, 0xAA, 0xBB];
         monster.torch = vec![17, 0xAA, 0xBB];
         monster.glow_block = vec![18, 0xAA, 0xBB];

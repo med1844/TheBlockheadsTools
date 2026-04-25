@@ -551,19 +551,23 @@ pub struct Item {
 impl Item {
     pub const MAX_SUB_ITEMS: usize = 4;
 
-    fn from_sub_item_values(value: plist::Value) -> Result<Slots<{ Self::MAX_SUB_ITEMS }>> {
-        let sub_item_values = match value.clone() {
+    fn from_sub_item_values(value: plist::Value) -> Result<Option<Slots<{ Self::MAX_SUB_ITEMS }>>> {
+        let sub_item_values = match value {
             plist::Value::Array(values) => values,
             _ => UnexpectedStructureSnafu {
                 type_name: "subItems",
                 target_structure: "plist::Array",
-                value: value.clone(),
+                value,
             }
             .fail()?,
         };
-        Slots::from_values(sub_item_values)
-            .map_err(Box::new)
-            .context(LoadSubItemsSnafu)
+        (sub_item_values.len() > 0)
+            .then_some(
+                Slots::from_values(sub_item_values)
+                    .map_err(Box::new)
+                    .context(LoadSubItemsSnafu),
+            )
+            .transpose()
     }
 
     fn to_sub_item_values(&self) -> Result<Option<plist::Value>> {
@@ -630,7 +634,7 @@ impl Item {
             let dict: plist::Dictionary =
                 plist::from_reader_xml(extra_bytes.as_slice()).context(DeserializeExtraSnafu)?;
             if let Some(value) = dict.get("s") {
-                sub_items = Some(Self::from_sub_item_values(value.to_owned())?);
+                sub_items = Self::from_sub_item_values(value.to_owned())?;
             }
             if let Some(value) = dict.get("d") {
                 dynamic_object = Some(Self::from_dyn_obj_save_dict(value.to_owned())?);
@@ -794,7 +798,7 @@ impl Item {
         let mut sub_items = None;
         let mut dynamic_object = None;
         if let Some(sub_item_values) = xml.sub_items {
-            sub_items = Some(Self::from_sub_item_values(sub_item_values)?);
+            sub_items = Self::from_sub_item_values(sub_item_values)?;
         }
         if let Some(dict) = xml.dynamic_object_save_dict {
             dynamic_object = Some(Self::from_dyn_obj_save_dict(dict)?);

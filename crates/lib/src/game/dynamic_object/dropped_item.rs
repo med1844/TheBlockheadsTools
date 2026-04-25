@@ -1,5 +1,7 @@
-use super::super::item::{Item, ItemXml};
-use super::DynamicObject;
+use super::{
+    super::item::{Item, ItemError, ItemXml},
+    DynamicObject,
+};
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
 
@@ -36,40 +38,30 @@ pub(crate) struct DroppedItemXml {
     float_pos_vy: f64,
 }
 
-impl Serialize for DroppedItem {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        DroppedItemXml {
-            obj: self.obj.clone(),
-            item: self.item.to_xml().map_err(serde::ser::Error::custom)?,
-            bounce_timer: self.bounce_timer,
-            creation_time: self.creation_time,
-            fall_speed: self.fall_speed,
-            hovers: self.hovers,
-            float_pos_vx: self.float_pos_vx,
-            float_pos_vy: self.float_pos_vy,
-        }
-        .serialize(serializer)
-    }
-}
-
-impl<'de> Deserialize<'de> for DroppedItem {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let xml = DroppedItemXml::deserialize(deserializer)?;
+impl DroppedItem {
+    pub(crate) fn try_from_xml(xml: DroppedItemXml) -> Result<Self, ItemError> {
         Ok(Self {
             obj: xml.obj,
-            item: Item::from_xml(xml.item).map_err(serde::de::Error::custom)?,
+            item: Item::from_xml(xml.item)?,
             bounce_timer: xml.bounce_timer,
             creation_time: xml.creation_time,
             fall_speed: xml.fall_speed,
             hovers: xml.hovers,
             float_pos_vx: xml.float_pos_vx,
             float_pos_vy: xml.float_pos_vy,
+        })
+    }
+
+    pub(crate) fn to_xml(&self) -> Result<DroppedItemXml, ItemError> {
+        Ok(DroppedItemXml {
+            obj: self.obj.clone(),
+            item: self.item.to_xml()?,
+            bounce_timer: self.bounce_timer,
+            creation_time: self.creation_time,
+            fall_speed: self.fall_speed,
+            hovers: self.hovers,
+            float_pos_vx: self.float_pos_vx,
+            float_pos_vy: self.float_pos_vy,
         })
     }
 }
