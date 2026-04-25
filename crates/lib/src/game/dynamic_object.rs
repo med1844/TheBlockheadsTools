@@ -1,3 +1,4 @@
+use super::item::ItemType;
 use crate::util::serde::{deserialize_some, serialize_some};
 use num_enum::TryFromPrimitive;
 use serde::{Deserialize, Serialize};
@@ -43,8 +44,25 @@ pub enum DynamicObjectError {
         value: plist::Value,
         source: plist::Error,
     },
-    #[snafu(display("Can't understand dynamicObjectSaveDict with {obj_type:?} yet"))]
-    UnsupportedInteractionObjectType { obj_type: InteractionObjectType },
+    #[snafu(display(
+        "Can't understand dynamicObjectSaveDict with {obj_type:?} yet, value: {value:?}"
+    ))]
+    UnsupportedInteractionObjectType {
+        obj_type: InteractionObjectType,
+        value: plist::Value,
+    },
+    #[snafu(display("Can't load value as ItemType: {value:?}"))]
+    UnknownItemType {
+        value: plist::Value,
+        source: plist::Error,
+    },
+    #[snafu(display(
+        "Can't understand dynamicObjectSaveDict with {item_type:?} yet, value: {value:?}"
+    ))]
+    UnsupportedItemType {
+        item_type: ItemType,
+        value: plist::Value,
+    },
     #[snafu(display("Can't load dynamicObjectSaveDict as known type: {dict:?}"))]
     DynObjSaveDictNoTypeMatch { dict: plist::Dictionary },
 }
@@ -329,9 +347,11 @@ pub mod workbench;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum AnyDynamicObject {
-    Chest(Box<chest::Chest>),
-    Workbench(Box<workbench::Workbench>),
-    Bed(Box<craft::Bed>),
+    Ladder(Box<craft::Ladder>),           // ID = 19
+    Door(Box<craft::Door>),               // ID = 20
+    Bed(Box<craft::Bed>),                 // ID = 23
+    Workbench(Box<workbench::Workbench>), // ID = 45
+    Chest(Box<chest::Chest>),             // ID = 46
 }
 
 impl AnyDynamicObject {
@@ -368,6 +388,34 @@ impl AnyDynamicObject {
                 }
                 _ => UnsupportedInteractionObjectTypeSnafu {
                     obj_type: interaction_obj_type,
+                    value: dict,
+                }
+                .fail(),
+            }
+        } else if let Some(value) = dict.get("itemType") {
+            let item_type: ItemType = plist::from_value(value).context(UnknownItemTypeSnafu {
+                value: value.to_owned(),
+            })?;
+            match item_type {
+                ItemType::Ladder => {
+                    let dict = plist::Value::Dictionary(dict);
+                    let ladder = plist::from_value(&dict).context(DeserializeDictionarySnafu {
+                        target_type: "Ladder",
+                        dict,
+                    })?;
+                    Ok(Self::Ladder(ladder))
+                }
+                ItemType::WoodenGate => {
+                    let dict = plist::Value::Dictionary(dict);
+                    let door = plist::from_value(&dict).context(DeserializeDictionarySnafu {
+                        target_type: "Door",
+                        dict,
+                    })?;
+                    Ok(Self::Door(door))
+                }
+                _ => UnsupportedItemTypeSnafu {
+                    item_type,
+                    value: dict,
                 }
                 .fail(),
             }
@@ -377,24 +425,29 @@ impl AnyDynamicObject {
     }
 
     pub fn to_save_dict(&self) -> Result<plist::Value> {
-        match self {
+        Ok(match self {
+            Self::Ladder(ladder) => plist::to_value(ladder).context(SerializeDictionarySnafu {
+                source_type: "Ladder",
+            })?,
+            Self::Door(door) => plist::to_value(door).context(SerializeDictionarySnafu {
+                source_type: "Door",
+            })?,
+            Self::Bed(bed) => {
+                plist::to_value(bed).context(SerializeDictionarySnafu { source_type: "Bed" })?
+            }
+            Self::Workbench(workbench) => {
+                plist::to_value(workbench).context(SerializeDictionarySnafu {
+                    source_type: "Workbench",
+                })?
+            }
             Self::Chest(chest) => {
                 let chest_item = chest.to_chest_item().context(SaveChestSnafu)?;
-                Ok(
-                    plist::to_value(&chest_item).context(SerializeDictionarySnafu {
-                        source_type: "ChestItem",
-                    })?,
-                )
+
+                plist::to_value(&chest_item).context(SerializeDictionarySnafu {
+                    source_type: "ChestItem",
+                })?
             }
-            Self::Workbench(workbench) => Ok(plist::to_value(workbench).context(
-                SerializeDictionarySnafu {
-                    source_type: "Workbench",
-                },
-            )?),
-            Self::Bed(bed) => Ok(
-                plist::to_value(bed).context(SerializeDictionarySnafu { source_type: "Bed" })?
-            ),
-        }
+        })
     }
 }
 

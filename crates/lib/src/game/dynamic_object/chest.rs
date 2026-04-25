@@ -57,21 +57,21 @@ pub enum ChestError {
     IncompleteShelfRenderItems,
     #[snafu(display("Incomplete shelf_item_data_bs array"))]
     IncompleteItemDataBs,
-    #[snafu(display("Get save_item_slot when portal chest shouldn't have one"))]
+    #[snafu(display("Get saveItemSlot when portal chest shouldn't have one"))]
     PortalChestHaveSlots,
-    #[snafu(display("No save_item_slot when chest type {chest_type:?} should have one"))]
+    #[snafu(display("No saveItemSlot when chest type {chest_type:?} should have one"))]
     NoSaveItemSlot { chest_type: ChestType },
-    #[snafu(display("Failed to compress slots"))]
+    #[snafu(display("Failed to compress chest slots"))]
     CompressSlots { source: std::io::Error },
-    #[snafu(display("Failed to decompress slots"))]
+    #[snafu(display("Failed to decompress chest slots"))]
     DecompressSlots { source: std::io::Error },
-    #[snafu(display("Failed to deserialize slots"))]
+    #[snafu(display("Failed to deserialize chest slots"))]
     DeserializeSlots { source: plist::Error },
-    #[snafu(display("Failed to serialize slots"))]
+    #[snafu(display("Failed to serialize chest slots"))]
     SerializeSlots { source: plist::Error },
-    #[snafu(display("Failed to load slots"))]
+    #[snafu(display("Failed to load chest slots"))]
     LoadSlots { source: Box<ItemError> },
-    #[snafu(display("Failed to save slots"))]
+    #[snafu(display("Failed to save chest slots"))]
     SaveSlots { source: Box<ItemError> },
 }
 

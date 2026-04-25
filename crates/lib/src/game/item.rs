@@ -56,10 +56,14 @@ pub enum ItemError {
     LoadInventory { source: Box<ItemError> },
     #[snafu(display("Failed to save slots in inventory"))]
     SaveInventory { source: Box<ItemError> },
+    #[snafu(display("Num slots mismatch: expected {expected}, got {got}"))]
+    NumSlotsMismatch { expected: usize, got: usize },
     #[snafu(display("Failed to load {i}-th slot"))]
     LoadSlots { source: Box<ItemError>, i: usize },
     #[snafu(display("Failed to save {i}-th slot"))]
     SaveSlots { source: Box<ItemError>, i: usize },
+    #[snafu(display("Failed to load {i}-th item in slot"))]
+    LoadSlot { source: Box<ItemError>, i: usize },
     #[snafu(display("Failed to save {i}-th item in slot"))]
     SaveSlot { source: Box<ItemError>, i: usize },
 }
@@ -834,7 +838,12 @@ impl Slot {
             plist::Value::Array(values) => Ok(Self(
                 values
                     .into_iter()
-                    .map(Item::try_from_value)
+                    .enumerate()
+                    .map(|(i, value)| {
+                        Item::try_from_value(value)
+                            .map_err(Box::new)
+                            .context(LoadSlotSnafu { i })
+                    })
                     .collect::<Result<Vec<Item>>>()?,
             )),
             _ => UnexpectedStructureSnafu {
@@ -879,12 +888,13 @@ pub struct Slots<const N: usize>([Slot; N]);
 
 impl<const N: usize> Slots<N> {
     pub fn from_values(values: Vec<plist::Value>) -> Result<Self> {
-        // TODO report slot number mismatch
-        // #[snafu(display("Num slots mismatch: expected {expected}, got {got}"))]
-        // NumSlotsMismatch {
-        //     expected: usize,
-        //     got: usize,
-        // },
+        if values.len() != N {
+            return NumSlotsMismatchSnafu {
+                expected: N,
+                got: values.len(),
+            }
+            .fail();
+        }
         let mut arr = core::array::from_fn(|_| Slot(Vec::new()));
         for (i, value) in values.into_iter().take(N).enumerate() {
             arr[i] = Slot::try_from_value(value)
