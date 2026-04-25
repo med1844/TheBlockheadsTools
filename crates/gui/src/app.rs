@@ -189,7 +189,6 @@ pub struct EditorApp {
     camera: Camera,
 
     show_info: bool,
-    show_grid: bool,
     fps_counter: FpsCounter,
 
     interaction_state: InteractionState,
@@ -239,7 +238,6 @@ impl EditorApp {
             camera,
 
             show_info: false,
-            show_grid: false,
             fps_counter: FpsCounter::new(2.0),
 
             interaction_state,
@@ -318,7 +316,7 @@ impl EditorApp {
     fn render_menu_bar(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
         egui::MenuBar::new().ui(ui, |ui| {
             ui.toggle_value(&mut self.show_info, "Info");
-            ui.toggle_value(&mut self.show_grid, "Grid");
+            ui.toggle_value(&mut self.render_settings.show_grid, "Grid");
             ui.separator();
             ui.menu_button("File", |ui| {
                 #[cfg(not(target_arch = "wasm32"))]
@@ -454,6 +452,14 @@ impl EditorApp {
         ui.checkbox(&mut self.render_settings.enable_reflect, "Enable Reflect");
         ui.checkbox(&mut self.render_settings.enable_destruct, "Enable Destruct");
         ui.checkbox(&mut self.render_settings.enable_ssao, "Enable SSAO");
+        ui.checkbox(
+            &mut self.render_settings.render_dw_icon,
+            "Render Dynamic Object Icons",
+        );
+        ui.checkbox(
+            &mut self.render_settings.render_dw_mesh,
+            "Render Dynamic Object Meshs",
+        );
         ui.checkbox(
             &mut self.render_settings.enable_cyclic,
             "Enable Cyclic World",
@@ -642,7 +648,6 @@ impl EditorApp {
             Render3dCallback {
                 camera_uniform: self.camera.uniform(),
                 dw_chunks,
-                show_grid: self.show_grid,
                 selected_block_coord_uniform: self.interaction_state.selected_block_gpu.uniform(),
                 hover_on_block_coord_uniform: self.interaction_state.hover_on_block_gpu.uniform(),
                 hover_on_id_uniform: self.interaction_state.hover_on_id_uniform(),

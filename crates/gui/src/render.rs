@@ -347,10 +347,12 @@ impl RenderResources {
         &self,
         render_pass: &mut wgpu::RenderPass<'_>,
         dw_buf: &[DwChunkBuf],
-        show_grid: bool,
+        render_settings: &RenderSettings,
     ) {
-        self.dw_icon.render(render_pass, dw_buf);
-        if show_grid {
+        if render_settings.render_dw_icon {
+            self.dw_icon.render(render_pass, dw_buf);
+        }
+        if render_settings.show_grid {
             self.grid.render(render_pass);
         }
     }
@@ -427,7 +429,6 @@ impl RenderResources {
 pub struct Render3dCallback {
     pub camera_uniform: CameraUniform,
     pub dw_chunks: Vec<DwChunkBuf>,
-    pub show_grid: bool,
     pub selected_block_coord_uniform: GpuCoordUniform,
     pub hover_on_block_coord_uniform: GpuCoordUniform,
     pub hover_on_id_uniform: DwChunkObjIdUniform,
@@ -542,7 +543,9 @@ impl egui_wgpu::CallbackTrait for Render3dCallback {
                 timestamp_writes: None,
                 occlusion_query_set: None,
             });
-            r.render_mesh_pass(&mut render_pass, &self.dw_chunks);
+            if self.render_settings.render_dw_mesh {
+                r.render_mesh_pass(&mut render_pass, &self.dw_chunks);
+            }
         }
 
         {
@@ -600,42 +603,44 @@ impl egui_wgpu::CallbackTrait for Render3dCallback {
             r.render_voxel_pass(&mut render_pass);
         }
 
-        {
-            let mut render_pass = egui_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("ssao pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &r.g_buffer.ssao_raw.view,
-                    depth_slice: None,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                timestamp_writes: None,
-                occlusion_query_set: None,
-            });
-            r.ssao.render(&mut render_pass);
-        }
+        if self.render_settings.enable_ssao {
+            {
+                let mut render_pass = egui_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("ssao pass"),
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view: &r.g_buffer.ssao_raw.view,
+                        depth_slice: None,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
+                            store: wgpu::StoreOp::Store,
+                        },
+                    })],
+                    depth_stencil_attachment: None,
+                    timestamp_writes: None,
+                    occlusion_query_set: None,
+                });
+                r.ssao.render(&mut render_pass);
+            }
 
-        {
-            let mut render_pass = egui_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("ssao blur pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &r.g_buffer.ssao_blur.view,
-                    depth_slice: None,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                timestamp_writes: None,
-                occlusion_query_set: None,
-            });
-            r.ssao_blur.render(&mut render_pass);
+            {
+                let mut render_pass = egui_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("ssao blur pass"),
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view: &r.g_buffer.ssao_blur.view,
+                        depth_slice: None,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
+                            store: wgpu::StoreOp::Store,
+                        },
+                    })],
+                    depth_stencil_attachment: None,
+                    timestamp_writes: None,
+                    occlusion_query_set: None,
+                });
+                r.ssao_blur.render(&mut render_pass);
+            }
         }
 
         {
@@ -665,7 +670,7 @@ impl egui_wgpu::CallbackTrait for Render3dCallback {
                 timestamp_writes: None,
                 occlusion_query_set: None,
             });
-            r.render_annotation_pass(&mut render_pass, &self.dw_chunks, self.show_grid);
+            r.render_annotation_pass(&mut render_pass, &self.dw_chunks, &self.render_settings);
         }
 
         if let Some((x, y)) = self.mouse_physical_pos {
