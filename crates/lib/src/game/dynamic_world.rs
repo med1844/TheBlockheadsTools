@@ -29,7 +29,11 @@ use lmdb_rs::{
 };
 use serde::Serialize;
 use snafu::prelude::*;
-use std::{collections::HashMap, io::Write, ops::Deref};
+use std::{
+    collections::{HashMap, hash_map},
+    io::Write,
+    ops::Deref,
+};
 
 trait IsEmpty {
     fn is_empty(&self) -> bool;
@@ -193,6 +197,86 @@ impl ChunkDynamicObjects {
             + self.yak.num_obj()
         // + self.mirror.num_obj()
     }
+
+    fn move_element(
+        &mut self,
+        dst: &mut Self,
+        obj_type: DynamicObjectType,
+        i: usize,
+    ) -> Option<usize> {
+        fn mv<T>(
+            src: &mut DynamicObjectList<T>,
+            dst: &mut DynamicObjectList<T>,
+            i: usize,
+        ) -> Option<usize> {
+            let new_i = dst.len();
+            dst.push(src.remove(i));
+            Some(new_i)
+        }
+        use DynamicObjectType::*;
+        match obj_type {
+            AppleTree => mv(&mut self.apple_tree, &mut dst.apple_tree, i),
+            MapleTree => mv(&mut self.maple_tree, &mut dst.maple_tree, i),
+            MangoTree => mv(&mut self.mango_tree, &mut dst.mango_tree, i),
+            PineTree => mv(&mut self.pine_tree, &mut dst.pine_tree, i),
+            CactusTree => mv(&mut self.cactus_tree, &mut dst.cactus_tree, i),
+            CoconutTree => mv(&mut self.coconut_tree, &mut dst.coconut_tree, i),
+            OrangeTree => mv(&mut self.orange_tree, &mut dst.orange_tree, i),
+            CherryTree => mv(&mut self.cherry_tree, &mut dst.cherry_tree, i),
+            CoffeeTree => mv(&mut self.coffee_tree, &mut dst.coffee_tree, i),
+            FlaxPlant => mv(&mut self.flax_plant, &mut dst.flax_plant, i),
+            SunflowerPlant => mv(&mut self.sunflower_plant, &mut dst.sunflower_plant, i),
+            CornPlant => mv(&mut self.corn_plant, &mut dst.corn_plant, i),
+            Dodo => mv(&mut self.dodo, &mut dst.dodo, i),
+            DroppedItem => mv(&mut self.dropped_item, &mut dst.dropped_item, i),
+            Fire => None, // helper(&mut self.fire, &mut dst.fire, index),
+            Torch => mv(&mut self.torch, &mut dst.torch, i),
+            GlowBlock => None, // helper(&mut self.glow_block, &mut dst.glow_block, index),
+            Ladder => mv(&mut self.ladder, &mut dst.ladder, i),
+            Door => mv(&mut self.door, &mut dst.door, i),
+            ArtificialLight => None, // helper(&mut self.artificial_light, &mut dst.artificial_light, index),
+            Bed => mv(&mut self.bed, &mut dst.bed, i),
+            DropBear => mv(&mut self.dropbear, &mut dst.dropbear, i),
+            GatherBlock => None, // helper(&mut self.gather_block, &mut dst.gather_block, index),
+            CarrotPlant => mv(&mut self.carrot_plant, &mut dst.carrot_plant, i),
+            Donkey => mv(&mut self.donkey, &mut dst.donkey, i),
+            Egg => mv(&mut self.egg, &mut dst.egg, i),
+            Window => mv(&mut self.window, &mut dst.window, i),
+            Boat => mv(&mut self.boat, &mut dst.boat, i),
+            ChilliPlant => mv(&mut self.chilli_plant, &mut dst.chilli_plant, i),
+            KelpPlant => mv(&mut self.kelp_plant, &mut dst.kelp_plant, i),
+            ClownFish => mv(&mut self.clown_fish, &mut dst.clown_fish, i),
+            Shark => mv(&mut self.shark, &mut dst.shark, i),
+            LimeTree => mv(&mut self.lime_tree, &mut dst.lime_tree, i),
+            Wire => mv(&mut self.wire, &mut dst.wire, i),
+            CaveTroll => mv(&mut self.cave_troll, &mut dst.cave_troll, i),
+            Rail => mv(&mut self.rail, &mut dst.rail, i),
+            HandCar => mv(&mut self.hand_car, &mut dst.hand_car, i),
+            SteamLocomotive => mv(&mut self.steam_locomotive, &mut dst.steam_locomotive, i),
+            FreightCar => mv(&mut self.freight_car, &mut dst.freight_car, i),
+            PassengerCar => mv(&mut self.passenger_car, &mut dst.passenger_car, i),
+            Workbench => mv(&mut self.workbench, &mut dst.workbench, i),
+            Chest => mv(&mut self.chest, &mut dst.chest, i),
+            Sign => mv(&mut self.sign, &mut dst.sign, i),
+            TradingPost => mv(&mut self.trading_post, &mut dst.trading_post, i),
+            TrainStation => mv(&mut self.train_station, &mut dst.train_station, i),
+            TradePortal => mv(&mut self.trade_portal, &mut dst.trade_portal, i),
+            Scorpion => mv(&mut self.scorpion, &mut dst.scorpion, i),
+            Painting => None, // helper(&mut self.painting, &mut dst.painting, index),
+            Column => mv(&mut self.column, &mut dst.column, i),
+            Stairs => mv(&mut self.stairs, &mut dst.stairs, i),
+            ElevatorMotor => mv(&mut self.elevator_motor, &mut dst.elevator_motor, i),
+            ElevatorShaft => mv(&mut self.elevator_shaft, &mut dst.elevator_shaft, i),
+            GemTree => mv(&mut self.gem_tree, &mut dst.gem_tree, i),
+            VinePlant => mv(&mut self.vine_plant, &mut dst.vine_plant, i),
+            TulipPlant => mv(&mut self.tulip_plant, &mut dst.tulip_plant, i),
+            OwnershipSign => None, // helper(&mut self.ownership_sign, &mut dst.ownership_sign, index)
+            WheatPlant => mv(&mut self.wheat_plant, &mut dst.wheat_plant, i),
+            TomatoPlant => mv(&mut self.tomato_plant, &mut dst.tomato_plant, i),
+            Yak => mv(&mut self.yak, &mut dst.yak, i),
+            Mirror => None, // helper(&mut self.mirror, &mut dst.mirror, index),
+        }
+    }
 }
 
 #[derive(Debug, Snafu)]
@@ -268,8 +352,35 @@ impl DynamicWorld {
         self.0.get_mut(&coord.into())
     }
 
+    pub fn entry<I: Into<ChunkCoord>>(
+        &'_ mut self,
+        coord: I,
+    ) -> hash_map::Entry<'_, ChunkCoord, ChunkDynamicObjects> {
+        self.0.entry(coord.into())
+    }
+
     pub fn iter(&self) -> impl Iterator<Item = (&ChunkCoord, &ChunkDynamicObjects)> {
         self.0.iter()
+    }
+
+    /// Moves `i`-th obj_type in `src_coord` chunk to `dst_coord`, returns new index in dst chunk
+    pub fn move_element(
+        &mut self,
+        src_coord: ChunkCoord,
+        dst_coord: ChunkCoord,
+        obj_type: DynamicObjectType,
+        index: usize,
+    ) -> Option<usize> {
+        if src_coord == dst_coord {
+            return None;
+        }
+        // ensure dst chunk always exists
+        let _ = self.entry(dst_coord).or_default();
+        if let [Some(src), Some(dst)] = self.0.get_disjoint_mut([&src_coord, &dst_coord]) {
+            src.move_element(dst, obj_type, index)
+        } else {
+            None
+        }
     }
 
     pub fn from_db(db: &Database<Str, Bytes>, rtxn: &RoTxn) -> Result<Self> {

@@ -1,5 +1,5 @@
 use super::{
-    dw_impl::InfoUi,
+    dw_impl::{InfoUi, ObjFlags},
     fps_counter::FpsCounter,
     gpu::{
         Camera, GpuCoord, RenderSettings,
@@ -700,25 +700,36 @@ impl EditorApp {
         }
     }
 
-    fn render_selected_dyn_obj_info_window(&mut self, ctx: &egui::Context) {
+    fn render_selected_dyn_obj_info_window(
+        &mut self,
+        ctx: &egui::Context,
+        frame: &mut eframe::Frame,
+    ) {
         if let Some(InteractionTarget::DynamicObject { chunk_coord, id }) =
             self.interaction_state.select
             && let Some(world_db) = self.world_db.as_mut()
-            && let Some(dw_chunk) = world_db.dw.chunk_at_mut(chunk_coord)
+            && let dw = &mut world_db.dw
+            && let Some(dw_chunk) = dw.chunk_at_mut(chunk_coord)
         {
             use lib::game::dynamic_object::DynamicObjectType::*;
-            fn draw_window<T: InfoUi>(title: &str, t: Option<&mut T>, ctx: &egui::Context) {
+            fn draw_window<T: InfoUi>(
+                title: &str,
+                t: Option<&mut T>,
+                ctx: &egui::Context,
+            ) -> ObjFlags {
+                let mut flags = ObjFlags::default();
                 if let Some(t) = t {
                     egui::Window::new(title)
                         .id("selected_dynamic_obj_info".into())
                         .show(ctx, |ui| {
-                            t.info(ui);
+                            t.info(ui, &mut flags);
                         });
                 }
+                flags
             }
 
             let title: &'static str = id.obj_type.into();
-            match id.obj_type {
+            let flags = match id.obj_type {
                 AppleTree => draw_window(title, dw_chunk.apple_tree.get_mut(id.index), ctx),
                 MapleTree => draw_window(title, dw_chunk.maple_tree.get_mut(id.index), ctx),
                 MangoTree => draw_window(title, dw_chunk.mango_tree.get_mut(id.index), ctx),
@@ -728,57 +739,101 @@ impl EditorApp {
                 OrangeTree => draw_window(title, dw_chunk.orange_tree.get_mut(id.index), ctx),
                 CherryTree => draw_window(title, dw_chunk.cherry_tree.get_mut(id.index), ctx),
                 CoffeeTree => draw_window(title, dw_chunk.coffee_tree.get_mut(id.index), ctx),
-                FlaxPlant => {}
-                SunflowerPlant => {}
+                // FlaxPlant => {}
+                // SunflowerPlant => {}
                 CornPlant => draw_window(title, dw_chunk.corn_plant.get_mut(id.index), ctx),
-                Dodo => {}
-                DroppedItem => {}
-                Fire => {}
+                // Dodo => {}
+                // DroppedItem => {}
+                // Fire => {}
                 Torch => draw_window(title, dw_chunk.torch.get_mut(id.index), ctx),
-                GlowBlock => {}
+                // GlowBlock => {}
                 Ladder => draw_window(title, dw_chunk.ladder.get_mut(id.index), ctx),
                 Door => draw_window(title, dw_chunk.door.get_mut(id.index), ctx),
-                ArtificialLight => {}
-                Bed => {}
-                DropBear => {}
-                GatherBlock => {}
+                // ArtificialLight => {}
+                // Bed => {}
+                // DropBear => {}
+                // GatherBlock => {}
                 CarrotPlant => draw_window(title, dw_chunk.carrot_plant.get_mut(id.index), ctx),
-                Donkey => {}
+                // Donkey => {}
                 Egg => draw_window(title, dw_chunk.egg.get_mut(id.index), ctx),
-                Window => {}
-                Boat => {}
-                ChilliPlant => {}
+                // Window => {}
+                // Boat => {}
+                // ChilliPlant => {}
                 KelpPlant => draw_window(title, dw_chunk.kelp_plant.get_mut(id.index), ctx),
-                ClownFish => {}
-                Shark => {}
+                // ClownFish => {}
+                // Shark => {}
                 LimeTree => draw_window(title, dw_chunk.lime_tree.get_mut(id.index), ctx),
-                Wire => {}
-                CaveTroll => {}
-                Rail => {}
-                HandCar => {}
-                SteamLocomotive => {}
-                FreightCar => {}
-                PassengerCar => {}
+                // Wire => {}
+                // CaveTroll => {}
+                // Rail => {}
+                // HandCar => {}
+                // SteamLocomotive => {}
+                // FreightCar => {}
+                // PassengerCar => {}
                 Workbench => draw_window(title, dw_chunk.workbench.get_mut(id.index), ctx),
                 Chest => draw_window(title, dw_chunk.chest.get_mut(id.index), ctx),
-                Sign => {}
-                TradingPost => {}
-                TrainStation => {}
-                TradePortal => {}
-                Scorpion => {}
-                Painting => {}
-                Column => {}
-                Stairs => {}
-                ElevatorMotor => {}
-                ElevatorShaft => {}
+                // Sign => {}
+                // TradingPost => {}
+                // TrainStation => {}
+                // TradePortal => {}
+                // Scorpion => {}
+                // Painting => {}
+                // Column => {}
+                // Stairs => {}
+                // ElevatorMotor => {}
+                // ElevatorShaft => {}
                 GemTree => draw_window(title, dw_chunk.gem_tree.get_mut(id.index), ctx),
-                VinePlant => {}
-                TulipPlant => {}
-                OwnershipSign => {}
-                WheatPlant => {}
+                // VinePlant => {}
+                // TulipPlant => {}
+                // OwnershipSign => {}
+                // WheatPlant => {}
                 TomatoPlant => draw_window(title, dw_chunk.tomato_plant.get_mut(id.index), ctx),
-                Yak => {}
-                Mirror => {}
+                // Yak => {}
+                // Mirror => {}
+                _ => ObjFlags::default(),
+            };
+            if let Some(state) = frame.wgpu_render_state() {
+                // handle obj move & dst chunk re-render
+                match flags {
+                    ObjFlags::PosChangedTo { x, y } => {
+                        if let Ok(dst_coord) = BlockCoord::new(x as u32, y as u16)
+                            && let (dst_chunk_coord, _) = dst_coord.decompose()
+                            && dst_chunk_coord != chunk_coord
+                        {
+                            let new_i = dw.move_element(
+                                chunk_coord,
+                                dst_chunk_coord,
+                                id.obj_type,
+                                id.index,
+                            );
+                            if let Some(new_i) = new_i {
+                                self.interaction_state.select =
+                                    Some(InteractionTarget::DynamicObject {
+                                        chunk_coord: dst_chunk_coord,
+                                        id: DwChunkObjId::new(id.obj_type, new_i),
+                                    });
+                            }
+
+                            let dst_dw_chunk = dw
+                                .chunk_at(dst_chunk_coord)
+                                .expect("move_element must have created chunk at dst_chunk_coord");
+                            self.dw_buf
+                                .set_chunk(&state.device, dst_chunk_coord, dst_dw_chunk);
+                        }
+                    }
+                    ObjFlags::RebuildMesh | ObjFlags::NoChange => {}
+                }
+
+                // handle current chunk re-render
+                match flags {
+                    ObjFlags::PosChangedTo { .. } | ObjFlags::RebuildMesh => {
+                        let dw_chunk = dw.chunk_at(chunk_coord).expect(
+                            "chunk must be Some to have ID read from GPU to have that chunk_coord",
+                        );
+                        self.dw_buf.set_chunk(&state.device, chunk_coord, dw_chunk);
+                    }
+                    ObjFlags::NoChange => {}
+                }
             }
         }
     }
@@ -806,6 +861,6 @@ impl eframe::App for EditorApp {
             });
 
         self.render_error_windows(ctx);
-        self.render_selected_dyn_obj_info_window(ctx);
+        self.render_selected_dyn_obj_info_window(ctx, frame);
     }
 }
