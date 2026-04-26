@@ -11,6 +11,7 @@ impl DwMeshRenderer {
         camera_buf: &wgpu::Buffer,
         albedo_texture: &Texture,
         render_settings_buf: &wgpu::Buffer,
+        world_dim_x_buf: &wgpu::Buffer,
     ) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("DW Sprite Shader"),
@@ -52,7 +53,18 @@ impl DwMeshRenderer {
                 // Render Settings
                 wgpu::BindGroupLayoutEntry {
                     binding: 3,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                // World Dim X
+                wgpu::BindGroupLayoutEntry {
+                    binding: 4,
+                    visibility: wgpu::ShaderStages::VERTEX,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform,
                         has_dynamic_offset: false,
@@ -81,6 +93,10 @@ impl DwMeshRenderer {
                 wgpu::BindGroupEntry {
                     binding: 3,
                     resource: render_settings_buf.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 4,
+                    resource: world_dim_x_buf.as_entire_binding(),
                 },
             ],
             label: Some("dw_bind_group"),

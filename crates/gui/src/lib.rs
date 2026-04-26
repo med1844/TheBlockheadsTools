@@ -4,3 +4,4 @@ mod fps_counter;
 mod gpu;
 mod image_type;
 mod render;
+mod util;

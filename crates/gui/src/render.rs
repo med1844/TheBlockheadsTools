@@ -271,12 +271,15 @@ impl RenderResources {
                 &albedo_texture,
                 &hover_on_id_buf,
                 &selected_id_buf,
+                &render_settings_buf,
+                &world_dim_x_buf,
             ),
             dw_mesh: mesh::DwMeshRenderer::new(
                 device,
                 &camera_buf,
                 &albedo_texture,
                 &render_settings_buf,
+                &world_dim_x_buf,
             ),
             grid: grid::GridRenderer::new(
                 device,

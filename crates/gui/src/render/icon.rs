@@ -104,6 +104,8 @@ impl DwIconRenderer {
         albedo_texture: &Texture,
         hover_on_id_buf: &wgpu::Buffer,
         selected_id_buf: &wgpu::Buffer,
+        render_settings_buf: &wgpu::Buffer,
+        world_dim_x_buf: &wgpu::Buffer,
     ) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Dynamic Object Icon Shader"),
@@ -215,6 +217,28 @@ impl DwIconRenderer {
                     },
                     count: None,
                 },
+                // Render settings
+                wgpu::BindGroupLayoutEntry {
+                    binding: 8,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                // World Dim X
+                wgpu::BindGroupLayoutEntry {
+                    binding: 9,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
             ],
             label: Some("dynamic_object_icon_bind_group_layout"),
         });
@@ -253,6 +277,14 @@ impl DwIconRenderer {
                 wgpu::BindGroupEntry {
                     binding: 7,
                     resource: selected_id_buf.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 8,
+                    resource: render_settings_buf.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 9,
+                    resource: world_dim_x_buf.as_entire_binding(),
                 },
             ],
             label: Some("dynamic_object_icon_bind_group"),

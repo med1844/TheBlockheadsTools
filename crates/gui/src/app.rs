@@ -1,3 +1,5 @@
+use crate::util::FastRem;
+
 use super::{
     dw_impl::{InfoUi, ObjFlags},
     fps_counter::FpsCounter,
@@ -7,6 +9,7 @@ use super::{
         voxel_util,
     },
     render::{GeometryBuffer, Render3dCallback, RenderResources},
+    util::Pow2,
 };
 use eframe::{egui, egui_wgpu, emath::Rect, wgpu};
 use glam::Vec3Swizzles;
@@ -621,20 +624,87 @@ impl EditorApp {
         let center = self.camera.world_offset().xy();
         const MAX_DIST: f32 = 48.0;
 
-        let min_x = min_coords.x.max(center.x - MAX_DIST).max(0.0);
+        let min_x = min_coords.x.max(center.x - MAX_DIST);
         let min_y = min_coords.y.max(center.y - MAX_DIST).max(0.0);
         let max_x = max_coords.x.min(center.x + MAX_DIST);
         let max_y = max_coords.y.min(center.y + MAX_DIST).min(1024.0);
 
-        let chunk_min_x = (min_x / 32.0).floor() as u32;
-        let chunk_min_y = (min_y / 32.0).floor() as u8;
-        let chunk_max_x = (max_x / 32.0).ceil() as u32;
-        let chunk_max_y = (max_y / 32.0).ceil() as u8;
-        let mut dw_chunks = Vec::with_capacity(
-            chunk_max_x.saturating_sub(chunk_min_x) as usize
-                * chunk_max_y.saturating_sub(chunk_min_y) as usize,
-        );
-        for x in chunk_min_x..chunk_max_x {
+        let chunk_width_f32 = Chunk::NUM_BLOCK_PER_ROW as f32;
+
+        let chunk_min_y = (min_y / chunk_width_f32).floor() as u8;
+        let chunk_max_y = (max_y / chunk_width_f32).ceil() as u8;
+
+        let world_width_macro = self
+            .world_db
+            .as_ref()
+            .and_then(|db| Pow2::new(db.main.world_v2.world_width_macro));
+        let is_cyclic = self.render_settings.enable_cyclic;
+
+        enum ChunkXIter {
+            Cyclic {
+                start: u32,
+                i: u32,
+                end: u32,
+                width: Pow2<u32>,
+            },
+            Linear {
+                i: u32,
+                end: u32,
+            },
+        }
+
+        impl Iterator for ChunkXIter {
+            type Item = u32;
+
+            fn next(&mut self) -> Option<Self::Item> {
+                let (val, current) = match self {
+                    ChunkXIter::Cyclic {
+                        start,
+                        end,
+                        i,
+                        width,
+                    } => ((*i < *end).then_some((*start + *i).fast_rem(*width)), i),
+                    ChunkXIter::Linear { i: current, end } => {
+                        ((*current < *end).then_some(*current), current)
+                    }
+                };
+                *current += 1;
+                val
+            }
+        }
+
+        let x_iter = if is_cyclic && let Some(width) = world_width_macro {
+            let span_x = max_x - min_x;
+            let world_block_width = (*width * Chunk::NUM_BLOCK_PER_ROW as u32) as f32;
+
+            let start_x_wrapped = min_x.rem_euclid(world_block_width);
+            let start_chunk_x = (start_x_wrapped / chunk_width_f32).floor() as u32;
+            let num_chunks_x =
+                ((start_x_wrapped % chunk_width_f32 + span_x) / chunk_width_f32).ceil() as u32;
+
+            ChunkXIter::Cyclic {
+                start: start_chunk_x,
+                end: num_chunks_x,
+                i: 0,
+                width,
+            }
+        } else {
+            let min_x = min_x.max(0.0);
+            let chunk_min_x = (min_x / chunk_width_f32).floor() as u32;
+            let mut chunk_max_x = (max_x / chunk_width_f32).ceil() as u32;
+
+            if let Some(width) = world_width_macro {
+                chunk_max_x = chunk_max_x.min(*width);
+            }
+
+            ChunkXIter::Linear {
+                i: chunk_min_x,
+                end: chunk_max_x,
+            }
+        };
+
+        let mut dw_chunks = Vec::new();
+        for x in x_iter {
             for y in chunk_min_y..chunk_max_y {
                 if let Some(chunk_buf) = self.dw_buf.get_chunk(ChunkCoord::new(x, y).unwrap()) {
                     dw_chunks.push(chunk_buf.clone()); // chunk_buf is cheap to clone

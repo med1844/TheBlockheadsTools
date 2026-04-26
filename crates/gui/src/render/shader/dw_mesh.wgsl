@@ -47,6 +47,7 @@ struct RenderSettings {
 };
 
 @group(0) @binding(3) var<uniform> render_settings: RenderSettings;
+@group(0) @binding(4) var<uniform> world_dim_x: u32;
 
 struct FragmentOutput {
     @location(0) uv: vec4<f32>,
@@ -59,13 +60,17 @@ struct FragmentOutput {
 @vertex
 fn vs_main(model: VertexInput) -> VertexOutput {
     var out: VertexOutput;
-    let pos_in_view = model.position - camera.world_offset.xyz;
+    var pos_in_view = model.position - camera.world_offset.xyz;
+    if (render_settings.enable_cyclic == 1u) {
+        let world_width = f32(world_dim_x);
+        pos_in_view.x -= world_width * round(pos_in_view.x / world_width);
+    }
     out.clip_position = camera.view_proj * vec4<f32>(pos_in_view, 1.0);
     out.tex_coords = model.tex_coords;
     out.id = model.id;
     out.chunk = model.chunk;
     out.normal = model.normal;
-    out.world_pos = model.position;
+    out.world_pos = vec3<f32>(camera.world_offset.x + pos_in_view.x, model.position.y, model.position.z);
     return out;
 }
 
