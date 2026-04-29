@@ -32,6 +32,7 @@ pub struct CameraUniform {
 impl Camera {
     pub const MAX_BLOCK_Z: f32 = 3.0;
     pub const MAX_Z: f32 = 1e8;
+    const EPSILON: f32 = 1e-5;
 
     fn eye(&self) -> Vec3 {
         Vec3::Z
@@ -46,7 +47,7 @@ impl Camera {
     }
 
     fn z_near(&self) -> f32 {
-        (self.world_offset.z - Self::MAX_BLOCK_Z + self.view_dist()).max(0.01)
+        (self.world_offset.z - Self::MAX_BLOCK_Z - Self::EPSILON + self.view_dist()).max(0.01)
     }
 
     fn z_far(&self) -> f32 {

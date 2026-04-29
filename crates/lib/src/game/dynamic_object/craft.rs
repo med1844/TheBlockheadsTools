@@ -161,13 +161,24 @@ pub struct Rail {
 }
 inherit!(Rail -> DynamicObject, obj);
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr)]
+#[repr(u8)]
+// How does the sign connects
+pub enum SignConnectionType {
+    GroundDouble = 1, // connects to sign or block below, standing on both side
+    GroundSingle = 2, // connects to sign or block below, standing on single leg
+    Front = 3,        // connects to front face of some block
+    Side = 4,         // connects to left or right face of some block
+    Up = 5,           // connects to sign or block above
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Sign {
     #[serde(flatten)]
     obj: InteractionObject,
     pub text: String,
-    pub connection_type: u64,
+    pub connection_type: SignConnectionType,
     pub offset_type: u64,
     pub save_time: f64,
 }

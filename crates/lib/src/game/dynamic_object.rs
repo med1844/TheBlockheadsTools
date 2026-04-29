@@ -342,6 +342,7 @@ pub enum AnyDynamicObject {
     Egg(Box<animal::Egg>),                  // ID = 30
     Workbench(Box<workbench::Workbench>),   // ID = 45
     Chest(Box<chest::Chest>),               // ID = 46
+    Sign(Box<craft::Sign>),                 // ID = 47
     TrainStation(Box<train::TrainStation>), // ID = 49
 }
 
@@ -440,6 +441,13 @@ impl AnyDynamicObject {
                 })?;
                 Ok(Self::Egg(egg))
             }
+            ItemType::Sign => {
+                let sign = plist::from_value(&value).context(DeserializeDictionarySnafu {
+                    target_type: "Sign",
+                    dict: value,
+                })?;
+                Ok(Self::Sign(sign))
+            }
             ItemType::TrainStation => {
                 let train_station =
                     plist::from_value(&value).context(DeserializeDictionarySnafu {
@@ -478,6 +486,9 @@ impl AnyDynamicObject {
                     source_type: "ChestItem",
                 })?
             }
+            Self::Sign(sign) => plist::to_value(sign).context(SerializeDictionarySnafu {
+                source_type: "Sign",
+            })?,
             Self::TrainStation(train_station) => {
                 plist::to_value(train_station).context(SerializeDictionarySnafu {
                     source_type: "TrainStation",

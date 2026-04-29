@@ -575,32 +575,6 @@ fn get_t_mesh(uv: vec2<f32>, raw_depth: f32, ray: Ray) -> f32 {
 fn fs_main(in: VertexOutput) -> FragmentOutput {
     let raw_mesh_depth = textureSampleLevel(mesh_depth_texture, mesh_depth_sampler, in.uv, 0);
 
-    let ndc_coords = vec2<f32>(in.uv.x * 2.0 - 1.0, (1.0 - in.uv.y) * 2.0 - 1.0);
-    let ray = create_camera_ray(ndc_coords);
-    var bounds_intersect = intersect_world_bounds(ray);
-
-    let t_mesh = get_t_mesh(in.uv, raw_mesh_depth, ray);
-    bounds_intersect.t_max = min(bounds_intersect.t_max, t_mesh - 1e-3);
-
-    if (!bounds_intersect.hit || bounds_intersect.t_min > bounds_intersect.t_max) {
-        var output: FragmentOutput;
-        output.uv           = vec4<f32>(0.0);
-        output.normal       = vec4<f32>(0.0, 0.0, 1.0, 0.0);
-        output.translucency = vec4<f32>(0.0);
-        output.flags        = 0u;
-        output.depth        = 1.0;
-        return output;
-    }
-
-    let traversal = traverse_world(ray, bounds_intersect);
-
-    var output: FragmentOutput;
-    output.translucency = vec4<f32>(traversal.translucency_color.rgb, traversal.translucency_color.a);
-
-    var flags = 0u;
-    if (traversal.hit_hovered_block)  { flags |= 1u; }
-    if (traversal.hit_selected_block) { flags |= 2u; }
-
     let screen_size = vec2<f32>(textureDimensions(mesh_id_texture));
     let pixel_coords = vec2<i32>(in.uv * screen_size);
     let mesh_id = textureLoad(mesh_id_texture, pixel_coords, 0);
@@ -627,6 +601,32 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
             mesh_flags |= 2u;
         }
     }
+
+    let ndc_coords = vec2<f32>(in.uv.x * 2.0 - 1.0, (1.0 - in.uv.y) * 2.0 - 1.0);
+    let ray = create_camera_ray(ndc_coords);
+    var bounds_intersect = intersect_world_bounds(ray);
+
+    let t_mesh = get_t_mesh(in.uv, raw_mesh_depth, ray);
+    bounds_intersect.t_max = min(bounds_intersect.t_max, t_mesh - 1e-3);
+
+    if (!bounds_intersect.hit || bounds_intersect.t_min > bounds_intersect.t_max) {
+        var output: FragmentOutput;
+        output.uv           = vec4<f32>(0.0);
+        output.normal       = vec4<f32>(0.0, 0.0, 1.0, 0.0);
+        output.translucency = vec4<f32>(0.0);
+        output.flags        = mesh_flags;
+        output.depth        = min(1.0, raw_mesh_depth);
+        return output;
+    }
+
+    let traversal = traverse_world(ray, bounds_intersect);
+
+    var output: FragmentOutput;
+    output.translucency = vec4<f32>(traversal.translucency_color.rgb, traversal.translucency_color.a);
+
+    var flags = 0u;
+    if (traversal.hit_hovered_block)  { flags |= 1u; }
+    if (traversal.hit_selected_block) { flags |= 2u; }
 
     output.flags = flags | mesh_flags;
 

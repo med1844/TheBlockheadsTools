@@ -263,6 +263,11 @@ impl DwFace {
             size,
         )
     }
+
+    pub fn mirror_uv_h(&mut self) {
+        let [[u_min, v_min], [u_max, v_max]] = self.uv_min_max;
+        self.uv_min_max = [[u_max, v_min], [u_min, v_max]];
+    }
 }
 
 pub struct DwBlock {
@@ -793,7 +798,7 @@ impl DwChunkBuf {
         // accu(chunk.passenger_car.iter(), &mut sum);
         accu(chunk.workbench.iter(), &mut sum);
         accu(chunk.chest.iter(), &mut sum);
-        // accu(chunk.sign.iter(), &mut sum);
+        accu(chunk.sign.iter(), &mut sum);
         // accu(chunk.trading_post.iter(), &mut sum);
         // accu(chunk.train_station.iter(), &mut sum);
         // accu(chunk.trade_portal.iter(), &mut sum);
@@ -889,7 +894,7 @@ impl DwChunkBuf {
         // add(chunk.passenger_car.iter(), PassengerCar, &mut builder);
         add(chunk.workbench.iter(), Workbench, &mut builder);
         add(chunk.chest.iter(), Chest, &mut builder);
-        // add(chunk.sign.iter(), Sign, &mut builder);
+        add(chunk.sign.iter(), Sign, &mut builder);
         // add(chunk.trading_post.iter(), TradingPost, &mut builder);
         add(chunk.train_station.iter(), TrainStation, &mut builder);
         // add(chunk.trade_portal.iter(), TradePortal, &mut builder);

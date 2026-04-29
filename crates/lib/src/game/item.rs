@@ -1423,6 +1423,60 @@ mod tests {
         ))
     }
 
+    #[test]
+    fn test_sign_deserialization() {
+        let xml = "
+<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
+<plist version=\"1.0\">
+    <data>
+    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
+    4jj6w3k/Ro/J52flG/z86Pz26T/fSrj+CwsAAA==
+    </data>
+</plist>";
+        let data: plist::Data = plist::from_reader_xml(xml.as_bytes()).unwrap();
+        let bytes: Vec<u8> = data.into();
+
+        let item = Item::try_from_bytes(bytes).expect("should parse");
+        assert!(matches!(item.item_type(), Ok(ItemType::Basket)));
+        assert!(matches!(
+            item.sub_items.unwrap()[3][0].dynamic_object,
+            Some(AnyDynamicObject::Sign(_))
+        ));
+    }
+
     fn inventory_round_trip(inventory_data: &[u8]) {
         let inventory_value =
             plist::from_reader_xml(inventory_data).expect("should be able to deserialize");

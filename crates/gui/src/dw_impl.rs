@@ -23,7 +23,7 @@ use the_blockheads_tools_lib::game::{
         UniqueID,
         animal::{DodoBreed, Egg},
         chest::{Chest, ChestType},
-        craft::{Door, Ladder, Torch, TorchConnectionType},
+        craft::{Door, Ladder, Sign, SignConnectionType, Torch, TorchConnectionType},
         plant::{CarrotPlant, CornPlant, KelpPlant, NormalPlant, Plant, TomatoPlant},
         train::TrainStation,
         tree::{
@@ -1157,11 +1157,13 @@ impl ToRow for InteractionObjectType {
 }
 
 impl ToGrid for InteractionObject {
-    fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut ObjFlags) {
+    fn to_grid(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags) {
         self.interaction_object_type
             .add_row("interactionObjectType", ui);
         self.is_in_use.add_row("isInUse", ui);
-        self.flipped.add_row("flipped", ui);
+        if self.flipped.add_row("flipped", ui).changed() {
+            *flags |= ObjFlags::RebuildMesh;
+        }
         self.paint_color.add_row("paintColor", ui);
     }
 }
@@ -1522,6 +1524,110 @@ impl BuildDwMesh for Chest {
                 builder.add_block(DwBlock::new(block_coord, VoxelType::FeederChest))
             }
         };
+        Ok(())
+    }
+}
+
+impl ToRow for SignConnectionType {
+    fn to_row(&mut self, ui: &mut egui::Ui) -> egui::Response {
+        wrap_combo_box_resp(
+            egui::ComboBox::from_id_salt("sign_connection_type_combo_box")
+                .selected_text(format!("{:?}", self))
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(self, Self::GroundDouble, "GroundDouble")
+                        | ui.selectable_value(self, Self::GroundSingle, "GroundSingle")
+                        | ui.selectable_value(self, Self::Front, "Front")
+                        | ui.selectable_value(self, Self::Side, "Side")
+                        | ui.selectable_value(self, Self::Up, "Up")
+                }),
+        )
+    }
+}
+
+impl ToGrid for Sign {
+    fn to_grid(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags) {
+        self.text.add_row("text", ui);
+        if self.connection_type.add_row("connectionType", ui).changed() {
+            *flags |= ObjFlags::RebuildMesh;
+        }
+        self.offset_type.add_row("offsetType", ui);
+        self.save_time.add_row("saveTime", ui);
+    }
+}
+
+impl InfoUi for Sign {
+    fn info(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags) {
+        let obj = self.deref_mut();
+        obj.info(ui, flags);
+
+        ui.vertical(|ui| {
+            ui.heading("Sign");
+            ui.separator();
+            self.add_grid("sign_grid", ui, flags);
+        });
+    }
+}
+
+impl BuildDwMesh for Sign {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { icons: 0, quads: 1 });
+
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        let z = 3.0;
+        match self.connection_type {
+            SignConnectionType::GroundDouble => {
+                builder.add_face(DwFace::new_sprite(
+                    ImageType::SignGroundDouble,
+                    [1.0, 0.0],
+                    self.float_pos,
+                    [2, 1],
+                    z,
+                ));
+            }
+            SignConnectionType::GroundSingle => {
+                builder.add_face(DwFace::new_sprite(
+                    ImageType::SignGroundSingle,
+                    [1.0, 0.0],
+                    self.float_pos,
+                    [2, 1],
+                    z,
+                ));
+            }
+            SignConnectionType::Front => {
+                builder.add_face(DwFace::new_sprite(
+                    ImageType::Sign,
+                    [1.0, 0.0],
+                    self.float_pos,
+                    [2, 1],
+                    z,
+                ));
+            }
+            SignConnectionType::Side => {
+                let mut face = DwFace::new_sprite(
+                    ImageType::SignHang,
+                    [if self.flipped { 1.5 } else { 0.5 }, 0.0],
+                    self.float_pos,
+                    [2, 2],
+                    z,
+                );
+                if !self.flipped {
+                    face.mirror_uv_h();
+                }
+                builder.add_face(face);
+            }
+            SignConnectionType::Up => {
+                let mut face = DwFace::new_sprite(
+                    ImageType::SignHang,
+                    [if self.flipped { 1.5 } else { 0.5 }, 0.0],
+                    self.float_pos,
+                    [2, 1],
+                    z,
+                );
+                if !self.flipped {
+                    face.mirror_uv_h();
+                }
+                builder.add_face(face);
+            }
+        }
         Ok(())
     }
 }

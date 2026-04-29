@@ -842,7 +842,7 @@ impl EditorApp {
                 // PassengerCar => {}
                 Workbench => draw_window(title, dw_chunk.workbench.get_mut(id.index), ctx),
                 Chest => draw_window(title, dw_chunk.chest.get_mut(id.index), ctx),
-                // Sign => {}
+                Sign => draw_window(title, dw_chunk.sign.get_mut(id.index), ctx),
                 // TradingPost => {}
                 TrainStation => draw_window(title, dw_chunk.train_station.get_mut(id.index), ctx),
                 // TradePortal => {}
