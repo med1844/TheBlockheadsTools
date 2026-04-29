@@ -1313,7 +1313,93 @@ mod tests {
         let data: plist::Data = plist::from_reader_xml(xml.as_bytes()).unwrap();
         let bytes: Vec<u8> = data.into();
 
-        let _ = Item::try_from_bytes(bytes).expect("should parse");
+        let item = Item::try_from_bytes(bytes).expect("should parse");
+
+        assert!(matches!(
+            item.sub_items.expect("item must have sub_items")[0][0].dynamic_object,
+            Some(AnyDynamicObject::Bed(_))
+        ))
+    }
+
+    #[test]
+    fn test_door_deserialization() {
+        let xml = "
+<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
+<plist version=\"1.0\">
+	<data>
+		MAEAAAAAAAAfiwgAAAAAAAAHZZFfT8IwFMWf4VPUvrM7/gkxpUQZJiREljge
+		fDJzu+LCWGtbHPv2doMxdE+99/R3T09bNj8dUvKDSicim9G+41KCWSTiJNvN
+		6DZ47k3pnHfZnbdZBG/+ksg00Yb426f1akFoD+BRyhQBvMAj/nr1GhDrAbB8
+		oYR+GSMfAPI8d8KSciJxKEENvhISlSnW1qxnB5zYxNQec3b/E8eqcRIZ3u2w
+		PRY8ZlAutruoZ/kjFdEer5sdlmQGd6i4y6Aua/YzFaHxhW7gUKmwqjpMYZjy
+		/nAyGjtjBlXX6OPBfaMxuI5VtonBQ1BIbGcYuqN2CpFnqFZeQ2uj7KNzjcre
+		n8GlrXEp9PupbV0lbZuXdNGmq/z/2WOWfB/xNklNTPsTd3A7wOD86M1afRjv
+		/gIIHASpRwIAAA==
+	</data>
+</plist>";
+        let data: plist::Data = plist::from_reader_xml(xml.as_bytes()).unwrap();
+        let bytes: Vec<u8> = data.into();
+
+        let item = Item::try_from_bytes(bytes).expect("should parse");
+        assert!(matches!(
+            item.dynamic_object,
+            Some(AnyDynamicObject::Door(_))
+        ));
+    }
+
+    #[test]
+    fn test_ladder_deserialization() {
+        let xml = "
+<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
+<plist version=\"1.0\">
+	<data>
+    	NQAAAAAAAAAfiwgAAAAAAAAHbZFNb8IwDIbP8Cuy3Kn5UAFNIWijTKqEtkqU
+    	w05TRT0WrTRZElb675cWurLBKfabx29sh82P+4x8ozZC5jM68PqUYL6Vqch3
+    	M7qJn3pTOudddhe8LOLXaElUJowl0eZxFS4I7QE8KJUhQBAHJFqF65g4D4Dl
+    	MyX0w1p1D1AUhZdUlLeV+wo0EGmpUNty5cx6rsBLbUrdMyf3P+04NRVby7sd
+    	9oklTxlUh8vO6kl+z2RiI2ma2w5LtE7qqMM0JhkfjCbjseczqLNW9weTVmPw
+    	W1bbCov7uFTY2orc4g4190cMmrihZZGjDoMWNla7PXKD2o3E4Jw2uEqcwUJm
+    	Ul/b96/dlTRvx2uynus2Xd5ou5r2P3vIxdcBLxtviOFkOL3kGZy23p71j/Hu
+    	D8Y1j35IAgAA
+	</data>
+</plist>";
+        let data: plist::Data = plist::from_reader_xml(xml.as_bytes()).unwrap();
+        let bytes: Vec<u8> = data.into();
+
+        let item = Item::try_from_bytes(bytes).expect("should parse");
+        assert!(matches!(
+            item.dynamic_object,
+            Some(AnyDynamicObject::Ladder(_))
+        ))
+    }
+
+    #[test]
+    fn test_egg_deserialization() {
+        let xml = "
+<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
+<plist version=\"1.0\">
+	<data>
+    	WwAAAAEAAAAfiwgAAAAAAAAHbVHLbsIwEDzDV7i+E8d5EKhMUEuohITaSA2H
+    	nqo02ULUkKS2ef09jmkIj568O56dmbXZeL/O0Ra4yMpihKlhYgRFUqZZsRzh
+    	RfTSG+Cx32UPwdsk+ginqMozIVG4eJ7PJgj3CHmqqhwICaIAhfPZe4SUBiHT
+    	V4zwSsrqkZDdbmfENctIynVNFCTkZQVcHuZKrKcGjFSmWNmc1K/iKDTNEul3
+    	O+wHDn7KSH2o7g89wd95GcuwFM1th8Wcx7rqMA5x7lPb8yzDZUR3Le5awxZj
+    	5DymZZdQgAiUUavb2J4IXxzgHElhWSFhCdynjDSllr0Ku4plsoqyNfBWVifo
+    	O0PDNN0+dS3bsb2LsHquKsXnvh05e9WbXfs17MM9W+97yxXxFupAN3kcyzbV
+    	m1Hq0cFdmk2R/W5gFvxj4bi2eWnS7N+e+qP97hHkeAN2fwIAAA==
+	</data>
+</plist>";
+        let data: plist::Data = plist::from_reader_xml(xml.as_bytes()).unwrap();
+        let bytes: Vec<u8> = data.into();
+
+        let item = Item::try_from_bytes(bytes).expect("should parse");
+        assert!(matches!(
+            item.dynamic_object,
+            Some(AnyDynamicObject::Egg(_))
+        ))
     }
 
     fn inventory_round_trip(inventory_data: &[u8]) {
