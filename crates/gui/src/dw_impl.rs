@@ -3,8 +3,8 @@ use super::{
     gpu::{
         VoxelType,
         dw::{
-            BuildDwMesh, BuildDwMeshError, CoordOutOfBoundSnafu, DwBlock, DwChunkBufBuilder,
-            DwFace, DwIcon, DwQuad, FaceDirection, InvalidItemTypeForDoorSnafu,
+            BuildDwMesh, BuildDwMeshError, CoordOutOfBoundSnafu, DwBlock, DwCapacity,
+            DwChunkBufBuilder, DwFace, DwIcon, DwQuad, FaceDirection, InvalidItemTypeForDoorSnafu,
             InvalidItemTypeForTorchSnafu, InvalidWorkbenchLevelSnafu,
         },
     },
@@ -33,6 +33,8 @@ use the_blockheads_tools_lib::game::{
     },
     item::ItemType,
 };
+
+const CUBE_NUM_FACES: usize = 6;
 
 #[derive(Debug)]
 pub enum ObjFlags {
@@ -336,6 +338,8 @@ impl InfoUi for Tree {
 }
 
 impl BuildDwMesh for AppleTree {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { icons: 1, quads: 0 });
+
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         builder.add_icon(DwIcon::new(self.float_pos, ItemType::Apple));
         Ok(())
@@ -362,6 +366,8 @@ impl InfoUi for AppleTree {
 }
 
 impl BuildDwMesh for MapleTree {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { icons: 1, quads: 0 });
+
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         builder.add_icon(DwIcon::new(self.float_pos, ItemType::MapleSeed));
         Ok(())
@@ -409,6 +415,8 @@ impl InfoUi for PineTree {
 }
 
 impl BuildDwMesh for PineTree {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { icons: 1, quads: 0 });
+
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         builder.add_icon(DwIcon::new(self.float_pos, ItemType::Pinecone));
         Ok(())
@@ -438,6 +446,8 @@ impl InfoUi for CactusTree {
 }
 
 impl BuildDwMesh for CactusTree {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { icons: 1, quads: 0 });
+
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         builder.add_icon(DwIcon::new(self.float_pos, ItemType::PricklyPear));
         Ok(())
@@ -452,6 +462,8 @@ impl InfoUi for CoconutTree {
 }
 
 impl BuildDwMesh for CoconutTree {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { icons: 1, quads: 0 });
+
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         builder.add_icon(DwIcon::new(self.float_pos, ItemType::Coconut));
         Ok(())
@@ -465,6 +477,8 @@ impl InfoUi for OrangeTree {
     }
 }
 impl BuildDwMesh for OrangeTree {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { icons: 1, quads: 0 });
+
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         builder.add_icon(DwIcon::new(self.float_pos, ItemType::Orange));
         Ok(())
@@ -479,6 +493,8 @@ impl InfoUi for CherryTree {
 }
 
 impl BuildDwMesh for CherryTree {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { icons: 1, quads: 0 });
+
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         builder.add_icon(DwIcon::new(self.float_pos, ItemType::Cherry));
         Ok(())
@@ -493,6 +509,8 @@ impl InfoUi for CoffeeTree {
 }
 
 impl BuildDwMesh for CoffeeTree {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { icons: 1, quads: 0 });
+
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         builder.add_icon(DwIcon::new(self.float_pos, ItemType::CoffeeCherry));
         Ok(())
@@ -606,6 +624,8 @@ impl InfoUi for CornPlant {
 }
 
 impl BuildDwMesh for CornPlant {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { icons: 0, quads: 1 });
+
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         builder.add_face(DwFace::new_sprite(
             if self.flowering {
@@ -741,6 +761,8 @@ impl DwQuad for RotatedTorchFace {
 }
 
 impl BuildDwMesh for Torch {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { icons: 0, quads: 1 });
+
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         let image_type = match self.item_type {
             ItemType::Torch => ImageType::BasicTorch0,
@@ -826,6 +848,8 @@ impl InfoUi for Ladder {
 }
 
 impl BuildDwMesh for Ladder {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { icons: 0, quads: 1 });
+
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         builder.add_face(DwFace::new_sprite(
             ImageType::Ladder,
@@ -860,6 +884,8 @@ impl InfoUi for Door {
 }
 
 impl BuildDwMesh for Door {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { icons: 0, quads: 2 });
+
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         let [x, y] = self.float_pos;
         let z = 2.0;
@@ -918,6 +944,8 @@ impl InfoUi for CarrotPlant {
 }
 
 impl BuildDwMesh for CarrotPlant {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { icons: 0, quads: 1 });
+
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         builder.add_face(DwFace::new_sprite(
             if self.flowering {
@@ -1000,6 +1028,8 @@ impl InfoUi for Egg {
 }
 
 impl BuildDwMesh for Egg {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { icons: 1, quads: 0 });
+
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         // TODO add render egg with real breed textures
         builder.add_icon(DwIcon::new(self.float_pos, ItemType::DodoEgg));
@@ -1034,6 +1064,14 @@ impl InfoUi for KelpPlant {
 }
 
 impl BuildDwMesh for KelpPlant {
+    fn capacity(&self) -> DwCapacity {
+        let len = self.number_of_occupied_tiles_above as usize;
+        DwCapacity {
+            icons: 0,
+            quads: if len == 0 { 0 } else { len / 2 + 1 },
+        }
+    }
+
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         let mut len = self.number_of_occupied_tiles_above;
         let [x, mut y] = self.float_pos;
@@ -1088,6 +1126,8 @@ impl InfoUi for LimeTree {
 }
 
 impl BuildDwMesh for LimeTree {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { icons: 1, quads: 0 });
+
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         builder.add_icon(DwIcon::new(self.float_pos, ItemType::Lime));
         Ok(())
@@ -1231,6 +1271,11 @@ impl InfoUi for Workbench {
 }
 
 impl BuildDwMesh for Workbench {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity {
+        icons: 0,
+        quads: CUBE_NUM_FACES,
+    });
+
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         let block_coord = BlockCoord::new(self.pos_x, self.pos_y).context(CoordOutOfBoundSnafu)?;
         match self.workbench_type {
@@ -1452,6 +1497,11 @@ impl InfoUi for Chest {
 }
 
 impl BuildDwMesh for Chest {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity {
+        icons: 0,
+        quads: CUBE_NUM_FACES,
+    });
+
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         let block_coord = BlockCoord::new(self.pos_x, self.pos_y).context(CoordOutOfBoundSnafu)?;
         match self.slots.chest_type() {
@@ -1525,6 +1575,8 @@ impl InfoUi for GemTree {
 }
 
 impl BuildDwMesh for GemTree {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { icons: 1, quads: 0 });
+
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         let item_type = match self.gem_tree_type {
             TreeType::Amethyst => ItemType::Amethyst,
@@ -1547,6 +1599,8 @@ impl InfoUi for TomatoPlant {
 }
 
 impl BuildDwMesh for TomatoPlant {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { icons: 0, quads: 1 });
+
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         builder.add_face(DwFace::new_sprite(
             if self.flowering {

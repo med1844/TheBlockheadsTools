@@ -1,7 +1,10 @@
 use super::{super::image_type::ImageType, VoxelType};
 use eframe::wgpu::{self, util::DeviceExt};
 use snafu::Snafu;
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    ops::{AddAssign, Mul},
+};
 use the_blockheads_tools_lib::game::{
     chunk::Chunk,
     coord::{BlockCoord, ChunkBlockCoord, ChunkCoord, CoordError},
@@ -463,7 +466,43 @@ pub enum BuildDwMeshError {
     },
 }
 
+#[derive(Default, Clone, Copy)]
+pub struct DwCapacity {
+    pub icons: usize,
+    pub quads: usize,
+}
+
+impl DwCapacity {
+    fn is_empty(&self) -> bool {
+        self.icons == 0 && self.quads == 0
+    }
+}
+
+impl AddAssign for DwCapacity {
+    fn add_assign(&mut self, rhs: Self) {
+        self.icons += rhs.icons;
+        self.quads += rhs.quads;
+    }
+}
+
+impl Mul<usize> for DwCapacity {
+    type Output = DwCapacity;
+
+    fn mul(self, rhs: usize) -> Self::Output {
+        Self::Output {
+            icons: self.icons * rhs,
+            quads: self.quads * rhs,
+        }
+    }
+}
+
 pub trait BuildDwMesh {
+    const STATIC_CAPACITY: Option<DwCapacity> = None;
+
+    fn capacity(&self) -> DwCapacity {
+        DwCapacity::default()
+    }
+
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError>;
 }
 
@@ -697,6 +736,85 @@ pub struct DwChunkBuf {
 }
 
 impl DwChunkBuf {
+    fn get_chunk_capacity(chunk: &ChunkDynamicObjects) -> DwCapacity {
+        let mut sum = DwCapacity::default();
+        fn accu<'a, T: BuildDwMesh + 'a, I: ExactSizeIterator<Item = &'a T>>(
+            i: I,
+            sum: &mut DwCapacity,
+        ) {
+            if let Some(cap) = T::STATIC_CAPACITY {
+                *sum += cap * i.len();
+            } else {
+                for obj in i {
+                    let cap = obj.capacity();
+                    *sum += cap;
+                }
+            }
+        }
+        accu(chunk.apple_tree.iter(), &mut sum);
+        accu(chunk.maple_tree.iter(), &mut sum);
+        accu(chunk.mango_tree.iter(), &mut sum);
+        accu(chunk.pine_tree.iter(), &mut sum);
+        accu(chunk.cactus_tree.iter(), &mut sum);
+        accu(chunk.coconut_tree.iter(), &mut sum);
+        accu(chunk.orange_tree.iter(), &mut sum);
+        accu(chunk.cherry_tree.iter(), &mut sum);
+        accu(chunk.coffee_tree.iter(), &mut sum);
+        // accu(chunk.flax_plant.iter(), &mut sum);
+        // accu(chunk.sunflower_plant.iter(), &mut sum);
+        accu(chunk.corn_plant.iter(), &mut sum);
+        // accu(chunk.dodo.iter(), &mut sum);
+        // accu(chunk.dropped_item.iter(), &mut sum);
+        // accu(chunk.fire.iter(), &mut sum);
+        accu(chunk.torch.iter(), &mut sum);
+        // accu(chunk.glow_block.iter(), &mut sum);
+        accu(chunk.ladder.iter(), &mut sum);
+        accu(chunk.door.iter(), &mut sum);
+        // accu(chunk.artificial_light.iter(), &mut sum);
+        // accu(chunk.bed.iter(), &mut sum);
+        // accu(chunk.dropbear.iter(), &mut sum);
+        // accu(chunk.gather_block.iter(), &mut sum);
+        accu(chunk.carrot_plant.iter(), &mut sum);
+        // accu(chunk.donkey.iter(), &mut sum);
+        accu(chunk.egg.iter(), &mut sum);
+        // accu(chunk.window.iter(), &mut sum);
+        // accu(chunk.boat.iter(), &mut sum);
+        // accu(chunk.chilli_plant.iter(), &mut sum);
+        accu(chunk.kelp_plant.iter(), &mut sum);
+        // accu(chunk.clown_fish.iter(), &mut sum);
+        // accu(chunk.shark.iter(), &mut sum);
+        accu(chunk.lime_tree.iter(), &mut sum);
+        // accu(chunk.wire.iter(), &mut sum);
+        // accu(chunk.cave_troll.iter(), &mut sum);
+        // accu(chunk.rail.iter(), &mut sum);
+        // accu(chunk.hand_car.iter(), &mut sum);
+        // accu(chunk.steam_locomotive.iter(), &mut sum);
+        // accu(chunk.freight_car.iter(), &mut sum);
+        // accu(chunk.passenger_car.iter(), &mut sum);
+        accu(chunk.workbench.iter(), &mut sum);
+        accu(chunk.chest.iter(), &mut sum);
+        // accu(chunk.sign.iter(), &mut sum);
+        // accu(chunk.trading_post.iter(), &mut sum);
+        // accu(chunk.train_station.iter(), &mut sum);
+        // accu(chunk.trade_portal.iter(), &mut sum);
+        // accu(chunk.scorpion.iter(), &mut sum);
+        // accu(chunk.painting.iter(), &mut sum);
+        // accu(chunk.column.iter(), &mut sum);
+        // accu(chunk.stairs.iter(), &mut sum);
+        // accu(chunk.elevator_motor.iter(), &mut sum);
+        // accu(chunk.elevator_shaft.iter(), &mut sum);
+        accu(chunk.gem_tree.iter(), &mut sum);
+        // accu(chunk.vine_plant.iter(), &mut sum);
+        // accu(chunk.tulip_plant.iter(), &mut sum);
+        // accu(chunk.ownership_sign.iter(), &mut sum);
+        // accu(chunk.wheat_plant.iter(), &mut sum);
+        accu(chunk.tomato_plant.iter(), &mut sum);
+        // accu(chunk.yak.iter(), &mut sum);
+        // accu(chunk.mirror.iter(), &mut sum);
+
+        sum
+    }
+
     pub fn from_chunk(
         chunk: &ChunkDynamicObjects,
         coord: ChunkCoord,
@@ -715,15 +833,14 @@ impl DwChunkBuf {
                 let _ = obj.build_dw_mesh(builder);
             }
         }
-
-        let num_objs = chunk.num_objects();
-        if num_objs == 0 {
+        let need_capacity = Self::get_chunk_capacity(chunk);
+        if need_capacity.is_empty() {
             return None;
         }
 
         let mut builder = DwChunkBufBuilder {
-            icon_instances: Vec::with_capacity(num_objs),
-            faces_mesh_builder: MeshAggregator::with_capacity(num_objs),
+            icon_instances: Vec::with_capacity(need_capacity.icons),
+            faces_mesh_builder: MeshAggregator::with_capacity(need_capacity.quads),
             blocks: ChunkDwBlock::default(),
             id: DwChunkObjId::new(DynamicObjectType::AppleTree, 0), // random id - won't be read.
             coord,
@@ -739,18 +856,57 @@ impl DwChunkBuf {
         add(chunk.orange_tree.iter(), OrangeTree, &mut builder);
         add(chunk.cherry_tree.iter(), CherryTree, &mut builder);
         add(chunk.coffee_tree.iter(), CoffeeTree, &mut builder);
+        // add(chunk.flax_plant.iter(), FlaxPlant, &mut builder);
+        // add(chunk.sunflower_plant.iter(), SunflowerPlant, &mut builder);
         add(chunk.corn_plant.iter(), CornPlant, &mut builder);
+        // add(chunk.dodo.iter(), Dodo, &mut builder);
+        // add(chunk.dropped_item.iter(), DroppedItem, &mut builder);
+        // add(chunk.fire.iter(), u8, &mut builder);
         add(chunk.torch.iter(), Torch, &mut builder);
+        // add(chunk.glow_block.iter(), u8, &mut builder);
         add(chunk.ladder.iter(), Ladder, &mut builder);
         add(chunk.door.iter(), Door, &mut builder);
+        // add(chunk.artificial_light.iter(), u8, &mut builder);
+        // add(chunk.bed.iter(), Bed, &mut builder);
+        // add(chunk.dropbear.iter(), DropBear, &mut builder);
+        // add(chunk.gather_block.iter(), u8, &mut builder);
         add(chunk.carrot_plant.iter(), CarrotPlant, &mut builder);
+        // add(chunk.donkey.iter(), Donkey, &mut builder);
         add(chunk.egg.iter(), Egg, &mut builder);
+        // add(chunk.window.iter(), Window, &mut builder);
+        // add(chunk.boat.iter(), Boat, &mut builder);
+        // add(chunk.chilli_plant.iter(), ChilliPlant, &mut builder);
         add(chunk.kelp_plant.iter(), KelpPlant, &mut builder);
+        // add(chunk.clown_fish.iter(), ClownFish, &mut builder);
+        // add(chunk.shark.iter(), Shark, &mut builder);
         add(chunk.lime_tree.iter(), LimeTree, &mut builder);
+        // add(chunk.wire.iter(), Wire, &mut builder);
+        // add(chunk.cave_troll.iter(), CaveTroll, &mut builder);
+        // add(chunk.rail.iter(), Rail, &mut builder);
+        // add(chunk.hand_car.iter(), HandCar, &mut builder);
+        // add(chunk.steam_locomotive.iter(), SteamLocomotive, &mut builder);
+        // add(chunk.freight_car.iter(), FreightCar, &mut builder);
+        // add(chunk.passenger_car.iter(), PassengerCar, &mut builder);
         add(chunk.workbench.iter(), Workbench, &mut builder);
         add(chunk.chest.iter(), Chest, &mut builder);
+        // add(chunk.sign.iter(), Sign, &mut builder);
+        // add(chunk.trading_post.iter(), TradingPost, &mut builder);
+        // add(chunk.train_station.iter(), TrainStation, &mut builder);
+        // add(chunk.trade_portal.iter(), TradePortal, &mut builder);
+        // add(chunk.scorpion.iter(), Scorpion, &mut builder);
+        // add(chunk.painting.iter(), u8, &mut builder);
+        // add(chunk.column.iter(), Column, &mut builder);
+        // add(chunk.stairs.iter(), Stairs, &mut builder);
+        // add(chunk.elevator_motor.iter(), ElevatorMotor, &mut builder);
+        // add(chunk.elevator_shaft.iter(), ElevatorShaft, &mut builder);
         add(chunk.gem_tree.iter(), GemTree, &mut builder);
+        // add(chunk.vine_plant.iter(), VinePlant, &mut builder);
+        // add(chunk.tulip_plant.iter(), TulipPlant, &mut builder);
+        // add(chunk.ownership_sign.iter(), u8, &mut builder);
+        // add(chunk.wheat_plant.iter(), WheatPlant, &mut builder);
         add(chunk.tomato_plant.iter(), TomatoPlant, &mut builder);
+        // add(chunk.yak.iter(), Yak, &mut builder);
+        // add(chunk.mirror.iter(), u8, &mut builder);
 
         let DwChunkBufBuilder {
             icon_instances,
