@@ -1,4 +1,4 @@
-use super::{super::image_type::ImageType, VoxelType, coord::Coord};
+use super::{super::image_type::ImageType, VoxelType};
 use eframe::wgpu::{self, util::DeviceExt};
 use snafu::Snafu;
 use std::collections::HashMap;
@@ -49,6 +49,34 @@ impl DwIconVertex {
     pub const INDICES: &[u16] = &[0, 1, 2, 0, 2, 3];
 }
 
+#[repr(C)]
+#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable, Default)]
+pub struct PackedChunkCoord {
+    coord: u32,
+}
+
+impl PackedChunkCoord {
+    const Y_NUM_BITS: usize = 5;
+    const Y_MASK: u32 = (1 << Self::Y_NUM_BITS) - 1;
+}
+
+impl From<ChunkCoord> for PackedChunkCoord {
+    fn from(value: ChunkCoord) -> Self {
+        Self {
+            coord: (value.x() << Self::Y_NUM_BITS) | value.y() as u32,
+        }
+    }
+}
+
+impl From<PackedChunkCoord> for ChunkCoord {
+    fn from(value: PackedChunkCoord) -> Self {
+        Self::new(
+            value.coord >> PackedChunkCoord::Y_NUM_BITS,
+            (value.coord & PackedChunkCoord::Y_MASK) as u8, // Y_MASK is guaranteed to be smaller than u8
+        ).expect("type safety violation: PackedChunkCoord must come from ChunkCoord instance, reconstructing should not violate invariance")
+    }
+}
+
 #[derive(Clone, Copy)]
 pub struct DwIcon {
     position: [f32; 2],
@@ -69,8 +97,7 @@ impl DwIcon {
             position: self.position,
             item_type: self.item_type as u32,
             raw_id: id.raw_id(),
-            chunk_x: coord.x(),
-            chunk_y: coord.y() as u32,
+            chunk: coord.into(),
         }
     }
 }
@@ -81,17 +108,15 @@ pub struct DwIconInstanceRaw {
     pub position: [f32; 2],
     pub item_type: u32,
     pub raw_id: u32,
-    pub chunk_x: u32,
-    pub chunk_y: u32,
+    pub chunk: PackedChunkCoord,
 }
 
 impl DwIconInstanceRaw {
-    const ATTRIBS: [wgpu::VertexAttribute; 5] = wgpu::vertex_attr_array![
+    const ATTRIBS: [wgpu::VertexAttribute; 4] = wgpu::vertex_attr_array![
         1 => Float32x2,
         2 => Uint32,
         3 => Uint32,
         4 => Uint32,
-        5 => Uint32,
     ];
 
     pub fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
@@ -115,39 +140,34 @@ pub trait DwQuad {
         let [[u_min, v_min], [u_max, v_max]] = self.uv_min_max();
 
         let raw_id = id.raw_id();
-        let chunk_x = chunk_coord.x();
-        let chunk_y = chunk_coord.y() as u32;
+        let chunk = (*chunk_coord).into();
 
         (
             [
                 DwVertex {
                     raw_id,
-                    chunk_x,
-                    chunk_y,
+                    chunk,
                     position: bottom_left.map(|v| v),
                     normal,
                     tex_coords: [u_min, v_max],
                 },
                 DwVertex {
                     raw_id,
-                    chunk_x,
-                    chunk_y,
+                    chunk,
                     position: bottom_right.map(|v| v),
                     normal,
                     tex_coords: [u_max, v_max],
                 },
                 DwVertex {
                     raw_id,
-                    chunk_x,
-                    chunk_y,
+                    chunk,
                     position: top_right.map(|v| v),
                     normal,
                     tex_coords: [u_max, v_min],
                 },
                 DwVertex {
                     raw_id,
-                    chunk_x,
-                    chunk_y,
+                    chunk,
                     position: top_left.map(|v| v),
                     normal,
                     tex_coords: [u_min, v_min],
@@ -546,8 +566,13 @@ pub struct DwChunkObjId {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable, Default)]
-pub struct DwChunkObjIdUniform([u32; 4]);
+#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable, Default)]
+pub struct DwChunkObjIdUniform {
+    is_some: u32,
+    raw_id: u32,
+    chunk: PackedChunkCoord,
+    _padding: u32,
+}
 
 impl DwChunkObjId {
     const MAX_INDEX_BITS: usize = 24;
@@ -582,14 +607,14 @@ impl DwChunkObjId {
 
 impl From<Option<(DwChunkObjId, ChunkCoord)>> for DwChunkObjIdUniform {
     fn from(value: Option<(DwChunkObjId, ChunkCoord)>) -> Self {
-        let mut uniform = [0; 4];
-        if let Some((id, chunk_coord)) = value {
-            uniform[0] = 1;
-            uniform[1] = id.raw_id();
-            uniform[2] = chunk_coord.x_u32();
-            uniform[3] = chunk_coord.y_u32();
-        }
-        Self(uniform)
+        value
+            .map(|(id, chunk_coord)| Self {
+                is_some: 1,
+                raw_id: id.raw_id(),
+                chunk: chunk_coord.into(),
+                _padding: 0,
+            })
+            .unwrap_or_default()
     }
 }
 
@@ -604,18 +629,17 @@ impl DwChunkObjIdUniform {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct DwVertex {
     pub raw_id: u32,
-    pub chunk_x: u32,
-    pub chunk_y: u32,
+    pub chunk: PackedChunkCoord,
     pub position: [f32; 3],
     pub normal: [f32; 3],
     pub tex_coords: [f32; 2],
 }
 
 impl DwVertex {
-    const ATTRIBS: [wgpu::VertexAttribute; 6] = wgpu::vertex_attr_array![0 => Uint32, 1 => Uint32, 2 => Uint32, 3 => Float32x3, 4 => Float32x3, 5 => Float32x2];
+    const ATTRIBS: [wgpu::VertexAttribute; 5] = wgpu::vertex_attr_array![0 => Uint32, 1 => Uint32, 2 => Float32x3, 3 => Float32x3, 4 => Float32x2];
     pub fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
         wgpu::VertexBufferLayout {
             array_stride: std::mem::size_of::<DwVertex>() as wgpu::BufferAddress,

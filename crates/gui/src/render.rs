@@ -13,11 +13,11 @@ use std::sync::{
     Arc, Mutex,
     atomic::{AtomicBool, Ordering},
 };
-use the_blockheads_tools_lib::game::chunk::Chunk;
+use the_blockheads_tools_lib::game::{chunk::Chunk, coord::ChunkCoord};
 use wgpu::util::DeviceExt;
 use zune_png::PngDecoder;
 
-const ID_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::R32Uint;
+const ID_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rg32Uint;
 
 pub(crate) enum ResizeOutcome {
     Unchanged,
@@ -30,7 +30,6 @@ pub(crate) struct GeometryBuffer {
     // Semi-transparent voxel pixels (alpha < 1.0) accumulated during ray marching.
     translucency: Texture,
     normal: Texture,
-    mesh_flags: Texture,
     flags: Texture,
     ssao_raw: Texture,
     ssao_blur: Texture,
@@ -59,12 +58,6 @@ impl GeometryBuffer {
             device,
             wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
             wgpu::TextureFormat::Rgba16Float,
-        );
-        let mesh_flags_texture = Texture::new(
-            size,
-            device,
-            wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
-            wgpu::TextureFormat::R8Uint,
         );
         let flags_texture = Texture::new(
             size,
@@ -99,8 +92,10 @@ impl GeometryBuffer {
         let dyn_obj_id_texture = Texture::new(
             size,
             device,
-            wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
-            wgpu::TextureFormat::R32Uint,
+            wgpu::TextureUsages::RENDER_ATTACHMENT
+                | wgpu::TextureUsages::COPY_SRC
+                | wgpu::TextureUsages::TEXTURE_BINDING,
+            ID_TEXTURE_FORMAT,
         );
         let translucency_texture = Texture::new(
             size,
@@ -120,7 +115,6 @@ impl GeometryBuffer {
             uv: uv_texture,
             translucency: translucency_texture,
             normal: normal_texture,
-            mesh_flags: mesh_flags_texture,
             flags: flags_texture,
             ssao_raw: ssao_raw_texture,
             ssao_blur: ssao_blur_texture,
@@ -169,7 +163,7 @@ pub struct RenderResources {
 
     // Stores the object ID of the pixel under cursor from g_buffer.dyn_obj_id
     staging_buffer: wgpu::Buffer,
-    hover_on_dyn_obj_id: Arc<Mutex<Option<DwChunkObjId>>>,
+    hover_on_dyn_obj_id: Arc<Mutex<Option<(DwChunkObjId, ChunkCoord)>>>,
     is_mapping: Arc<AtomicBool>,
     has_new_copy: Arc<AtomicBool>,
 
@@ -185,14 +179,14 @@ pub struct RenderResources {
 }
 
 impl RenderResources {
-    const STAGING_BUFFER_SIZE: u64 = std::mem::size_of::<u32>() as u64; // only read single pixel
+    const STAGING_BUFFER_SIZE: u64 = std::mem::size_of::<(u32, u32)>() as u64; // read raw_id and packed_chunk
 
     pub fn new(
         state: &egui_wgpu::RenderState,
         camera_buf: wgpu::Buffer,
         selected_block_buf: wgpu::Buffer,
         hover_on_block_buf: wgpu::Buffer,
-        hover_on_dyn_obj_id: Arc<Mutex<Option<DwChunkObjId>>>,
+        hover_on_dyn_obj_id: Arc<Mutex<Option<(DwChunkObjId, ChunkCoord)>>>,
     ) -> Self {
         let device = &state.device;
         let queue = &state.queue;
@@ -262,6 +256,8 @@ impl RenderResources {
                 world_dim_x_buf.clone(),
                 &selected_block_buf,
                 &hover_on_block_buf,
+                &hover_on_id_buf,
+                &selected_id_buf,
                 &g_buffer,
                 &render_settings_buf,
                 &albedo_texture,
@@ -280,8 +276,6 @@ impl RenderResources {
                 device,
                 &camera_buf,
                 &albedo_texture,
-                &hover_on_id_buf,
-                &selected_id_buf,
                 &render_settings_buf,
             ),
             grid: grid::GridRenderer::new(
@@ -411,14 +405,23 @@ impl RenderResources {
         self.staging_buffer
             .map_async(wgpu::MapMode::Read, bounds.clone(), move |result| {
                 if result.is_ok() {
+                    let u32_size = std::mem::size_of::<u32>();
                     let buffer_view = staging_buffer.get_mapped_range(bounds);
                     let raw_id = u32::from_ne_bytes(
-                        buffer_view[..]
+                        buffer_view[0..u32_size]
                             .try_into()
                             .expect("array size should be exactly 4"),
                     );
+                    let packed_chunk = u32::from_ne_bytes(
+                        buffer_view[u32_size..u32_size + u32_size]
+                            .try_into()
+                            .expect("array size should be exactly 4"),
+                    );
+                    let chunk_y = packed_chunk & 0b11111;
+                    let chunk_x = packed_chunk >> 5;
                     let mut guard = hover_on_dyn_obj_id.lock().expect("should lock mutex");
-                    *guard = DwChunkObjId::try_from_u32(raw_id);
+                    *guard = DwChunkObjId::try_from_u32(raw_id)
+                        .map(|id| (id, ChunkCoord::new(chunk_x, chunk_y as u8).unwrap()));
                 }
                 staging_buffer.unmap();
                 is_mapping.store(false, Ordering::SeqCst);
@@ -515,15 +518,6 @@ impl egui_wgpu::CallbackTrait for Render3dCallback {
                     }),
                     Some(wgpu::RenderPassColorAttachment {
                         view: &r.g_buffer.translucency.view,
-                        depth_slice: None,
-                        resolve_target: None,
-                        ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
-                            store: wgpu::StoreOp::Store,
-                        },
-                    }),
-                    Some(wgpu::RenderPassColorAttachment {
-                        view: &r.g_buffer.mesh_flags.view,
                         depth_slice: None,
                         resolve_target: None,
                         ops: wgpu::Operations {

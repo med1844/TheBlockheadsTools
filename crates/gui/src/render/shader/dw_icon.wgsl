@@ -8,8 +8,8 @@ struct CameraUniform {
 struct IdUniform {
     is_some: u32,
     id: u32,
-    x: u32,
-    y: u32,
+    chunk: u32,
+    _padding: u32,
 };
 
 @group(0) @binding(0) var<uniform> camera: CameraUniform;
@@ -45,8 +45,7 @@ struct DynObjInstanceInput {
     @location(1) instance_pos: vec2<f32>,
     @location(2) item_type: u32,
     @location(3) id: u32,
-    @location(4) chunk_x: u32,
-    @location(5) chunk_y: u32,
+    @location(4) chunk: u32,
 };
 
 struct DynObjVSOutput {
@@ -54,13 +53,12 @@ struct DynObjVSOutput {
     @location(0) uv: vec2<f32>,
     @location(1) @interpolate(flat) item_type: u32,
     @location(2) @interpolate(flat) id: u32,
-    @location(3) @interpolate(flat) chunk_x: u32,
-    @location(4) @interpolate(flat) chunk_y: u32,
+    @location(3) @interpolate(flat) chunk: u32,
 };
 
 struct FragmentOutput {
     @location(0) color: vec4<f32>,
-    @location(1) id: u32,
+    @location(1) id: vec2<u32>,
 }
 
 @vertex
@@ -77,8 +75,7 @@ fn vs_dynamic_object_icon(model: DynObjVertexInput, instance: DynObjInstanceInpu
     out.uv.y = 1 - out.uv.y;
     out.item_type = instance.item_type;
     out.id = instance.id;
-    out.chunk_x = instance.chunk_x;
-    out.chunk_y = instance.chunk_y;
+    out.chunk = instance.chunk;
 
     return out;
 }
@@ -201,8 +198,7 @@ fn fs_dynamic_object_icon(in: DynObjVSOutput) -> FragmentOutput {
     }
 
     let hovered = hover_on_id.is_some != 0u
-        && in.chunk_x == hover_on_id.x
-        && in.chunk_y == hover_on_id.y
+        && in.chunk == hover_on_id.chunk
         && in.id == hover_on_id.id;
 
     var final_color: vec3<f32> = color.rgb;
@@ -211,8 +207,7 @@ fn fs_dynamic_object_icon(in: DynObjVSOutput) -> FragmentOutput {
     }
 
     let selected = selected_id.is_some != 0u
-        && in.chunk_x == selected_id.x
-        && in.chunk_y == selected_id.y
+        && in.chunk == selected_id.chunk
         && in.id == selected_id.id;
 
     if (selected) {
@@ -221,6 +216,6 @@ fn fs_dynamic_object_icon(in: DynObjVSOutput) -> FragmentOutput {
 
     var output: FragmentOutput;
     output.color = vec4<f32>(final_color, color.a);
-    output.id = in.id;
+    output.id = vec2<u32>(in.id, in.chunk);
     return output;
 }

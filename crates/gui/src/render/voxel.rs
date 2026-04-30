@@ -25,6 +25,8 @@ impl VoxelRenderer {
         world_dim_x_buf: wgpu::Buffer,
         selected_block_buf: &wgpu::Buffer,
         hover_on_block_buf: &wgpu::Buffer,
+        hover_on_id_buf: &wgpu::Buffer,
+        selected_id_buf: &wgpu::Buffer,
         g_buffer: &GeometryBuffer,
         render_settings_buf: &wgpu::Buffer,
         albedo_texture: &Texture,
@@ -166,6 +168,28 @@ impl VoxelRenderer {
                     },
                     count: None,
                 },
+                // hover_on_id_buf
+                wgpu::BindGroupLayoutEntry {
+                    binding: 12,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                // selected_id_buf
+                wgpu::BindGroupLayoutEntry {
+                    binding: 13,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
             ],
             label: Some("Voxel Static Bind Group Layout"),
         });
@@ -220,6 +244,14 @@ impl VoxelRenderer {
                 wgpu::BindGroupEntry {
                     binding: 11,
                     resource: world_dim_x_buf.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 12,
+                    resource: hover_on_id_buf.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 13,
+                    resource: selected_id_buf.as_entire_binding(),
                 },
             ],
             label: Some("Voxel Static Bind Group"),
@@ -382,7 +414,7 @@ impl VoxelRenderer {
                 },
                 wgpu::BindGroupEntry {
                     binding: 2,
-                    resource: wgpu::BindingResource::TextureView(&g_buffer.mesh_flags.view),
+                    resource: wgpu::BindingResource::TextureView(&g_buffer.dyn_obj_id.view),
                 },
             ],
             label: Some("Voxel Buffer Bind Group"),

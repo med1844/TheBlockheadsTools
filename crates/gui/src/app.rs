@@ -99,7 +99,7 @@ struct InteractionState {
     select: Option<InteractionTarget>,
 
     selected_block_chunk: Option<Chunk>,
-    hover_on_dyn_obj_id: Arc<Mutex<Option<DwChunkObjId>>>,
+    hover_on_dyn_obj_id: Arc<Mutex<Option<(DwChunkObjId, ChunkCoord)>>>,
 
     selected_block_gpu: GpuCoord<BlockCoord>,
     hover_on_block_gpu: GpuCoord<BlockCoord>,
@@ -577,14 +577,13 @@ impl EditorApp {
             let hover_on_block_coord = BlockCoord::new(x as u32, y as u16).ok();
 
             if let Some(block_coord) = hover_on_block_coord {
-                if let Some(id) = {
+                if let Some((id, chunk_coord)) = {
                     *self
                         .interaction_state
                         .hover_on_dyn_obj_id
                         .lock()
                         .expect("should lock")
                 } {
-                    let chunk_coord = block_coord.into();
                     self.interaction_state.set_hover_on_obj(chunk_coord, id);
                 } else {
                     self.interaction_state.set_hover_on_block(block_coord);

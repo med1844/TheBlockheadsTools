@@ -10,8 +10,6 @@ impl DwMeshRenderer {
         device: &wgpu::Device,
         camera_buf: &wgpu::Buffer,
         albedo_texture: &Texture,
-        hover_on_id_buf: &wgpu::Buffer,
-        selected_id_buf: &wgpu::Buffer,
         render_settings_buf: &wgpu::Buffer,
     ) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -51,31 +49,9 @@ impl DwMeshRenderer {
                     ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                     count: None,
                 },
-                // Hover on id
-                wgpu::BindGroupLayoutEntry {
-                    binding: 3,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-                // Selected id
-                wgpu::BindGroupLayoutEntry {
-                    binding: 4,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
                 // Render Settings
                 wgpu::BindGroupLayoutEntry {
-                    binding: 5,
+                    binding: 3,
                     visibility: wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform,
@@ -104,14 +80,6 @@ impl DwMeshRenderer {
                 },
                 wgpu::BindGroupEntry {
                     binding: 3,
-                    resource: hover_on_id_buf.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 4,
-                    resource: selected_id_buf.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 5,
                     resource: render_settings_buf.as_entire_binding(),
                 },
             ],
@@ -159,12 +127,6 @@ impl DwMeshRenderer {
                     Some(wgpu::ColorTargetState {
                         format: wgpu::TextureFormat::Bgra8Unorm,
                         blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-                        write_mask: wgpu::ColorWrites::ALL,
-                    }),
-                    // slot 4: flags
-                    Some(wgpu::ColorTargetState {
-                        format: wgpu::TextureFormat::R8Uint,
-                        blend: None,
                         write_mask: wgpu::ColorWrites::ALL,
                     }),
                 ],

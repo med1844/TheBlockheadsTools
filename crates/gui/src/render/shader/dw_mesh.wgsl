@@ -8,23 +8,20 @@ struct CameraUniform {
 struct IdUniform {
     is_some: u32,
     id: u32,
-    x: u32,
-    y: u32,
+    chunk: u32,
+    _padding: u32,
 };
 
 @group(0) @binding(0) var<uniform> camera: CameraUniform;
 @group(0) @binding(1) var tilemap_texture: texture_2d<f32>;
 @group(0) @binding(2) var tilemap_sampler: sampler;
-@group(0) @binding(3) var<uniform> hover_on_id: IdUniform;
-@group(0) @binding(4) var<uniform> selected_id: IdUniform;
 
 struct VertexInput {
     @location(0) @interpolate(flat) id: u32,
-    @location(1) @interpolate(flat) chunk_x: u32,
-    @location(2) @interpolate(flat) chunk_y: u32,
-    @location(3) position: vec3<f32>,
-    @location(4) normal: vec3<f32>,
-    @location(5) tex_coords: vec2<f32>,
+    @location(1) @interpolate(flat) chunk: u32,
+    @location(2) position: vec3<f32>,
+    @location(3) normal: vec3<f32>,
+    @location(4) tex_coords: vec2<f32>,
 };
 
 struct VertexOutput {
@@ -32,9 +29,8 @@ struct VertexOutput {
     @location(0) tex_coords: vec2<f32>,
     @location(1) normal: vec3<f32>,
     @location(2) @interpolate(flat) id: u32,
-    @location(3) @interpolate(flat) chunk_x: u32,
-    @location(4) @interpolate(flat) chunk_y: u32,
-    @location(5) world_pos: vec3<f32>,
+    @location(3) @interpolate(flat) chunk: u32,
+    @location(4) world_pos: vec3<f32>,
 };
 
 struct RenderSettings {
@@ -50,14 +46,13 @@ struct RenderSettings {
     _padding0: u32,
 };
 
-@group(0) @binding(5) var<uniform> render_settings: RenderSettings;
+@group(0) @binding(3) var<uniform> render_settings: RenderSettings;
 
 struct FragmentOutput {
     @location(0) uv: vec4<f32>,
     @location(1) normal: vec4<f32>,
-    @location(2) id: u32,
+    @location(2) id: vec2<u32>,
     @location(3) translucency: vec4<f32>,
-    @location(4) flags: u32,
     @builtin(frag_depth) depth: f32,
 }
 
@@ -68,8 +63,7 @@ fn vs_main(model: VertexInput) -> VertexOutput {
     out.clip_position = camera.view_proj * vec4<f32>(pos_in_view, 1.0);
     out.tex_coords = model.tex_coords;
     out.id = model.id;
-    out.chunk_x = model.chunk_x;
-    out.chunk_y = model.chunk_y;
+    out.chunk = model.chunk;
     out.normal = model.normal;
     out.world_pos = model.position;
     return out;
@@ -93,30 +87,8 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
         discard;
     }
 
-    var flags = 0u;
-
-    // Highlight when both chunk coord and object id match the hovered target.
-    let hovered = hover_on_id.is_some != 0u
-        && in.chunk_x == hover_on_id.x
-        && in.chunk_y == hover_on_id.y
-        && in.id == hover_on_id.id;
-
-    if (hovered) {
-        flags |= 1u;
-    }
-
-    let selected = selected_id.is_some != 0u
-        && in.chunk_x == selected_id.x
-        && in.chunk_y == selected_id.y
-        && in.id == selected_id.id;
-
-    if (selected) {
-        flags |= 2u;
-    }
-
     var output: FragmentOutput;
-    output.id = in.id;
-    output.flags = flags;
+    output.id = vec2<u32>(in.id, in.chunk);
 
     if (color.a < 1.0) {
         // Translucent mesh pixel

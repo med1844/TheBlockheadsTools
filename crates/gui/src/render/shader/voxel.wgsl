@@ -115,9 +115,18 @@ struct RenderSettings {
 // Enforced by Rust code.
 @group(0) @binding(11) var<uniform> world_dim_x: u32;
 
+struct IdUniform {
+    is_some: u32,
+    id: u32,
+    chunk: u32,
+};
+
+@group(0) @binding(12) var<uniform> hover_on_id: IdUniform;
+@group(0) @binding(13) var<uniform> selected_id: IdUniform;
+
 @group(1) @binding(0) var mesh_depth_texture: texture_depth_2d;
 @group(1) @binding(1) var mesh_depth_sampler: sampler;
-@group(1) @binding(2) var mesh_flags_texture: texture_2d<u32>;
+@group(1) @binding(2) var mesh_id_texture: texture_2d<u32>;
 
 @group(2) @binding(0) var<storage, read> voxel_data: array<u32>;
 
@@ -592,9 +601,32 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     if (traversal.hit_hovered_block)  { flags |= 1u; }
     if (traversal.hit_selected_block) { flags |= 2u; }
 
-    let screen_size = vec2<f32>(textureDimensions(mesh_flags_texture));
+    let screen_size = vec2<f32>(textureDimensions(mesh_id_texture));
     let pixel_coords = vec2<i32>(in.uv * screen_size);
-    let mesh_flags = textureLoad(mesh_flags_texture, pixel_coords, 0).r;
+    let mesh_id = textureLoad(mesh_id_texture, pixel_coords, 0);
+
+    let raw_id = mesh_id.r;
+    let packed_chunk = mesh_id.g;
+
+    var mesh_flags = 0u;
+
+    if (raw_id != 0u || packed_chunk != 0u) {
+        let hovered = hover_on_id.is_some != 0u
+            && packed_chunk == hover_on_id.chunk
+            && raw_id == hover_on_id.id;
+
+        if (hovered) {
+            mesh_flags |= 1u;
+        }
+
+        let selected = selected_id.is_some != 0u
+            && packed_chunk == selected_id.chunk
+            && raw_id == selected_id.id;
+
+        if (selected) {
+            mesh_flags |= 2u;
+        }
+    }
 
     output.flags = flags | mesh_flags;
 
