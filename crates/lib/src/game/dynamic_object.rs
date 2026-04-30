@@ -39,32 +39,13 @@ pub enum DynamicObjectError {
     LoadChest { source: chest::ChestError },
     #[snafu(display("Failed to save chest"))]
     SaveChest { source: chest::ChestError },
-    #[snafu(display("Can't load value as InteractionObjectType: {value:?}"))]
-    UnknownInteractionObjectType {
-        value: Box<plist::Value>,
-        source: plist::Error,
-    },
-    #[snafu(display(
-        "Can't understand dynamicObjectSaveDict with {obj_type:?} yet, value: {value:?}"
-    ))]
-    UnsupportedInteractionObjectType {
-        obj_type: InteractionObjectType,
-        value: Box<plist::Value>,
-    },
-    #[snafu(display("Can't load value as ItemType: {value:?}"))]
-    UnknownItemType {
-        value: Box<plist::Value>,
-        source: plist::Error,
-    },
     #[snafu(display(
         "Can't understand dynamicObjectSaveDict with {item_type:?} yet, value: {value:?}"
     ))]
-    UnsupportedItemType {
+    UnsupportedItemTypeForDynObj {
         item_type: ItemType,
         value: Box<plist::Value>,
     },
-    #[snafu(display("Can't load dynamicObjectSaveDict as known type: {dict:?}"))]
-    DynObjSaveDictNoTypeMatch { dict: Box<plist::Dictionary> },
 }
 
 type Result<T> = std::result::Result<T, DynamicObjectError>;
@@ -364,79 +345,101 @@ pub enum AnyDynamicObject {
 }
 
 impl AnyDynamicObject {
-    pub fn try_from_save_dict(dict: plist::Dictionary) -> Result<Self> {
-        if dict.contains_key("chestType") {
-            let dict = plist::Value::Dictionary(dict);
-            let chest_item = plist::from_value(&dict).context(DeserializeDictionarySnafu {
-                target_type: "ChestItem",
-                dict,
-            })?;
-            Ok(Self::Chest(Box::new(
-                chest::Chest::from_chest_item(chest_item).context(LoadChestSnafu)?,
-            )))
-        } else if dict.contains_key("workbenchType") {
-            let dict = plist::Value::Dictionary(dict);
-            let workbench = plist::from_value(&dict).context(DeserializeDictionarySnafu {
-                target_type: "Workbench",
-                dict,
-            })?;
-            Ok(Self::Workbench(Box::new(workbench)))
-        } else if let Some(value) = dict.get("interactionObjectType") {
-            let interaction_obj_type: InteractionObjectType =
-                plist::from_value(value).context(UnknownInteractionObjectTypeSnafu {
-                    value: value.to_owned(),
+    pub fn try_from_save_dict(item_type: ItemType, value: plist::Value) -> Result<Self> {
+        match item_type {
+            ItemType::Chest
+            | ItemType::Safe
+            | ItemType::Shelf
+            | ItemType::GoldenChest
+            | ItemType::PortalChest
+            | ItemType::DisplayCabinet
+            | ItemType::FeederChest => {
+                let chest_item = plist::from_value(&value).context(DeserializeDictionarySnafu {
+                    target_type: "ChestItem",
+                    dict: value,
                 })?;
-            match interaction_obj_type {
-                InteractionObjectType::Bed => {
-                    let dict = plist::Value::Dictionary(dict);
-                    let bed = plist::from_value(&dict).context(DeserializeDictionarySnafu {
-                        target_type: "Bed",
-                        dict,
-                    })?;
-                    Ok(Self::Bed(Box::new(bed)))
-                }
-                _ => UnsupportedInteractionObjectTypeSnafu {
-                    obj_type: interaction_obj_type,
-                    value: plist::Value::Dictionary(dict),
-                }
-                .fail(),
+                Ok(Self::Chest(Box::new(
+                    chest::Chest::from_chest_item(chest_item).context(LoadChestSnafu)?,
+                )))
             }
-        } else if let Some(value) = dict.get("itemType") {
-            let item_type: ItemType = plist::from_value(value).context(UnknownItemTypeSnafu {
-                value: value.to_owned(),
-            })?;
-            match item_type {
-                ItemType::Ladder => {
-                    let dict = plist::Value::Dictionary(dict);
-                    let ladder = plist::from_value(&dict).context(DeserializeDictionarySnafu {
-                        target_type: "Ladder",
-                        dict,
-                    })?;
-                    Ok(Self::Ladder(ladder))
-                }
-                ItemType::WoodenGate => {
-                    let dict = plist::Value::Dictionary(dict);
-                    let door = plist::from_value(&dict).context(DeserializeDictionarySnafu {
-                        target_type: "Door",
-                        dict,
-                    })?;
-                    Ok(Self::Door(door))
-                }
-                _ => UnsupportedItemTypeSnafu {
-                    item_type,
-                    value: plist::Value::Dictionary(dict),
-                }
-                .fail(),
+            ItemType::Portal
+            | ItemType::AmethystPortal
+            | ItemType::SapphirePortal
+            | ItemType::EmeraldPortal
+            | ItemType::RubyPortal
+            | ItemType::DiamondPortal
+            | ItemType::WorkBench
+            | ItemType::Campfire
+            | ItemType::TaylorsBench
+            | ItemType::WoodworkBench
+            | ItemType::ToolBench
+            | ItemType::Press
+            | ItemType::Kiln
+            | ItemType::Furnace
+            | ItemType::CraftBench
+            | ItemType::MixingBench
+            | ItemType::DyeBench
+            | ItemType::MetalworkBench
+            | ItemType::SteamGenerator
+            | ItemType::ElectricKiln
+            | ItemType::ElectricFurnace
+            | ItemType::ElectricMetalworkBench
+            | ItemType::ElectricStove
+            | ItemType::SolarPanel
+            | ItemType::Flywheel
+            | ItemType::ArmorBench
+            | ItemType::TrainYard
+            | ItemType::Easel
+            | ItemType::BuildersBench
+            | ItemType::Refinery
+            | ItemType::ElectricPress
+            | ItemType::CompostBin
+            | ItemType::ElectricSluice
+            | ItemType::EggExtractor
+            | ItemType::PizzaOven => {
+                let workbench = plist::from_value(&value).context(DeserializeDictionarySnafu {
+                    target_type: "Workbench",
+                    dict: value,
+                })?;
+                Ok(Self::Workbench(Box::new(workbench)))
             }
-        } else if dict.contains_key("hatchTimer") {
-            let dict = plist::Value::Dictionary(dict);
-            let egg = plist::from_value(&dict).context(DeserializeDictionarySnafu {
-                target_type: "Egg",
-                dict,
-            })?;
-            Ok(Self::Egg(egg))
-        } else {
-            DynObjSaveDictNoTypeMatchSnafu { dict }.fail()
+            ItemType::Bed
+            | ItemType::SoftBed
+            | ItemType::GoldenBed
+            | ItemType::RainbowSoftBed
+            | ItemType::RainbowGoldenBed => {
+                let bed = plist::from_value(&value).context(DeserializeDictionarySnafu {
+                    target_type: "Bed",
+                    dict: value,
+                })?;
+                Ok(Self::Bed(Box::new(bed)))
+            }
+            ItemType::Ladder => {
+                let ladder = plist::from_value(&value).context(DeserializeDictionarySnafu {
+                    target_type: "Ladder",
+                    dict: value,
+                })?;
+                Ok(Self::Ladder(ladder))
+            }
+            ItemType::WoodenGate
+            | ItemType::Door
+            | ItemType::IronDoor
+            | ItemType::Trapdoor
+            | ItemType::IronTrapdoor => {
+                let door = plist::from_value(&value).context(DeserializeDictionarySnafu {
+                    target_type: "Door",
+                    dict: value,
+                })?;
+                Ok(Self::Door(door))
+            }
+            ItemType::DodoEgg => {
+                let egg = plist::from_value(&value).context(DeserializeDictionarySnafu {
+                    target_type: "Egg",
+                    dict: value,
+                })?;
+                Ok(Self::Egg(egg))
+            }
+            _ => UnsupportedItemTypeForDynObjSnafu { item_type, value }.fail(),
         }
     }
 

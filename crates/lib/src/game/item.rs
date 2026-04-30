@@ -582,17 +582,10 @@ impl Item {
         })
     }
 
-    fn from_dyn_obj_save_dict(value: plist::Value) -> Result<AnyDynamicObject> {
-        let dict = match value {
-            plist::Value::Dictionary(dict) => dict,
-            _ => UnexpectedStructureSnafu {
-                type_name: "dynamicObjectSaveDict",
-                target_structure: "plist::Array",
-                value: value.clone(),
-            }
-            .fail()?,
-        };
-        AnyDynamicObject::try_from_save_dict(dict).context(LoadDynObjSaveDictSnafu)
+    fn from_dyn_obj_save_dict(item_type_id: u16, value: plist::Value) -> Result<AnyDynamicObject> {
+        let item_type = ItemType::try_from(item_type_id)
+            .context(InvalidItemTypeIdSnafu { id: item_type_id })?;
+        AnyDynamicObject::try_from_save_dict(item_type, value).context(LoadDynObjSaveDictSnafu)
     }
 
     fn to_dynamic_object_save_dict(&self) -> Result<Option<plist::Value>> {
@@ -637,7 +630,7 @@ impl Item {
                 sub_items = Self::from_sub_item_values(value.to_owned())?;
             }
             if let Some(value) = dict.get("d") {
-                dynamic_object = Some(Self::from_dyn_obj_save_dict(value.to_owned())?);
+                dynamic_object = Some(Self::from_dyn_obj_save_dict(type_id, value.to_owned())?);
             }
         }
         Ok(Self {
@@ -801,7 +794,7 @@ impl Item {
             sub_items = Self::from_sub_item_values(sub_item_values)?;
         }
         if let Some(dict) = xml.dynamic_object_save_dict {
-            dynamic_object = Some(Self::from_dyn_obj_save_dict(dict)?);
+            dynamic_object = Some(Self::from_dyn_obj_save_dict(xml.item_type, dict)?);
         }
 
         Ok(Self {
@@ -1179,7 +1172,7 @@ mod tests {
 </dict>
 </plist>";
         let dict = plist::from_reader_xml(xml.as_bytes()).unwrap();
-        let dyn_obj = AnyDynamicObject::try_from_save_dict(dict).unwrap();
+        let dyn_obj = AnyDynamicObject::try_from_save_dict(ItemType::Chest, dict).unwrap();
         assert!(matches!(dyn_obj, AnyDynamicObject::Chest(..)));
     }
 
@@ -1236,7 +1229,7 @@ mod tests {
 </dict>
 </plist>";
         let dict = plist::from_reader_xml(xml.as_bytes()).unwrap();
-        let dyn_obj = AnyDynamicObject::try_from_save_dict(dict).unwrap();
+        let dyn_obj = AnyDynamicObject::try_from_save_dict(ItemType::Shelf, dict).unwrap();
         assert!(matches!(dyn_obj, AnyDynamicObject::Chest(..)));
     }
 
@@ -1274,7 +1267,7 @@ mod tests {
 </dict>
 </plist>";
         let dict = plist::from_reader_xml(xml.as_bytes()).unwrap();
-        let dyn_obj = AnyDynamicObject::try_from_save_dict(dict).unwrap();
+        let dyn_obj = AnyDynamicObject::try_from_save_dict(ItemType::PortalChest, dict).unwrap();
         assert!(matches!(dyn_obj, AnyDynamicObject::Chest(..)));
     }
 
