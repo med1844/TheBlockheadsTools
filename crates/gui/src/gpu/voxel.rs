@@ -675,6 +675,7 @@ impl VoxelType {
         Ok(match (block.fg()?, block.content()?) {
             (BlockType::Air, _) | (_, BlockContentType::Sprite) => Self::Air,
             (BlockType::Snow, _) => Self::Snow,
+            (BlockType::Water, _) => Self::Water,
             (block_type, BlockContentType::Nothing) => block_type.into(),
             (BlockType::Dirt, BlockContentType::Clay) => Self::DirtClay,
             (BlockType::Dirt, BlockContentType::Flint) => Self::DirtFlint,
@@ -701,7 +702,17 @@ impl VoxelType {
     fn mg_from_block_inner<'b>(block: BlockView<'b>) -> Result<Self, BlockError> {
         Ok(match block.content()? {
             BlockContentType::Nothing
-            | BlockContentType::Workbench
+            | BlockContentType::Clay
+            | BlockContentType::Flint
+            | BlockContentType::CopperOre
+            | BlockContentType::TinOre
+            | BlockContentType::IronOre
+            | BlockContentType::Coal
+            | BlockContentType::GoldNuggets
+            | BlockContentType::PlatinumOre
+            | BlockContentType::TitaniumOre
+            | BlockContentType::Oil => Self::fg_from_block_inner(block)?,
+            BlockContentType::Workbench
             | BlockContentType::WorkbenchSprite
             | BlockContentType::Sprite => Self::Air,
             BlockContentType::AppleTreeLeaf => Self::AppleTreeLeaf,
@@ -756,7 +767,6 @@ impl VoxelType {
             | BlockContentType::DeadCherryTreeTrunk
             | BlockContentType::DeadLimeTreeTrunk => Self::AnyDeadTreeTrunk,
             BlockContentType::GoldChest => Self::GoldChest,
-            _ => Self::Unknown,
         })
     }
 
@@ -817,11 +827,7 @@ pub mod voxel_util {
                     ChunkBlockCoord::new(x as u8, y as u8).expect("x and y must be within limit"),
                 );
                 let fg_type = VoxelType::fg_from_block(block);
-                let mg_type = if fg_type == VoxelType::Air {
-                    VoxelType::mg_from_block(block)
-                } else {
-                    fg_type
-                };
+                let mg_type = VoxelType::mg_from_block(block);
                 let mut bg_type = VoxelType::bg_from_block(block);
                 if bg_type == VoxelType::Air && fg_type != VoxelType::Air {
                     bg_type = fg_type;
