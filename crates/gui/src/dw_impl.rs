@@ -1035,13 +1035,6 @@ impl InfoUi for KelpPlant {
 
 impl BuildDwMesh for KelpPlant {
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
-        builder.add_face(DwFace::new_sprite(
-            ImageType::KelpPlant,
-            [0.5, 0.0],
-            self.float_pos,
-            [1, 2],
-            2.0,
-        ));
         let mut len = self.number_of_occupied_tiles_above;
         let [x, mut y] = self.float_pos;
         while len >= 3 {

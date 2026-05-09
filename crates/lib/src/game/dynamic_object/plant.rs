@@ -72,7 +72,7 @@ pub struct KelpPlant {
     #[serde(flatten)]
     normal_plant: NormalPlant,
     pub growth_timer: f32,
-    pub number_of_occupied_tiles_above: i32,
+    pub number_of_occupied_tiles_above: u32,
 }
 inherit!(KelpPlant -> NormalPlant, normal_plant);
 
