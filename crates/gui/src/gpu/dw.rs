@@ -749,6 +749,7 @@ impl DwChunkBuf {
         add(chunk.lime_tree.iter(), LimeTree, &mut builder);
         add(chunk.workbench.iter(), Workbench, &mut builder);
         add(chunk.chest.iter(), Chest, &mut builder);
+        add(chunk.gem_tree.iter(), GemTree, &mut builder);
         add(chunk.tomato_plant.iter(), TomatoPlant, &mut builder);
 
         let DwChunkBufBuilder {
