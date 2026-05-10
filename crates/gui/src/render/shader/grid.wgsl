@@ -1,25 +1,9 @@
-struct CameraUniform {
-    view_proj: mat4x4<f32>,
-    inv_view_proj: mat4x4<f32>,
-    camera_pos: vec4<f32>, // xyz
-    world_offset: vec4<f32>,
-};
+//!include camera_uniform.wgsl
 
 @group(0) @binding(0) var<uniform> camera: CameraUniform;
 @group(0) @binding(1) var<uniform> world_dim_x: u32; // 1x world = 16384, 16x world = 262144
 
-struct RenderSettings {
-    light_dir: vec3<f32>,
-    enable_reflect: u32,
-    enable_destruct: u32,
-    enable_ssao: u32,
-    enable_cyclic: u32,
-    ambient_light: f32,
-    shininess: f32,
-    specular_intensity: f32,
-    min_depth_factor: f32,
-    _padding0: u32,
-};
+//!include render_settings.wgsl
 
 @group(0) @binding(2) var<uniform> render_settings: RenderSettings;
 

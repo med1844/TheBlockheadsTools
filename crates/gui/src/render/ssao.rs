@@ -30,7 +30,7 @@ impl SsaoRenderer {
 
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("SSAO Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("shader/ssao.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(wgsl_macro::include_wgsl!("src/render/shader/ssao.wgsl").into()),
         });
 
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -242,7 +242,7 @@ impl SsaoBlurRenderer {
     pub fn new(device: &wgpu::Device, g_buffer: &GeometryBuffer) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("SSAO Blur Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("shader/ssao_blur.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(wgsl_macro::include_wgsl!("src/render/shader/ssao_blur.wgsl").into()),
         });
 
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {

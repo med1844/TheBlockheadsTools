@@ -13,6 +13,7 @@ wgpu = { workspace = true, features = ["dx12", "metal", "vulkan", "gles", "wgsl"
 bytemuck = { version = "1.12", features = ["derive"] }
 glam = { version = "0.30.4", features = ["bytemuck"] }
 the-blockheads-tools-lib = { workspace = true }
+wgsl_macro = { workspace = true }
 env_logger = "0.11.8"
 log = "0.4.27"
 zune-png = "0.4.10"

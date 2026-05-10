@@ -3232,6 +3232,7 @@ dependencies = [
  "the-blockheads-tools-lib",
  "wasm-bindgen-futures",
  "wgpu",
+ "wgsl_macro",
  "zune-png",
 ]
 
@@ -3883,6 +3884,10 @@ dependencies = [
  "thiserror 2.0.18",
  "web-sys",
 ]
+
+[[package]]
+name = "wgsl_macro"
+version = "0.1.0"
 
 [[package]]
 name = "which"

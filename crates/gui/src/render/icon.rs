@@ -109,7 +109,7 @@ impl DwIconRenderer {
     ) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Dynamic Object Icon Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("shader/dw_icon.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(wgsl_macro::include_wgsl!("src/render/shader/dw_icon.wgsl").into()),
         });
 
         let block_image_types = Self::ITEM_IMAGE_TYPE

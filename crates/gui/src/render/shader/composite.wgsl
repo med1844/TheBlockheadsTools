@@ -1,22 +1,6 @@
-struct RenderSettings {
-    light_dir: vec3<f32>,
-    enable_reflect: u32,
-    enable_destruct: u32,
-    enable_ssao: u32,
-    enable_cyclic: u32,
-    ambient_light: f32,
-    shininess: f32,
-    specular_intensity: f32,
-    min_depth_factor: f32,
-    _padding0: u32,
-};
+//!include render_settings.wgsl
 
-struct CameraUniform {
-    view_proj: mat4x4<f32>,
-    inv_view_proj: mat4x4<f32>,
-    camera_pos: vec4<f32>,
-    world_offset: vec4<f32>,
-};
+//!include camera_uniform.wgsl
 
 @group(0) @binding(0) var uv_texture:           texture_2d<f32>;
 @group(0) @binding(1) var uv_sampler:           sampler;

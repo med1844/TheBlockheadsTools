@@ -23,7 +23,7 @@ impl CompositeRenderer {
     ) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Composite Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("shader/composite.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(wgsl_macro::include_wgsl!("src/render/shader/composite.wgsl").into()),
         });
         let buffer_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {

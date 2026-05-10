@@ -20,6 +20,7 @@ snafu = "0.9.0"
 the-blockheads-tools-lib = { path = "crates/lib" }
 the-blockheads-tools-gui = { path = "crates/gui" }
 lmdb-rs = { path = "crates/lmdb_rs" }
+wgsl_macro = { path = "crates/wgsl_macro" }
 
 [profile.wasm-release]
 inherits = "release"

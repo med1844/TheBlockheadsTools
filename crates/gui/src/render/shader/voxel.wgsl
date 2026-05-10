@@ -77,12 +77,7 @@ struct TraversalResult {
     hit_hovered_block:  bool,
 }
 
-struct CameraUniform {
-    view_proj: mat4x4<f32>,
-    inv_view_proj: mat4x4<f32>,
-    camera_pos: vec4<f32>, // xyz
-    world_offset: vec4<f32>,
-};
+//!include camera_uniform.wgsl
 
 @group(0) @binding(0) var<uniform> camera: CameraUniform;
 @group(0) @binding(1) var texture_atlas: texture_2d<f32>;
@@ -91,18 +86,7 @@ struct CameraUniform {
 @group(0) @binding(4) var<uniform> selected_block: vec4<u32>;
 @group(0) @binding(5) var<uniform> hover_on_block: vec4<u32>;
 
-struct RenderSettings {
-    light_dir: vec3<f32>,
-    enable_reflect: u32,
-    enable_destruct: u32,
-    enable_ssao: u32,
-    enable_cyclic: u32,
-    ambient_light: f32,
-    shininess: f32,
-    specular_intensity: f32,
-    min_depth_factor: f32,
-    _padding0: u32,
-};
+//!include render_settings.wgsl
 
 @group(0) @binding(6) var<uniform> render_settings: RenderSettings;
 @group(0) @binding(7) var texture_reflect: texture_2d<f32>;
@@ -115,11 +99,7 @@ struct RenderSettings {
 // Enforced by Rust code.
 @group(0) @binding(11) var<uniform> world_dim_x: u32;
 
-struct IdUniform {
-    is_some: u32,
-    id: u32,
-    chunk: u32,
-};
+//!include id_uniform.wgsl
 
 @group(0) @binding(12) var<uniform> hover_on_id: IdUniform;
 @group(0) @binding(13) var<uniform> selected_id: IdUniform;
