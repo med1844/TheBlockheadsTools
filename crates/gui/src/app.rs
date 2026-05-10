@@ -844,7 +844,7 @@ impl EditorApp {
                 Chest => draw_window(title, dw_chunk.chest.get_mut(id.index), ctx),
                 // Sign => {}
                 // TradingPost => {}
-                // TrainStation => {}
+                TrainStation => draw_window(title, dw_chunk.train_station.get_mut(id.index), ctx),
                 // TradePortal => {}
                 // Scorpion => {}
                 // Painting => {}

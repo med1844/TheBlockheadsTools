@@ -336,12 +336,13 @@ pub mod workbench;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum AnyDynamicObject {
-    Ladder(Box<craft::Ladder>),           // ID = 19
-    Door(Box<craft::Door>),               // ID = 20
-    Bed(Box<craft::Bed>),                 // ID = 23
-    Egg(Box<animal::Egg>),                // ID = 30
-    Workbench(Box<workbench::Workbench>), // ID = 45
-    Chest(Box<chest::Chest>),             // ID = 46
+    Ladder(Box<craft::Ladder>),             // ID = 19
+    Door(Box<craft::Door>),                 // ID = 20
+    Bed(Box<craft::Bed>),                   // ID = 23
+    Egg(Box<animal::Egg>),                  // ID = 30
+    Workbench(Box<workbench::Workbench>),   // ID = 45
+    Chest(Box<chest::Chest>),               // ID = 46
+    TrainStation(Box<train::TrainStation>), // ID = 49
 }
 
 impl AnyDynamicObject {
@@ -439,6 +440,14 @@ impl AnyDynamicObject {
                 })?;
                 Ok(Self::Egg(egg))
             }
+            ItemType::TrainStation => {
+                let train_station =
+                    plist::from_value(&value).context(DeserializeDictionarySnafu {
+                        target_type: "TrainStation",
+                        dict: value,
+                    })?;
+                Ok(Self::TrainStation(train_station))
+            }
             _ => UnsupportedItemTypeForDynObjSnafu { item_type, value }.fail(),
         }
     }
@@ -467,6 +476,11 @@ impl AnyDynamicObject {
 
                 plist::to_value(&chest_item).context(SerializeDictionarySnafu {
                     source_type: "ChestItem",
+                })?
+            }
+            Self::TrainStation(train_station) => {
+                plist::to_value(train_station).context(SerializeDictionarySnafu {
+                    source_type: "TrainStation",
                 })?
             }
         })

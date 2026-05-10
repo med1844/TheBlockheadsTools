@@ -1395,6 +1395,34 @@ mod tests {
         ))
     }
 
+    #[test]
+    fn test_train_station_deserialization() {
+        let xml = "
+<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
+<plist version=\"1.0\">
+	<data>
+		yAAAAAAAAAAfiwgAAAAAAAAHdVJNc4IwED3rr0i5SwRHkU7EsWo7zjiVGfHQ
+		UyeF1dIiSZP4wb9vABVa2lOyb9/u230JGZ/3CTqCkDFLR4Zldg0EaciiON2N
+		jE3w2BkaY69N7marafDizxFPYqmQv3lYLqbI6GA84TwBjGfBDPnLxTpAugfG
+		82cDGe9K8XuMT6eTSXOWGbJ9TpTYF4yDUNlSN+voAjNSkaFlyu4/xtFoFIfK
+		a7fIJ2ReRHB+6OiClvA2iTmHW7JFtjSRgGt5RpXPZEWgQtDi1iICaOJZPcfp
+		m32Ci6jC+5ZTYQTfyoq2capA0FDpaVdvHxCqIONQaeTpHQhvQPD1equUi3Qj
+		4d+B2SkFsZhVeamEfhNPgtD2EHwJr3ROtcCUJUw01btNdc7k67nJLDz4m501
+		2YUzv7mSHiGI97XFSndtd+i4pms7fWtgubZd8zQnKjirxq5Pk3Vj0UMafx2g
+		bsx1ArvnDAZufSKCyz9SncX/8trfx6a6mvYCAAA=
+	</data>
+</plist>";
+        let data: plist::Data = plist::from_reader_xml(xml.as_bytes()).unwrap();
+        let bytes: Vec<u8> = data.into();
+
+        let item = Item::try_from_bytes(bytes).expect("should parse");
+        assert!(matches!(
+            item.dynamic_object,
+            Some(AnyDynamicObject::TrainStation(_))
+        ))
+    }
+
     fn inventory_round_trip(inventory_data: &[u8]) {
         let inventory_value =
             plist::from_reader_xml(inventory_data).expect("should be able to deserialize");

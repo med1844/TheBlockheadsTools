@@ -25,6 +25,7 @@ use the_blockheads_tools_lib::game::{
         chest::{Chest, ChestType},
         craft::{Door, Ladder, Torch, TorchConnectionType},
         plant::{CarrotPlant, CornPlant, KelpPlant, NormalPlant, Plant, TomatoPlant},
+        train::TrainStation,
         tree::{
             AppleTree, CactusTree, CherryTree, CoconutTree, CoffeeTree, GemTree, LimeTree,
             MangoTree, MapleTree, OrangeTree, PineTree, Tree, TreeFruit, TreeType,
@@ -1521,6 +1522,33 @@ impl BuildDwMesh for Chest {
                 builder.add_block(DwBlock::new(block_coord, VoxelType::FeederChest))
             }
         };
+        Ok(())
+    }
+}
+
+impl ToGrid for TrainStation {
+    fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut ObjFlags) {
+        self.text.add_row("text", ui);
+        self.save_time.add_row("saveTime", ui);
+    }
+}
+
+impl InfoUi for TrainStation {
+    fn info(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags) {
+        let obj = self.deref_mut();
+        obj.info(ui, flags);
+
+        ui.vertical(|ui| {
+            ui.heading("TrainStation");
+            ui.separator();
+            self.add_grid("train_station_grid", ui, flags);
+        });
+    }
+}
+
+impl BuildDwMesh for TrainStation {
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        builder.add_icon(DwIcon::new(self.float_pos, ItemType::TrainStation));
         Ok(())
     }
 }

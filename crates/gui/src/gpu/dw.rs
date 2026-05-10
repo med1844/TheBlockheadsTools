@@ -891,7 +891,7 @@ impl DwChunkBuf {
         add(chunk.chest.iter(), Chest, &mut builder);
         // add(chunk.sign.iter(), Sign, &mut builder);
         // add(chunk.trading_post.iter(), TradingPost, &mut builder);
-        // add(chunk.train_station.iter(), TrainStation, &mut builder);
+        add(chunk.train_station.iter(), TrainStation, &mut builder);
         // add(chunk.trade_portal.iter(), TradePortal, &mut builder);
         // add(chunk.scorpion.iter(), Scorpion, &mut builder);
         // add(chunk.painting.iter(), u8, &mut builder);
