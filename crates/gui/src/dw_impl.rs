@@ -66,6 +66,36 @@ impl BitOrAssign for ObjFlags {
     }
 }
 
+// helper mod to keep read-only fields private
+mod context {
+    use super::ObjFlags;
+
+    pub struct DwUiContext {
+        world_width: u32,
+        cyclic: bool,
+        pub flags: ObjFlags,
+    }
+
+    impl DwUiContext {
+        pub fn new(world_width: u32, cyclic: bool, flags: ObjFlags) -> Self {
+            Self {
+                world_width,
+                cyclic,
+                flags,
+            }
+        }
+
+        pub fn world_width(&self) -> u32 {
+            self.world_width
+        }
+
+        pub fn cyclic(&self) -> bool {
+            self.cyclic
+        }
+    }
+}
+pub use context::DwUiContext;
+
 trait ToRow {
     fn to_row(&mut self, ui: &mut egui::Ui) -> egui::Response;
 
@@ -150,9 +180,9 @@ impl<T: ToRow + Default> ToRow for Option<T> {
 }
 
 impl<T: ToGrid + Default> ToGrid for Option<T> {
-    fn to_grid(&mut self, _: &mut egui::Ui, _: &mut ObjFlags) {}
+    fn to_grid(&mut self, _: &mut egui::Ui, _: &mut DwUiContext) {}
 
-    fn add_grid<H: Hash>(&mut self, id: H, ui: &mut egui::Ui, flags: &mut ObjFlags) {
+    fn add_grid<H: Hash>(&mut self, id: H, ui: &mut egui::Ui, context: &mut DwUiContext) {
         let mut is_some = self.is_some();
 
         ui.vertical(|ui| {
@@ -166,7 +196,7 @@ impl<T: ToGrid + Default> ToGrid for Option<T> {
             }
 
             if let Some(t) = self {
-                t.add_grid(id, ui, flags);
+                t.add_grid(id, ui, context);
             } else {
                 ui.weak("None");
             }
@@ -195,22 +225,37 @@ impl ToRow for bool {
 }
 
 trait ToGrid {
-    fn to_grid(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags);
-    fn add_grid<H: Hash>(&mut self, id: H, ui: &mut egui::Ui, flags: &mut ObjFlags) {
+    fn to_grid(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext);
+    fn add_grid<H: Hash>(&mut self, id: H, ui: &mut egui::Ui, context: &mut DwUiContext) {
         egui::Grid::new(id).num_columns(2).show(ui, |ui| {
-            self.to_grid(ui, flags);
+            self.to_grid(ui, context);
         });
     }
 }
 
 impl ToGrid for DynamicObject {
-    fn to_grid(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags) {
+    fn to_grid(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         let mut float_pos_changed = false;
         float_pos_changed |= self.float_pos[0].add_row("floatPos[0]", ui).changed();
+        if float_pos_changed {
+            let world_width = context.world_width() as f32;
+            if context.cyclic() {
+                self.float_pos[0] = self.float_pos[0].rem_euclid(world_width);
+            } else {
+                self.float_pos[0] = self.float_pos[0].max(0.0).min(world_width - 1e-3);
+            }
+        }
         float_pos_changed |= self.float_pos[1].add_row("floatPos[1]", ui).changed();
 
         let mut int_pos_changed = false;
         int_pos_changed |= self.pos_x.add_row("pos_x", ui).changed();
+        if int_pos_changed {
+            if context.cyclic() {
+                self.pos_x = self.pos_x.rem_euclid(context.world_width());
+            } else {
+                self.pos_x = self.pos_x.min(context.world_width() - 1);
+            }
+        }
         int_pos_changed |= self.pos_y.add_row("pos_y", ui).changed();
 
         match (float_pos_changed, int_pos_changed) {
@@ -226,7 +271,7 @@ impl ToGrid for DynamicObject {
             (false, false) => {}
         }
         if float_pos_changed | int_pos_changed {
-            *flags |= ObjFlags::PosChangedTo {
+            context.flags |= ObjFlags::PosChangedTo {
                 x: self.float_pos[0],
                 y: self.float_pos[1],
             };
@@ -238,7 +283,7 @@ impl ToGrid for DynamicObject {
 }
 
 impl<T: Default + ToGrid> ToGrid for Vec<T> {
-    fn to_grid(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags) {
+    fn to_grid(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         ui.vertical(|ui| {
             let mut to_remove = None;
 
@@ -249,7 +294,7 @@ impl<T: Default + ToGrid> ToGrid for Vec<T> {
                     }
 
                     ui.collapsing(format!("Item #{}", i), |ui| {
-                        item.add_grid(format!("item_grid_{}", i), ui, flags);
+                        item.add_grid(format!("item_grid_{}", i), ui, context);
                     });
                 });
             }
@@ -267,7 +312,7 @@ impl<T: Default + ToGrid> ToGrid for Vec<T> {
 }
 
 impl ToGrid for TreeFruit {
-    fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut ObjFlags) {
+    fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut DwUiContext) {
         self.has_created_free_block_this_season
             .add_row("hasCreatedFreeBlockThisSeason", ui);
         self.pos_x.add_row("pos.x", ui);
@@ -280,15 +325,15 @@ fn grid_as_row<T: ToGrid, H: Hash>(
     label: &str,
     id: H,
     ui: &mut egui::Ui,
-    flags: &mut ObjFlags,
+    context: &mut DwUiContext,
 ) {
     ui.label(label);
-    t.add_grid(id, ui, flags);
+    t.add_grid(id, ui, context);
     ui.end_row();
 }
 
 impl ToGrid for Tree {
-    fn to_grid(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags) {
+    fn to_grid(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         self.age.add_row("age", ui);
         self.dead.add_row("dead", ui);
         self.time_died.add_row("timeDied", ui);
@@ -309,34 +354,34 @@ impl ToGrid for Tree {
             "treeFruits",
             "tree_fruits_grid",
             ui,
-            flags,
+            context,
         );
     }
 }
 
 pub(crate) trait InfoUi {
-    fn info(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags);
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext);
 }
 
 impl InfoUi for DynamicObject {
-    fn info(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags) {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         ui.vertical(|ui| {
             ui.heading("DynamicObject");
             ui.separator();
-            self.add_grid("dynamic_object_grid", ui, flags);
+            self.add_grid("dynamic_object_grid", ui, context);
         });
     }
 }
 
 impl InfoUi for Tree {
-    fn info(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags) {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         let obj = self.deref_mut();
-        obj.info(ui, flags);
+        obj.info(ui, context);
 
         ui.vertical(|ui| {
             ui.heading("Tree");
             ui.separator();
-            self.add_grid("tree_grid", ui, flags);
+            self.add_grid("tree_grid", ui, context);
         });
     }
 }
@@ -351,20 +396,20 @@ impl BuildDwMesh for AppleTree {
 }
 
 impl ToGrid for AppleTree {
-    fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut ObjFlags) {
+    fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut DwUiContext) {
         self.available_food.add_row("availableFood", ui);
     }
 }
 
 impl InfoUi for AppleTree {
-    fn info(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags) {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         let tree = self.deref_mut();
-        tree.info(ui, flags);
+        tree.info(ui, context);
 
         ui.vertical(|ui| {
             ui.heading("AppleTree");
             ui.separator();
-            self.add_grid("apple_tree_grid", ui, flags);
+            self.add_grid("apple_tree_grid", ui, context);
         });
     }
 }
@@ -379,9 +424,9 @@ impl BuildDwMesh for MapleTree {
 }
 
 impl InfoUi for MapleTree {
-    fn info(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags) {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         let tree = self.deref_mut();
-        tree.info(ui, flags);
+        tree.info(ui, context);
     }
 }
 
@@ -393,27 +438,27 @@ impl BuildDwMesh for MangoTree {
 }
 
 impl InfoUi for MangoTree {
-    fn info(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags) {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         let tree = self.deref_mut();
-        tree.info(ui, flags);
+        tree.info(ui, context);
     }
 }
 
 impl ToGrid for PineTree {
-    fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut ObjFlags) {
+    fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut DwUiContext) {
         self.available_food.add_row("availableFood", ui);
     }
 }
 
 impl InfoUi for PineTree {
-    fn info(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags) {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         let tree = self.deref_mut();
-        tree.info(ui, flags);
+        tree.info(ui, context);
 
         ui.vertical(|ui| {
             ui.heading("PineTree");
             ui.separator();
-            self.add_grid("pine_tree_grid", ui, flags);
+            self.add_grid("pine_tree_grid", ui, context);
         });
     }
 }
@@ -428,7 +473,7 @@ impl BuildDwMesh for PineTree {
 }
 
 impl ToGrid for CactusTree {
-    fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut ObjFlags) {
+    fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut DwUiContext) {
         self.available_food.add_row("availableFood", ui);
         self.split_direction.add_row("splitDirection", ui);
         self.split_height_a.add_row("splitHeightA", ui);
@@ -437,14 +482,14 @@ impl ToGrid for CactusTree {
 }
 
 impl InfoUi for CactusTree {
-    fn info(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags) {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         let tree = self.deref_mut();
-        tree.info(ui, flags);
+        tree.info(ui, context);
 
         ui.vertical(|ui| {
             ui.heading("CactusTree");
             ui.separator();
-            self.add_grid("cactus_tree_grid", ui, flags);
+            self.add_grid("cactus_tree_grid", ui, context);
         });
     }
 }
@@ -462,9 +507,9 @@ impl BuildDwMesh for CactusTree {
 }
 
 impl InfoUi for CoconutTree {
-    fn info(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags) {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         let tree = self.deref_mut();
-        tree.info(ui, flags);
+        tree.info(ui, context);
     }
 }
 
@@ -478,9 +523,9 @@ impl BuildDwMesh for CoconutTree {
 }
 
 impl InfoUi for OrangeTree {
-    fn info(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags) {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         let tree = self.deref_mut();
-        tree.info(ui, flags);
+        tree.info(ui, context);
     }
 }
 impl BuildDwMesh for OrangeTree {
@@ -493,9 +538,9 @@ impl BuildDwMesh for OrangeTree {
 }
 
 impl InfoUi for CherryTree {
-    fn info(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags) {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         let tree = self.deref_mut();
-        tree.info(ui, flags);
+        tree.info(ui, context);
     }
 }
 
@@ -509,9 +554,9 @@ impl BuildDwMesh for CherryTree {
 }
 
 impl InfoUi for CoffeeTree {
-    fn info(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags) {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         let tree = self.deref_mut();
-        tree.info(ui, flags);
+        tree.info(ui, context);
     }
 }
 
@@ -528,14 +573,14 @@ impl BuildDwMesh for CoffeeTree {
 }
 
 impl ToGrid for Plant {
-    fn to_grid(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags) {
+    fn to_grid(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         self.save_time.add_row("saveTime", ui);
         self.season_offset.add_row("seasonOffset", ui);
         self.gather_progress.add_row("gatherProgress", ui);
         self.has_flowered_this_season
             .add_row("hasFloweredThisSeason", ui);
         if self.flowering.add_row("flowering", ui).changed() {
-            *flags |= ObjFlags::RebuildMesh;
+            context.flags |= ObjFlags::RebuildMesh;
         }
         self.frozen.add_row("frozen", ui);
         self.age.add_row("age", ui);
@@ -547,14 +592,14 @@ impl ToGrid for Plant {
 }
 
 impl InfoUi for Plant {
-    fn info(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags) {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         let obj = self.deref_mut();
-        obj.info(ui, flags);
+        obj.info(ui, context);
 
         ui.vertical(|ui| {
             ui.heading("Plant");
             ui.separator();
-            self.add_grid("plant_grid", ui, flags);
+            self.add_grid("plant_grid", ui, context);
         });
     }
 }
@@ -586,7 +631,7 @@ impl ToRow for LightDirection {
 }
 
 impl ToGrid for ArtificialLight {
-    fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut ObjFlags) {
+    fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut DwUiContext) {
         self.max_red.add_row("maxRed", ui);
         self.max_green.add_row("maxGreen", ui);
         self.max_blue.add_row("maxBlue", ui);
@@ -601,35 +646,35 @@ impl ToGrid for ArtificialLight {
 }
 
 impl ToGrid for NormalPlant {
-    fn to_grid(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags) {
+    fn to_grid(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         self.available_food.add_row("saveTime", ui);
         grid_as_row(
             &mut self.light_dict,
             "lightDict",
             "light_dict_grid",
             ui,
-            flags,
+            context,
         );
     }
 }
 
 impl InfoUi for NormalPlant {
-    fn info(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags) {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         let plant = self.deref_mut();
-        plant.info(ui, flags);
+        plant.info(ui, context);
 
         ui.vertical(|ui| {
             ui.heading("NormalPlant");
             ui.separator();
-            self.add_grid("normal_plant_grid", ui, flags);
+            self.add_grid("normal_plant_grid", ui, context);
         });
     }
 }
 
 impl InfoUi for CornPlant {
-    fn info(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags) {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         let normal_plant = self.deref_mut();
-        normal_plant.info(ui, flags);
+        normal_plant.info(ui, context);
     }
 }
 
@@ -823,16 +868,16 @@ impl ToRow for TorchConnectionType {
 }
 
 impl ToGrid for Torch {
-    fn to_grid(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags) {
+    fn to_grid(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         grid_as_row(
             &mut self.light_dict,
             "lightDict",
             "light_dict_grid",
             ui,
-            flags,
+            context,
         );
         if self.connection_type.add_row("connectionType", ui).changed() {
-            *flags |= ObjFlags::RebuildMesh;
+            context.flags |= ObjFlags::RebuildMesh;
         }
         self.item_type.add_row("itemType", ui);
         self.data_a.add_row("dataA", ui);
@@ -841,14 +886,14 @@ impl ToGrid for Torch {
 }
 
 impl InfoUi for Torch {
-    fn info(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags) {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         let obj = self.deref_mut();
-        obj.info(ui, flags);
+        obj.info(ui, context);
 
         ui.vertical(|ui| {
             ui.heading("Torch");
             ui.separator();
-            self.add_grid("torch_grid", ui, flags);
+            self.add_grid("torch_grid", ui, context);
         });
     }
 }
@@ -983,21 +1028,21 @@ impl BuildDwMesh for Torch {
 }
 
 impl ToGrid for Ladder {
-    fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut ObjFlags) {
+    fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut DwUiContext) {
         self.paint_color.add_row("paintColor", ui);
         self.item_type.add_row("itemType", ui);
     }
 }
 
 impl InfoUi for Ladder {
-    fn info(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags) {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         let obj = self.deref_mut();
-        obj.info(ui, flags);
+        obj.info(ui, context);
 
         ui.vertical(|ui| {
             ui.heading("Ladder");
             ui.separator();
-            self.add_grid("ladder_grid", ui, flags);
+            self.add_grid("ladder_grid", ui, context);
         });
     }
 }
@@ -1018,7 +1063,7 @@ impl BuildDwMesh for Ladder {
 }
 
 impl ToGrid for Door {
-    fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut ObjFlags) {
+    fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut DwUiContext) {
         self.item_type.add_row("itemType", ui);
         self.blocked.add_row("blocked", ui);
         self.iron_place_client_id.add_row("ironPlaceClientId", ui);
@@ -1026,14 +1071,14 @@ impl ToGrid for Door {
 }
 
 impl InfoUi for Door {
-    fn info(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags) {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         let obj = self.deref_mut();
-        obj.info(ui, flags);
+        obj.info(ui, context);
 
         ui.vertical(|ui| {
             ui.heading("Door");
             ui.separator();
-            self.add_grid("door_grid", ui, flags);
+            self.add_grid("door_grid", ui, context);
         });
     }
 }
@@ -1092,9 +1137,9 @@ impl BuildDwMesh for Door {
 }
 
 impl InfoUi for CarrotPlant {
-    fn info(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags) {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         let normal_plant = self.deref_mut();
-        normal_plant.info(ui, flags);
+        normal_plant.info(ui, context);
     }
 }
 
@@ -1162,7 +1207,7 @@ impl ToRow for DodoBreed {
 }
 
 impl ToGrid for Egg {
-    fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut ObjFlags) {
+    fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut DwUiContext) {
         self.genes_dict.breed.add_row("breed", ui);
         self.hatch_timer.add_row("hatchTimer", ui);
         self.save_time.add_row("saveTime", ui);
@@ -1170,14 +1215,14 @@ impl ToGrid for Egg {
 }
 
 impl InfoUi for Egg {
-    fn info(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags) {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         let obj = self.deref_mut();
-        obj.info(ui, flags);
+        obj.info(ui, context);
 
         ui.vertical(|ui| {
             ui.heading("Egg");
             ui.separator();
-            self.add_grid("egg_grid", ui, flags);
+            self.add_grid("egg_grid", ui, context);
         });
     }
 }
@@ -1193,27 +1238,27 @@ impl BuildDwMesh for Egg {
 }
 
 impl ToGrid for KelpPlant {
-    fn to_grid(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags) {
+    fn to_grid(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         self.growth_timer.add_row("growthTimer", ui);
         if self
             .number_of_occupied_tiles_above
             .add_row("numberOfOccupiedTilesAbove", ui)
             .changed()
         {
-            *flags |= ObjFlags::RebuildMesh;
+            context.flags |= ObjFlags::RebuildMesh;
         }
     }
 }
 
 impl InfoUi for KelpPlant {
-    fn info(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags) {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         let normal_plant = self.deref_mut();
-        normal_plant.info(ui, flags);
+        normal_plant.info(ui, context);
 
         ui.vertical(|ui| {
             ui.heading("KelpPlant");
             ui.separator();
-            self.add_grid("kelp_plant_grid", ui, flags);
+            self.add_grid("kelp_plant_grid", ui, context);
         });
     }
 }
@@ -1274,9 +1319,9 @@ impl BuildDwMesh for KelpPlant {
 }
 
 impl InfoUi for LimeTree {
-    fn info(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags) {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         let tree = self.deref_mut();
-        tree.info(ui, flags);
+        tree.info(ui, context);
     }
 }
 
@@ -1311,26 +1356,26 @@ impl ToRow for InteractionObjectType {
 }
 
 impl ToGrid for InteractionObject {
-    fn to_grid(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags) {
+    fn to_grid(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         self.interaction_object_type
             .add_row("interactionObjectType", ui);
         self.is_in_use.add_row("isInUse", ui);
         if self.flipped.add_row("flipped", ui).changed() {
-            *flags |= ObjFlags::RebuildMesh;
+            context.flags |= ObjFlags::RebuildMesh;
         }
         self.paint_color.add_row("paintColor", ui);
     }
 }
 
 impl InfoUi for InteractionObject {
-    fn info(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags) {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         let obj = self.deref_mut();
-        obj.info(ui, flags);
+        obj.info(ui, context);
 
         ui.vertical(|ui| {
             ui.heading("InteractionObject");
             ui.separator();
-            self.add_grid("interaction_object_grid", ui, flags);
+            self.add_grid("interaction_object_grid", ui, context);
         });
     }
 }
@@ -1383,7 +1428,7 @@ impl ToRow for WorkbenchType {
 }
 
 impl ToGrid for Workbench {
-    fn to_grid(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags) {
+    fn to_grid(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         self.available_electricity
             .add_row("availableElectricity", ui);
         self.craft_progress_count.add_row("craftProgressCount", ui);
@@ -1396,12 +1441,12 @@ impl ToGrid for Workbench {
         self.hurrying.add_row("hurrying", ui);
         self.last_world_time.add_row("lastWorldTime", ui);
         if self.level.add_row("level", ui).changed() {
-            *flags |= ObjFlags::RebuildMesh;
+            context.flags |= ObjFlags::RebuildMesh;
         }
         self.save_time.add_row("saveTime", ui);
         self.selected_index.add_row("selectedIndex", ui);
         if self.workbench_type.add_row("workbenchType", ui).changed() {
-            *flags |= ObjFlags::RebuildMesh;
+            context.flags |= ObjFlags::RebuildMesh;
         }
         self.x_scroll.add_row("xScroll", ui);
         grid_as_row(
@@ -1409,20 +1454,20 @@ impl ToGrid for Workbench {
             "lightDict",
             "light_dict_grid",
             ui,
-            flags,
+            context,
         );
     }
 }
 
 impl InfoUi for Workbench {
-    fn info(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags) {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         let obj = self.deref_mut();
-        obj.info(ui, flags);
+        obj.info(ui, context);
 
         ui.vertical(|ui| {
             ui.heading("Workbench");
             ui.separator();
-            self.add_grid("workbench_grid", ui, flags);
+            self.add_grid("workbench_grid", ui, context);
         });
     }
 }
@@ -1835,16 +1880,16 @@ fn toggle_selected_index(
 }
 
 impl ToGrid for Item {
-    fn to_grid(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags) {
+    fn to_grid(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         if self.type_id.add_row("typeId", ui).changed() {
-            *flags |= ObjFlags::RebuildMesh;
+            context.flags |= ObjFlags::RebuildMesh;
         }
         let item_type = self.item_type();
         match item_type {
             Ok(mut item_type) => {
                 if item_type.add_row("itemType", ui).changed() {
                     self.set_item_type(item_type);
-                    *flags |= ObjFlags::RebuildMesh;
+                    context.flags |= ObjFlags::RebuildMesh;
                 }
             }
             Err(e) => {
@@ -1893,7 +1938,7 @@ impl ToGrid for Item {
                     && let Some(slot) = slots.get_mut(idx)
                 {
                     let items = slot.deref_mut();
-                    items.add_grid(id.with("selected_slot_items_grid"), ui, flags);
+                    items.add_grid(id.with("selected_slot_items_grid"), ui, context);
                 }
             });
         } else {
@@ -2003,35 +2048,35 @@ impl ToGrid for Item {
                     );
 
                     if changed {
-                        *flags |= ObjFlags::RebuildMesh;
+                        context.flags |= ObjFlags::RebuildMesh;
                     }
                 });
 
             if let Some(dyn_obj) = &mut self.dynamic_object {
                 ui.horizontal(|ui| match dyn_obj {
                     AnyDynamicObject::Ladder(ladder) => {
-                        ladder.add_grid("ladder_grid", ui, flags);
+                        ladder.add_grid("ladder_grid", ui, context);
                     }
                     AnyDynamicObject::Door(door) => {
-                        door.add_grid("door_grid", ui, flags);
+                        door.add_grid("door_grid", ui, context);
                     }
                     AnyDynamicObject::Bed(bed) => {
-                        bed.add_grid("bed_grid", ui, flags);
+                        bed.add_grid("bed_grid", ui, context);
                     }
                     AnyDynamicObject::Egg(egg) => {
-                        egg.add_grid("egg_grid", ui, flags);
+                        egg.add_grid("egg_grid", ui, context);
                     }
                     AnyDynamicObject::Workbench(workbench) => {
-                        workbench.add_grid("workbench_grid", ui, flags);
+                        workbench.add_grid("workbench_grid", ui, context);
                     }
                     AnyDynamicObject::Chest(chest) => {
-                        chest.add_grid("chest_grid", ui, flags);
+                        chest.add_grid("chest_grid", ui, context);
                     }
                     AnyDynamicObject::Sign(sign) => {
-                        sign.add_grid("sign_grid", ui, flags);
+                        sign.add_grid("sign_grid", ui, context);
                     }
                     AnyDynamicObject::TrainStation(train_station) => {
-                        train_station.add_grid("train_station_grid", ui, flags);
+                        train_station.add_grid("train_station_grid", ui, context);
                     }
                 });
                 ui.end_row();
@@ -2042,7 +2087,7 @@ impl ToGrid for Item {
 }
 
 impl ToGrid for Chest {
-    fn to_grid(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags) {
+    fn to_grid(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         self.save_time.add_row("saveTime", ui);
         ui.label("slots");
         ui.vertical(|ui| {
@@ -2093,7 +2138,7 @@ impl ToGrid for Chest {
                     items.add_grid(
                         format!("selected_slot_items_grid_{:?}", unique_id),
                         ui,
-                        flags,
+                        context,
                     );
                 }
             } else {
@@ -2105,14 +2150,14 @@ impl ToGrid for Chest {
 }
 
 impl InfoUi for Chest {
-    fn info(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags) {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         let obj = self.deref_mut();
-        obj.info(ui, flags);
+        obj.info(ui, context);
 
         ui.vertical(|ui| {
             ui.heading("Chest");
             ui.separator();
-            self.add_grid("chest_grid", ui, flags);
+            self.add_grid("chest_grid", ui, context);
         });
     }
 }
@@ -2193,10 +2238,10 @@ impl ToRow for SignConnectionType {
 }
 
 impl ToGrid for Sign {
-    fn to_grid(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags) {
+    fn to_grid(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         self.text.add_row("text", ui);
         if self.connection_type.add_row("connectionType", ui).changed() {
-            *flags |= ObjFlags::RebuildMesh;
+            context.flags |= ObjFlags::RebuildMesh;
         }
         self.offset_type.add_row("offsetType", ui);
         self.save_time.add_row("saveTime", ui);
@@ -2204,14 +2249,14 @@ impl ToGrid for Sign {
 }
 
 impl InfoUi for Sign {
-    fn info(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags) {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         let obj = self.deref_mut();
-        obj.info(ui, flags);
+        obj.info(ui, context);
 
         ui.vertical(|ui| {
             ui.heading("Sign");
             ui.separator();
-            self.add_grid("sign_grid", ui, flags);
+            self.add_grid("sign_grid", ui, context);
         });
     }
 }
@@ -2282,21 +2327,21 @@ impl BuildDwMesh for Sign {
 }
 
 impl ToGrid for TrainStation {
-    fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut ObjFlags) {
+    fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut DwUiContext) {
         self.text.add_row("text", ui);
         self.save_time.add_row("saveTime", ui);
     }
 }
 
 impl InfoUi for TrainStation {
-    fn info(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags) {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         let obj = self.deref_mut();
-        obj.info(ui, flags);
+        obj.info(ui, context);
 
         ui.vertical(|ui| {
             ui.heading("TrainStation");
             ui.separator();
-            self.add_grid("train_station_grid", ui, flags);
+            self.add_grid("train_station_grid", ui, context);
         });
     }
 }
@@ -2339,23 +2384,23 @@ impl ToRow for TreeType {
 }
 
 impl ToGrid for GemTree {
-    fn to_grid(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags) {
+    fn to_grid(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         if self.gem_tree_type.add_row("gemTreeType", ui).changed() {
-            *flags |= ObjFlags::RebuildMesh;
+            context.flags |= ObjFlags::RebuildMesh;
         }
         self.fruit_year.add_row("fruitYear", ui);
     }
 }
 
 impl InfoUi for GemTree {
-    fn info(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags) {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         let tree = self.deref_mut();
-        tree.info(ui, flags);
+        tree.info(ui, context);
 
         ui.vertical(|ui| {
             ui.heading("GemTree");
             ui.separator();
-            self.add_grid("gem_tree_grid", ui, flags);
+            self.add_grid("gem_tree_grid", ui, context);
         });
     }
 }
@@ -2378,9 +2423,9 @@ impl BuildDwMesh for GemTree {
 }
 
 impl InfoUi for TomatoPlant {
-    fn info(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags) {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         let normal_plant = self.deref_mut();
-        normal_plant.info(ui, flags);
+        normal_plant.info(ui, context);
     }
 }
 

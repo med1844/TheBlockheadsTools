@@ -1,5 +1,5 @@
 use super::{
-    dw_impl::{InfoUi, ObjFlags},
+    dw_impl::{DwUiContext, InfoUi, ObjFlags},
     fps_counter::FpsCounter,
     gpu::{
         Camera, GpuCoord, RenderSettings,
@@ -770,7 +770,7 @@ impl EditorApp {
 
     fn render_selected_dyn_obj_info_window(
         &mut self,
-        ctx: &egui::Context,
+        egui_ctx: &egui::Context,
         frame: &mut eframe::Frame,
     ) {
         if let Some(InteractionTarget::DynamicObject { chunk_coord, id }) =
@@ -783,21 +783,27 @@ impl EditorApp {
             fn draw_window<T: InfoUi>(
                 title: &str,
                 t: Option<&mut T>,
-                ctx: &egui::Context,
+                ctx: (&egui::Context, DwUiContext),
             ) -> ObjFlags {
-                let mut flags = ObjFlags::default();
+                let (egui_ctx, mut context) = ctx;
                 if let Some(t) = t {
                     egui::Window::new(title)
                         .id("selected_dynamic_obj_info".into())
-                        .show(ctx, |ui| {
+                        .show(egui_ctx, |ui| {
                             egui::ScrollArea::both().show(ui, |ui| {
-                                t.info(ui, &mut flags);
+                                t.info(ui, &mut context);
                             });
                         });
                 }
-                flags
+                context.flags
             }
 
+            let context = DwUiContext::new(
+                world_db.main.world_v2.world_width_macro * Chunk::NUM_BLOCK_PER_ROW as u32,
+                self.render_settings.enable_cyclic,
+                ObjFlags::default(),
+            );
+            let ctx = (egui_ctx, context);
             let title: &'static str = id.obj_type.into();
             let flags = match id.obj_type {
                 AppleTree => draw_window(title, dw_chunk.apple_tree.get_mut(id.index), ctx),
