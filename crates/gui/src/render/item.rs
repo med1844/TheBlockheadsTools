@@ -1,102 +1,15 @@
-use super::{DwChunkBuf, DwIconInstanceRaw, DwIconVertex, ID_TEXTURE_FORMAT, ImageType, Texture};
+use super::{DwChunkBuf, DwIconVertex, DwItemInstanceRaw, ID_TEXTURE_FORMAT, Texture};
 use eframe::wgpu::{self, util::DeviceExt};
 
-pub struct DwIconRenderer {
+pub struct DwItemRenderer {
     pipeline: wgpu::RenderPipeline,
     vertex_buf: wgpu::Buffer,
     index_buf: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
 }
 
-impl DwIconRenderer {
-    const ITEM_IMAGE_TYPE: &[[ImageType; 6]] = {
-        use ImageType::*;
-        &[
-            [MinedStone; 6], // Stone
-                             // Kiln
-                             // Brick
-                             // Limestone
-                             // MinedLimestone
-                             // Marble
-                             // MinedMarble
-                             // Furnace
-                             // WoodworkBench
-                             // TaylorsBench
-                             // Press
-                             // Sandstone
-                             // MinedSandstone
-                             // RedMarble
-                             // MinedRedMarble
-                             // WovenFlaxMat
-                             // YellowFlaxMat
-                             // RedFlaxMat
-                             // Glass
-                             // Chest
-                             // DeprecatedFood
-                             // GoldBlock
-                             // DeprecatedMango
-                             // Rock
-                             // Dirt
-                             // Wood
-                             // WorkBench
-                             // Sand
-                             // ToolBench
-                             // LapisLazuli
-                             // MinedLapisLazuli
-                             // CraftBench
-                             // MixingBench
-                             // ReinforcedPlatform
-                             // DeprecatedStonePickaxe
-                             // DeprecatedCopperIngot
-                             // Ice
-                             // DyeBench
-                             // Compost
-                             // Basalt
-                             // MinedBasalt
-                             // Safe
-                             // CopperBlock
-                             // TinBlock
-                             // BronzeBlock
-                             // IronBlock
-                             // SteelBlock
-                             // MetalworkBench
-                             // GoldenChest
-                             // DeprecatedBronzeMachete
-                             // PortalChest
-                             // BlackSand
-                             // BlackGlass
-                             // SteamGenerator
-                             // ElectricKiln
-                             // ElectricFurnace
-                             // ElectricMetalworkBench
-                             // ElectricStove
-                             // SolarPanel
-                             // Flywheel
-                             // ArmorBench
-                             // TrainYard
-                             // BuildersBench
-                             // ElevatorShaft
-                             // ElectricElevatorMotor
-                             // PlatiumBlock
-                             // CarbonFiberBlock
-                             // TitaniumBlock
-                             // DeprecatedIronSword
-                             // ElectricPress
-                             // Gravel
-                             // CompostBin
-                             // EggExtractor
-                             // PizzaOven
-                             // AmethystBlock
-                             // SapphireBlock
-                             // EmeraldBlock
-                             // RubyBlock
-                             // DiamondBlock
-                             // Plaster
-                             // FeederChest
-                             // LuminousPlaster
-        ]
-    };
-
+impl DwItemRenderer {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         device: &wgpu::Device,
         camera_buf: &wgpu::Buffer,
@@ -109,18 +22,9 @@ impl DwIconRenderer {
     ) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Dynamic Object Icon Shader"),
-            source: wgpu::ShaderSource::Wgsl(wgsl_macro::include_wgsl!("src/render/shader/dw_icon.wgsl").into()),
-        });
-
-        let block_image_types = Self::ITEM_IMAGE_TYPE
-            .iter()
-            .flat_map(|v| v.map(|v| v as u32))
-            .collect::<Vec<_>>();
-
-        let uv_at_face_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Texture UV Atlas Buffer"),
-            contents: bytemuck::cast_slice(&block_image_types),
-            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            source: wgpu::ShaderSource::Wgsl(
+                wgsl_macro::include_wgsl!("src/render/shader/dw_item.wgsl").into(),
+            ),
         });
 
         let vertex_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -184,20 +88,9 @@ impl DwIconRenderer {
                     ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                     count: None,
                 },
-                // Voxel UV Atlas
-                wgpu::BindGroupLayoutEntry {
-                    binding: 5,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
                 // Hover on id
                 wgpu::BindGroupLayoutEntry {
-                    binding: 6,
+                    binding: 5,
                     visibility: wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform,
@@ -208,7 +101,7 @@ impl DwIconRenderer {
                 },
                 // Selected id
                 wgpu::BindGroupLayoutEntry {
-                    binding: 7,
+                    binding: 6,
                     visibility: wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform,
@@ -219,7 +112,7 @@ impl DwIconRenderer {
                 },
                 // Render settings
                 wgpu::BindGroupLayoutEntry {
-                    binding: 8,
+                    binding: 7,
                     visibility: wgpu::ShaderStages::VERTEX,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform,
@@ -230,7 +123,7 @@ impl DwIconRenderer {
                 },
                 // World Dim X
                 wgpu::BindGroupLayoutEntry {
-                    binding: 9,
+                    binding: 8,
                     visibility: wgpu::ShaderStages::VERTEX,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform,
@@ -240,7 +133,7 @@ impl DwIconRenderer {
                     count: None,
                 },
             ],
-            label: Some("dynamic_object_icon_bind_group_layout"),
+            label: Some("dynamic_object_item_bind_group_layout"),
         });
 
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -268,26 +161,22 @@ impl DwIconRenderer {
                 },
                 wgpu::BindGroupEntry {
                     binding: 5,
-                    resource: uv_at_face_buf.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 6,
                     resource: hover_on_id_buf.as_entire_binding(),
                 },
                 wgpu::BindGroupEntry {
-                    binding: 7,
+                    binding: 6,
                     resource: selected_id_buf.as_entire_binding(),
                 },
                 wgpu::BindGroupEntry {
-                    binding: 8,
+                    binding: 7,
                     resource: render_settings_buf.as_entire_binding(),
                 },
                 wgpu::BindGroupEntry {
-                    binding: 9,
+                    binding: 8,
                     resource: world_dim_x_buf.as_entire_binding(),
                 },
             ],
-            label: Some("dynamic_object_icon_bind_group"),
+            label: Some("dynamic_object_item_bind_group"),
         });
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -301,14 +190,14 @@ impl DwIconRenderer {
             layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &shader,
-                entry_point: Some("vs_dynamic_object_icon"),
-                buffers: &[DwIconVertex::desc(), DwIconInstanceRaw::desc()],
+                entry_point: Some("vs_dynamic_object_item"),
+                buffers: &[DwIconVertex::desc(), DwItemInstanceRaw::desc()],
                 compilation_options: Default::default(),
             },
             // ... fragment and other states remain the same
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
-                entry_point: Some("fs_dynamic_object_icon"),
+                entry_point: Some("fs_dynamic_object_item"),
                 targets: &[
                     Some(wgpu::ColorTargetState {
                         format: wgpu::TextureFormat::Bgra8Unorm,

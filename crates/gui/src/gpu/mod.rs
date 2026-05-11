@@ -10,4 +10,4 @@ pub use camera::{Camera, CameraUniform};
 pub use coord::{GpuCoord, GpuCoordUniform};
 pub use render_settings::RenderSettings;
 pub use texture::Texture;
-pub use voxel::{VoxelType, voxel_util};
+pub use voxel::{BlockUv, VoxelType, voxel_util};

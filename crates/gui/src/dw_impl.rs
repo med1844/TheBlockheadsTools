@@ -1,10 +1,10 @@
 // Implements traits for dynamic object types defined in lib
 use super::{
     gpu::{
-        VoxelType,
+        BlockUv,
         dw::{
             BuildDwMesh, BuildDwMeshError, CoordOutOfBoundSnafu, DwBlock, DwCapacity,
-            DwChunkBufBuilder, DwFace, DwIcon, DwQuad, FaceDirection, InvalidItemTypeForDoorSnafu,
+            DwChunkBufBuilder, DwFace, DwItem, DwQuad, FaceDirection, InvalidItemTypeForDoorSnafu,
             InvalidItemTypeForTorchSnafu, InvalidWorkbenchLevelSnafu,
         },
     },
@@ -37,17 +37,15 @@ use the_blockheads_tools_lib::game::{
 
 const CUBE_NUM_FACES: usize = 6;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub enum ObjFlags {
-    PosChangedTo { x: f32, y: f32 },
+    PosChangedTo {
+        x: f32,
+        y: f32,
+    },
     RebuildMesh,
+    #[default]
     NoChange,
-}
-
-impl Default for ObjFlags {
-    fn default() -> Self {
-        Self::NoChange
-    }
 }
 
 impl BitOrAssign for ObjFlags {
@@ -339,10 +337,10 @@ impl InfoUi for Tree {
 }
 
 impl BuildDwMesh for AppleTree {
-    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { icons: 1, quads: 0 });
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 1, quads: 0 });
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
-        builder.add_icon(DwIcon::new(self.float_pos, ItemType::Apple));
+        builder.add_item(DwItem::new(self.float_pos, ItemType::Apple));
         Ok(())
     }
 }
@@ -367,10 +365,10 @@ impl InfoUi for AppleTree {
 }
 
 impl BuildDwMesh for MapleTree {
-    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { icons: 1, quads: 0 });
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 1, quads: 0 });
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
-        builder.add_icon(DwIcon::new(self.float_pos, ItemType::MapleSeed));
+        builder.add_item(DwItem::new(self.float_pos, ItemType::MapleSeed));
         Ok(())
     }
 }
@@ -384,7 +382,7 @@ impl InfoUi for MapleTree {
 
 impl BuildDwMesh for MangoTree {
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
-        builder.add_icon(DwIcon::new(self.float_pos, ItemType::Mango));
+        builder.add_item(DwItem::new(self.float_pos, ItemType::Mango));
         Ok(())
     }
 }
@@ -416,10 +414,10 @@ impl InfoUi for PineTree {
 }
 
 impl BuildDwMesh for PineTree {
-    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { icons: 1, quads: 0 });
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 1, quads: 0 });
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
-        builder.add_icon(DwIcon::new(self.float_pos, ItemType::Pinecone));
+        builder.add_item(DwItem::new(self.float_pos, ItemType::Pinecone));
         Ok(())
     }
 }
@@ -447,10 +445,10 @@ impl InfoUi for CactusTree {
 }
 
 impl BuildDwMesh for CactusTree {
-    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { icons: 1, quads: 0 });
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 1, quads: 0 });
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
-        builder.add_icon(DwIcon::new(self.float_pos, ItemType::PricklyPear));
+        builder.add_item(DwItem::new(self.float_pos, ItemType::PricklyPear));
         Ok(())
     }
 }
@@ -463,10 +461,10 @@ impl InfoUi for CoconutTree {
 }
 
 impl BuildDwMesh for CoconutTree {
-    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { icons: 1, quads: 0 });
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 1, quads: 0 });
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
-        builder.add_icon(DwIcon::new(self.float_pos, ItemType::Coconut));
+        builder.add_item(DwItem::new(self.float_pos, ItemType::Coconut));
         Ok(())
     }
 }
@@ -478,10 +476,10 @@ impl InfoUi for OrangeTree {
     }
 }
 impl BuildDwMesh for OrangeTree {
-    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { icons: 1, quads: 0 });
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 1, quads: 0 });
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
-        builder.add_icon(DwIcon::new(self.float_pos, ItemType::Orange));
+        builder.add_item(DwItem::new(self.float_pos, ItemType::Orange));
         Ok(())
     }
 }
@@ -494,10 +492,10 @@ impl InfoUi for CherryTree {
 }
 
 impl BuildDwMesh for CherryTree {
-    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { icons: 1, quads: 0 });
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 1, quads: 0 });
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
-        builder.add_icon(DwIcon::new(self.float_pos, ItemType::Cherry));
+        builder.add_item(DwItem::new(self.float_pos, ItemType::Cherry));
         Ok(())
     }
 }
@@ -510,10 +508,10 @@ impl InfoUi for CoffeeTree {
 }
 
 impl BuildDwMesh for CoffeeTree {
-    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { icons: 1, quads: 0 });
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 1, quads: 0 });
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
-        builder.add_icon(DwIcon::new(self.float_pos, ItemType::CoffeeCherry));
+        builder.add_item(DwItem::new(self.float_pos, ItemType::CoffeeCherry));
         Ok(())
     }
 }
@@ -625,7 +623,7 @@ impl InfoUi for CornPlant {
 }
 
 impl BuildDwMesh for CornPlant {
-    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { icons: 0, quads: 1 });
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 0, quads: 1 });
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         builder.add_face(DwFace::new_sprite(
@@ -762,7 +760,7 @@ impl DwQuad for RotatedTorchFace {
 }
 
 impl BuildDwMesh for Torch {
-    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { icons: 0, quads: 1 });
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 0, quads: 1 });
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         let image_type = match self.item_type {
@@ -849,7 +847,7 @@ impl InfoUi for Ladder {
 }
 
 impl BuildDwMesh for Ladder {
-    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { icons: 0, quads: 1 });
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 0, quads: 1 });
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         builder.add_face(DwFace::new_sprite(
@@ -885,7 +883,7 @@ impl InfoUi for Door {
 }
 
 impl BuildDwMesh for Door {
-    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { icons: 0, quads: 2 });
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 0, quads: 2 });
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         let [x, y] = self.float_pos;
@@ -945,7 +943,7 @@ impl InfoUi for CarrotPlant {
 }
 
 impl BuildDwMesh for CarrotPlant {
-    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { icons: 0, quads: 1 });
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 0, quads: 1 });
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         builder.add_face(DwFace::new_sprite(
@@ -1029,11 +1027,11 @@ impl InfoUi for Egg {
 }
 
 impl BuildDwMesh for Egg {
-    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { icons: 1, quads: 0 });
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 1, quads: 0 });
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         // TODO add render egg with real breed textures
-        builder.add_icon(DwIcon::new(self.float_pos, ItemType::DodoEgg));
+        builder.add_item(DwItem::new(self.float_pos, ItemType::DodoEgg));
         Ok(())
     }
 }
@@ -1068,7 +1066,7 @@ impl BuildDwMesh for KelpPlant {
     fn capacity(&self) -> DwCapacity {
         let len = self.number_of_occupied_tiles_above as usize;
         DwCapacity {
-            icons: 0,
+            items: 0,
             quads: if len == 0 { 0 } else { len / 2 + 1 },
         }
     }
@@ -1127,10 +1125,10 @@ impl InfoUi for LimeTree {
 }
 
 impl BuildDwMesh for LimeTree {
-    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { icons: 1, quads: 0 });
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 1, quads: 0 });
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
-        builder.add_icon(DwIcon::new(self.float_pos, ItemType::Lime));
+        builder.add_item(DwItem::new(self.float_pos, ItemType::Lime));
         Ok(())
     }
 }
@@ -1275,15 +1273,17 @@ impl InfoUi for Workbench {
 
 impl BuildDwMesh for Workbench {
     const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity {
-        icons: 0,
+        items: 0,
         quads: CUBE_NUM_FACES,
     });
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        use BlockUv::*;
+        use ImageType::*;
         let block_coord = BlockCoord::new(self.pos_x, self.pos_y).context(CoordOutOfBoundSnafu)?;
         match self.workbench_type {
             WorkbenchType::Undefined => {
-                builder.add_icon(DwIcon::new(self.float_pos, ItemType::Unknown))
+                builder.add_item(DwItem::new(self.float_pos, ItemType::Unknown))
             }
             WorkbenchType::BasicPortal | WorkbenchType::PlacedPortal => builder.add_face(
                 DwFace::new_sprite(ImageType::Portal0, [0.5, 0.0], self.float_pos, [1, 2], 2.0),
@@ -1291,10 +1291,22 @@ impl BuildDwMesh for Workbench {
             WorkbenchType::Workbench => builder.add_block(DwBlock::new(
                 block_coord,
                 match self.level {
-                    0 => VoxelType::WorkbenchLevel1,
-                    1 => VoxelType::WorkbenchLevel2,
-                    2 => VoxelType::WorkbenchLevel3,
-                    3 => VoxelType::WorkbenchLevel4,
+                    0 => TopSide {
+                        top: WorkbenchLevel1Top,
+                        side: WorkbenchLevel1,
+                    },
+                    1 => TopSide {
+                        top: WorkbenchLevel2Top,
+                        side: WorkbenchLevel2,
+                    },
+                    2 => TopSide {
+                        top: WorkbenchLevel3Top,
+                        side: WorkbenchLevel3,
+                    },
+                    3 => TopSide {
+                        top: WorkbenchLevel4Top,
+                        side: WorkbenchLevel4,
+                    },
                     _ => InvalidWorkbenchLevelSnafu {
                         workbench_type: self.workbench_type,
                         level: self.level,
@@ -1313,8 +1325,14 @@ impl BuildDwMesh for Workbench {
             WorkbenchType::Weave => builder.add_block(DwBlock::new(
                 block_coord,
                 match self.level {
-                    0 => VoxelType::TailorsBenchLevel1,
-                    1 => VoxelType::TailorsBenchLevel2,
+                    0 => TopSide {
+                        top: WorkbenchWeave1Top,
+                        side: WorkbenchWeave1,
+                    },
+                    1 => TopSide {
+                        top: WorkbenchWeave2Top,
+                        side: WorkbenchWeave2,
+                    },
                     _ => InvalidWorkbenchLevelSnafu {
                         workbench_type: self.workbench_type,
                         level: self.level,
@@ -1323,19 +1341,44 @@ impl BuildDwMesh for Workbench {
                     .fail()?,
                 },
             )),
-            WorkbenchType::Wood => {
-                builder.add_block(DwBlock::new(block_coord, VoxelType::WoodworkBench))
-            }
+            WorkbenchType::Wood => builder.add_block(DwBlock::new(
+                block_coord,
+                TopSide {
+                    top: WorkbenchWood1Top,
+                    side: WorkbenchWood1,
+                },
+            )),
             WorkbenchType::Tool => builder.add_block(DwBlock::new(
                 block_coord,
                 match self.level {
-                    0 => VoxelType::ToolBenchLevel1,
-                    1 => VoxelType::ToolBenchLevel2,
-                    2 => VoxelType::ToolBenchLevel3,
-                    3 => VoxelType::ToolBenchLevel4,
-                    4 => VoxelType::ToolBenchLevel5,
-                    5 => VoxelType::ToolBenchLevel6,
-                    6 => VoxelType::ToolBenchLevel7,
+                    0 => TopSide {
+                        top: WorkbenchTool1Top,
+                        side: WorkbenchTool1,
+                    },
+                    1 => TopSide {
+                        top: WorkbenchTool2Top,
+                        side: WorkbenchTool2,
+                    },
+                    2 => TopSide {
+                        top: WorkbenchTool3Top,
+                        side: WorkbenchTool3,
+                    },
+                    3 => TopSide {
+                        top: WorkbenchTool4Top,
+                        side: WorkbenchTool4,
+                    },
+                    4 => TopSide {
+                        top: WorkbenchTool5Top,
+                        side: WorkbenchTool5,
+                    },
+                    5 => TopSide {
+                        top: WorkbenchTool6Top,
+                        side: WorkbenchTool6,
+                    },
+                    6 => TopSide {
+                        top: WorkbenchTool7Top,
+                        side: WorkbenchTool7,
+                    },
                     _ => InvalidWorkbenchLevelSnafu {
                         workbench_type: self.workbench_type,
                         level: self.level,
@@ -1347,8 +1390,14 @@ impl BuildDwMesh for Workbench {
             WorkbenchType::Press => builder.add_block(DwBlock::new(
                 block_coord,
                 match self.level {
-                    0 => VoxelType::PressLevel1,
-                    1 => VoxelType::PressLevel2,
+                    0 => TopSide {
+                        top: WorkbenchPress1Top,
+                        side: WorkbenchPress1,
+                    },
+                    1 => TopSide {
+                        top: WorkbenchPress2Top,
+                        side: WorkbenchPress2,
+                    },
                     _ => InvalidWorkbenchLevelSnafu {
                         workbench_type: self.workbench_type,
                         level: self.level,
@@ -1357,13 +1406,28 @@ impl BuildDwMesh for Workbench {
                     .fail()?,
                 },
             )),
-            WorkbenchType::Kiln => builder.add_block(DwBlock::new(block_coord, VoxelType::Kiln)),
+            WorkbenchType::Kiln => builder.add_block(DwBlock::new(
+                block_coord,
+                TopSide {
+                    top: KilnTop,
+                    side: Kiln,
+                },
+            )),
             WorkbenchType::Furnace => builder.add_block(DwBlock::new(
                 block_coord,
                 match self.level {
-                    0 => VoxelType::FurnaceLevel1,
-                    1 => VoxelType::FurnaceLevel2,
-                    2 => VoxelType::FurnaceLevel3,
+                    0 => TopSide {
+                        top: Furnace1Top,
+                        side: Furnace1,
+                    },
+                    1 => TopSide {
+                        top: Furnace2Top,
+                        side: Furnace2,
+                    },
+                    2 => TopSide {
+                        top: Furnace3Top,
+                        side: Furnace3,
+                    },
                     _ => InvalidWorkbenchLevelSnafu {
                         workbench_type: self.workbench_type,
                         level: self.level,
@@ -1375,10 +1439,22 @@ impl BuildDwMesh for Workbench {
             WorkbenchType::Craft => builder.add_block(DwBlock::new(
                 block_coord,
                 match self.level {
-                    0 => VoxelType::CraftBenchLevel1,
-                    1 => VoxelType::CraftBenchLevel2,
-                    2 => VoxelType::CraftBenchLevel3,
-                    3 => VoxelType::CraftBenchLevel4,
+                    0 => TopSide {
+                        top: CraftBenchLevel1Top,
+                        side: CraftBenchLevel1,
+                    },
+                    1 => TopSide {
+                        top: CraftBenchLevel2Top,
+                        side: CraftBenchLevel2,
+                    },
+                    2 => TopSide {
+                        top: CraftBenchLevel3Top,
+                        side: CraftBenchLevel3,
+                    },
+                    3 => TopSide {
+                        top: CraftBenchLevel4Top,
+                        side: CraftBenchLevel4,
+                    },
                     _ => InvalidWorkbenchLevelSnafu {
                         workbench_type: self.workbench_type,
                         level: self.level,
@@ -1387,15 +1463,31 @@ impl BuildDwMesh for Workbench {
                     .fail()?,
                 },
             )),
-            WorkbenchType::Mix => {
-                builder.add_block(DwBlock::new(block_coord, VoxelType::MixingBench))
-            }
-            WorkbenchType::Dye => builder.add_block(DwBlock::new(block_coord, VoxelType::DyeBench)),
+            WorkbenchType::Mix => builder.add_block(DwBlock::new(
+                block_coord,
+                TopSide {
+                    top: MixBenchLevel1Top,
+                    side: MixBenchLevel1,
+                },
+            )),
+            WorkbenchType::Dye => builder.add_block(DwBlock::new(
+                block_coord,
+                TopSide {
+                    top: DyeBenchLevel1Top,
+                    side: DyeBenchLevel1,
+                },
+            )),
             WorkbenchType::Metalwork => builder.add_block(DwBlock::new(
                 block_coord,
                 match self.level {
-                    0 => VoxelType::MetalworkBenchLevel1,
-                    1 => VoxelType::MetalworkBenchLevel2,
+                    0 => TopSide {
+                        top: MetalworkBenchLevel1Top,
+                        side: MetalworkBenchLevel1,
+                    },
+                    1 => TopSide {
+                        top: MetalworkBenchLevel2Top,
+                        side: MetalworkBenchLevel2,
+                    },
                     _ => InvalidWorkbenchLevelSnafu {
                         workbench_type: self.workbench_type,
                         level: self.level,
@@ -1404,33 +1496,70 @@ impl BuildDwMesh for Workbench {
                     .fail()?,
                 },
             )),
-            WorkbenchType::SteamGenerator => {
-                builder.add_block(DwBlock::new(block_coord, VoxelType::SteamGenerator))
-            }
-            WorkbenchType::ElectricKiln => {
-                builder.add_block(DwBlock::new(block_coord, VoxelType::ElectricKiln))
-            }
-            WorkbenchType::ElectricFurnace => {
-                builder.add_block(DwBlock::new(block_coord, VoxelType::ElectricFurnace))
-            }
-            WorkbenchType::ElectricMetalworkBench => {
-                builder.add_block(DwBlock::new(block_coord, VoxelType::ElectricMetalworkBench))
-            }
-            WorkbenchType::ElectricStove => {
-                builder.add_block(DwBlock::new(block_coord, VoxelType::ElectricStove))
-            }
-            WorkbenchType::SolarPanel => {
-                builder.add_block(DwBlock::new(block_coord, VoxelType::SolarPanel))
-            }
-            WorkbenchType::Flywheel => {
-                builder.add_block(DwBlock::new(block_coord, VoxelType::Flywheel))
-            }
+            WorkbenchType::SteamGenerator => builder.add_block(DwBlock::new(
+                block_coord,
+                TopSide {
+                    top: SteamGeneratorTop,
+                    side: SteamGenerator,
+                },
+            )),
+            WorkbenchType::ElectricKiln => builder.add_block(DwBlock::new(
+                block_coord,
+                TopSide {
+                    top: ElectricKilnTop,
+                    side: ElectricKiln,
+                },
+            )),
+            WorkbenchType::ElectricFurnace => builder.add_block(DwBlock::new(
+                block_coord,
+                TopSide {
+                    top: ElectricFurnaceTop,
+                    side: ElectricFurnace,
+                },
+            )),
+            WorkbenchType::ElectricMetalworkBench => builder.add_block(DwBlock::new(
+                block_coord,
+                TopSide {
+                    top: ElectricMetalworkBenchTop,
+                    side: ElectricMetalworkBench,
+                },
+            )),
+            WorkbenchType::ElectricStove => builder.add_block(DwBlock::new(
+                block_coord,
+                TopSide {
+                    top: ElectricStoveTop,
+                    side: ElectricStove,
+                },
+            )),
+            WorkbenchType::SolarPanel => builder.add_block(DwBlock::new(
+                block_coord,
+                TopSide {
+                    top: SolarPanelTop,
+                    side: SolarPanel,
+                },
+            )),
+            WorkbenchType::Flywheel => builder.add_block(DwBlock::new(
+                block_coord,
+                TopSide {
+                    top: FlywheelTop,
+                    side: Flywheel,
+                },
+            )),
             WorkbenchType::ArmorBench => builder.add_block(DwBlock::new(
                 block_coord,
                 match self.level {
-                    0 => VoxelType::ArmorBenchLevel1,
-                    1 => VoxelType::ArmorBenchLevel2,
-                    2 => VoxelType::ArmorBenchLevel3,
+                    0 => TopSide {
+                        top: ArmorBenchLevel1Top,
+                        side: ArmorBenchLevel1,
+                    },
+                    1 => TopSide {
+                        top: ArmorBenchLevel2Top,
+                        side: ArmorBenchLevel2,
+                    },
+                    2 => TopSide {
+                        top: ArmorBenchLevel3Top,
+                        side: ArmorBenchLevel3,
+                    },
                     _ => InvalidWorkbenchLevelSnafu {
                         workbench_type: self.workbench_type,
                         level: self.level,
@@ -1439,15 +1568,25 @@ impl BuildDwMesh for Workbench {
                     .fail()?,
                 },
             )),
-            WorkbenchType::TrainYard => {
-                builder.add_block(DwBlock::new(block_coord, VoxelType::TrainYard))
-            }
-            WorkbenchType::Easel => builder.add_icon(DwIcon::new(self.float_pos, ItemType::Easel)),
+            WorkbenchType::TrainYard => builder.add_block(DwBlock::new(
+                block_coord,
+                TopSide {
+                    top: TrainYardTop,
+                    side: TrainYard,
+                },
+            )),
+            WorkbenchType::Easel => builder.add_item(DwItem::new(self.float_pos, ItemType::Easel)),
             WorkbenchType::Build => builder.add_block(DwBlock::new(
                 block_coord,
                 match self.level {
-                    0 => VoxelType::BuildersBenchLevel1,
-                    1 => VoxelType::BuildersBenchLevel2,
+                    0 => TopSide {
+                        top: BuildersBenchLevel1Top,
+                        side: BuildersBenchLevel1,
+                    },
+                    1 => TopSide {
+                        top: BuildersBenchLevel2Top,
+                        side: BuildersBenchLevel2,
+                    },
                     _ => InvalidWorkbenchLevelSnafu {
                         workbench_type: self.workbench_type,
                         level: self.level,
@@ -1457,23 +1596,39 @@ impl BuildDwMesh for Workbench {
                 },
             )),
             WorkbenchType::Refinery => {
-                builder.add_icon(DwIcon::new(self.float_pos, ItemType::Refinery))
+                builder.add_item(DwItem::new(self.float_pos, ItemType::Refinery))
             }
-            WorkbenchType::ElectricPress => {
-                builder.add_block(DwBlock::new(block_coord, VoxelType::ElectricPress))
-            }
-            WorkbenchType::CompostBin => {
-                builder.add_block(DwBlock::new(block_coord, VoxelType::CompostBin))
-            }
+            WorkbenchType::ElectricPress => builder.add_block(DwBlock::new(
+                block_coord,
+                TopSide {
+                    top: ElectricPressTop,
+                    side: ElectricPress,
+                },
+            )),
+            WorkbenchType::CompostBin => builder.add_block(DwBlock::new(
+                block_coord,
+                TopSide {
+                    top: CompostBinTop,
+                    side: CompostBin,
+                },
+            )),
             WorkbenchType::Sluice => {
-                builder.add_icon(DwIcon::new(self.float_pos, ItemType::ElectricSluice))
+                builder.add_item(DwItem::new(self.float_pos, ItemType::ElectricSluice))
             }
-            WorkbenchType::EggExtractor => {
-                builder.add_block(DwBlock::new(block_coord, VoxelType::EggExtractor))
-            }
-            WorkbenchType::PizzaOven => {
-                builder.add_block(DwBlock::new(block_coord, VoxelType::PizzaOven))
-            }
+            WorkbenchType::EggExtractor => builder.add_block(DwBlock::new(
+                block_coord,
+                TopSide {
+                    top: EggExtractorTop,
+                    side: EggExtractor,
+                },
+            )),
+            WorkbenchType::PizzaOven => builder.add_block(DwBlock::new(
+                block_coord,
+                TopSide {
+                    top: PizzaOvenTop,
+                    side: PizzaOven,
+                },
+            )),
         }
         Ok(())
     }
@@ -1501,28 +1656,54 @@ impl InfoUi for Chest {
 
 impl BuildDwMesh for Chest {
     const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity {
-        icons: 0,
+        items: 0,
         quads: CUBE_NUM_FACES,
     });
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        use BlockUv::*;
+        use ImageType::*;
         let block_coord = BlockCoord::new(self.pos_x, self.pos_y).context(CoordOutOfBoundSnafu)?;
         match self.slots.chest_type() {
-            ChestType::Standard => {
-                builder.add_block(DwBlock::new(block_coord, VoxelType::StandardChest))
-            }
-            ChestType::Safe => builder.add_block(DwBlock::new(block_coord, VoxelType::Safe)),
-            ChestType::Shelf => builder.add_icon(DwIcon::new(self.float_pos, ItemType::Shelf)),
-            ChestType::Gold => builder.add_block(DwBlock::new(block_coord, VoxelType::GoldChest)),
-            ChestType::Portal => {
-                builder.add_block(DwBlock::new(block_coord, VoxelType::PortalChest))
-            }
+            ChestType::Standard => builder.add_block(DwBlock::new(
+                block_coord,
+                TopSide {
+                    top: ChestTop,
+                    side: Chest,
+                },
+            )),
+            ChestType::Safe => builder.add_block(DwBlock::new(
+                block_coord,
+                TopSide {
+                    top: SafeTop,
+                    side: Safe,
+                },
+            )),
+            ChestType::Shelf => builder.add_item(DwItem::new(self.float_pos, ItemType::Shelf)),
+            ChestType::Gold => builder.add_block(DwBlock::new(
+                block_coord,
+                TopSide {
+                    top: ChestGoldTop,
+                    side: ChestGold,
+                },
+            )),
+            ChestType::Portal => builder.add_block(DwBlock::new(
+                block_coord,
+                TopSide {
+                    top: ChestPortalTop,
+                    side: ChestPortal,
+                },
+            )),
             ChestType::Cabinet => {
-                builder.add_icon(DwIcon::new(self.float_pos, ItemType::DisplayCabinet))
+                builder.add_item(DwItem::new(self.float_pos, ItemType::DisplayCabinet))
             }
-            ChestType::Feeder => {
-                builder.add_block(DwBlock::new(block_coord, VoxelType::FeederChest))
-            }
+            ChestType::Feeder => builder.add_block(DwBlock::new(
+                block_coord,
+                TopSide {
+                    top: ChestFeederTop,
+                    side: ChestFeeder,
+                },
+            )),
         };
         Ok(())
     }
@@ -1569,7 +1750,7 @@ impl InfoUi for Sign {
 }
 
 impl BuildDwMesh for Sign {
-    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { icons: 0, quads: 1 });
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 0, quads: 1 });
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         let z = 3.0;
@@ -1654,7 +1835,7 @@ impl InfoUi for TrainStation {
 
 impl BuildDwMesh for TrainStation {
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
-        builder.add_icon(DwIcon::new(self.float_pos, ItemType::TrainStation));
+        builder.add_item(DwItem::new(self.float_pos, ItemType::TrainStation));
         Ok(())
     }
 }
@@ -1709,7 +1890,7 @@ impl InfoUi for GemTree {
 }
 
 impl BuildDwMesh for GemTree {
-    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { icons: 1, quads: 0 });
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 1, quads: 0 });
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         let item_type = match self.gem_tree_type {
@@ -1720,7 +1901,7 @@ impl BuildDwMesh for GemTree {
             TreeType::Diamond => ItemType::Diamond,
             _ => ItemType::Unknown,
         };
-        builder.add_icon(DwIcon::new(self.float_pos, item_type));
+        builder.add_item(DwItem::new(self.float_pos, item_type));
         Ok(())
     }
 }
@@ -1733,7 +1914,7 @@ impl InfoUi for TomatoPlant {
 }
 
 impl BuildDwMesh for TomatoPlant {
-    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { icons: 0, quads: 1 });
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 0, quads: 1 });
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         builder.add_face(DwFace::new_sprite(

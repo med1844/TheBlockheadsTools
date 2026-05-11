@@ -15,7 +15,9 @@ impl DwMeshRenderer {
     ) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("DW Sprite Shader"),
-            source: wgpu::ShaderSource::Wgsl(wgsl_macro::include_wgsl!("src/render/shader/dw_mesh.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(
+                wgsl_macro::include_wgsl!("src/render/shader/dw_mesh.wgsl").into(),
+            ),
         });
 
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {

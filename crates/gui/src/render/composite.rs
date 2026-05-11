@@ -23,7 +23,9 @@ impl CompositeRenderer {
     ) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Composite Shader"),
-            source: wgpu::ShaderSource::Wgsl(wgsl_macro::include_wgsl!("src/render/shader/composite.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(
+                wgsl_macro::include_wgsl!("src/render/shader/composite.wgsl").into(),
+            ),
         });
         let buffer_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -101,7 +103,7 @@ impl CompositeRenderer {
                         ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                         count: None,
                     },
-                    // overlay texture (icons, grid)
+                    // overlay texture (items, grid)
                     wgpu::BindGroupLayoutEntry {
                         binding: 8,
                         visibility: wgpu::ShaderStages::FRAGMENT,

@@ -456,7 +456,7 @@ impl EditorApp {
         ui.checkbox(&mut self.render_settings.enable_destruct, "Enable Destruct");
         ui.checkbox(&mut self.render_settings.enable_ssao, "Enable SSAO");
         ui.checkbox(
-            &mut self.render_settings.render_dw_icon,
+            &mut self.render_settings.render_dw_item,
             "Render Dynamic Object Icons",
         );
         ui.checkbox(

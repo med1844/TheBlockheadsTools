@@ -35,7 +35,9 @@ impl VoxelRenderer {
     ) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Voxel Shader"),
-            source: wgpu::ShaderSource::Wgsl(wgsl_macro::include_wgsl!("src/render/shader/voxel.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(
+                wgsl_macro::include_wgsl!("src/render/shader/voxel.wgsl").into(),
+            ),
         });
 
         let uv_face_u32 = VoxelType::uv_at_face()

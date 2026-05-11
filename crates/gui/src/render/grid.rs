@@ -16,7 +16,9 @@ impl GridRenderer {
     ) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Grid Shader"),
-            source: wgpu::ShaderSource::Wgsl(wgsl_macro::include_wgsl!("src/render/shader/grid.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(
+                wgsl_macro::include_wgsl!("src/render/shader/grid.wgsl").into(),
+            ),
         });
 
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {

@@ -1,5 +1,5 @@
 // Maps to TileMap.png
-#[repr(u32)]
+#[repr(u16)]
 #[derive(Debug, Clone, Copy)]
 #[allow(dead_code)] // not all tiles are used but still nice to have all annotated
 pub enum ImageType {

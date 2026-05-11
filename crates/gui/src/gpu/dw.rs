@@ -1,4 +1,4 @@
-use super::{super::image_type::ImageType, VoxelType};
+use super::{super::image_type::ImageType, voxel::BlockUv};
 use eframe::wgpu::{self, util::DeviceExt};
 use snafu::Snafu;
 use std::{
@@ -81,24 +81,221 @@ impl From<PackedChunkCoord> for ChunkCoord {
 }
 
 #[derive(Clone, Copy)]
-pub struct DwIcon {
+pub struct DwItem {
     position: [f32; 2],
     item_type: ItemType,
+    block_uv: Option<BlockUv>,
 }
 
-impl DwIcon {
-    pub fn new(position: [f32; 2], item_type: ItemType) -> Self {
-        let [x, y] = position;
-        Self {
-            position: [x, y + 0.5],
-            item_type,
+impl DwItem {
+    fn map_deprecated(item_type: ItemType) -> ItemType {
+        match item_type {
+            ItemType::WovenFlaxMat
+            | ItemType::YellowFlaxMat
+            | ItemType::RedFlaxMat
+            | ItemType::DeprecatedFood
+            | ItemType::DeprecatedMango
+            | ItemType::DeprecatedStonePickaxe
+            | ItemType::DeprecatedCopperIngot
+            | ItemType::DeprecatedBronzeMachete
+            | ItemType::DeprecatedIronSword => ItemType::Unknown,
+            _ => item_type,
         }
     }
 
-    pub fn instance(self, id: DwChunkObjId, coord: ChunkCoord) -> DwIconInstanceRaw {
-        DwIconInstanceRaw {
+    fn default_block_uv(item_type: ItemType) -> Option<BlockUv> {
+        use BlockUv::*;
+        use ImageType::*;
+        Some(match item_type {
+            ItemType::Stone => All(Stone),
+            ItemType::Kiln => TopSide {
+                top: KilnTop,
+                side: Kiln,
+            },
+            ItemType::Brick => All(RedBrick),
+            ItemType::Limestone => All(Limestone),
+            ItemType::MinedLimestone => All(MinedLimestone),
+            ItemType::Marble => All(Marble),
+            ItemType::MinedMarble => All(MinedMarble),
+            ItemType::Furnace => TopSide {
+                top: Furnace1Top,
+                side: Furnace1,
+            },
+            ItemType::WoodworkBench => TopSide {
+                top: WorkbenchWood1Top,
+                side: WorkbenchWood1,
+            },
+            ItemType::TaylorsBench => TopSide {
+                top: WorkbenchWeave1Top,
+                side: WorkbenchWeave1,
+            },
+            ItemType::Press => TopSide {
+                top: WorkbenchPress1Top,
+                side: WorkbenchPress1,
+            },
+            ItemType::Sandstone => All(SandStone),
+            ItemType::MinedSandstone => All(MinedSandStone),
+            ItemType::RedMarble => All(RedMarble),
+            ItemType::MinedRedMarble => All(MinedRedMarble),
+            // These blocks are rendered as stone in game
+            ItemType::Glass => All(Glass),
+            ItemType::Chest => TopSide {
+                top: ChestTop,
+                side: Chest,
+            },
+            ItemType::GoldBlock => All(GoldBlock),
+            ItemType::Rock => All(Stone),
+            ItemType::Dirt => All(Dirt),
+            ItemType::Wood => All(Wood),
+            ItemType::WorkBench => TopSide {
+                top: WorkbenchLevel1Top,
+                side: WorkbenchLevel1,
+            },
+            ItemType::Sand => All(Sand),
+            ItemType::ToolBench => TopSide {
+                top: WorkbenchTool1Top,
+                side: WorkbenchTool1,
+            },
+            ItemType::LapisLazuli => All(LapisLazuli),
+            ItemType::MinedLapisLazuli => All(MinedLapisLazuli),
+            ItemType::CraftBench => TopSide {
+                top: CraftBenchLevel1Top,
+                side: CraftBenchLevel1,
+            },
+            ItemType::MixingBench => TopSide {
+                top: MixBenchLevel1Top,
+                side: MixBenchLevel1,
+            },
+            ItemType::ReinforcedPlatform => All(ReinforcedPlatform),
+            ItemType::Ice => All(Ice),
+            ItemType::DyeBench => TopSide {
+                top: DyeBenchLevel1Top,
+                side: DyeBenchLevel1,
+            },
+            ItemType::Compost => All(Compost),
+            ItemType::Basalt => All(Basalt),
+            ItemType::MinedBasalt => All(Basalt),
+            ItemType::Safe => All(Safe),
+            ItemType::CopperBlock => All(CopperBlock),
+            ItemType::TinBlock => All(TinBlock),
+            ItemType::BronzeBlock => All(BronzeBlock),
+            ItemType::IronBlock => All(IronBlock),
+            ItemType::SteelBlock => All(SteelBlock),
+            ItemType::MetalworkBench => TopSide {
+                top: MetalworkBenchLevel1Top,
+                side: MetalworkBenchLevel1,
+            },
+            ItemType::GoldenChest => TopSide {
+                top: ChestGoldTop,
+                side: ChestGold,
+            },
+            ItemType::PortalChest => TopSide {
+                top: ChestPortalTop,
+                side: ChestPortal,
+            },
+            ItemType::BlackSand => All(BlackSand),
+            ItemType::BlackGlass => All(BlackGlass),
+            ItemType::SteamGenerator => TopSide {
+                top: SteamGeneratorTop,
+                side: SteamGenerator,
+            },
+            ItemType::ElectricKiln => TopSide {
+                top: ElectricKilnTop,
+                side: ElectricKiln,
+            },
+            ItemType::ElectricFurnace => TopSide {
+                top: ElectricFurnaceTop,
+                side: ElectricFurnace,
+            },
+            ItemType::ElectricMetalworkBench => TopSide {
+                top: ElectricMetalworkBenchTop,
+                side: ElectricMetalworkBench,
+            },
+            ItemType::ElectricStove => TopSide {
+                top: ElectricStoveTop,
+                side: ElectricStove,
+            },
+            ItemType::SolarPanel => TopSide {
+                top: SolarPanelTop,
+                side: SolarPanel,
+            },
+            ItemType::Flywheel => TopSide {
+                top: FlywheelTop,
+                side: Flywheel,
+            },
+            ItemType::ArmorBench => TopSide {
+                top: ArmorBenchLevel1Top,
+                side: ArmorBenchLevel1,
+            },
+            ItemType::TrainYard => TopSide {
+                top: TrainYardTop,
+                side: TrainYard,
+            },
+            ItemType::BuildersBench => TopSide {
+                top: BuildersBenchLevel1Top,
+                side: BuildersBenchLevel1,
+            },
+            ItemType::ElevatorShaft => All(ElevatorShaft),
+            ItemType::ElectricElevatorMotor => All(ElevatorMotor),
+            ItemType::PlatiumBlock => All(PlatinumBlock0),
+            ItemType::CarbonFiberBlock => All(CarbonFiberBlock),
+            ItemType::TitaniumBlock => All(TitaniumBlock),
+            ItemType::DeprecatedIronSword => None?,
+            ItemType::ElectricPress => TopSide {
+                top: ElectricPressTop,
+                side: ElectricPress,
+            },
+            ItemType::Gravel => All(Gravel),
+            ItemType::CompostBin => TopSide {
+                top: CompostBinTop,
+                side: CompostBin,
+            },
+            ItemType::EggExtractor => TopSide {
+                top: EggExtractorTop,
+                side: EggExtractor,
+            },
+            ItemType::PizzaOven => TopSide {
+                top: PizzaOvenTop,
+                side: PizzaOven,
+            },
+            ItemType::AmethystBlock => All(AmethystBlock),
+            ItemType::SapphireBlock => All(SapphireBlock),
+            ItemType::EmeraldBlock => All(EmeraldBlock),
+            ItemType::RubyBlock => All(RubyBlock),
+            ItemType::DiamondBlock => All(DiamondBlock),
+            ItemType::Plaster => All(Plaster),
+            ItemType::FeederChest => TopSide {
+                top: ChestFeederTop,
+                side: ChestFeeder,
+            },
+            ItemType::LuminousPlaster => All(LuminousPlaster),
+            _ => None?,
+        })
+    }
+
+    pub fn new(position: [f32; 2], item_type: ItemType) -> Self {
+        let [x, y] = position;
+        let item_type = Self::map_deprecated(item_type);
+        let block_uv = Self::default_block_uv(item_type);
+        Self {
+            position: [x, y + 0.5],
+            item_type,
+            block_uv,
+        }
+    }
+
+    pub fn instance(self, id: DwChunkObjId, coord: ChunkCoord) -> DwItemInstanceRaw {
+        let is_block = self.block_uv.is_some() as u16;
+        let [top, side] = self
+            .block_uv
+            .map(|block_uv| [block_uv.up(), block_uv.side()].map(|v| v as u16))
+            .unwrap_or([0; 2]);
+        DwItemInstanceRaw {
             position: self.position,
-            item_type: self.item_type as u32,
+            item_type: self.item_type as u16,
+            is_block,
+            top,
+            side,
             raw_id: id.raw_id(),
             chunk: coord.into(),
         }
@@ -107,24 +304,31 @@ impl DwIcon {
 
 #[repr(C)]
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct DwIconInstanceRaw {
+pub struct DwItemInstanceRaw {
     pub position: [f32; 2],
-    pub item_type: u32,
+    pub item_type: u16,
+
+    // If item_type highest bit is true, use these instead
+    pub is_block: u16,
+    pub top: u16,
+    pub side: u16,
+
     pub raw_id: u32,
     pub chunk: PackedChunkCoord,
 }
 
-impl DwIconInstanceRaw {
-    const ATTRIBS: [wgpu::VertexAttribute; 4] = wgpu::vertex_attr_array![
+impl DwItemInstanceRaw {
+    const ATTRIBS: [wgpu::VertexAttribute; 5] = wgpu::vertex_attr_array![
         1 => Float32x2,
         2 => Uint32,
         3 => Uint32,
         4 => Uint32,
+        5 => Uint32,
     ];
 
     pub fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
         wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<DwIconInstanceRaw>() as wgpu::BufferAddress,
+            array_stride: std::mem::size_of::<DwItemInstanceRaw>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Instance,
             attributes: &Self::ATTRIBS,
         }
@@ -272,12 +476,12 @@ impl DwFace {
 
 pub struct DwBlock {
     coord: BlockCoord,
-    voxel_type: VoxelType,
+    block_uv: BlockUv,
 }
 
 impl DwBlock {
-    pub fn new(coord: BlockCoord, voxel_type: VoxelType) -> Self {
-        Self { coord, voxel_type }
+    pub fn new(coord: BlockCoord, block_uv: BlockUv) -> Self {
+        Self { coord, block_uv }
     }
 }
 
@@ -320,12 +524,12 @@ impl ChunkDwBlock {
         let z = 1;
         let x = block.coord.x();
         let y = block.coord.y() as u32;
-        let uv = block.voxel_type.uv();
+        let uv = block.block_uv;
 
         let dw_face = DwFace::from_tile_map(
             match face_direction {
                 FaceDirection::Up => uv.up(),
-                FaceDirection::Down => uv.down(),
+                FaceDirection::Down => uv.bottom(),
                 FaceDirection::Left | FaceDirection::Right | FaceDirection::Front => uv.side(),
             },
             face_direction,
@@ -473,19 +677,19 @@ pub enum BuildDwMeshError {
 
 #[derive(Default, Clone, Copy)]
 pub struct DwCapacity {
-    pub icons: usize,
+    pub items: usize,
     pub quads: usize,
 }
 
 impl DwCapacity {
     fn is_empty(&self) -> bool {
-        self.icons == 0 && self.quads == 0
+        self.items == 0 && self.quads == 0
     }
 }
 
 impl AddAssign for DwCapacity {
     fn add_assign(&mut self, rhs: Self) {
-        self.icons += rhs.icons;
+        self.items += rhs.items;
         self.quads += rhs.quads;
     }
 }
@@ -495,7 +699,7 @@ impl Mul<usize> for DwCapacity {
 
     fn mul(self, rhs: usize) -> Self::Output {
         Self::Output {
-            icons: self.icons * rhs,
+            items: self.items * rhs,
             quads: self.quads * rhs,
         }
     }
@@ -696,7 +900,7 @@ impl DwVertex {
 pub struct DwChunkBufBuilder {
     id: DwChunkObjId,
     coord: ChunkCoord,
-    icon_instances: Vec<DwIconInstanceRaw>,
+    item_instances: Vec<DwItemInstanceRaw>,
     faces_mesh_builder: MeshAggregator<[DwVertex; 4], [u32; 6]>,
     blocks: ChunkDwBlock,
 }
@@ -710,8 +914,8 @@ impl DwChunkBufBuilder {
         self.faces_mesh_builder.add(vertices, indices);
     }
 
-    pub fn add_icon(&mut self, icon: DwIcon) {
-        self.icon_instances.push(icon.instance(self.id, self.coord));
+    pub fn add_item(&mut self, item: DwItem) {
+        self.item_instances.push(item.instance(self.id, self.coord));
     }
 
     pub fn add_block(&mut self, block: DwBlock) {
@@ -730,7 +934,7 @@ impl DwChunkBufBuilder {
 
 #[derive(Clone)]
 pub struct DwChunkBuf {
-    // icon instances
+    // item instances
     pub instance_buf: wgpu::Buffer,
     pub num_instances: u32,
 
@@ -844,7 +1048,7 @@ impl DwChunkBuf {
         }
 
         let mut builder = DwChunkBufBuilder {
-            icon_instances: Vec::with_capacity(need_capacity.icons),
+            item_instances: Vec::with_capacity(need_capacity.items),
             faces_mesh_builder: MeshAggregator::with_capacity(need_capacity.quads),
             blocks: ChunkDwBlock::default(),
             id: DwChunkObjId::new(DynamicObjectType::AppleTree, 0), // random id - won't be read.
@@ -914,7 +1118,7 @@ impl DwChunkBuf {
         // add(chunk.mirror.iter(), u8, &mut builder);
 
         let DwChunkBufBuilder {
-            icon_instances,
+            item_instances,
             mut faces_mesh_builder,
             blocks,
             ..
@@ -922,7 +1126,7 @@ impl DwChunkBuf {
 
         let instance_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Dynamic Object Icon Instance Buffer"),
-            contents: bytemuck::cast_slice(&icon_instances),
+            contents: bytemuck::cast_slice(&item_instances),
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         });
 
@@ -931,7 +1135,7 @@ impl DwChunkBuf {
         let (faces_vertex_buf, faces_index_buf, faces_num_indices) =
             faces_mesh_builder.build_const(device);
 
-        let num_instances = icon_instances.len() as u32;
+        let num_instances = item_instances.len() as u32;
         if num_instances + faces_num_indices == 0 {
             return None;
         }

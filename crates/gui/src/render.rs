@@ -1,12 +1,8 @@
-use super::{
-    gpu::{
-        CameraUniform, GpuCoordUniform, RenderSettings, Texture, VoxelType,
-        dw::{
-            DwChunkBuf, DwChunkObjId, DwChunkObjIdUniform, DwIconInstanceRaw, DwIconVertex,
-            DwVertex,
-        },
+use super::gpu::{
+    CameraUniform, GpuCoordUniform, RenderSettings, Texture, VoxelType,
+    dw::{
+        DwChunkBuf, DwChunkObjId, DwChunkObjIdUniform, DwIconVertex, DwItemInstanceRaw, DwVertex,
     },
-    image_type::ImageType,
 };
 use eframe::{egui, egui_wgpu, wgpu};
 use std::sync::{
@@ -147,7 +143,7 @@ impl GeometryBuffer {
 
 mod composite;
 mod grid;
-mod icon;
+mod item;
 mod mesh;
 mod ssao;
 pub(crate) mod voxel;
@@ -168,7 +164,7 @@ pub struct RenderResources {
     has_new_copy: Arc<AtomicBool>,
 
     voxel: voxel::VoxelRenderer,
-    dw_icon: icon::DwIconRenderer,
+    dw_item: item::DwItemRenderer,
     dw_mesh: mesh::DwMeshRenderer,
     grid: grid::GridRenderer,
     composite: composite::CompositeRenderer,
@@ -264,7 +260,7 @@ impl RenderResources {
                 &reflect_texture,
                 &destruct_texture,
             ),
-            dw_icon: icon::DwIconRenderer::new(
+            dw_item: item::DwItemRenderer::new(
                 device,
                 &camera_buf,
                 &items_texture,
@@ -346,8 +342,8 @@ impl RenderResources {
         dw_buf: &[DwChunkBuf],
         render_settings: &RenderSettings,
     ) {
-        if render_settings.render_dw_icon {
-            self.dw_icon.render(render_pass, dw_buf);
+        if render_settings.render_dw_item {
+            self.dw_item.render(render_pass, dw_buf);
         }
         if render_settings.show_grid {
             self.grid.render(render_pass);
