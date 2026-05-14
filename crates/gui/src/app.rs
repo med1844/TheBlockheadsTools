@@ -1,5 +1,3 @@
-use crate::util::FastRem;
-
 use super::{
     dw_impl::{InfoUi, ObjFlags},
     fps_counter::FpsCounter,
@@ -9,7 +7,7 @@ use super::{
         voxel_util,
     },
     render::{GeometryBuffer, Render3dCallback, RenderResources},
-    util::Pow2,
+    util::{FastRem, Pow2},
 };
 use eframe::{egui, egui_wgpu, emath::Rect, wgpu};
 use glam::Vec3Swizzles;

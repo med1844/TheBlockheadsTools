@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use snafu::prelude::*;
 use std::ops::{Deref, DerefMut};
-use strum_macros::IntoStaticStr;
+use strum::IntoStaticStr;
 
 #[derive(Debug, Snafu)]
 pub enum DynamicObjectError {

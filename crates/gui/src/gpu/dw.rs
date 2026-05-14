@@ -300,6 +300,27 @@ impl DwItem {
             chunk: coord.into(),
         }
     }
+
+    /// Build a `DwItemInstanceRaw` for the item-selector grid.
+    /// The grid position is stored in `position` as `[col as f32, row as f32]`.
+    /// `raw_id` and `chunk` are set to zero; the selector never uses them.
+    pub fn selector_instance(col: u32, row: u32, item_type: ItemType) -> DwItemInstanceRaw {
+        let item_type = Self::map_deprecated(item_type);
+        let block_uv = Self::default_block_uv(item_type);
+        let is_block = block_uv.is_some() as u16;
+        let [top, side] = block_uv
+            .map(|b| [b.up(), b.side()].map(|v| v as u16))
+            .unwrap_or([0; 2]);
+        DwItemInstanceRaw {
+            position: [col as f32, row as f32],
+            item_type: item_type as u16,
+            is_block,
+            top,
+            side,
+            raw_id: 0,
+            chunk: PackedChunkCoord::default(),
+        }
+    }
 }
 
 #[repr(C)]

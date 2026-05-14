@@ -22,3 +22,4 @@ rayon = "1.11.0"
 wasm-bindgen-futures = { workspace = true, optional = true }
 snafu = { workspace = true }
 num_enum = { workspace = true }
+strum = { workspace = true }

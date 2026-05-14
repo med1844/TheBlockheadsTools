@@ -9,13 +9,18 @@ use super::{
         },
     },
     image_type::ImageType,
+    render::{
+        ItemSelectorCallback,
+        item_selector::{COL_PX, GRID_COLS, GRID_ROWS, MAX_SIZE, ROW_PX},
+    },
 };
-use eframe::egui;
+use eframe::{egui, egui_wgpu};
 use snafu::ResultExt;
 use std::{
     hash::Hash,
     ops::{BitOrAssign, DerefMut},
 };
+use strum::IntoEnumIterator;
 use the_blockheads_tools_lib::game::{
     coord::BlockCoord,
     dynamic_object::{
@@ -643,10 +648,116 @@ impl BuildDwMesh for CornPlant {
 
 impl ToRow for ItemType {
     fn to_row(&mut self, ui: &mut egui::Ui) -> egui::Response {
-        // ItemType contains TOO MANY types, might need dedicated selector.
-        // TODO either add selector, limit door/ladder/etc type, or display raw id
         let item_type_str: &'static str = (*self).into();
-        ui.label(item_type_str)
+
+        let mut resp = ui.button(item_type_str);
+        let window_id = resp.id.with("item_type_window");
+
+        let mut is_open = ui.data_mut(|d| d.get_temp(window_id).unwrap_or(false));
+
+        if resp.clicked() {
+            is_open = !is_open;
+            ui.data_mut(|d| d.insert_temp(window_id, is_open));
+        }
+
+        if is_open {
+            let mut keep_open = true;
+            let scroll_id = window_id.with("scroll_offset");
+            let hovered_item_id = window_id.with("hovered_item");
+
+            egui::Window::new("Select ItemType")
+                .id(window_id)
+                .open(&mut keep_open)
+                .resizable(true)
+                .default_width(MAX_SIZE.x)
+                .default_height(MAX_SIZE.y + 17.65625) // default label height is 14.65625, spacing is 3
+                .show(ui.ctx(), |ui| {
+                    // ui.available_size() will return all space available within the window.
+                    // It won't save space for ui.label if we put it after the gpu-rendered part.
+                    // The window height will, as the result, increase indefinitely.
+                    //
+                    // Either we subtract the size of ui.label from ui.available_size()
+                    // then use ui.with_layout(Layout::bottom_up), or we accept 1 frame latency
+                    // by storing the hovered_item and use it in next frame.
+                    //
+                    // You don't know the size of ui.label until you add it. There's no way to solve
+                    // this circular dependency with egui.
+                    //
+                    // For now we accept 1 frame lag and some extra memory usage.
+                    let mut hovered_item: Option<ItemType> =
+                        ui.data_mut(|d| d.get_temp::<Option<ItemType>>(hovered_item_id).flatten());
+                    let text_h = ui
+                        .label(if let Some(item) = hovered_item.take() {
+                            let name: &'static str = item.into();
+                            name
+                        } else {
+                            ""
+                        })
+                        .rect
+                        .height();
+
+                    let (rect, response) = ui
+                        .allocate_exact_size(ui.available_size().min(MAX_SIZE), egui::Sense::all());
+
+                    let mut scroll_offset: egui::Vec2 =
+                        ui.data_mut(|d| d.get_temp(scroll_id).unwrap_or(egui::Vec2::ZERO));
+
+                    let mut drag_delta = response.drag_delta();
+                    if drag_delta != egui::Vec2::ZERO {
+                        let max_offset = MAX_SIZE - rect.size();
+
+                        // 1. Calculate the minimum allowed drag delta.
+                        // If we're already out of bounds (scroll_offset > max_offset), this floors at 0.0.
+                        // If we're in bounds, this floors at the exact distance to the max_offset.
+                        let min_delta = (scroll_offset - max_offset).min(egui::Vec2::ZERO);
+
+                        // 2. Cap the drag_delta so it never pushes us further out of bounds.
+                        drag_delta = drag_delta.max(min_delta);
+                        scroll_offset = (scroll_offset - drag_delta).max(egui::Vec2::ZERO);
+                        ui.data_mut(|d| d.insert_temp(scroll_id, scroll_offset));
+                    }
+
+                    let viewport = egui::Rect::from_min_size(scroll_offset.to_pos2(), rect.size());
+
+                    if let Some(pos) = response.hover_pos() {
+                        let rel = pos + scroll_offset - rect.min;
+                        let col = (rel.x / COL_PX).floor() as u32;
+                        let row = (rel.y / ROW_PX).floor() as u32;
+
+                        if col < GRID_COLS && row < GRID_ROWS {
+                            let idx = (row * GRID_COLS + col) as usize;
+                            hovered_item = ItemType::iter().nth(idx);
+                        }
+                    }
+                    ui.data_mut(|d| d.insert_temp(hovered_item_id, hovered_item));
+
+                    if response.clicked()
+                        && let Some(new_item) = hovered_item
+                        && *self != new_item
+                    {
+                        *self = new_item;
+                        resp.mark_changed();
+                    }
+
+                    ui.painter().add(egui_wgpu::Callback::new_paint_callback(
+                        rect,
+                        ItemSelectorCallback {
+                            hovered_index: hovered_item.map(|i| i as u32),
+                            selected_index: *self as u32,
+                            viewport,
+                            pixels_per_point: ui.pixels_per_point(),
+                        },
+                    ));
+
+                    ui.set_max_height(text_h + rect.height());
+                });
+
+            if !keep_open {
+                ui.data_mut(|d| d.insert_temp(window_id, false));
+            }
+        }
+
+        resp
     }
 }
 

@@ -1,6 +1,6 @@
 use num_enum::TryFromPrimitive;
 use snafu::prelude::*;
-use strum_macros::{Display, IntoStaticStr};
+use strum::{Display, IntoStaticStr};
 
 #[derive(Debug, Snafu)]
 pub enum BlockError {
