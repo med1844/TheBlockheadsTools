@@ -212,7 +212,7 @@ impl<T> FromIterator<T> for DynamicObjectList<T> {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, Hash)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, Hash)]
 #[serde(transparent)]
 pub struct UniqueID(u64);
 inherit!(UniqueID -> u64);
@@ -252,9 +252,10 @@ pub struct DynamicObject {
     pub owner_id: Option<String>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize_repr, Deserialize_repr)]
 #[repr(u8)]
 pub enum InteractionObjectType {
+    #[default]
     InteractionObject = 0,
     Workbench = 1,
     Chest = 2,
@@ -267,7 +268,7 @@ pub enum InteractionObjectType {
     Mirror = 9,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InteractionObject {
     #[serde(flatten)]
@@ -334,7 +335,7 @@ pub mod train;
 pub mod tree;
 pub mod workbench;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, IntoStaticStr)]
 pub enum AnyDynamicObject {
     Ladder(Box<craft::Ladder>),             // ID = 19
     Door(Box<craft::Door>),                 // ID = 20

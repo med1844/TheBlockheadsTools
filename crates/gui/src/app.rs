@@ -790,7 +790,9 @@ impl EditorApp {
                     egui::Window::new(title)
                         .id("selected_dynamic_obj_info".into())
                         .show(ctx, |ui| {
-                            t.info(ui, &mut flags);
+                            egui::ScrollArea::both().show(ui, |ui| {
+                                t.info(ui, &mut flags);
+                            });
                         });
                 }
                 flags

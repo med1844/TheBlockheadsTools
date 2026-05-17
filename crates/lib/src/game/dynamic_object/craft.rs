@@ -1,6 +1,6 @@
 use super::{
-    super::item::ItemType, ArtificialLight, DynamicObject, InteractionObject, deserialize_some,
-    serialize_some,
+    super::item::ItemType, ArtificialLight, DynamicObject, InteractionObject,
+    InteractionObjectType, deserialize_some, serialize_some,
 };
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
@@ -42,6 +42,16 @@ pub struct Ladder {
 }
 inherit!(Ladder -> DynamicObject, obj);
 
+impl Default for Ladder {
+    fn default() -> Self {
+        Self {
+            obj: DynamicObject::default(),
+            paint_color: Default::default(),
+            item_type: ItemType::Ladder,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Door {
@@ -60,6 +70,17 @@ pub struct Door {
 }
 inherit!(Door -> DynamicObject, obj);
 
+impl Default for Door {
+    fn default() -> Self {
+        Self {
+            obj: DynamicObject::default(),
+            item_type: ItemType::Door,
+            blocked: Default::default(),
+            iron_place_client_id: Option::default(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Bed {
@@ -70,6 +91,20 @@ pub struct Bed {
     pub save_time: f64,
 }
 inherit!(Bed -> InteractionObject, obj);
+
+impl Default for Bed {
+    fn default() -> Self {
+        Self {
+            obj: InteractionObject {
+                interaction_object_type: InteractionObjectType::Bed,
+                ..Default::default()
+            },
+            item_type: ItemType::Bed,
+            bedding_color: Default::default(),
+            save_time: 0.0,
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -161,13 +196,14 @@ pub struct Rail {
 }
 inherit!(Rail -> DynamicObject, obj);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize_repr, Deserialize_repr)]
 #[repr(u8)]
 // How does the sign connects
 pub enum SignConnectionType {
     GroundDouble = 1, // connects to sign or block below, standing on both side
     GroundSingle = 2, // connects to sign or block below, standing on single leg
-    Front = 3,        // connects to front face of some block
+    #[default]
+    Front = 3, // connects to front face of some block
     Side = 4,         // connects to left or right face of some block
     Up = 5,           // connects to sign or block above
 }
@@ -183,6 +219,21 @@ pub struct Sign {
     pub save_time: f64,
 }
 inherit!(Sign -> InteractionObject, obj);
+
+impl Default for Sign {
+    fn default() -> Self {
+        Self {
+            obj: InteractionObject {
+                interaction_object_type: InteractionObjectType::Sign,
+                ..Default::default()
+            },
+            text: String::default(),
+            connection_type: SignConnectionType::default(),
+            offset_type: 0,
+            save_time: 0.0,
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

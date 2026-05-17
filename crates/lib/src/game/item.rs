@@ -74,6 +74,7 @@ type Result<T> = std::result::Result<T, ItemError>;
     Debug,
     Clone,
     Copy,
+    Default,
     PartialEq,
     Eq,
     IntoStaticStr,
@@ -84,6 +85,7 @@ type Result<T> = std::result::Result<T, ItemError>;
 )]
 #[repr(u16)]
 pub enum ItemType {
+    #[default]
     Unknown = 0,
     Clothing = 1,
     DeprecatedDirtBlock = 2,
@@ -513,6 +515,26 @@ pub enum ItemType {
     LuminousPlaster = 1105,
 }
 
+impl ItemType {
+    pub fn to_idx(self) -> usize {
+        let idx = self as u16;
+        (if idx >= Self::Stone as u16 {
+            idx - Self::Stone as u16 + 1 + Self::DiamondStairs as u16
+        } else {
+            idx
+        }) as usize
+    }
+
+    pub fn from_idx(idx: usize) -> Result<Self> {
+        let id = if idx > Self::DiamondStairs as usize {
+            idx - Self::DiamondStairs as usize - 1 + Self::Stone as usize
+        } else {
+            idx
+        } as u16;
+        Self::try_from(id).context(InvalidItemTypeIdSnafu { id })
+    }
+}
+
 /// Item as stored in dynamic world XML (DroppedItem, etc.)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -538,7 +560,7 @@ pub(crate) struct ItemXml {
     pub dynamic_object_save_dict: Option<plist::Value>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct Item {
     pub type_id: u16,
     pub data_a: u16,
@@ -823,7 +845,7 @@ impl Item {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct Slot(pub Vec<Item>); // TODO consider switch to smallvec
 
 impl Slot {
@@ -883,6 +905,12 @@ impl DerefMut for Slot {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Slots<const N: usize>([Slot; N]);
+
+impl<const N: usize> Default for Slots<N> {
+    fn default() -> Self {
+        Self(std::array::from_fn(|_| Slot::default()))
+    }
+}
 
 impl<const N: usize> Slots<N> {
     pub fn new(slots: [Slot; N]) -> Self {

@@ -1,4 +1,7 @@
-use super::{DynamicObject, InteractionObject, UniqueID, deserialize_some, serialize_some};
+use super::{
+    DynamicObject, InteractionObject, InteractionObjectType, UniqueID, deserialize_some,
+    serialize_some,
+};
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
 
@@ -68,3 +71,16 @@ pub struct TrainStation {
     pub save_time: f64,
 }
 inherit!(TrainStation -> InteractionObject, obj);
+
+impl Default for TrainStation {
+    fn default() -> Self {
+        Self {
+            obj: InteractionObject {
+                interaction_object_type: InteractionObjectType::TrainStation,
+                ..Default::default()
+            },
+            text: String::default(),
+            save_time: 0.0,
+        }
+    }
+}

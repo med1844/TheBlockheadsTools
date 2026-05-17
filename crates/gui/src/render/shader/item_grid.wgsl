@@ -4,8 +4,8 @@
 @group(0) @binding(3) var tilemap_sampler: sampler;
 
 struct ItemSelectorUniforms {
-    hovered_index: u32,
-    selected_index: u32,
+    hovered_id: u32,
+    selected_id: u32,
     // Top-left corner of the visible viewport in grid-pixel space.
     viewport_origin: vec2<f32>,
     // Width and height of the visible viewport in grid-pixels.
@@ -33,20 +33,25 @@ struct VertexInput {
 struct InstanceInput {
     // position stores [col, row] as f32.
     @location(1) instance_pos: vec2<f32>,
-    // item_type in low 16 bits, is_block flag in bit 16. The rest are padding.
-    @location(2) item_type_or_block: u32,
+    // item_type in low 16 bits, is_block flag at bit 16, is_empty at bit 17. The rest are padding.
+    @location(2) item_type_n_flags: u32,
     // top tile index in low 16 bits, side tile index in high 16 bits.
     @location(3) top_side: u32,
-    // locations 4 (id) and 5 (chunk) exist in the buffer but are unused here.
+    // In DwItem this is unique identifier of obj in chunk. Here it is
+    // used to identify which instance to highlight and can't be used
+    // to identify anything in chunk.
+    @location(4) id: u32,
+    // location 5 (chunk) exist in the buffer but are unused here.
 }
 
 struct VSOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) uv: vec2<f32>,
     @location(1) @interpolate(flat) item_type: u32,
-    @location(2) @interpolate(flat) is_block: u32,
-    @location(3) @interpolate(flat) top: u32,
-    @location(4) @interpolate(flat) side: u32,
+    @location(2) @interpolate(flat) flags: u32,
+    @location(4) @interpolate(flat) top: u32,
+    @location(5) @interpolate(flat) side: u32,
+    @location(6) @interpolate(flat) id: u32,
 }
 
 @vertex
@@ -68,27 +73,35 @@ fn vs_main(model: VertexInput, instance: InstanceInput) -> VSOutput {
     out.uv = model.position + 0.5;
 
     // Unpack item_type_or_block and top_side.
-    out.item_type = instance.item_type_or_block & 0xFFFF;
-    out.is_block  = (instance.item_type_or_block >> 16) & 1u;
+    out.item_type = instance.item_type_n_flags & 0xFFFF;
+    out.flags     = instance.item_type_n_flags >> 16;
     out.top       = instance.top_side & 0xFFFF;
     out.side      = instance.top_side >> 16;
+    out.id        = instance.id;
 
     return out;
 }
 
 @fragment
 fn fs_main(in: VSOutput) -> @location(0) vec4<f32> {
-    var color = sample_item_texture(in.item_type, in.is_block, in.top, in.side, in.uv);
+    let is_block = in.flags & 1u;
+    let is_empty = in.flags & 2u;
+    var color: vec4<f32>;
+    if (is_empty != 0u) {
+        color = vec4<f32>(0.0);
+    } else {
+        color = sample_item_texture(in.item_type, is_block, in.top, in.side, in.uv);
+    }
 
     let outline_width: f32 = 0.03;
     let dist_from_edge_x = min(in.uv.x, 1.0 - in.uv.x);
     let dist_from_edge_y = min(in.uv.y, 1.0 - in.uv.y);
 
     if (dist_from_edge_x < outline_width || dist_from_edge_y < outline_width) {
-        if (in.item_type == uniforms.selected_index) {
+        if (in.id == uniforms.selected_id) {
             let outline_color = vec4<f32>(1.0, 1.0, 0.0, 1.0);
             color = mix(color, outline_color, outline_color.a);
-        } else if (in.item_type == uniforms.hovered_index) {
+        } else if (in.id == uniforms.hovered_id) {
             let outline_color = vec4<f32>(1.0, 1.0, 1.0, 0.5);
             color = mix(color, outline_color, outline_color.a);
         }

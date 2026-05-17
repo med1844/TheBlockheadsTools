@@ -1,4 +1,4 @@
-use super::{ArtificialLight, InteractionObject};
+use super::{ArtificialLight, InteractionObject, InteractionObjectType};
 use crate::util::serde::{deserialize_some, serialize_some};
 use num_enum::TryFromPrimitive;
 use serde::{Deserialize, Serialize};
@@ -84,6 +84,33 @@ pub struct Workbench {
     pub light_dict: Option<ArtificialLight>,
 }
 inherit!(Workbench -> InteractionObject, obj);
+
+impl Default for Workbench {
+    fn default() -> Self {
+        Self {
+            obj: InteractionObject {
+                interaction_object_type: InteractionObjectType::Workbench,
+                ..Default::default()
+            },
+            available_electricity: 0,
+            craft_progress_count: 0.0,
+            fire_spread_timer: 0.0,
+            fuel_fraction: 0.0,
+            has_fuel: false,
+            hurry_cost: 0,
+            hurry_seconds: 0.0,
+            hurry_timer: 0.0,
+            hurrying: false,
+            last_world_time: 0.0,
+            level: 0,
+            save_time: 0.0,
+            selected_index: 0,
+            workbench_type: WorkbenchType::default(),
+            x_scroll: 0.0,
+            light_dict: Option::default(),
+        }
+    }
+}
 
 impl Workbench {
     #[allow(clippy::too_many_arguments)]

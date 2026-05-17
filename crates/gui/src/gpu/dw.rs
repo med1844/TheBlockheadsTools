@@ -9,12 +9,13 @@ use the_blockheads_tools_lib::game::{
     chunk::Chunk,
     coord::{BlockCoord, ChunkBlockCoord, ChunkCoord, CoordError},
     dynamic_object::{
-        DynamicObjectType,
+        AnyDynamicObject, DynamicObjectType,
+        chest::ChestType,
         craft::{Door, Torch},
         workbench::WorkbenchType,
     },
     dynamic_world::ChunkDynamicObjects,
-    item::ItemType,
+    item::{Item, ItemError, ItemType},
 };
 
 #[repr(C)]
@@ -273,15 +274,296 @@ impl DwItem {
         })
     }
 
-    pub fn new(position: [f32; 2], item_type: ItemType) -> Self {
-        let [x, y] = position;
+    pub fn from_item_type(position: [f32; 2], item_type: ItemType) -> Self {
         let item_type = Self::map_deprecated(item_type);
         let block_uv = Self::default_block_uv(item_type);
         Self {
-            position: [x, y + 0.5],
+            position,
             item_type,
             block_uv,
         }
+    }
+
+    pub fn from_item(position: [f32; 2], item: &Item) -> Result<Self, ItemError> {
+        // If there's any dynamic object that provides override then use override.
+        // Otherwise fallback to Self::from_item_type.
+        enum Override {
+            ItemType(ItemType),
+            BlockUv(BlockUv),
+        }
+        use BlockUv::*;
+        use ImageType::*;
+        let override_tex: Option<Override> =
+            item.dynamic_object
+                .as_ref()
+                .and_then(|dyn_obj| match dyn_obj {
+                    AnyDynamicObject::Workbench(workbench) => {
+                        Some(match workbench.workbench_type {
+                            WorkbenchType::Undefined => Override::ItemType(ItemType::Unknown),
+                            WorkbenchType::BasicPortal | WorkbenchType::PlacedPortal => {
+                                Override::ItemType(match workbench.level {
+                                    0 => ItemType::Portal,
+                                    1 => ItemType::AmethystPortal,
+                                    2 => ItemType::SapphirePortal,
+                                    3 => ItemType::RubyPortal,
+                                    4 => ItemType::DiamondPortal,
+                                    _ => None?,
+                                })
+                            }
+                            WorkbenchType::Workbench => Override::BlockUv(match workbench.level {
+                                0 => TopSide {
+                                    top: WorkbenchLevel1Top,
+                                    side: WorkbenchLevel1,
+                                },
+                                1 => TopSide {
+                                    top: WorkbenchLevel2Top,
+                                    side: WorkbenchLevel2,
+                                },
+                                2 => TopSide {
+                                    top: WorkbenchLevel3Top,
+                                    side: WorkbenchLevel3,
+                                },
+                                3 => TopSide {
+                                    top: WorkbenchLevel4Top,
+                                    side: WorkbenchLevel4,
+                                },
+                                _ => None?,
+                            }),
+                            WorkbenchType::Campfire => Override::ItemType(ItemType::Campfire),
+                            WorkbenchType::Weave => Override::BlockUv(match workbench.level {
+                                0 => TopSide {
+                                    top: WorkbenchWeave1Top,
+                                    side: WorkbenchWeave1,
+                                },
+                                1 => TopSide {
+                                    top: WorkbenchWeave2Top,
+                                    side: WorkbenchWeave2,
+                                },
+                                _ => None?,
+                            }),
+                            WorkbenchType::Wood => Override::BlockUv(TopSide {
+                                top: WorkbenchWood1Top,
+                                side: WorkbenchWood1,
+                            }),
+                            WorkbenchType::Tool => Override::BlockUv(match workbench.level {
+                                0 => TopSide {
+                                    top: WorkbenchTool1Top,
+                                    side: WorkbenchTool1,
+                                },
+                                1 => TopSide {
+                                    top: WorkbenchTool2Top,
+                                    side: WorkbenchTool2,
+                                },
+                                2 => TopSide {
+                                    top: WorkbenchTool3Top,
+                                    side: WorkbenchTool3,
+                                },
+                                3 => TopSide {
+                                    top: WorkbenchTool4Top,
+                                    side: WorkbenchTool4,
+                                },
+                                4 => TopSide {
+                                    top: WorkbenchTool5Top,
+                                    side: WorkbenchTool5,
+                                },
+                                5 => TopSide {
+                                    top: WorkbenchTool6Top,
+                                    side: WorkbenchTool6,
+                                },
+                                6 => TopSide {
+                                    top: WorkbenchTool7Top,
+                                    side: WorkbenchTool7,
+                                },
+                                _ => None?,
+                            }),
+                            WorkbenchType::Press => Override::BlockUv(match workbench.level {
+                                0 => TopSide {
+                                    top: WorkbenchPress1Top,
+                                    side: WorkbenchPress1,
+                                },
+                                1 => TopSide {
+                                    top: WorkbenchPress2Top,
+                                    side: WorkbenchPress2,
+                                },
+                                _ => None?,
+                            }),
+                            WorkbenchType::Kiln => Override::BlockUv(TopSide {
+                                top: KilnTop,
+                                side: Kiln,
+                            }),
+                            WorkbenchType::Furnace => Override::BlockUv(match workbench.level {
+                                0 => TopSide {
+                                    top: Furnace1Top,
+                                    side: Furnace1,
+                                },
+                                1 => TopSide {
+                                    top: Furnace2Top,
+                                    side: Furnace2,
+                                },
+                                2 => TopSide {
+                                    top: Furnace3Top,
+                                    side: Furnace3,
+                                },
+                                _ => None?,
+                            }),
+                            WorkbenchType::Craft => Override::BlockUv(match workbench.level {
+                                0 => TopSide {
+                                    top: CraftBenchLevel1Top,
+                                    side: CraftBenchLevel1,
+                                },
+                                1 => TopSide {
+                                    top: CraftBenchLevel2Top,
+                                    side: CraftBenchLevel2,
+                                },
+                                2 => TopSide {
+                                    top: CraftBenchLevel3Top,
+                                    side: CraftBenchLevel3,
+                                },
+                                3 => TopSide {
+                                    top: CraftBenchLevel4Top,
+                                    side: CraftBenchLevel4,
+                                },
+                                _ => None?,
+                            }),
+                            WorkbenchType::Mix => Override::BlockUv(TopSide {
+                                top: MixBenchLevel1Top,
+                                side: MixBenchLevel1,
+                            }),
+                            WorkbenchType::Dye => Override::BlockUv(TopSide {
+                                top: DyeBenchLevel1Top,
+                                side: DyeBenchLevel1,
+                            }),
+                            WorkbenchType::Metalwork => Override::BlockUv(match workbench.level {
+                                0 => TopSide {
+                                    top: MetalworkBenchLevel1Top,
+                                    side: MetalworkBenchLevel1,
+                                },
+                                1 => TopSide {
+                                    top: MetalworkBenchLevel2Top,
+                                    side: MetalworkBenchLevel2,
+                                },
+                                _ => None?,
+                            }),
+                            WorkbenchType::SteamGenerator => Override::BlockUv(TopSide {
+                                top: SteamGeneratorTop,
+                                side: SteamGenerator,
+                            }),
+                            WorkbenchType::ElectricKiln => Override::BlockUv(TopSide {
+                                top: ElectricKilnTop,
+                                side: ElectricKiln,
+                            }),
+                            WorkbenchType::ElectricFurnace => Override::BlockUv(TopSide {
+                                top: ElectricFurnaceTop,
+                                side: ElectricFurnace,
+                            }),
+                            WorkbenchType::ElectricMetalworkBench => Override::BlockUv(TopSide {
+                                top: ElectricMetalworkBenchTop,
+                                side: ElectricMetalworkBench,
+                            }),
+                            WorkbenchType::ElectricStove => Override::BlockUv(TopSide {
+                                top: ElectricStoveTop,
+                                side: ElectricStove,
+                            }),
+                            WorkbenchType::SolarPanel => Override::BlockUv(TopSide {
+                                top: SolarPanelTop,
+                                side: SolarPanel,
+                            }),
+                            WorkbenchType::Flywheel => Override::BlockUv(TopSide {
+                                top: FlywheelTop,
+                                side: Flywheel,
+                            }),
+                            WorkbenchType::ArmorBench => Override::BlockUv(match workbench.level {
+                                0 => TopSide {
+                                    top: ArmorBenchLevel1Top,
+                                    side: ArmorBenchLevel1,
+                                },
+                                1 => TopSide {
+                                    top: ArmorBenchLevel2Top,
+                                    side: ArmorBenchLevel2,
+                                },
+                                2 => TopSide {
+                                    top: ArmorBenchLevel3Top,
+                                    side: ArmorBenchLevel3,
+                                },
+                                _ => None?,
+                            }),
+                            WorkbenchType::TrainYard => Override::BlockUv(TopSide {
+                                top: TrainYardTop,
+                                side: TrainYard,
+                            }),
+                            WorkbenchType::Easel => Override::ItemType(ItemType::Easel),
+                            WorkbenchType::Build => Override::BlockUv(match workbench.level {
+                                0 => TopSide {
+                                    top: BuildersBenchLevel1Top,
+                                    side: BuildersBenchLevel1,
+                                },
+                                1 => TopSide {
+                                    top: BuildersBenchLevel2Top,
+                                    side: BuildersBenchLevel2,
+                                },
+                                _ => None?,
+                            }),
+                            WorkbenchType::Refinery => Override::ItemType(ItemType::Refinery),
+                            WorkbenchType::ElectricPress => Override::BlockUv(TopSide {
+                                top: ElectricPressTop,
+                                side: ElectricPress,
+                            }),
+                            WorkbenchType::CompostBin => Override::BlockUv(TopSide {
+                                top: CompostBinTop,
+                                side: CompostBin,
+                            }),
+                            WorkbenchType::Sluice => Override::ItemType(ItemType::ElectricSluice),
+                            WorkbenchType::EggExtractor => Override::BlockUv(TopSide {
+                                top: EggExtractorTop,
+                                side: EggExtractor,
+                            }),
+                            WorkbenchType::PizzaOven => Override::BlockUv(TopSide {
+                                top: PizzaOvenTop,
+                                side: PizzaOven,
+                            }),
+                        })
+                    }
+                    AnyDynamicObject::Chest(chest) => Some(match chest.slots.chest_type() {
+                        ChestType::Standard => Override::BlockUv(TopSide {
+                            top: ChestTop,
+                            side: Chest,
+                        }),
+                        ChestType::Safe => Override::BlockUv(TopSide {
+                            top: SafeTop,
+                            side: Safe,
+                        }),
+                        ChestType::Shelf => Override::ItemType(ItemType::Shelf),
+                        ChestType::Gold => Override::BlockUv(TopSide {
+                            top: ChestGoldTop,
+                            side: ChestGold,
+                        }),
+                        ChestType::Portal => Override::BlockUv(TopSide {
+                            top: ChestPortalTop,
+                            side: ChestPortal,
+                        }),
+                        ChestType::Cabinet => Override::ItemType(ItemType::DisplayCabinet),
+                        ChestType::Feeder => Override::BlockUv(TopSide {
+                            top: ChestFeederTop,
+                            side: ChestFeeder,
+                        }),
+                    }),
+                    _ => None,
+                });
+        let Self {
+            mut item_type,
+            mut block_uv,
+            ..
+        } = Self::from_item_type(position, item.item_type()?);
+        match override_tex {
+            Some(Override::ItemType(override_item_type)) => item_type = override_item_type,
+            Some(Override::BlockUv(override_block_uv)) => block_uv = Some(override_block_uv),
+            None => {}
+        }
+        Ok(Self {
+            position,
+            item_type,
+            block_uv,
+        })
     }
 
     pub fn instance(self, id: DwChunkObjId, coord: ChunkCoord) -> DwItemInstanceRaw {
@@ -290,10 +572,11 @@ impl DwItem {
             .block_uv
             .map(|block_uv| [block_uv.up(), block_uv.side()].map(|v| v as u16))
             .unwrap_or([0; 2]);
+        let [x, y] = self.position;
         DwItemInstanceRaw {
-            position: self.position,
+            position: [x, y + 0.5],
             item_type: self.item_type as u16,
-            is_block,
+            flags: is_block,
             top,
             side,
             raw_id: id.raw_id(),
@@ -301,23 +584,19 @@ impl DwItem {
         }
     }
 
-    /// Build a `DwItemInstanceRaw` for the item-selector grid.
-    /// The grid position is stored in `position` as `[col as f32, row as f32]`.
-    /// `raw_id` and `chunk` are set to zero; the selector never uses them.
-    pub fn selector_instance(col: u32, row: u32, item_type: ItemType) -> DwItemInstanceRaw {
-        let item_type = Self::map_deprecated(item_type);
-        let block_uv = Self::default_block_uv(item_type);
-        let is_block = block_uv.is_some() as u16;
-        let [top, side] = block_uv
+    pub fn grid_instance(&self, idx: u32) -> DwItemInstanceRaw {
+        let is_block = self.block_uv.is_some() as u16;
+        let [top, side] = self
+            .block_uv
             .map(|b| [b.up(), b.side()].map(|v| v as u16))
             .unwrap_or([0; 2]);
         DwItemInstanceRaw {
-            position: [col as f32, row as f32],
-            item_type: item_type as u16,
-            is_block,
+            position: self.position,
+            item_type: self.item_type as u16,
+            flags: is_block,
             top,
             side,
-            raw_id: 0,
+            raw_id: idx,
             chunk: PackedChunkCoord::default(),
         }
     }
@@ -329,8 +608,9 @@ pub struct DwItemInstanceRaw {
     pub position: [f32; 2],
     pub item_type: u16,
 
-    // If item_type highest bit is true, use these instead
-    pub is_block: u16,
+    // 2^0 => is_block, i.e. use top & side instead of item_type to render
+    // 2^1 => is_empty, render nothing
+    pub flags: u16,
     pub top: u16,
     pub side: u16,
 
@@ -352,6 +632,18 @@ impl DwItemInstanceRaw {
             array_stride: std::mem::size_of::<DwItemInstanceRaw>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Instance,
             attributes: &Self::ATTRIBS,
+        }
+    }
+
+    pub fn empty(col: u32, row: u32, idx: u32) -> Self {
+        Self {
+            position: [col as f32, row as f32],
+            item_type: 0,
+            flags: 1 << 1,
+            top: 0,
+            side: 0,
+            raw_id: idx,
+            chunk: PackedChunkCoord::default(),
         }
     }
 }

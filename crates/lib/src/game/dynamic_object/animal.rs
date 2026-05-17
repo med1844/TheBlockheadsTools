@@ -100,9 +100,10 @@ pub struct DropBear {
 }
 inherit!(DropBear -> Animal, animal);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize_repr, Deserialize_repr)]
 #[repr(u16)]
 pub enum DodoBreed {
+    #[default]
     Standard = 0,
     Stone = 1,
     Limestone = 2,
@@ -138,12 +139,12 @@ pub enum DodoBreed {
     Rainbow = 32,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct DodoGenes {
     pub breed: DodoBreed,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Egg {
     #[serde(flatten)]

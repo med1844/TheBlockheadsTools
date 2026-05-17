@@ -7,7 +7,7 @@ use super::{
         },
         item::{ItemError, ItemType, Slot, Slots},
     },
-    InteractionObject,
+    InteractionObject, InteractionObjectType,
 };
 use num_enum::TryFromPrimitive;
 use serde::{Deserialize, Serialize};
@@ -94,6 +94,12 @@ pub enum ChestSlots {
         slots: ShelfSlots,
     },
     Feeder(StandardSlots),
+}
+
+impl Default for ChestSlots {
+    fn default() -> Self {
+        Self::Standard(Slots::default())
+    }
 }
 
 impl ChestSlots {
@@ -223,6 +229,19 @@ pub struct Chest {
     pub slots: ChestSlots,
 }
 inherit!(Chest -> InteractionObject, obj);
+
+impl Default for Chest {
+    fn default() -> Self {
+        Self {
+            obj: InteractionObject {
+                interaction_object_type: InteractionObjectType::Chest,
+                ..Default::default()
+            },
+            save_time: 0.0,
+            slots: ChestSlots::default(),
+        }
+    }
+}
 
 impl Chest {
     pub fn new(obj: InteractionObject, save_time: f64, slots: ChestSlots) -> Self {

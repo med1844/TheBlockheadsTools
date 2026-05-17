@@ -4,14 +4,14 @@ use super::{
         BlockUv,
         dw::{
             BuildDwMesh, BuildDwMeshError, CoordOutOfBoundSnafu, DwBlock, DwCapacity,
-            DwChunkBufBuilder, DwFace, DwItem, DwQuad, FaceDirection, InvalidItemTypeForDoorSnafu,
-            InvalidItemTypeForTorchSnafu, InvalidWorkbenchLevelSnafu,
+            DwChunkBufBuilder, DwFace, DwItem, DwItemInstanceRaw, DwQuad, FaceDirection,
+            InvalidItemTypeForDoorSnafu, InvalidItemTypeForTorchSnafu, InvalidWorkbenchLevelSnafu,
         },
     },
     image_type::ImageType,
     render::{
-        ItemSelectorCallback,
-        item_selector::{COL_PX, GRID_COLS, GRID_ROWS, MAX_SIZE, ROW_PX},
+        ItemGridCallback, ItemSelectorCallback,
+        item_grid::{COL_PX, ROW_PX, SELECTOR_COLS, SELECTOR_ROWS, SELECTOR_SIZE},
     },
 };
 use eframe::{egui, egui_wgpu};
@@ -24,10 +24,10 @@ use strum::IntoEnumIterator;
 use the_blockheads_tools_lib::game::{
     coord::BlockCoord,
     dynamic_object::{
-        ArtificialLight, DynamicObject, InteractionObject, InteractionObjectType, LightDirection,
-        UniqueID,
+        AnyDynamicObject, ArtificialLight, DynamicObject, InteractionObject, InteractionObjectType,
+        LightDirection, UniqueID,
         animal::{DodoBreed, Egg},
-        chest::{Chest, ChestType},
+        chest::{Chest, ChestSlots, ChestType},
         craft::{Door, Ladder, Sign, SignConnectionType, Torch, TorchConnectionType},
         plant::{CarrotPlant, CornPlant, KelpPlant, NormalPlant, Plant, TomatoPlant},
         train::TrainStation,
@@ -37,12 +37,12 @@ use the_blockheads_tools_lib::game::{
         },
         workbench::{Workbench, WorkbenchType},
     },
-    item::ItemType,
+    item::{Item, ItemType, Slot},
 };
 
 const CUBE_NUM_FACES: usize = 6;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq)]
 pub enum ObjFlags {
     PosChangedTo {
         x: f32,
@@ -345,7 +345,7 @@ impl BuildDwMesh for AppleTree {
     const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 1, quads: 0 });
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
-        builder.add_item(DwItem::new(self.float_pos, ItemType::Apple));
+        builder.add_item(DwItem::from_item_type(self.float_pos, ItemType::Apple));
         Ok(())
     }
 }
@@ -373,7 +373,7 @@ impl BuildDwMesh for MapleTree {
     const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 1, quads: 0 });
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
-        builder.add_item(DwItem::new(self.float_pos, ItemType::MapleSeed));
+        builder.add_item(DwItem::from_item_type(self.float_pos, ItemType::MapleSeed));
         Ok(())
     }
 }
@@ -387,7 +387,7 @@ impl InfoUi for MapleTree {
 
 impl BuildDwMesh for MangoTree {
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
-        builder.add_item(DwItem::new(self.float_pos, ItemType::Mango));
+        builder.add_item(DwItem::from_item_type(self.float_pos, ItemType::Mango));
         Ok(())
     }
 }
@@ -422,7 +422,7 @@ impl BuildDwMesh for PineTree {
     const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 1, quads: 0 });
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
-        builder.add_item(DwItem::new(self.float_pos, ItemType::Pinecone));
+        builder.add_item(DwItem::from_item_type(self.float_pos, ItemType::Pinecone));
         Ok(())
     }
 }
@@ -453,7 +453,10 @@ impl BuildDwMesh for CactusTree {
     const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 1, quads: 0 });
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
-        builder.add_item(DwItem::new(self.float_pos, ItemType::PricklyPear));
+        builder.add_item(DwItem::from_item_type(
+            self.float_pos,
+            ItemType::PricklyPear,
+        ));
         Ok(())
     }
 }
@@ -469,7 +472,7 @@ impl BuildDwMesh for CoconutTree {
     const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 1, quads: 0 });
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
-        builder.add_item(DwItem::new(self.float_pos, ItemType::Coconut));
+        builder.add_item(DwItem::from_item_type(self.float_pos, ItemType::Coconut));
         Ok(())
     }
 }
@@ -484,7 +487,7 @@ impl BuildDwMesh for OrangeTree {
     const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 1, quads: 0 });
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
-        builder.add_item(DwItem::new(self.float_pos, ItemType::Orange));
+        builder.add_item(DwItem::from_item_type(self.float_pos, ItemType::Orange));
         Ok(())
     }
 }
@@ -500,7 +503,7 @@ impl BuildDwMesh for CherryTree {
     const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 1, quads: 0 });
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
-        builder.add_item(DwItem::new(self.float_pos, ItemType::Cherry));
+        builder.add_item(DwItem::from_item_type(self.float_pos, ItemType::Cherry));
         Ok(())
     }
 }
@@ -516,7 +519,10 @@ impl BuildDwMesh for CoffeeTree {
     const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 1, quads: 0 });
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
-        builder.add_item(DwItem::new(self.float_pos, ItemType::CoffeeCherry));
+        builder.add_item(DwItem::from_item_type(
+            self.float_pos,
+            ItemType::CoffeeCherry,
+        ));
         Ok(())
     }
 }
@@ -646,6 +652,55 @@ impl BuildDwMesh for CornPlant {
     }
 }
 
+struct ItemGridResult {
+    hovered_idx: Option<usize>,
+    viewport: egui::Rect,
+}
+
+fn handle_item_grid_drag(
+    ui: &mut egui::Ui,
+    scroll_id: egui::Id,
+    max_size: egui::Vec2,
+    rect: egui::Rect,
+    num_col: usize,
+    num_row: usize,
+    response: &egui::Response,
+) -> ItemGridResult {
+    let mut scroll_offset: egui::Vec2 =
+        ui.data_mut(|d| d.get_temp(scroll_id).unwrap_or(egui::Vec2::ZERO));
+    let mut drag_delta = response.drag_delta();
+    if drag_delta != egui::Vec2::ZERO {
+        let max_offset = max_size - rect.size();
+
+        // 1. Calculate the minimum allowed drag delta.
+        // If we're already out of bounds (scroll_offset > max_offset), this floors at 0.0.
+        // If we're in bounds, this floors at the exact distance to the max_offset.
+        let min_delta = (scroll_offset - max_offset).min(egui::Vec2::ZERO);
+
+        // 2. Cap the drag_delta so it never pushes us further out of bounds.
+        drag_delta = drag_delta.max(min_delta);
+        scroll_offset = (scroll_offset - drag_delta).max(egui::Vec2::ZERO);
+        ui.data_mut(|d| d.insert_temp(scroll_id, scroll_offset));
+    }
+    let viewport = egui::Rect::from_min_size(scroll_offset.to_pos2(), rect.size());
+
+    let mut hovered_idx = None;
+    if let Some(pos) = response.hover_pos() {
+        let rel = pos + scroll_offset - rect.min;
+        let col = (rel.x / COL_PX).floor() as usize;
+        let row = (rel.y / ROW_PX).floor() as usize;
+
+        if col < num_col && row < num_row {
+            hovered_idx = Some(row * num_col + col);
+        }
+    }
+
+    ItemGridResult {
+        hovered_idx,
+        viewport,
+    }
+}
+
 impl ToRow for ItemType {
     fn to_row(&mut self, ui: &mut egui::Ui) -> egui::Response {
         let item_type_str: &'static str = (*self).into();
@@ -663,14 +718,14 @@ impl ToRow for ItemType {
         if is_open {
             let mut keep_open = true;
             let scroll_id = window_id.with("scroll_offset");
-            let hovered_item_id = window_id.with("hovered_item");
+            let hovered_idx_id = window_id.with("hovered_item");
 
             egui::Window::new("Select ItemType")
                 .id(window_id)
                 .open(&mut keep_open)
                 .resizable(true)
-                .default_width(MAX_SIZE.x)
-                .default_height(MAX_SIZE.y + 17.65625) // default label height is 14.65625, spacing is 3
+                .default_width(SELECTOR_SIZE.x)
+                .default_height(SELECTOR_SIZE.y + 17.65625) // default label height is 14.65625, spacing is 3
                 .show(ui.ctx(), |ui| {
                     // ui.available_size() will return all space available within the window.
                     // It won't save space for ui.label if we put it after the gpu-rendered part.
@@ -684,66 +739,56 @@ impl ToRow for ItemType {
                     // this circular dependency with egui.
                     //
                     // For now we accept 1 frame lag and some extra memory usage.
-                    let mut hovered_item: Option<ItemType> =
-                        ui.data_mut(|d| d.get_temp::<Option<ItemType>>(hovered_item_id).flatten());
+                    let mut hovered_idx: Option<usize> =
+                        ui.data_mut(|d| d.get_temp::<Option<usize>>(hovered_idx_id).flatten());
                     let text_h = ui
-                        .label(if let Some(item) = hovered_item.take() {
-                            let name: &'static str = item.into();
-                            name
-                        } else {
-                            ""
-                        })
+                        .label(
+                            if let Some(idx) = hovered_idx.take()
+                                && let Some(item_type) = ItemType::iter().nth(idx)
+                            {
+                                let name: &'static str = item_type.into();
+                                name
+                            } else {
+                                ""
+                            },
+                        )
                         .rect
                         .height();
 
-                    let (rect, response) = ui
-                        .allocate_exact_size(ui.available_size().min(MAX_SIZE), egui::Sense::all());
+                    let (rect, response) = ui.allocate_exact_size(
+                        ui.available_size().min(SELECTOR_SIZE),
+                        egui::Sense::all(),
+                    );
+                    let rect = rect.intersect(ui.ctx().content_rect());
 
-                    let mut scroll_offset: egui::Vec2 =
-                        ui.data_mut(|d| d.get_temp(scroll_id).unwrap_or(egui::Vec2::ZERO));
-
-                    let mut drag_delta = response.drag_delta();
-                    if drag_delta != egui::Vec2::ZERO {
-                        let max_offset = MAX_SIZE - rect.size();
-
-                        // 1. Calculate the minimum allowed drag delta.
-                        // If we're already out of bounds (scroll_offset > max_offset), this floors at 0.0.
-                        // If we're in bounds, this floors at the exact distance to the max_offset.
-                        let min_delta = (scroll_offset - max_offset).min(egui::Vec2::ZERO);
-
-                        // 2. Cap the drag_delta so it never pushes us further out of bounds.
-                        drag_delta = drag_delta.max(min_delta);
-                        scroll_offset = (scroll_offset - drag_delta).max(egui::Vec2::ZERO);
-                        ui.data_mut(|d| d.insert_temp(scroll_id, scroll_offset));
-                    }
-
-                    let viewport = egui::Rect::from_min_size(scroll_offset.to_pos2(), rect.size());
-
-                    if let Some(pos) = response.hover_pos() {
-                        let rel = pos + scroll_offset - rect.min;
-                        let col = (rel.x / COL_PX).floor() as u32;
-                        let row = (rel.y / ROW_PX).floor() as u32;
-
-                        if col < GRID_COLS && row < GRID_ROWS {
-                            let idx = (row * GRID_COLS + col) as usize;
-                            hovered_item = ItemType::iter().nth(idx);
-                        }
-                    }
-                    ui.data_mut(|d| d.insert_temp(hovered_item_id, hovered_item));
+                    let ItemGridResult {
+                        hovered_idx,
+                        viewport,
+                    } = handle_item_grid_drag(
+                        ui,
+                        scroll_id,
+                        SELECTOR_SIZE,
+                        rect,
+                        SELECTOR_COLS as usize,
+                        SELECTOR_ROWS as usize,
+                        &response,
+                    );
+                    ui.data_mut(|d| d.insert_temp(hovered_idx_id, hovered_idx));
 
                     if response.clicked()
-                        && let Some(new_item) = hovered_item
-                        && *self != new_item
+                        && let Some(idx) = hovered_idx
+                        && let Ok(new_item_type) = ItemType::from_idx(idx)
+                        && *self != new_item_type
                     {
-                        *self = new_item;
+                        *self = new_item_type;
                         resp.mark_changed();
                     }
 
                     ui.painter().add(egui_wgpu::Callback::new_paint_callback(
                         rect,
                         ItemSelectorCallback {
-                            hovered_index: hovered_item.map(|i| i as u32),
-                            selected_index: *self as u32,
+                            hovered_index: hovered_idx.map(|i| i as u32),
+                            selected_index: self.to_idx() as u32,
                             viewport,
                             pixels_per_point: ui.pixels_per_point(),
                         },
@@ -1142,7 +1187,7 @@ impl BuildDwMesh for Egg {
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         // TODO add render egg with real breed textures
-        builder.add_item(DwItem::new(self.float_pos, ItemType::DodoEgg));
+        builder.add_item(DwItem::from_item_type(self.float_pos, ItemType::DodoEgg));
         Ok(())
     }
 }
@@ -1239,7 +1284,7 @@ impl BuildDwMesh for LimeTree {
     const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 1, quads: 0 });
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
-        builder.add_item(DwItem::new(self.float_pos, ItemType::Lime));
+        builder.add_item(DwItem::from_item_type(self.float_pos, ItemType::Lime));
         Ok(())
     }
 }
@@ -1394,7 +1439,7 @@ impl BuildDwMesh for Workbench {
         let block_coord = BlockCoord::new(self.pos_x, self.pos_y).context(CoordOutOfBoundSnafu)?;
         match self.workbench_type {
             WorkbenchType::Undefined => {
-                builder.add_item(DwItem::new(self.float_pos, ItemType::Unknown))
+                builder.add_item(DwItem::from_item_type(self.float_pos, ItemType::Unknown))
             }
             WorkbenchType::BasicPortal | WorkbenchType::PlacedPortal => builder.add_face(
                 DwFace::new_sprite(ImageType::Portal0, [0.5, 0.0], self.float_pos, [1, 2], 2.0),
@@ -1686,7 +1731,9 @@ impl BuildDwMesh for Workbench {
                     side: TrainYard,
                 },
             )),
-            WorkbenchType::Easel => builder.add_item(DwItem::new(self.float_pos, ItemType::Easel)),
+            WorkbenchType::Easel => {
+                builder.add_item(DwItem::from_item_type(self.float_pos, ItemType::Easel))
+            }
             WorkbenchType::Build => builder.add_block(DwBlock::new(
                 block_coord,
                 match self.level {
@@ -1707,7 +1754,7 @@ impl BuildDwMesh for Workbench {
                 },
             )),
             WorkbenchType::Refinery => {
-                builder.add_item(DwItem::new(self.float_pos, ItemType::Refinery))
+                builder.add_item(DwItem::from_item_type(self.float_pos, ItemType::Refinery))
             }
             WorkbenchType::ElectricPress => builder.add_block(DwBlock::new(
                 block_coord,
@@ -1723,9 +1770,10 @@ impl BuildDwMesh for Workbench {
                     side: CompostBin,
                 },
             )),
-            WorkbenchType::Sluice => {
-                builder.add_item(DwItem::new(self.float_pos, ItemType::ElectricSluice))
-            }
+            WorkbenchType::Sluice => builder.add_item(DwItem::from_item_type(
+                self.float_pos,
+                ItemType::ElectricSluice,
+            )),
             WorkbenchType::EggExtractor => builder.add_block(DwBlock::new(
                 block_coord,
                 TopSide {
@@ -1745,10 +1793,300 @@ impl BuildDwMesh for Workbench {
     }
 }
 
+fn slots_to_item_instances<'a, I: Iterator<Item = &'a Slot>>(
+    slots: I,
+    num_col: usize,
+) -> Vec<DwItemInstanceRaw> {
+    slots
+        .enumerate()
+        .map(|(i, slot)| {
+            let col = (i % num_col) as u32;
+            let row = (i / num_col) as u32;
+
+            if let Some(first_item) = slot.first()
+                && let Ok(dw_item) = DwItem::from_item([col, row].map(|v| v as f32), first_item)
+            {
+                dw_item.grid_instance(i as u32)
+            } else {
+                DwItemInstanceRaw::empty(col, row, i as u32)
+            }
+        })
+        .collect()
+}
+
+fn toggle_selected_index(
+    ui: &mut egui::Ui,
+    selected_idx_id: egui::Id,
+    hovered_idx: Option<usize>,
+    response: &egui::Response,
+) -> Option<usize> {
+    let mut selected_idx: Option<usize> =
+        ui.data_mut(|d| d.get_temp::<Option<usize>>(selected_idx_id).flatten());
+    if response.clicked() {
+        // toggle
+        if selected_idx == hovered_idx {
+            selected_idx = None;
+        } else {
+            selected_idx = hovered_idx;
+        }
+    }
+    ui.data_mut(|d| d.insert_temp(selected_idx_id, selected_idx));
+    selected_idx
+}
+
+impl ToGrid for Item {
+    fn to_grid(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags) {
+        if self.type_id.add_row("typeId", ui).changed() {
+            *flags |= ObjFlags::RebuildMesh;
+        }
+        self.data_a.add_row("dataA", ui);
+        self.data_b.add_row("dataB", ui);
+        self.selected_sub_item_index
+            .add_row("selectedSubItemIndex", ui);
+
+        ui.label("subItems");
+        if let Some(slots) = self.sub_items.as_mut() {
+            ui.vertical(|ui| {
+                let id = ui.id().with("chest_item_rows");
+                let scroll_id = id.with("scroll_offset");
+                let selected_idx_id = id.with("selected_idx");
+
+                let (num_col, num_row) = (Self::MAX_SUB_ITEMS, 1usize);
+                let size = egui::Vec2::new(COL_PX * num_col as f32, ROW_PX * num_row as f32);
+                let (rect, response) = ui.allocate_exact_size(size, egui::Sense::all());
+                let rect = rect.intersect(ui.ctx().content_rect());
+                let ItemGridResult {
+                    hovered_idx,
+                    viewport,
+                } = handle_item_grid_drag(ui, scroll_id, size, rect, num_col, num_row, &response);
+
+                let selected_idx =
+                    toggle_selected_index(ui, selected_idx_id, hovered_idx, &response);
+
+                let instances = slots_to_item_instances(slots.iter(), num_col);
+
+                ui.painter().add(egui_wgpu::Callback::new_paint_callback(
+                    rect,
+                    ItemGridCallback {
+                        hovered_index: hovered_idx.map(|i| i as u32),
+                        selected_index: selected_idx.map(|i| i as u32),
+                        viewport,
+                        pixels_per_point: ui.pixels_per_point(),
+                        instances,
+                    },
+                ));
+
+                if let Some(idx) = selected_idx
+                    && let Some(slot) = slots.iter_mut().nth(idx)
+                {
+                    let items = slot.deref_mut();
+                    items.add_grid(id.with("selected_slot_items_grid"), ui, flags);
+                }
+            });
+        } else {
+            ui.weak("No subItems");
+        }
+        ui.end_row();
+
+        ui.label("dynamicObject");
+        ui.vertical(|ui| {
+            let current_variant_name = match &self.dynamic_object {
+                None => "None",
+                Some(obj) => obj.into(),
+            };
+
+            egui::ComboBox::from_id_salt("dyn_obj_combo")
+                .selected_text(current_variant_name)
+                .show_ui(ui, |ui| {
+                    let mut changed = false;
+
+                    let mut selectable_variant =
+                        |ui: &mut egui::Ui,
+                         name: &str,
+                         is_selected: bool,
+                         new_variant: fn() -> Option<AnyDynamicObject>,
+                         new_item_type: Option<ItemType>,
+                         item: &mut Item| {
+                            if ui.selectable_label(is_selected, name).clicked() {
+                                item.dynamic_object = new_variant();
+                                if let Some(new_item_type) = new_item_type {
+                                    item.set_item_type(new_item_type);
+                                }
+                                changed = true;
+                            }
+                        };
+
+                    selectable_variant(
+                        ui,
+                        "None",
+                        self.dynamic_object.is_none(),
+                        || None,
+                        None,
+                        self,
+                    );
+                    selectable_variant(
+                        ui,
+                        "Ladder",
+                        matches!(self.dynamic_object, Some(AnyDynamicObject::Ladder(_))),
+                        || Some(AnyDynamicObject::Ladder(Box::default())),
+                        Some(ItemType::Ladder),
+                        self,
+                    );
+                    selectable_variant(
+                        ui,
+                        "Door",
+                        matches!(self.dynamic_object, Some(AnyDynamicObject::Door(_))),
+                        || Some(AnyDynamicObject::Door(Box::default())),
+                        Some(ItemType::Door),
+                        self,
+                    );
+                    selectable_variant(
+                        ui,
+                        "Bed",
+                        matches!(self.dynamic_object, Some(AnyDynamicObject::Bed(_))),
+                        || Some(AnyDynamicObject::Bed(Box::default())),
+                        Some(ItemType::Bed),
+                        self,
+                    );
+                    selectable_variant(
+                        ui,
+                        "Egg",
+                        matches!(self.dynamic_object, Some(AnyDynamicObject::Egg(_))),
+                        || Some(AnyDynamicObject::Egg(Box::default())),
+                        Some(ItemType::DodoEgg),
+                        self,
+                    );
+                    selectable_variant(
+                        ui,
+                        "Workbench",
+                        matches!(self.dynamic_object, Some(AnyDynamicObject::Workbench(_))),
+                        || Some(AnyDynamicObject::Workbench(Box::default())),
+                        Some(ItemType::WorkBench),
+                        self,
+                    );
+                    selectable_variant(
+                        ui,
+                        "Chest",
+                        matches!(self.dynamic_object, Some(AnyDynamicObject::Chest(_))),
+                        || Some(AnyDynamicObject::Chest(Box::default())),
+                        Some(ItemType::Chest),
+                        self,
+                    );
+                    selectable_variant(
+                        ui,
+                        "Sign",
+                        matches!(self.dynamic_object, Some(AnyDynamicObject::Sign(_))),
+                        || Some(AnyDynamicObject::Sign(Box::default())),
+                        Some(ItemType::Sign),
+                        self,
+                    );
+                    selectable_variant(
+                        ui,
+                        "TrainStation",
+                        matches!(self.dynamic_object, Some(AnyDynamicObject::TrainStation(_))),
+                        || Some(AnyDynamicObject::TrainStation(Box::default())),
+                        Some(ItemType::TrainStation),
+                        self,
+                    );
+
+                    if changed {
+                        *flags |= ObjFlags::RebuildMesh;
+                    }
+                });
+
+            if let Some(dyn_obj) = &mut self.dynamic_object {
+                ui.horizontal(|ui| match dyn_obj {
+                    AnyDynamicObject::Ladder(ladder) => {
+                        ladder.add_grid("ladder_grid", ui, flags);
+                    }
+                    AnyDynamicObject::Door(door) => {
+                        door.add_grid("door_grid", ui, flags);
+                    }
+                    AnyDynamicObject::Bed(bed) => {
+                        bed.add_grid("bed_grid", ui, flags);
+                    }
+                    AnyDynamicObject::Egg(egg) => {
+                        egg.add_grid("egg_grid", ui, flags);
+                    }
+                    AnyDynamicObject::Workbench(workbench) => {
+                        workbench.add_grid("workbench_grid", ui, flags);
+                    }
+                    AnyDynamicObject::Chest(chest) => {
+                        chest.add_grid("chest_grid", ui, flags);
+                    }
+                    AnyDynamicObject::Sign(sign) => {
+                        sign.add_grid("sign_grid", ui, flags);
+                    }
+                    AnyDynamicObject::TrainStation(train_station) => {
+                        train_station.add_grid("train_station_grid", ui, flags);
+                    }
+                });
+                ui.end_row();
+            }
+        });
+        ui.end_row();
+    }
+}
+
 impl ToGrid for Chest {
-    fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut ObjFlags) {
+    fn to_grid(&mut self, ui: &mut egui::Ui, flags: &mut ObjFlags) {
         self.save_time.add_row("saveTime", ui);
-        // TODO find a proper way to display the items
+        ui.label("slots");
+        ui.vertical(|ui| {
+            let unique_id = self.unique_id;
+            if let Some((num_col, num_row, slots)) = match &mut self.slots {
+                ChestSlots::Standard(slots)
+                | ChestSlots::Safe(slots)
+                | ChestSlots::Gold(slots)
+                | ChestSlots::Feeder(slots) => Some((4, 4, slots.as_mut_slice())),
+                ChestSlots::Shelf { slots, .. } | ChestSlots::Cabinet { slots, .. } => {
+                    Some((2, 2, slots.as_mut_slice()))
+                }
+                ChestSlots::Portal => None,
+            } {
+                let id = ui.id().with("chest_item_rows");
+                let scroll_id = id.with("scroll_offset");
+                let selected_idx_id = id.with("selected_idx");
+
+                let size = egui::Vec2::new(COL_PX * num_col as f32, ROW_PX * num_row as f32);
+                let (rect, response) = ui.allocate_exact_size(size, egui::Sense::all());
+                let rect = rect.intersect(ui.ctx().content_rect());
+                let ItemGridResult {
+                    hovered_idx,
+                    viewport,
+                } = handle_item_grid_drag(ui, scroll_id, size, rect, num_col, num_row, &response);
+
+                let selected_idx =
+                    toggle_selected_index(ui, selected_idx_id, hovered_idx, &response);
+
+                let instances = slots_to_item_instances(slots.iter(), num_col);
+
+                ui.painter().add(egui_wgpu::Callback::new_paint_callback(
+                    rect,
+                    ItemGridCallback {
+                        hovered_index: hovered_idx.map(|i| i as u32),
+                        selected_index: selected_idx.map(|i| i as u32),
+                        viewport,
+                        pixels_per_point: ui.pixels_per_point(),
+                        instances,
+                    },
+                ));
+
+                if let Some(idx) = selected_idx
+                    && let Some(slot) = slots.iter_mut().nth(idx)
+                {
+                    let items = slot.deref_mut();
+                    items.add_grid(
+                        format!("selected_slot_items_grid_{:?}", unique_id),
+                        ui,
+                        flags,
+                    );
+                }
+            } else {
+                ui.weak("Portal chest has no owned slots");
+            }
+        });
+        ui.end_row();
     }
 }
 
@@ -1790,7 +2128,9 @@ impl BuildDwMesh for Chest {
                     side: Safe,
                 },
             )),
-            ChestType::Shelf => builder.add_item(DwItem::new(self.float_pos, ItemType::Shelf)),
+            ChestType::Shelf => {
+                builder.add_item(DwItem::from_item_type(self.float_pos, ItemType::Shelf))
+            }
             ChestType::Gold => builder.add_block(DwBlock::new(
                 block_coord,
                 TopSide {
@@ -1805,9 +2145,10 @@ impl BuildDwMesh for Chest {
                     side: ChestPortal,
                 },
             )),
-            ChestType::Cabinet => {
-                builder.add_item(DwItem::new(self.float_pos, ItemType::DisplayCabinet))
-            }
+            ChestType::Cabinet => builder.add_item(DwItem::from_item_type(
+                self.float_pos,
+                ItemType::DisplayCabinet,
+            )),
             ChestType::Feeder => builder.add_block(DwBlock::new(
                 block_coord,
                 TopSide {
@@ -1946,7 +2287,10 @@ impl InfoUi for TrainStation {
 
 impl BuildDwMesh for TrainStation {
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
-        builder.add_item(DwItem::new(self.float_pos, ItemType::TrainStation));
+        builder.add_item(DwItem::from_item_type(
+            self.float_pos,
+            ItemType::TrainStation,
+        ));
         Ok(())
     }
 }
@@ -2012,7 +2356,7 @@ impl BuildDwMesh for GemTree {
             TreeType::Diamond => ItemType::Diamond,
             _ => ItemType::Unknown,
         };
-        builder.add_item(DwItem::new(self.float_pos, item_type));
+        builder.add_item(DwItem::from_item_type(self.float_pos, item_type));
         Ok(())
     }
 }

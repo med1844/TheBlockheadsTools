@@ -144,7 +144,7 @@ impl GeometryBuffer {
 mod composite;
 mod grid;
 mod item;
-pub(crate) mod item_selector;
+pub(crate) mod item_grid;
 mod mesh;
 mod ssao;
 pub(crate) mod voxel;
@@ -155,6 +155,7 @@ pub struct RenderResources {
     selected_block_buf: wgpu::Buffer,
     hover_on_id_buf: wgpu::Buffer,
     selected_id_buf: wgpu::Buffer,
+    item_instance_buf: Option<(wgpu::Buffer, u32)>,
 
     g_buffer: GeometryBuffer,
 
@@ -171,7 +172,7 @@ pub struct RenderResources {
     composite: composite::CompositeRenderer,
     ssao: ssao::SsaoRenderer,
     ssao_blur: ssao::SsaoBlurRenderer,
-    item_selector: item_selector::ItemSelectorRenderer,
+    item_grid: item_grid::ItemGridRenderer,
 
     render_settings_buf: wgpu::Buffer,
 }
@@ -291,7 +292,7 @@ impl RenderResources {
             ssao: ssao::SsaoRenderer::new(device, queue, &camera_buf, &g_buffer),
             ssao_blur: ssao::SsaoBlurRenderer::new(device, &g_buffer),
             composite,
-            item_selector: item_selector::ItemSelectorRenderer::new(
+            item_grid: item_grid::ItemGridRenderer::new(
                 device,
                 &items_texture,
                 &albedo_texture,
@@ -307,6 +308,7 @@ impl RenderResources {
             hover_on_block_buf,
             hover_on_id_buf,
             selected_id_buf,
+            item_instance_buf: None,
 
             g_buffer,
 
@@ -718,14 +720,12 @@ impl egui_wgpu::CallbackTrait for ItemSelectorCallback {
         callback_resources: &mut egui_wgpu::CallbackResources,
     ) -> Vec<wgpu::CommandBuffer> {
         let r: &mut RenderResources = callback_resources.get_mut().unwrap();
-        let viewport = self.viewport * self.pixels_per_point;
-        r.item_selector.prepare(
+        r.item_grid.prepare(
             device,
             queue,
             self.hovered_index,
-            self.selected_index,
-            viewport.min.into(),
-            viewport.size().into(),
+            Some(self.selected_index),
+            self.viewport,
             self.pixels_per_point,
         );
         Vec::new()
@@ -738,6 +738,52 @@ impl egui_wgpu::CallbackTrait for ItemSelectorCallback {
         callback_resources: &egui_wgpu::CallbackResources,
     ) {
         let r: &RenderResources = callback_resources.get().unwrap();
-        r.item_selector.render(render_pass);
+        r.item_grid.render(render_pass, &None);
+    }
+}
+
+pub struct ItemGridCallback {
+    pub hovered_index: Option<u32>,
+    pub selected_index: Option<u32>,
+    pub viewport: egui::Rect,
+    pub pixels_per_point: f32,
+    pub instances: Vec<DwItemInstanceRaw>, // we are doing malloc per frame :(
+}
+
+impl egui_wgpu::CallbackTrait for ItemGridCallback {
+    fn prepare(
+        &self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        _screen_descriptor: &egui_wgpu::ScreenDescriptor,
+        _egui_encoder: &mut wgpu::CommandEncoder,
+        callback_resources: &mut egui_wgpu::CallbackResources,
+    ) -> Vec<wgpu::CommandBuffer> {
+        let r: &mut RenderResources = callback_resources.get_mut().unwrap();
+        r.item_grid.prepare(
+            device,
+            queue,
+            self.hovered_index,
+            self.selected_index,
+            self.viewport,
+            self.pixels_per_point,
+        );
+        let instance_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Chest Instance Buffer"),
+            contents: bytemuck::cast_slice(&self.instances),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+        let num_instances = self.instances.len() as u32;
+        r.item_instance_buf = Some((instance_buf, num_instances));
+        Vec::new()
+    }
+    fn paint(
+        &self,
+        _info: egui::PaintCallbackInfo,
+        render_pass: &mut wgpu::RenderPass<'static>,
+        callback_resources: &egui_wgpu::CallbackResources,
+    ) {
+        let r: &RenderResources = callback_resources.get().unwrap();
+        r.item_grid.render(render_pass, &r.item_instance_buf);
     }
 }
