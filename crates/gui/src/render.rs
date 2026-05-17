@@ -271,6 +271,8 @@ impl RenderResources {
                 &selected_id_buf,
                 &render_settings_buf,
                 &world_dim_x_buf,
+                &destruct_texture,
+                &reflect_texture,
             ),
             dw_mesh: mesh::DwMeshRenderer::new(
                 device,
@@ -294,6 +296,10 @@ impl RenderResources {
                 &items_texture,
                 &albedo_texture,
                 target_format,
+                &render_settings_buf,
+                &camera_buf,
+                &destruct_texture,
+                &reflect_texture,
             ),
 
             camera_buf,

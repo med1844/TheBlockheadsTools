@@ -13,6 +13,12 @@
 //!include render_settings.wgsl
 @group(0) @binding(7) var<uniform> render_settings: RenderSettings;
 @group(0) @binding(8) var<uniform> world_dim_x: u32;
+@group(0) @binding(9)  var tile_destruct:          texture_2d<f32>;
+@group(0) @binding(10) var tile_destruct_sampler:  sampler;
+@group(0) @binding(11) var tile_reflect:           texture_2d<f32>;
+@group(0) @binding(12) var tile_reflect_sampler:   sampler;
+
+//!include lighting.wgsl
 
 //!include item.wgsl
 

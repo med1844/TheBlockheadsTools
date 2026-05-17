@@ -42,61 +42,7 @@ fn vs_composite(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
     return out;
 }
 
-fn calculate_lighting(
-    p_pos: vec3<f32>,
-    p_normal: vec3<f32>,
-    p_albedo: vec3<f32>,
-    p_specular_val: f32,
-    p_occlusion: f32,
-    depth: f32,
-) -> vec3<f32> {
-    let light_dir = normalize(render_settings.light_dir);
-    let view_dir = normalize(camera.camera_pos.xyz - p_pos);
-    let half_dir = normalize(light_dir + view_dir);
-
-    // Diffuse
-    let diffuse_strength = max(dot(p_normal, light_dir), 0.0);
-    let diffuse = p_albedo * (render_settings.ambient_light + diffuse_strength);
-
-    // Specular (Blinn-Phong)
-    var specular = vec3<f32>(0.0);
-    if (render_settings.enable_reflect != 0u) {
-        let spec_strength = pow(max(dot(p_normal, half_dir), 0.0), render_settings.shininess);
-        specular = vec3<f32>(spec_strength * render_settings.specular_intensity * p_specular_val);
-    }
-
-    // Depth falloff (darkening distant blocks)
-    let depth_factor = (1.0 - depth) * (1.0 - render_settings.min_depth_factor) + render_settings.min_depth_factor;
-
-    return (diffuse * p_occlusion + specular) * depth_factor;
-}
-
-fn perturb_normal(normal: vec3<f32>, destruct_color: vec3<f32>) -> vec3<f32> {
-    // Replicate logic from voxel.wgsl for Tangent Space mapping
-    // We need to find the tangent/bitangent for the given normal.
-    // Since our voxels are axis-aligned, we can infer it.
-    var tangent: vec3<f32>;
-    var bitangent: vec3<f32>;
-
-    if (normal.x != 0.0) {
-        tangent = vec3<f32>(0.0, 0.0, 1.0);
-        bitangent = vec3<f32>(0.0, -1.0, 0.0);
-    } else if (normal.y != 0.0) {
-        tangent = vec3<f32>(1.0, 0.0, 0.0);
-        bitangent = vec3<f32>(0.0, 0.0, 1.0);
-    } else {
-        tangent = vec3<f32>(1.0, 0.0, 0.0);
-        bitangent = vec3<f32>(0.0, -1.0, 0.0);
-    }
-
-    let local_n = vec3<f32>(
-        (destruct_color.r - 0.5) * 0.5,
-        (destruct_color.g - 0.5) * 0.5,
-        1.0
-    );
-
-    return normalize(tangent * local_n.x + bitangent * local_n.y + normal * local_n.z);
-}
+//!include lighting.wgsl
 
 fn calculate_solid_color(in: VertexOutput, raw_depth: f32) -> vec4<f32> {
     let raw_uv = textureSampleLevel(uv_texture, uv_sampler, in.uv, 0.0).rg;
@@ -127,7 +73,7 @@ fn calculate_solid_color(in: VertexOutput, raw_depth: f32) -> vec4<f32> {
     }
 
     // Lighting
-    var solid_rgb = calculate_lighting(world_pos, normal, albedo_color.rgb, reflect_val, occlusion, raw_depth);
+    var solid_rgb = calculate_lighting(render_settings.light_dir, world_pos, normal, albedo_color.rgb, reflect_val, occlusion, raw_depth);
     return vec4<f32>(solid_rgb, 1.0);
 }
 

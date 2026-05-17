@@ -80,14 +80,25 @@ fn render_block_item(uv: vec2<f32>, top: u32, side: u32) -> vec4<f32> {
     let final_atlas_uv = uv_min_tile + clenched_uv * VOXEL_TILE_SIZE_UV;
     var surface_color = textureSampleLevel(tilemap_texture, tilemap_sampler, final_atlas_uv, 0.0);
 
-    // Apply lighting similar to voxel.wgsl
+    // Apply lighting
     if (surface_color.a > 0.0) {
-        let light_direction = normalize(vec3<f32>(0.0, -1.0, -0.5));
-        let ambient_light = 0.05;
-        let diffuse_factor = max(dot(face_normal, light_direction), 0.0);
-        let final_light_factor = ambient_light + (1.0 - ambient_light) * diffuse_factor;
-        let final_rgb = surface_color.rgb * final_light_factor; // Apply lighting
-        surface_color = vec4<f32>(final_rgb, surface_color.a);
+        var perturbed_normal = face_normal;
+        if (render_settings.enable_destruct != 0u) {
+            let destruct_color = textureSampleLevel(tile_destruct, tile_destruct_sampler, final_atlas_uv, 0.0).rgb;
+            perturbed_normal = perturb_normal(face_normal, destruct_color);
+        }
+        let icon_light_dir = vec3<f32>(0.0, -1.0, -0.5);
+        let reflect_val = textureSampleLevel(tile_reflect, tile_reflect_sampler, final_atlas_uv, 0.0).r;
+        let lit = calculate_lighting(
+            icon_light_dir,
+            vec3<f32>(0.0), // no world position for icons
+            perturbed_normal,
+            surface_color.rgb,
+            reflect_val,
+            1.0, // no SSAO for item
+            1.0, // no depth darkening for icons
+        );
+        surface_color = vec4<f32>(lit, surface_color.a);
     }
     return surface_color;
 }
