@@ -1885,6 +1885,7 @@ impl ToGrid for Item {
                         viewport,
                         pixels_per_point: ui.pixels_per_point(),
                         instances,
+                        id: ui.id(),
                     },
                 ));
 
@@ -2081,6 +2082,7 @@ impl ToGrid for Chest {
                         viewport,
                         pixels_per_point: ui.pixels_per_point(),
                         instances,
+                        id: ui.id(),
                     },
                 ));
 

@@ -3,7 +3,16 @@
 @group(0) @binding(2) var tilemap_texture: texture_2d<f32>;
 @group(0) @binding(3) var tilemap_sampler: sampler;
 
-struct ItemSelectorUniforms {
+//!include render_settings.wgsl
+@group(0) @binding(4) var<uniform> render_settings:       RenderSettings;
+//!include camera_uniform.wgsl
+@group(0) @binding(5) var<uniform> camera:                CameraUniform;
+@group(0) @binding(6) var          tile_destruct:         texture_2d<f32>;
+@group(0) @binding(7) var          tile_destruct_sampler: sampler;
+@group(0) @binding(8) var          tile_reflect:          texture_2d<f32>;
+@group(0) @binding(9) var          tile_reflect_sampler:  sampler;
+
+struct Uniforms {
     hovered_id: u32,
     selected_id: u32,
     // Top-left corner of the visible viewport in grid-pixel space.
@@ -13,15 +22,7 @@ struct ItemSelectorUniforms {
     // Width and height of a single item cell in grid-pixels.
     cell_size: vec2<f32>,
 }
-@group(0) @binding(4) var<uniform> uniforms:              ItemSelectorUniforms;
-//!include render_settings.wgsl
-@group(0) @binding(5) var<uniform> render_settings:       RenderSettings;
-//!include camera_uniform.wgsl
-@group(0) @binding(6) var<uniform> camera:                CameraUniform;
-@group(0) @binding(7) var          tile_destruct:         texture_2d<f32>;
-@group(0) @binding(8) var          tile_destruct_sampler: sampler;
-@group(0) @binding(9) var          tile_reflect:          texture_2d<f32>;
-@group(0) @binding(10) var         tile_reflect_sampler:  sampler;
+@group(1) @binding(0) var<uniform> uniforms:             Uniforms;
 
 //!include lighting.wgsl
 //!include item.wgsl

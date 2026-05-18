@@ -155,7 +155,6 @@ pub struct RenderResources {
     selected_block_buf: wgpu::Buffer,
     hover_on_id_buf: wgpu::Buffer,
     selected_id_buf: wgpu::Buffer,
-    item_instance_buf: Option<(wgpu::Buffer, u32)>,
 
     g_buffer: GeometryBuffer,
 
@@ -308,7 +307,6 @@ impl RenderResources {
             hover_on_block_buf,
             hover_on_id_buf,
             selected_id_buf,
-            item_instance_buf: None,
 
             g_buffer,
 
@@ -727,6 +725,7 @@ impl egui_wgpu::CallbackTrait for ItemSelectorCallback {
             Some(self.selected_index),
             self.viewport,
             self.pixels_per_point,
+            None,
         );
         Vec::new()
     }
@@ -738,7 +737,7 @@ impl egui_wgpu::CallbackTrait for ItemSelectorCallback {
         callback_resources: &egui_wgpu::CallbackResources,
     ) {
         let r: &RenderResources = callback_resources.get().unwrap();
-        r.item_grid.render(render_pass, &None);
+        r.item_grid.render(render_pass, None);
     }
 }
 
@@ -748,6 +747,7 @@ pub struct ItemGridCallback {
     pub viewport: egui::Rect,
     pub pixels_per_point: f32,
     pub instances: Vec<DwItemInstanceRaw>, // we are doing malloc per frame :(
+    pub id: egui::Id,
 }
 
 impl egui_wgpu::CallbackTrait for ItemGridCallback {
@@ -767,14 +767,8 @@ impl egui_wgpu::CallbackTrait for ItemGridCallback {
             self.selected_index,
             self.viewport,
             self.pixels_per_point,
+            Some((self.id, &self.instances)),
         );
-        let instance_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Chest Instance Buffer"),
-            contents: bytemuck::cast_slice(&self.instances),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
-        let num_instances = self.instances.len() as u32;
-        r.item_instance_buf = Some((instance_buf, num_instances));
         Vec::new()
     }
     fn paint(
@@ -784,6 +778,6 @@ impl egui_wgpu::CallbackTrait for ItemGridCallback {
         callback_resources: &egui_wgpu::CallbackResources,
     ) {
         let r: &RenderResources = callback_resources.get().unwrap();
-        r.item_grid.render(render_pass, &r.item_instance_buf);
+        r.item_grid.render(render_pass, Some(&self.id));
     }
 }
