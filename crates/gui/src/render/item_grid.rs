@@ -45,6 +45,7 @@ pub struct ItemGridRenderer {
 }
 
 impl ItemGridRenderer {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         device: &wgpu::Device,
         items_texture: &Texture,

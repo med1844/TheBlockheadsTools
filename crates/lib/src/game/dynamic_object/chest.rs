@@ -53,10 +53,6 @@ type ShelfSlots = Slots<NUM_SHELF_SLOTS>;
 
 #[derive(Debug, Snafu)]
 pub enum ChestError {
-    #[snafu(display("Incomplete shelf_render_items array"))]
-    IncompleteShelfRenderItems,
-    #[snafu(display("Incomplete shelf_item_data_bs array"))]
-    IncompleteItemDataBs,
     #[snafu(display("Get saveItemSlot when portal chest shouldn't have one"))]
     PortalChestHaveSlots,
     #[snafu(display("No saveItemSlot when chest type {chest_type:?} should have one"))]
@@ -82,15 +78,15 @@ pub enum ChestSlots {
     Standard(StandardSlots),
     Safe(StandardSlots),
     Shelf {
-        render_items: Option<[ItemType; NUM_SHELF_SLOTS]>,
-        item_data_bs: Option<[u16; NUM_SHELF_SLOTS]>,
+        render_items: [Option<ItemType>; NUM_SHELF_SLOTS],
+        item_data_bs: [Option<u16>; NUM_SHELF_SLOTS],
         slots: ShelfSlots,
     },
     Gold(StandardSlots),
     Portal,
     Cabinet {
-        render_items: Option<[ItemType; NUM_SHELF_SLOTS]>,
-        item_data_bs: Option<[u16; NUM_SHELF_SLOTS]>,
+        render_items: [Option<ItemType>; NUM_SHELF_SLOTS],
+        item_data_bs: [Option<u16>; NUM_SHELF_SLOTS],
         slots: ShelfSlots,
     },
     Feeder(StandardSlots),
@@ -118,8 +114,8 @@ impl ChestSlots {
     pub fn from_chest_type_and_slots(
         chest_type: ChestType,
         slot_values: Option<Vec<plist::Value>>,
-        render_items: Option<[ItemType; NUM_SHELF_SLOTS]>,
-        item_data_bs: Option<[u16; NUM_SHELF_SLOTS]>,
+        render_items: Option<[Option<ItemType>; NUM_SHELF_SLOTS]>,
+        item_data_bs: Option<[Option<u16>; NUM_SHELF_SLOTS]>,
     ) -> Result<Self> {
         match (slot_values, chest_type) {
             (
@@ -141,6 +137,8 @@ impl ChestSlots {
                 let slots = Slots::from_values(slot_values)
                     .map_err(Box::new)
                     .context(LoadSlotsSnafu)?;
+                let render_items = render_items.unwrap_or([None; NUM_SHELF_SLOTS]);
+                let item_data_bs = item_data_bs.unwrap_or([None; NUM_SHELF_SLOTS]);
                 Ok(match chest_type {
                     ChestType::Shelf => Self::Shelf {
                         render_items,
@@ -177,8 +175,8 @@ impl ChestSlots {
     ) -> Result<(
         ChestType,
         Option<Vec<plist::Value>>,
-        Option<[ItemType; NUM_SHELF_SLOTS]>,
-        Option<[u16; NUM_SHELF_SLOTS]>,
+        Option<[Option<ItemType>; NUM_SHELF_SLOTS]>,
+        Option<[Option<u16>; NUM_SHELF_SLOTS]>,
     )> {
         let chest_type = self.chest_type();
         let slot_values = match self {
@@ -204,7 +202,7 @@ impl ChestSlots {
                 render_items,
                 item_data_bs,
                 ..
-            } => (*render_items, *item_data_bs),
+            } => (Some(*render_items), Some(*item_data_bs)),
         };
         Ok((chest_type, slot_values, render_items, item_data_bs))
     }
@@ -358,37 +356,25 @@ impl Chest {
         let slot_values = slot_bytes
             .map(|bytes| -> Result<Vec<plist::Value>> { Self::parse_slot_bytes(bytes) })
             .transpose()?;
-        let shelf_render_items = match (
+        let shelf_render_items = [
             meta.shelf_render_items_0,
             meta.shelf_render_items_1,
             meta.shelf_render_items_2,
             meta.shelf_render_items_3,
-        ) {
-            (Some(r0), Some(r1), Some(r2), Some(r3)) => Some([r0, r1, r2, r3]),
-            (None, None, None, None) => None,
-            _ => {
-                return IncompleteShelfRenderItemsSnafu.fail();
-            }
-        };
+        ];
 
-        let shelf_item_data_bs = match (
+        let shelf_item_data_bs = [
             meta.shelf_item_data_bs_0,
             meta.shelf_item_data_bs_1,
             meta.shelf_item_data_bs_2,
             meta.shelf_item_data_bs_3,
-        ) {
-            (Some(d0), Some(d1), Some(d2), Some(d3)) => Some([d0, d1, d2, d3]),
-            (None, None, None, None) => None,
-            _ => {
-                return IncompleteItemDataBsSnafu.fail();
-            }
-        };
+        ];
 
         let slots = ChestSlots::from_chest_type_and_slots(
             meta.chest_type,
             slot_values,
-            shelf_render_items,
-            shelf_item_data_bs,
+            Some(shelf_render_items),
+            Some(shelf_item_data_bs),
         )?;
 
         Ok(Self {
@@ -401,14 +387,8 @@ impl Chest {
     pub(crate) fn to_meta_and_slots(&self) -> Result<(ChestMeta, Option<Vec<u8>>)> {
         let (chest_type, save_item_slots, shelf_render_items, shelf_item_data_bs) =
             self.slots.to_chest_type_and_slots()?;
-        let (r0, r1, r2, r3) = match shelf_render_items {
-            Some([a, b, c, d]) => (Some(a), Some(b), Some(c), Some(d)),
-            None => (None, None, None, None),
-        };
-        let (d0, d1, d2, d3) = match shelf_item_data_bs {
-            Some([a, b, c, d]) => (Some(a), Some(b), Some(c), Some(d)),
-            None => (None, None, None, None),
-        };
+        let [r0, r1, r2, r3] = shelf_render_items.unwrap_or_default();
+        let [d0, d1, d2, d3] = shelf_item_data_bs.unwrap_or_default();
         let slot_bytes = match save_item_slots {
             Some(slot_values) => {
                 let compressed = compress(

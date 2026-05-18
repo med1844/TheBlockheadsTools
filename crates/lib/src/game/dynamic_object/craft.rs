@@ -200,6 +200,7 @@ inherit!(Rail -> DynamicObject, obj);
 #[repr(u8)]
 // How does the sign connects
 pub enum SignConnectionType {
+    None = 0,         // standalone item
     GroundDouble = 1, // connects to sign or block below, standing on both side
     GroundSingle = 2, // connects to sign or block below, standing on single leg
     #[default]

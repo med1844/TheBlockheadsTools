@@ -108,7 +108,7 @@ impl DwItem {
         use BlockUv::*;
         use ImageType::*;
         Some(match item_type {
-            ItemType::Stone => All(Stone),
+            ItemType::Stone => All(MinedStone),
             ItemType::Kiln => TopSide {
                 top: KilnTop,
                 side: Kiln,

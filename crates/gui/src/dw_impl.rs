@@ -1839,6 +1839,18 @@ impl ToGrid for Item {
         if self.type_id.add_row("typeId", ui).changed() {
             *flags |= ObjFlags::RebuildMesh;
         }
+        let item_type = self.item_type();
+        match item_type {
+            Ok(mut item_type) => {
+                if item_type.add_row("itemType", ui).changed() {
+                    self.set_item_type(item_type);
+                    *flags |= ObjFlags::RebuildMesh;
+                }
+            }
+            Err(e) => {
+                ui.weak(e.to_string());
+            }
+        }
         self.data_a.add_row("dataA", ui);
         self.data_b.add_row("dataB", ui);
         self.selected_sub_item_index
@@ -1877,7 +1889,7 @@ impl ToGrid for Item {
                 ));
 
                 if let Some(idx) = selected_idx
-                    && let Some(slot) = slots.iter_mut().nth(idx)
+                    && let Some(slot) = slots.get_mut(idx)
                 {
                     let items = slot.deref_mut();
                     items.add_grid(id.with("selected_slot_items_grid"), ui, flags);
@@ -2073,7 +2085,7 @@ impl ToGrid for Chest {
                 ));
 
                 if let Some(idx) = selected_idx
-                    && let Some(slot) = slots.iter_mut().nth(idx)
+                    && let Some(slot) = slots.get_mut(idx)
                 {
                     let items = slot.deref_mut();
                     items.add_grid(
@@ -2167,7 +2179,8 @@ impl ToRow for SignConnectionType {
             egui::ComboBox::from_id_salt("sign_connection_type_combo_box")
                 .selected_text(format!("{:?}", self))
                 .show_ui(ui, |ui| {
-                    ui.selectable_value(self, Self::GroundDouble, "GroundDouble")
+                    ui.selectable_value(self, Self::None, "None")
+                        | ui.selectable_value(self, Self::GroundDouble, "GroundDouble")
                         | ui.selectable_value(self, Self::GroundSingle, "GroundSingle")
                         | ui.selectable_value(self, Self::Front, "Front")
                         | ui.selectable_value(self, Self::Side, "Side")
@@ -2207,6 +2220,7 @@ impl BuildDwMesh for Sign {
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         let z = 3.0;
         match self.connection_type {
+            SignConnectionType::None => {}
             SignConnectionType::GroundDouble => {
                 builder.add_face(DwFace::new_sprite(
                     ImageType::SignGroundDouble,
