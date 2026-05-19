@@ -1378,8 +1378,8 @@ impl DwChunkBuf {
         add(chunk.orange_tree.iter(), OrangeTree, &mut builder);
         add(chunk.cherry_tree.iter(), CherryTree, &mut builder);
         add(chunk.coffee_tree.iter(), CoffeeTree, &mut builder);
-        // add(chunk.flax_plant.iter(), FlaxPlant, &mut builder);
-        // add(chunk.sunflower_plant.iter(), SunflowerPlant, &mut builder);
+        add(chunk.flax_plant.iter(), FlaxPlant, &mut builder);
+        add(chunk.sunflower_plant.iter(), SunflowerPlant, &mut builder);
         add(chunk.corn_plant.iter(), CornPlant, &mut builder);
         // add(chunk.dodo.iter(), Dodo, &mut builder);
         // add(chunk.dropped_item.iter(), DroppedItem, &mut builder);
@@ -1397,7 +1397,7 @@ impl DwChunkBuf {
         add(chunk.egg.iter(), Egg, &mut builder);
         // add(chunk.window.iter(), Window, &mut builder);
         // add(chunk.boat.iter(), Boat, &mut builder);
-        // add(chunk.chilli_plant.iter(), ChilliPlant, &mut builder);
+        add(chunk.chilli_plant.iter(), ChilliPlant, &mut builder);
         add(chunk.kelp_plant.iter(), KelpPlant, &mut builder);
         // add(chunk.clown_fish.iter(), ClownFish, &mut builder);
         // add(chunk.shark.iter(), Shark, &mut builder);
@@ -1422,10 +1422,10 @@ impl DwChunkBuf {
         // add(chunk.elevator_motor.iter(), ElevatorMotor, &mut builder);
         // add(chunk.elevator_shaft.iter(), ElevatorShaft, &mut builder);
         add(chunk.gem_tree.iter(), GemTree, &mut builder);
-        // add(chunk.vine_plant.iter(), VinePlant, &mut builder);
-        // add(chunk.tulip_plant.iter(), TulipPlant, &mut builder);
+        add(chunk.vine_plant.iter(), VinePlant, &mut builder);
+        add(chunk.tulip_plant.iter(), TulipPlant, &mut builder);
         // add(chunk.ownership_sign.iter(), u8, &mut builder);
-        // add(chunk.wheat_plant.iter(), WheatPlant, &mut builder);
+        add(chunk.wheat_plant.iter(), WheatPlant, &mut builder);
         add(chunk.tomato_plant.iter(), TomatoPlant, &mut builder);
         // add(chunk.yak.iter(), Yak, &mut builder);
         // add(chunk.mirror.iter(), u8, &mut builder);

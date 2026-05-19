@@ -815,8 +815,10 @@ impl EditorApp {
                 OrangeTree => draw_window(title, dw_chunk.orange_tree.get_mut(id.index), ctx),
                 CherryTree => draw_window(title, dw_chunk.cherry_tree.get_mut(id.index), ctx),
                 CoffeeTree => draw_window(title, dw_chunk.coffee_tree.get_mut(id.index), ctx),
-                // FlaxPlant => {}
-                // SunflowerPlant => {}
+                FlaxPlant => draw_window(title, dw_chunk.flax_plant.get_mut(id.index), ctx),
+                SunflowerPlant => {
+                    draw_window(title, dw_chunk.sunflower_plant.get_mut(id.index), ctx)
+                }
                 CornPlant => draw_window(title, dw_chunk.corn_plant.get_mut(id.index), ctx),
                 // Dodo => {}
                 // DroppedItem => {}
@@ -834,7 +836,7 @@ impl EditorApp {
                 Egg => draw_window(title, dw_chunk.egg.get_mut(id.index), ctx),
                 // Window => {}
                 // Boat => {}
-                // ChilliPlant => {}
+                ChilliPlant => draw_window(title, dw_chunk.chilli_plant.get_mut(id.index), ctx),
                 KelpPlant => draw_window(title, dw_chunk.kelp_plant.get_mut(id.index), ctx),
                 // ClownFish => {}
                 // Shark => {}
@@ -859,10 +861,10 @@ impl EditorApp {
                 // ElevatorMotor => {}
                 // ElevatorShaft => {}
                 GemTree => draw_window(title, dw_chunk.gem_tree.get_mut(id.index), ctx),
-                // VinePlant => {}
-                // TulipPlant => {}
+                VinePlant => draw_window(title, dw_chunk.vine_plant.get_mut(id.index), ctx),
+                TulipPlant => draw_window(title, dw_chunk.tulip_plant.get_mut(id.index), ctx),
                 // OwnershipSign => {}
-                // WheatPlant => {}
+                WheatPlant => draw_window(title, dw_chunk.wheat_plant.get_mut(id.index), ctx),
                 TomatoPlant => draw_window(title, dw_chunk.tomato_plant.get_mut(id.index), ctx),
                 // Yak => {}
                 // Mirror => {}

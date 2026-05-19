@@ -29,7 +29,10 @@ use the_blockheads_tools_lib::game::{
         animal::{DodoBreed, Egg},
         chest::{Chest, ChestSlots, ChestType},
         craft::{Door, Ladder, Sign, SignConnectionType, Torch, TorchConnectionType},
-        plant::{CarrotPlant, CornPlant, KelpPlant, NormalPlant, Plant, TomatoPlant},
+        plant::{
+            CarrotPlant, ChilliPlant, CornPlant, FlaxPlant, KelpPlant, NormalPlant, Plant,
+            SunflowerPlant, TomatoPlant, TulipPlant, VinePlant, WheatPlant,
+        },
         train::TrainStation,
         tree::{
             AppleTree, CactusTree, CherryTree, CoconutTree, CoffeeTree, GemTree, LimeTree,
@@ -671,6 +674,58 @@ impl InfoUi for NormalPlant {
     }
 }
 
+impl InfoUi for FlaxPlant {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        let normal_plant = self.deref_mut();
+        normal_plant.info(ui, context);
+    }
+}
+
+impl BuildDwMesh for FlaxPlant {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 0, quads: 1 });
+
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        builder.add_face(DwFace::new_sprite(
+            if self.flowering {
+                ImageType::FlaxPlantFlower
+            } else {
+                ImageType::FlaxPlant
+            },
+            [0.5, 0.0],
+            self.float_pos,
+            [1, 2],
+            2.0,
+        ));
+        Ok(())
+    }
+}
+
+impl InfoUi for SunflowerPlant {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        let normal_plant = self.deref_mut();
+        normal_plant.info(ui, context);
+    }
+}
+
+impl BuildDwMesh for SunflowerPlant {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 0, quads: 1 });
+
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        builder.add_face(DwFace::new_sprite(
+            if self.flowering {
+                ImageType::SunflowerPlantFlower
+            } else {
+                ImageType::SunflowerPlant
+            },
+            [0.5, 0.0],
+            self.float_pos,
+            [1, 2],
+            2.0,
+        ));
+        Ok(())
+    }
+}
+
 impl InfoUi for CornPlant {
     fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         let normal_plant = self.deref_mut();
@@ -1237,6 +1292,32 @@ impl BuildDwMesh for Egg {
     }
 }
 
+impl InfoUi for ChilliPlant {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        let normal_plant = self.deref_mut();
+        normal_plant.info(ui, context);
+    }
+}
+
+impl BuildDwMesh for ChilliPlant {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 0, quads: 1 });
+
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        builder.add_face(DwFace::new_sprite(
+            if self.flowering {
+                ImageType::ChilliPlantFlower
+            } else {
+                ImageType::ChilliPlant
+            },
+            [0.5, 0.0],
+            self.float_pos,
+            [1, 2],
+            2.0,
+        ));
+        Ok(())
+    }
+}
+
 impl ToGrid for KelpPlant {
     fn to_grid(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         self.growth_timer.add_row("growthTimer", ui);
@@ -1265,7 +1346,7 @@ impl InfoUi for KelpPlant {
 
 impl BuildDwMesh for KelpPlant {
     fn capacity(&self) -> DwCapacity {
-        let len = self.number_of_occupied_tiles_above as usize;
+        let len = self.number_of_occupied_tiles_above as usize + 1;
         DwCapacity {
             items: 0,
             quads: if len == 0 { 0 } else { len / 2 + 1 },
@@ -1273,7 +1354,7 @@ impl BuildDwMesh for KelpPlant {
     }
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
-        let mut len = self.number_of_occupied_tiles_above;
+        let mut len = self.number_of_occupied_tiles_above + 1;
         let [x, mut y] = self.float_pos;
         while len >= 3 {
             builder.add_face(DwFace::new_sprite(
@@ -2418,6 +2499,166 @@ impl BuildDwMesh for GemTree {
             _ => ItemType::Unknown,
         };
         builder.add_item(DwItem::from_item_type(self.float_pos, item_type));
+        Ok(())
+    }
+}
+
+impl ToGrid for VinePlant {
+    fn to_grid(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        self.growth_timer.add_row("growthTimer", ui);
+        if self
+            .number_of_occupied_tiles_below
+            .add_row("numberOfOccupiedTilesBelow", ui)
+            .changed()
+        {
+            context.flags |= ObjFlags::RebuildMesh;
+        }
+    }
+}
+
+impl InfoUi for VinePlant {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        let tree = self.deref_mut();
+        tree.info(ui, context);
+
+        ui.vertical(|ui| {
+            ui.heading("GemTree");
+            ui.separator();
+            self.add_grid("gem_tree_grid", ui, context);
+        });
+    }
+}
+
+impl BuildDwMesh for VinePlant {
+    fn capacity(&self) -> DwCapacity {
+        let len = self.number_of_occupied_tiles_below as usize + 1;
+        DwCapacity {
+            items: 0,
+            quads: if len <= 1 { len } else { (len + 3) / 2 },
+        }
+    }
+
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        let len = self.number_of_occupied_tiles_below + 1;
+        let [x, mut y] = self.float_pos;
+        match len {
+            0 => {}
+            1 => {
+                builder.add_face(DwFace::new_sprite(
+                    ImageType::VinePlantBottom,
+                    [0.5, 0.0],
+                    [x, y],
+                    [1, 1],
+                    3.0,
+                ));
+            }
+            mut len => {
+                builder.add_face(DwFace::new_sprite(
+                    ImageType::VinePlantTop,
+                    [0.5, 0.0],
+                    [x, y],
+                    [1, 1],
+                    3.0,
+                ));
+                y -= 1.0;
+                len -= 1;
+                while len >= 3 {
+                    builder.add_face(DwFace::new_sprite(
+                        ImageType::VinePlant,
+                        [0.5, 1.0],
+                        [x, y],
+                        [1, 2],
+                        3.0,
+                    ));
+                    y -= 2.0;
+                    len -= 2;
+                }
+                if len == 2 {
+                    builder.add_face(DwFace::new_sprite(
+                        ImageType::VinePlantOddLen,
+                        [0.5, 0.0],
+                        [x, y],
+                        [1, 1],
+                        3.0,
+                    ));
+                    y -= 1.0;
+                }
+                builder.add_face(DwFace::new_sprite(
+                    ImageType::VinePlantBottom,
+                    [0.5, 0.0],
+                    [x, y],
+                    [1, 1],
+                    3.0,
+                ));
+            }
+        }
+
+        Ok(())
+    }
+}
+
+impl ToGrid for TulipPlant {
+    fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut DwUiContext) {
+        self.color_genes.add_row("colorGenes", ui);
+        self.mate_color_genes.add_row("mateColorGenes", ui);
+        self.mix_genes.add_row("mixGenes", ui);
+    }
+}
+
+impl InfoUi for TulipPlant {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        let tree = self.deref_mut();
+        tree.info(ui, context);
+
+        ui.vertical(|ui| {
+            ui.heading("TulipPlant");
+            ui.separator();
+            self.add_grid("tulip_plant_grid", ui, context);
+        });
+    }
+}
+
+impl BuildDwMesh for TulipPlant {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 0, quads: 1 });
+
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        builder.add_face(DwFace::new_sprite(
+            if self.flowering {
+                ImageType::TulipPlantMature
+            } else {
+                ImageType::TulipPlantSprout
+            },
+            [0.5, 0.0],
+            self.float_pos,
+            [1, 1],
+            2.0,
+        ));
+        Ok(())
+    }
+}
+
+impl InfoUi for WheatPlant {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        let normal_plant = self.deref_mut();
+        normal_plant.info(ui, context);
+    }
+}
+
+impl BuildDwMesh for WheatPlant {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 0, quads: 1 });
+
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        builder.add_face(DwFace::new_sprite(
+            if self.flowering {
+                ImageType::WheatPlantFlower
+            } else {
+                ImageType::WheatPlant
+            },
+            [0.5, 0.0],
+            self.float_pos,
+            [1, 2],
+            2.0,
+        ));
         Ok(())
     }
 }

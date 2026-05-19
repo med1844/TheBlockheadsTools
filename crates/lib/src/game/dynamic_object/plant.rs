@@ -93,6 +93,6 @@ pub struct VinePlant {
     #[serde(flatten)]
     normal_plant: NormalPlant,
     pub growth_timer: f32,
-    pub number_of_occupied_tiles_below: i32,
+    pub number_of_occupied_tiles_below: u32,
 }
 inherit!(VinePlant -> NormalPlant, normal_plant);
