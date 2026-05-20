@@ -253,7 +253,11 @@ impl DwMeshRenderer {
         }
     }
 
-    pub fn render_translucent_depth(&self, rpass: &mut wgpu::RenderPass<'_>, dw_buf: &[DwChunkBuf]) {
+    pub fn render_translucent_depth(
+        &self,
+        rpass: &mut wgpu::RenderPass<'_>,
+        dw_buf: &[DwChunkBuf],
+    ) {
         rpass.set_pipeline(&self.translucent_depth_pipeline);
         rpass.set_bind_group(0, &self.bind_group, &[]);
         for dw_chunk_buf in dw_buf {

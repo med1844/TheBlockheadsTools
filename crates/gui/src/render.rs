@@ -400,9 +400,11 @@ impl RenderResources {
         render_pass: &mut wgpu::RenderPass<'_>,
         dw_buf: &[DwChunkBuf],
         render_settings: &RenderSettings,
+        blockhead_instances: &Option<(wgpu::Buffer, u32)>,
     ) {
         if render_settings.render_dw_item {
-            self.dw_item.render(render_pass, dw_buf);
+            self.dw_item
+                .render(render_pass, dw_buf, blockhead_instances);
         }
         if render_settings.show_grid {
             self.grid.render(render_pass);
@@ -490,6 +492,7 @@ impl RenderResources {
 pub struct Render3dCallback {
     pub camera_uniform: CameraUniform,
     pub dw_chunks: Vec<DwChunkBuf>,
+    pub blockhead_instances: Option<(wgpu::Buffer, u32)>,
     pub selected_block_coord_uniform: GpuCoordUniform,
     pub hover_on_block_coord_uniform: GpuCoordUniform,
     pub hover_on_id_uniform: DwChunkObjIdUniform,
@@ -761,7 +764,12 @@ impl egui_wgpu::CallbackTrait for Render3dCallback {
                 timestamp_writes: None,
                 occlusion_query_set: None,
             });
-            r.render_annotation_pass(&mut render_pass, &self.dw_chunks, &self.render_settings);
+            r.render_annotation_pass(
+                &mut render_pass,
+                &self.dw_chunks,
+                &self.render_settings,
+                &self.blockhead_instances,
+            );
         }
 
         if let Some((x, y)) = self.mouse_physical_pos {

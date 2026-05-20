@@ -3,7 +3,7 @@ use super::{
     fps_counter::FpsCounter,
     gpu::{
         Camera, GpuCoord, RenderSettings,
-        dw::{DwBuf, DwChunkObjId, DwChunkObjIdUniform},
+        dw::{DwBuf, DwChunkObjId, DwChunkObjIdUniform, ObjectType},
         voxel_util,
     },
     render::{GeometryBuffer, Render3dCallback, RenderResources},
@@ -18,12 +18,14 @@ use std::path::PathBuf;
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::sync::{Arc, Mutex};
 use the_blockheads_tools_lib::{
-    self as lib, DynArch,
+    DynArch,
     game::{
         block::{Block, BlockMut, BlockViewMut},
         chunk::{Chunk, Chunks},
         coord::{BlockCoord, ChunkCoord},
         db::world_db::{WorldDb, WorldDbError},
+        dynamic_object::DynamicObjectType,
+        dynamic_world::{ChunkDynamicObjects, DynamicWorld},
     },
 };
 
@@ -332,6 +334,8 @@ impl EditorApp {
                 }
             }
         }
+        self.dw_buf
+            .set_blockheads(device, &world_db.main.blockheads);
 
         self.world_db = Some(world_db);
 
@@ -760,12 +764,14 @@ impl EditorApp {
                 }
             }
         }
+        let blockhead_instances = self.dw_buf.get_blockhead_instances();
 
         ui.painter().add(egui_wgpu::Callback::new_paint_callback(
             rect,
             Render3dCallback {
                 camera_uniform: self.camera.uniform(),
                 dw_chunks,
+                blockhead_instances,
                 selected_block_coord_uniform: self.interaction_state.selected_block_gpu.uniform(),
                 hover_on_block_coord_uniform: self.interaction_state.hover_on_block_gpu.uniform(),
                 hover_on_id_uniform: self.interaction_state.hover_on_id_uniform(),
@@ -875,10 +881,9 @@ impl EditorApp {
         if let Some(InteractionTarget::DynamicObject { chunk_coord, id }) =
             self.interaction_state.select
             && let Some(world_db) = self.world_db.as_mut()
-            && let dw = &mut world_db.dw
-            && let Some(dw_chunk) = dw.chunk_at_mut(chunk_coord)
         {
-            use lib::game::dynamic_object::DynamicObjectType::*;
+            let dw = &mut world_db.dw;
+
             fn draw_window<T: InfoUi>(
                 title: &str,
                 t: Option<&mut T>,
@@ -899,122 +904,164 @@ impl EditorApp {
                 (context.flags, open)
             }
 
+            fn draw_dyn_obj_window(
+                dyn_obj_type: DynamicObjectType,
+                index: usize,
+                dw_chunk: &mut ChunkDynamicObjects,
+                ctx: (&egui::Context, DwUiContext),
+            ) -> (ObjFlags, bool) {
+                use DynamicObjectType::*;
+                let title: &'static str = dyn_obj_type.into();
+                match dyn_obj_type {
+                    AppleTree => draw_window(title, dw_chunk.apple_tree.get_mut(index), ctx),
+                    MapleTree => draw_window(title, dw_chunk.maple_tree.get_mut(index), ctx),
+                    MangoTree => draw_window(title, dw_chunk.mango_tree.get_mut(index), ctx),
+                    PineTree => draw_window(title, dw_chunk.pine_tree.get_mut(index), ctx),
+                    CactusTree => draw_window(title, dw_chunk.cactus_tree.get_mut(index), ctx),
+                    CoconutTree => draw_window(title, dw_chunk.coconut_tree.get_mut(index), ctx),
+                    OrangeTree => draw_window(title, dw_chunk.orange_tree.get_mut(index), ctx),
+                    CherryTree => draw_window(title, dw_chunk.cherry_tree.get_mut(index), ctx),
+                    CoffeeTree => draw_window(title, dw_chunk.coffee_tree.get_mut(index), ctx),
+                    FlaxPlant => draw_window(title, dw_chunk.flax_plant.get_mut(index), ctx),
+                    SunflowerPlant => {
+                        draw_window(title, dw_chunk.sunflower_plant.get_mut(index), ctx)
+                    }
+                    CornPlant => draw_window(title, dw_chunk.corn_plant.get_mut(index), ctx),
+                    // Dodo => {}
+                    // DroppedItem => {}
+                    // Fire => {}
+                    Torch => draw_window(title, dw_chunk.torch.get_mut(index), ctx),
+                    // GlowBlock => {}
+                    Ladder => draw_window(title, dw_chunk.ladder.get_mut(index), ctx),
+                    Door => draw_window(title, dw_chunk.door.get_mut(index), ctx),
+                    // ArtificialLight => {}
+                    // Bed => {}
+                    // DropBear => {}
+                    // GatherBlock => {}
+                    CarrotPlant => draw_window(title, dw_chunk.carrot_plant.get_mut(index), ctx),
+                    // Donkey => {}
+                    Egg => draw_window(title, dw_chunk.egg.get_mut(index), ctx),
+                    Window => draw_window(title, dw_chunk.window.get_mut(index), ctx),
+                    // Boat => {}
+                    ChilliPlant => draw_window(title, dw_chunk.chilli_plant.get_mut(index), ctx),
+                    KelpPlant => draw_window(title, dw_chunk.kelp_plant.get_mut(index), ctx),
+                    // ClownFish => {}
+                    // Shark => {}
+                    LimeTree => draw_window(title, dw_chunk.lime_tree.get_mut(index), ctx),
+                    Wire => draw_window(title, dw_chunk.wire.get_mut(index), ctx),
+                    // CaveTroll => {}
+                    // Rail => {}
+                    // HandCar => {}
+                    // SteamLocomotive => {}
+                    // FreightCar => {}
+                    // PassengerCar => {}
+                    Workbench => draw_window(title, dw_chunk.workbench.get_mut(index), ctx),
+                    Chest => draw_window(title, dw_chunk.chest.get_mut(index), ctx),
+                    Sign => draw_window(title, dw_chunk.sign.get_mut(index), ctx),
+                    // TradingPost => {}
+                    TrainStation => draw_window(title, dw_chunk.train_station.get_mut(index), ctx),
+                    // TradePortal => {}
+                    // Scorpion => {}
+                    // Painting => {}
+                    // Column => {}
+                    // Stairs => {}
+                    // ElevatorMotor => {}
+                    // ElevatorShaft => {}
+                    GemTree => draw_window(title, dw_chunk.gem_tree.get_mut(index), ctx),
+                    VinePlant => draw_window(title, dw_chunk.vine_plant.get_mut(index), ctx),
+                    TulipPlant => draw_window(title, dw_chunk.tulip_plant.get_mut(index), ctx),
+                    // OwnershipSign => {}
+                    WheatPlant => draw_window(title, dw_chunk.wheat_plant.get_mut(index), ctx),
+                    TomatoPlant => draw_window(title, dw_chunk.tomato_plant.get_mut(index), ctx),
+                    // Yak => {}
+                    // Mirror => {}
+                    _ => (ObjFlags::default(), true),
+                }
+            }
+
             let context = DwUiContext::new(
                 world_db.main.world_v2.world_width_macro * Chunk::NUM_BLOCK_PER_ROW as u32,
                 self.render_settings.enable_cyclic,
                 ObjFlags::default(),
             );
             let ctx = (egui_ctx, context);
-            let title: &'static str = id.obj_type.into();
-            let (flags, open) = match id.obj_type {
-                AppleTree => draw_window(title, dw_chunk.apple_tree.get_mut(id.index), ctx),
-                MapleTree => draw_window(title, dw_chunk.maple_tree.get_mut(id.index), ctx),
-                MangoTree => draw_window(title, dw_chunk.mango_tree.get_mut(id.index), ctx),
-                PineTree => draw_window(title, dw_chunk.pine_tree.get_mut(id.index), ctx),
-                CactusTree => draw_window(title, dw_chunk.cactus_tree.get_mut(id.index), ctx),
-                CoconutTree => draw_window(title, dw_chunk.coconut_tree.get_mut(id.index), ctx),
-                OrangeTree => draw_window(title, dw_chunk.orange_tree.get_mut(id.index), ctx),
-                CherryTree => draw_window(title, dw_chunk.cherry_tree.get_mut(id.index), ctx),
-                CoffeeTree => draw_window(title, dw_chunk.coffee_tree.get_mut(id.index), ctx),
-                FlaxPlant => draw_window(title, dw_chunk.flax_plant.get_mut(id.index), ctx),
-                SunflowerPlant => {
-                    draw_window(title, dw_chunk.sunflower_plant.get_mut(id.index), ctx)
-                }
-                CornPlant => draw_window(title, dw_chunk.corn_plant.get_mut(id.index), ctx),
-                // Dodo => {}
-                // DroppedItem => {}
-                // Fire => {}
-                Torch => draw_window(title, dw_chunk.torch.get_mut(id.index), ctx),
-                // GlowBlock => {}
-                Ladder => draw_window(title, dw_chunk.ladder.get_mut(id.index), ctx),
-                Door => draw_window(title, dw_chunk.door.get_mut(id.index), ctx),
-                // ArtificialLight => {}
-                // Bed => {}
-                // DropBear => {}
-                // GatherBlock => {}
-                CarrotPlant => draw_window(title, dw_chunk.carrot_plant.get_mut(id.index), ctx),
-                // Donkey => {}
-                Egg => draw_window(title, dw_chunk.egg.get_mut(id.index), ctx),
-                Window => draw_window(title, dw_chunk.window.get_mut(id.index), ctx),
-                // Boat => {}
-                ChilliPlant => draw_window(title, dw_chunk.chilli_plant.get_mut(id.index), ctx),
-                KelpPlant => draw_window(title, dw_chunk.kelp_plant.get_mut(id.index), ctx),
-                // ClownFish => {}
-                // Shark => {}
-                LimeTree => draw_window(title, dw_chunk.lime_tree.get_mut(id.index), ctx),
-                Wire => draw_window(title, dw_chunk.wire.get_mut(id.index), ctx),
-                // CaveTroll => {}
-                // Rail => {}
-                // HandCar => {}
-                // SteamLocomotive => {}
-                // FreightCar => {}
-                // PassengerCar => {}
-                Workbench => draw_window(title, dw_chunk.workbench.get_mut(id.index), ctx),
-                Chest => draw_window(title, dw_chunk.chest.get_mut(id.index), ctx),
-                Sign => draw_window(title, dw_chunk.sign.get_mut(id.index), ctx),
-                // TradingPost => {}
-                TrainStation => draw_window(title, dw_chunk.train_station.get_mut(id.index), ctx),
-                // TradePortal => {}
-                // Scorpion => {}
-                // Painting => {}
-                // Column => {}
-                // Stairs => {}
-                // ElevatorMotor => {}
-                // ElevatorShaft => {}
-                GemTree => draw_window(title, dw_chunk.gem_tree.get_mut(id.index), ctx),
-                VinePlant => draw_window(title, dw_chunk.vine_plant.get_mut(id.index), ctx),
-                TulipPlant => draw_window(title, dw_chunk.tulip_plant.get_mut(id.index), ctx),
-                // OwnershipSign => {}
-                WheatPlant => draw_window(title, dw_chunk.wheat_plant.get_mut(id.index), ctx),
-                TomatoPlant => draw_window(title, dw_chunk.tomato_plant.get_mut(id.index), ctx),
-                // Yak => {}
-                // Mirror => {}
-                _ => (ObjFlags::default(), true),
+            let draw_result = match id.obj_type {
+                ObjectType::DynamicObject(dyn_obj_type) => dw
+                    .chunk_at_mut(chunk_coord)
+                    .map(|dw_chunk| draw_dyn_obj_window(dyn_obj_type, id.index, dw_chunk, ctx)),
+                ObjectType::Blockhead => Some(draw_window(
+                    "Blockhead",
+                    world_db.main.blockheads.get_mut(id.index),
+                    ctx,
+                )),
             };
-            if !open {
-                self.interaction_state.select = None;
-            }
-            if let Some(state) = frame.wgpu_render_state() {
-                // handle obj move & dst chunk re-render
-                match flags {
-                    ObjFlags::PosChangedTo { x, y } => {
+            if let Some((flags, open)) = draw_result {
+                if !open {
+                    self.interaction_state.select = None;
+                }
+
+                let mut move_dyn_obj =
+                    |x: f32,
+                     y: f32,
+                     chunk_coord: ChunkCoord,
+                     dyn_obj_ty: DynamicObjectType,
+                     index: usize,
+                     dw: &mut DynamicWorld,
+                     device: &wgpu::Device| {
                         if let Ok(dst_coord) = BlockCoord::new(x as u32, y as u16)
                             && let (dst_chunk_coord, _) = dst_coord.decompose()
                             && dst_chunk_coord != chunk_coord
                         {
-                            let new_i = dw.move_element(
-                                chunk_coord,
-                                dst_chunk_coord,
-                                id.obj_type,
-                                id.index,
-                            );
+                            let new_i =
+                                dw.move_element(chunk_coord, dst_chunk_coord, dyn_obj_ty, index);
                             if let Some(new_i) = new_i {
                                 self.interaction_state.select =
                                     Some(InteractionTarget::DynamicObject {
                                         chunk_coord: dst_chunk_coord,
-                                        id: DwChunkObjId::new(id.obj_type, new_i),
+                                        id: DwChunkObjId::from_dyn_obj(dyn_obj_ty, new_i),
                                     });
                             }
 
                             let dst_dw_chunk = dw
                                 .chunk_at(dst_chunk_coord)
                                 .expect("move_element must have created chunk at dst_chunk_coord");
-                            self.dw_buf
-                                .set_chunk(&state.device, dst_chunk_coord, dst_dw_chunk);
+                            self.dw_buf.set_chunk(device, dst_chunk_coord, dst_dw_chunk);
                         }
+                    };
+                if let Some(state) = frame.wgpu_render_state() {
+                    // handle obj move & dst chunk re-render
+                    let expect_chunk_reason =
+                        "chunk must be Some to have ID read from GPU to have that chunk_coord";
+                    match flags {
+                        ObjFlags::PosChangedTo { x, y } => match id.obj_type {
+                            ObjectType::DynamicObject(dyn_obj_ty) => {
+                                move_dyn_obj(
+                                    x,
+                                    y,
+                                    chunk_coord,
+                                    dyn_obj_ty,
+                                    id.index,
+                                    dw,
+                                    &state.device,
+                                );
+                                let dw_chunk = dw.chunk_at(chunk_coord).expect(expect_chunk_reason);
+                                self.dw_buf.set_chunk(&state.device, chunk_coord, dw_chunk);
+                            }
+                            ObjectType::Blockhead => {
+                                if let Some(blockhead) = world_db.main.blockheads.get_mut(id.index)
+                                {
+                                    blockhead.float_pos = [x, y];
+                                }
+                                self.dw_buf
+                                    .set_blockheads(&state.device, &world_db.main.blockheads);
+                            }
+                        },
+                        ObjFlags::RebuildMesh => {
+                            let dw_chunk = dw.chunk_at(chunk_coord).expect(expect_chunk_reason);
+                            self.dw_buf.set_chunk(&state.device, chunk_coord, dw_chunk);
+                        }
+                        ObjFlags::NoChange => {}
                     }
-                    ObjFlags::RebuildMesh | ObjFlags::NoChange => {}
-                }
-
-                // handle current chunk re-render
-                match flags {
-                    ObjFlags::PosChangedTo { .. } | ObjFlags::RebuildMesh => {
-                        let dw_chunk = dw.chunk_at(chunk_coord).expect(
-                            "chunk must be Some to have ID read from GPU to have that chunk_coord",
-                        );
-                        self.dw_buf.set_chunk(&state.device, chunk_coord, dw_chunk);
-                    }
-                    ObjFlags::NoChange => {}
                 }
             }
         }

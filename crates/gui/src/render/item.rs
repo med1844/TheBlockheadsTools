@@ -285,20 +285,31 @@ impl DwItemRenderer {
         }
     }
 
-    pub fn render(&self, render_pass: &mut wgpu::RenderPass<'_>, dw_buf: &[DwChunkBuf]) {
+    pub fn render(
+        &self,
+        render_pass: &mut wgpu::RenderPass<'_>,
+        dw_buf: &[DwChunkBuf],
+        blockhead_instances: &Option<(wgpu::Buffer, u32)>,
+    ) {
         render_pass.set_pipeline(&self.pipeline);
         render_pass.set_bind_group(0, &self.bind_group, &[]);
+        render_pass.set_vertex_buffer(0, self.vertex_buf.slice(..));
+        render_pass.set_index_buffer(self.index_buf.slice(..), wgpu::IndexFormat::Uint16);
         for dw_chunk_buf in dw_buf {
             if dw_chunk_buf.num_instances > 0 {
-                render_pass.set_vertex_buffer(0, self.vertex_buf.slice(..));
                 render_pass.set_vertex_buffer(1, dw_chunk_buf.instance_buf.slice(..));
-                render_pass.set_index_buffer(self.index_buf.slice(..), wgpu::IndexFormat::Uint16);
                 render_pass.draw_indexed(
                     0..DwIconVertex::INDICES.len() as u32,
                     0,
                     0..dw_chunk_buf.num_instances,
                 );
             }
+        }
+        if let Some((instance_buf, num_instances)) = blockhead_instances
+            && *num_instances > 0
+        {
+            render_pass.set_vertex_buffer(1, instance_buf.slice(..));
+            render_pass.draw_indexed(0..DwIconVertex::INDICES.len() as u32, 0, 0..*num_instances);
         }
     }
 }

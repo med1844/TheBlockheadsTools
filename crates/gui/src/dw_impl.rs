@@ -29,6 +29,7 @@ use the_blockheads_tools_lib::game::{
         AnyDynamicObject, ArtificialLight, DynamicObject, InteractionObject, InteractionObjectType,
         LightDirection, UniqueID,
         animal::{DodoBreed, Egg},
+        blockhead::Blockhead,
         chest::{Chest, ChestSlots, ChestType},
         craft::{
             Door, Ladder, Sign, SignConnectionType, Torch, TorchConnectionType, Window, Wire,
@@ -157,7 +158,7 @@ impl ToRow for String {
     }
 }
 
-impl ToRow for &'static str {
+impl ToRow for &str {
     fn to_row(&mut self, ui: &mut egui::Ui) -> egui::Response {
         ui.label(*self)
     }
@@ -2136,7 +2137,7 @@ impl ToGrid for Item {
         ui.label("subItems");
         if let Some(slots) = self.sub_items.as_mut() {
             ui.vertical(|ui| {
-                let id = ui.id().with("chest_item_rows");
+                let id = ui.id().with("sub_item_item_grid");
                 let scroll_id = id.with("scroll_offset");
                 let selected_idx_id = id.with("selected_idx");
 
@@ -2334,7 +2335,7 @@ impl ToGrid for Chest {
                 }
                 ChestSlots::Portal => None,
             } {
-                let id = ui.id().with("chest_item_rows");
+                let id = ui.id().with("chest_slots_item_grid");
                 let scroll_id = id.with("scroll_offset");
                 let selected_idx_id = id.with("selected_idx");
 
@@ -3000,4 +3001,81 @@ pub(crate) fn block_content_type_drop_menu(
                     | ui.selectable_value(b, DiamondTreeTrunkLeaf, "DiamondTreeTrunkLeaf")
             }),
     )
+}
+
+impl ToGrid for Blockhead {
+    fn to_grid(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        let actions = format!("{:?}", self.actions);
+        actions.as_str().add_row("actions", ui);
+        self.clothing_increment_timer
+            .add_row("clothingIncrementTimer", ui);
+        self.double_time_unlocked.add_row("doubleTimeUnlocked", ui);
+        self.interaction_item_index
+            .add_row("interactionItemIndex", ui);
+        self.interaction_item_sub_index
+            .add_row("interactionItemSubIndex", ui);
+        self.name.add_row("name", ui);
+        self.selected_tool_index.add_row("selectedToolIndex", ui);
+        let skin_options = format!("{:?}", self.skin_options);
+        skin_options.as_str().add_row("skinOptions", ui);
+        let state = format!("{:?}", self.state);
+        state.as_str().add_row("state", ui);
+        self.final_goal_square_x.add_row("finalGoalSquareX", ui);
+        self.final_goal_square_y.add_row("finalGoalSquareY", ui);
+        self.load_requires_recalculation
+            .add_row("loadRequiresRecalculation", ui);
+
+        let slots = self.inventory.deref_mut();
+        ui.label("inventory");
+        ui.vertical(|ui| {
+            let id = ui.id().with("blockhead_inventory_item_grid");
+            let scroll_id = id.with("scroll_offset");
+            let selected_idx_id = id.with("selected_idx");
+
+            let (num_col, num_row) = (Self::INVENTORY_NUM_SLOTS, 1usize);
+            let size = egui::Vec2::new(COL_PX * num_col as f32, ROW_PX * num_row as f32);
+            let (rect, response) = ui.allocate_exact_size(size, egui::Sense::all());
+            let rect = rect.intersect(ui.ctx().content_rect());
+            let ItemGridResult {
+                hovered_idx,
+                viewport,
+            } = handle_item_grid_drag(ui, scroll_id, size, rect, num_col, num_row, &response);
+
+            let selected_idx = toggle_selected_index(ui, selected_idx_id, hovered_idx, &response);
+
+            let instances = slots_to_item_instances(slots.iter(), num_col);
+
+            ui.painter().add(egui_wgpu::Callback::new_paint_callback(
+                rect,
+                ItemGridCallback {
+                    hovered_index: hovered_idx.map(|i| i as u32),
+                    selected_index: selected_idx.map(|i| i as u32),
+                    viewport,
+                    pixels_per_point: ui.pixels_per_point(),
+                    id: ui.id(),
+                    instances: ItemGridInstances::Custom { instances },
+                },
+            ));
+
+            if let Some(idx) = selected_idx
+                && let Some(slot) = slots.get_mut(idx)
+            {
+                let items = slot.deref_mut();
+                items.add_grid(id.with("selected_slot_items_grid"), ui, context);
+            }
+        });
+    }
+}
+
+impl InfoUi for Blockhead {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        let obj = self.deref_mut();
+        obj.info(ui, context);
+
+        ui.vertical(|ui| {
+            ui.heading("Blockhead");
+            ui.separator();
+            self.add_grid("blockhead_grid", ui, context);
+        });
+    }
 }

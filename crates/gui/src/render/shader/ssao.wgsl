@@ -98,7 +98,7 @@ fn evaluate_sample_occlusion(local_pos: vec3<f32>, sample_local_pos: vec3<f32>) 
 
     let screen_size = vec2<f32>(textureDimensions(voxel_depth_texture, 0));
     let sample_depth = get_surface_depth_only(offset_uv, screen_size);
-    
+
     if (sample_depth >= 1.0) {
         return 0.0;
     }

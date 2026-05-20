@@ -11,8 +11,8 @@ pub(crate) struct BlockheadXml {
     actions: plist::Value,
     clothing_increment_timer: u64,
     double_time_unlocked: bool,
-    interaction_item_index: i64, // could be -1... my god
-    interaction_item_sub_index: i64,
+    interaction_item_index: i32, // could be -1... my god
+    interaction_item_sub_index: i32,
     name: String,
     selected_tool_index: u64,
     skin_options: plist::Data,
@@ -49,8 +49,8 @@ pub struct Blockhead {
     pub actions: plist::Value,
     pub clothing_increment_timer: u64,
     pub double_time_unlocked: bool,
-    pub interaction_item_index: i64, // could be -1... my god
-    pub interaction_item_sub_index: i64,
+    pub interaction_item_index: i32, // could be -1... my god
+    pub interaction_item_sub_index: i32,
     pub name: String,
     pub selected_tool_index: u64,
     pub skin_options: plist::Data,
@@ -63,6 +63,8 @@ pub struct Blockhead {
 inherit!(Blockhead -> DynamicObject, obj);
 
 impl Blockhead {
+    pub const INVENTORY_NUM_SLOTS: usize = 8;
+
     pub(crate) fn from_xml_and_inventory(xml: BlockheadXml, inventory: Inventory) -> Self {
         Self {
             obj: xml.obj,

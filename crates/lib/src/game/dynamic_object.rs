@@ -21,7 +21,7 @@ pub enum DynamicObjectError {
     },
     #[snafu(display("Invalid dynamic object type ID {id}"))]
     InvalidDynamicObjectTypeId {
-        id: u16,
+        id: u8,
         source: num_enum::TryFromPrimitiveError<DynamicObjectType>,
     },
     #[snafu(display("Failed to deserialize plist dictionary to {target_type}, dict: {dict:?}"))]
@@ -51,7 +51,7 @@ pub enum DynamicObjectError {
 type Result<T> = std::result::Result<T, DynamicObjectError>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, TryFromPrimitive, IntoStaticStr)]
-#[repr(u16)]
+#[repr(u8)]
 pub enum DynamicObjectType {
     AppleTree = 1,
     MapleTree = 2,
@@ -117,7 +117,7 @@ pub enum DynamicObjectType {
 
 impl DynamicObjectType {
     pub fn try_from_str(s: &str) -> Result<Self> {
-        let value: u16 = s.parse().with_context(|_| ParseObjTypeAsIntSnafu {
+        let value: u8 = s.parse().with_context(|_| ParseObjTypeAsIntSnafu {
             type_str: s.to_owned(),
         })?;
         Self::try_from(value).context(InvalidDynamicObjectTypeIdSnafu { id: value })

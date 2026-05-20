@@ -10,6 +10,7 @@ use the_blockheads_tools_lib::game::{
     coord::{BlockCoord, ChunkBlockCoord, ChunkCoord, CoordError},
     dynamic_object::{
         AnyDynamicObject, DynamicObjectType,
+        blockhead::Blockhead,
         chest::ChestType,
         craft::{Door, Torch, Window},
         workbench::WorkbenchType,
@@ -1126,8 +1127,27 @@ impl<V, I> MeshAggregator<V, I> {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum ObjectType {
+    DynamicObject(DynamicObjectType),
+    Blockhead,
+}
+
+impl ObjectType {
+    const BLOCKHEAD_ID: u8 = u8::MAX;
+}
+
+impl From<ObjectType> for u8 {
+    fn from(value: ObjectType) -> Self {
+        match value {
+            ObjectType::DynamicObject(obj_ty) => obj_ty as u8,
+            ObjectType::Blockhead => ObjectType::BLOCKHEAD_ID,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct DwChunkObjId {
-    pub obj_type: DynamicObjectType,
+    pub obj_type: ObjectType,
     pub index: usize,
 }
 
@@ -1145,8 +1165,14 @@ impl DwChunkObjId {
     const MAX_INDEX: usize = (1 << Self::MAX_INDEX_BITS); // valid range: 0..MAX_INDEX
     const INDEX_MASK: usize = Self::MAX_INDEX - 1;
 
-    fn obj_type_from_raw(raw_id: u32) -> Option<DynamicObjectType> {
-        DynamicObjectType::try_from((raw_id >> Self::MAX_INDEX_BITS) as u16).ok()
+    fn obj_type_from_raw(raw_id: u32) -> Option<ObjectType> {
+        let type_id = (raw_id >> Self::MAX_INDEX_BITS) as u8;
+        match type_id {
+            ObjectType::BLOCKHEAD_ID => Some(ObjectType::Blockhead),
+            _ => Some(ObjectType::DynamicObject(
+                DynamicObjectType::try_from(type_id).ok()?,
+            )),
+        }
     }
 
     fn index_from_raw(raw_id: u32) -> usize {
@@ -1158,16 +1184,28 @@ impl DwChunkObjId {
             .map(|obj_type| Self::new(obj_type, Self::index_from_raw(raw_id)))
     }
 
-    pub fn new(obj_type: DynamicObjectType, index: usize) -> Self {
+    pub fn new(obj_ty: ObjectType, index: usize) -> Self {
+        Self {
+            obj_type: obj_ty,
+            index,
+        }
+    }
+
+    pub fn from_dyn_obj(dyn_obj_ty: DynamicObjectType, index: usize) -> Self {
         if index > Self::INDEX_MASK {
             // should be very rare or nearly impossible to happen; should be warning
-            println!("index {} interferes with obj_type {:?}", index, obj_type);
+            println!("index {} interferes with obj_type {:?}", index, dyn_obj_ty);
         }
-        Self { obj_type, index }
+        Self::new(ObjectType::DynamicObject(dyn_obj_ty), index)
+    }
+
+    pub fn from_blockhead(index: usize) -> Self {
+        Self::new(ObjectType::Blockhead, index)
     }
 
     pub fn raw_id(&self) -> u32 {
-        (self.obj_type as u32) << Self::MAX_INDEX_BITS | self.index as u32
+        let obj_ty: u8 = self.obj_type.into();
+        (obj_ty as u32) << Self::MAX_INDEX_BITS | self.index as u32
     }
 }
 
@@ -1353,7 +1391,7 @@ impl DwChunkBuf {
             builder: &mut DwChunkBufBuilder,
         ) {
             for (index, obj) in i.enumerate() {
-                let id = DwChunkObjId::new(obj_type, index);
+                let id = DwChunkObjId::from_dyn_obj(obj_type, index);
                 builder.set_id(id);
 
                 // should report error, for now we just skip
@@ -1369,7 +1407,7 @@ impl DwChunkBuf {
             item_instances: Vec::with_capacity(need_capacity.items),
             faces_mesh_builder: MeshAggregator::with_capacity(need_capacity.quads),
             blocks: ChunkDwBlock::default(),
-            id: DwChunkObjId::new(DynamicObjectType::AppleTree, 0), // random id - won't be read.
+            id: DwChunkObjId::from_dyn_obj(DynamicObjectType::AppleTree, 0), // random id - won't be read.
             coord,
         };
 
@@ -1472,12 +1510,14 @@ impl DwChunkBuf {
 // Buffers storing all dynamic world objects
 pub struct DwBuf {
     chunks: HashMap<ChunkCoord, Option<DwChunkBuf>>,
+    blockhead_instances: Option<(wgpu::Buffer, u32)>,
 }
 
 impl DwBuf {
     pub fn new() -> Self {
         Self {
             chunks: HashMap::new(),
+            blockhead_instances: None,
         }
     }
 
@@ -1502,5 +1542,29 @@ impl DwBuf {
         let coord = coord.into();
         let buf = DwChunkBuf::from_chunk(chunk, coord, device);
         self.chunks.insert(coord, buf);
+    }
+
+    pub fn get_blockhead_instances(&self) -> Option<(wgpu::Buffer, u32)> {
+        self.blockhead_instances.clone()
+    }
+
+    pub fn set_blockheads(&mut self, device: &wgpu::Device, blockheads: &[Blockhead]) {
+        let blockhead_instances = blockheads
+            .iter()
+            .enumerate()
+            .map(|(i, blockhead)| {
+                DwItem::from_item_type(blockhead.float_pos, ItemType::Blockhead).instance(
+                    DwChunkObjId::from_blockhead(i),
+                    ChunkCoord::new(0, 0).expect("const coord must work"),
+                )
+            })
+            .collect::<Vec<_>>();
+        let instance_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Dynamic Object Icon Instance Buffer"),
+            contents: bytemuck::cast_slice(&blockhead_instances),
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+        });
+
+        self.blockhead_instances = Some((instance_buf, blockhead_instances.len() as u32));
     }
 }
