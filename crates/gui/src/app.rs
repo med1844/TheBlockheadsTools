@@ -189,7 +189,7 @@ pub struct EditorApp {
     dw_buf: DwBuf,
     camera: Camera,
 
-    show_info: bool,
+    show_settings: bool,
     fps_counter: FpsCounter,
 
     interaction_state: InteractionState,
@@ -238,7 +238,7 @@ impl EditorApp {
             dw_buf: DwBuf::new(),
             camera,
 
-            show_info: false,
+            show_settings: false,
             fps_counter: FpsCounter::new(2.0),
 
             interaction_state,
@@ -316,7 +316,7 @@ impl EditorApp {
 
     fn render_menu_bar(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
         egui::MenuBar::new().ui(ui, |ui| {
-            ui.toggle_value(&mut self.show_info, "Info");
+            ui.toggle_value(&mut self.show_settings, "Settings");
             ui.toggle_value(&mut self.render_settings.show_grid, "Grid");
             ui.separator();
             ui.menu_button("File", |ui| {
@@ -381,6 +381,24 @@ impl EditorApp {
                     }
                 }
             });
+            ui.separator();
+            ui.label("Viewport center:");
+            ui.add(
+                egui::DragValue::new(&mut self.camera.world_offset_mut().x)
+                    .speed(0.1)
+                    .prefix("X: "),
+            );
+            ui.add(
+                egui::DragValue::new(&mut self.camera.world_offset_mut().y)
+                    .speed(0.1)
+                    .prefix("Y: "),
+            );
+            ui.add(
+                egui::DragValue::new(&mut self.camera.world_offset_mut().z)
+                    .speed(0.1)
+                    .range(Camera::MAX_BLOCK_Z..=Camera::MAX_Z)
+                    .prefix("Dist: "),
+            );
         });
 
         if let Some(state) = frame.wgpu_render_state()
@@ -432,7 +450,7 @@ impl EditorApp {
         );
     }
 
-    fn render_side_panel(&mut self, ui: &mut egui::Ui) {
+    fn render_settings_window(&mut self, ui: &mut egui::Ui) {
         ui.label(format!("fps: {:.1}", self.fps_counter.fps()));
         ui.separator();
         ui.add(
@@ -483,23 +501,6 @@ impl EditorApp {
                 .text("Min Depth Factor"),
         );
 
-        ui.separator();
-        ui.add(
-            egui::DragValue::new(&mut self.camera.world_offset_mut().x)
-                .speed(0.1)
-                .prefix("Viewport Center X: "),
-        );
-        ui.add(
-            egui::DragValue::new(&mut self.camera.world_offset_mut().y)
-                .speed(0.1)
-                .prefix("Viewport Center Y: "),
-        );
-        ui.add(
-            egui::DragValue::new(&mut self.camera.world_offset_mut().z)
-                .speed(0.1)
-                .range(Camera::MAX_BLOCK_Z..=Camera::MAX_Z)
-                .prefix("Distance: "),
-        );
         if let Some(selected_chunk) = self.interaction_state.selected_block_chunk.as_ref()
             && let Some(InteractionTarget::Block(selected_block_coord)) =
                 self.interaction_state.select
@@ -931,11 +932,13 @@ impl eframe::App for EditorApp {
             self.render_menu_bar(ui, frame);
         });
 
-        egui::SidePanel::left("Info")
-            .resizable(false)
-            .show_animated(ctx, self.show_info, |ui| {
-                self.render_side_panel(ui);
+        let mut show_settings = self.show_settings;
+        egui::Window::new("Settings")
+            .open(&mut show_settings)
+            .show(ctx, |ui| {
+                self.render_settings_window(ui);
             });
+        self.show_settings = show_settings;
 
         egui::CentralPanel::default()
             .frame(egui::Frame::default().inner_margin(0.0))
