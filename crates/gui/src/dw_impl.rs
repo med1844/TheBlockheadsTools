@@ -1975,6 +1975,7 @@ impl ToGrid for Item {
             }
             Err(e) => {
                 ui.weak(e.to_string());
+                ui.end_row();
             }
         }
         self.data_a.add_row("dataA", ui);
