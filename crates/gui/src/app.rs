@@ -784,18 +784,20 @@ impl EditorApp {
                 title: &str,
                 t: Option<&mut T>,
                 ctx: (&egui::Context, DwUiContext),
-            ) -> ObjFlags {
+            ) -> (ObjFlags, bool) {
                 let (egui_ctx, mut context) = ctx;
+                let mut open = true;
                 if let Some(t) = t {
                     egui::Window::new(title)
                         .id("selected_dynamic_obj_info".into())
+                        .open(&mut open)
                         .show(egui_ctx, |ui| {
                             egui::ScrollArea::both().show(ui, |ui| {
                                 t.info(ui, &mut context);
                             });
                         });
                 }
-                context.flags
+                (context.flags, open)
             }
 
             let context = DwUiContext::new(
@@ -805,7 +807,7 @@ impl EditorApp {
             );
             let ctx = (egui_ctx, context);
             let title: &'static str = id.obj_type.into();
-            let flags = match id.obj_type {
+            let (flags, open) = match id.obj_type {
                 AppleTree => draw_window(title, dw_chunk.apple_tree.get_mut(id.index), ctx),
                 MapleTree => draw_window(title, dw_chunk.maple_tree.get_mut(id.index), ctx),
                 MangoTree => draw_window(title, dw_chunk.mango_tree.get_mut(id.index), ctx),
@@ -868,8 +870,11 @@ impl EditorApp {
                 TomatoPlant => draw_window(title, dw_chunk.tomato_plant.get_mut(id.index), ctx),
                 // Yak => {}
                 // Mirror => {}
-                _ => ObjFlags::default(),
+                _ => (ObjFlags::default(), true),
             };
+            if !open {
+                self.interaction_state.select = None;
+            }
             if let Some(state) = frame.wgpu_render_state() {
                 // handle obj move & dst chunk re-render
                 match flags {
