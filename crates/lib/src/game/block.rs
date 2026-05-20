@@ -4,13 +4,13 @@ use strum::{Display, IntoStaticStr};
 
 #[derive(Debug, Snafu)]
 pub enum BlockError {
-    #[snafu(display("Invalid block type ID {id}"))]
-    InvalidBlockTypeId {
+    #[snafu(display("Unknown block type ID {id}"))]
+    UnknownBlockTypeId {
         id: u8,
         source: num_enum::TryFromPrimitiveError<BlockType>,
     },
-    #[snafu(display("Invalid block content type ID {id}"))]
-    InvalidBlockContentTypeId {
+    #[snafu(display("Unknown block content type ID {id}"))]
+    UnknownBlockContentTypeId {
         id: u8,
         source: num_enum::TryFromPrimitiveError<BlockContentType>,
     },
@@ -86,7 +86,7 @@ pub enum BlockType {
     TradePortalBaseEmerald = 63,
     TradePortalBaseRuby = 64,
     TradePortalBaseDiamond = 65,
-    // PlatinumBlock = 67,
+    PlatinumBlock = 67,
     TitaniumBlock = 68,
     CarbonFiberBlock = 69,
     Gravel = 70,
@@ -191,6 +191,12 @@ pub enum BlockContentType {
     DiamondTreeTrunkLeaf = 123,
 }
 
+impl From<BlockContentType> for u8 {
+    fn from(value: BlockContentType) -> Self {
+        value as u8
+    }
+}
+
 impl BlockContentType {
     pub fn as_str(&self) -> &'static str {
         self.into()
@@ -222,15 +228,15 @@ pub trait Block {
 
     fn fg(&self) -> Result<BlockType> {
         let raw = self.fg_raw();
-        BlockType::try_from(raw).context(InvalidBlockTypeIdSnafu { id: raw })
+        BlockType::try_from(raw).context(UnknownBlockTypeIdSnafu { id: raw })
     }
     fn bg(&self) -> Result<BlockType> {
         let raw = self.bg_raw();
-        BlockType::try_from(raw).context(InvalidBlockTypeIdSnafu { id: raw })
+        BlockType::try_from(raw).context(UnknownBlockTypeIdSnafu { id: raw })
     }
     fn content(&self) -> Result<BlockContentType> {
         let raw = self.content_raw();
-        BlockContentType::try_from(raw).context(InvalidBlockContentTypeIdSnafu { id: raw })
+        BlockContentType::try_from(raw).context(UnknownBlockContentTypeIdSnafu { id: raw })
     }
     fn height(&self) -> u8 {
         self.as_bytes()[HEIGHT]
@@ -251,23 +257,44 @@ pub trait BlockMut {
     fn as_mut_bytes(&mut self) -> &mut [u8; 64];
 
     // provided
+    fn fg_raw_mut(&mut self) -> &mut u8 {
+        &mut self.as_mut_bytes()[FG]
+    }
     fn set_fg<I: Into<u8>>(&mut self, value: I) {
         self.as_mut_bytes()[FG] = value.into();
+    }
+    fn bg_raw_mut(&mut self) -> &mut u8 {
+        &mut self.as_mut_bytes()[BG]
     }
     fn set_bg<I: Into<u8>>(&mut self, value: I) {
         self.as_mut_bytes()[BG] = value.into();
     }
+    fn content_raw_mut(&mut self) -> &mut u8 {
+        &mut self.as_mut_bytes()[CONTENT]
+    }
     fn set_content<I: Into<u8>>(&mut self, value: I) {
         self.as_mut_bytes()[CONTENT] = value.into();
+    }
+    fn height_mut(&mut self) -> &mut u8 {
+        &mut self.as_mut_bytes()[HEIGHT]
     }
     fn set_height(&mut self, value: u8) {
         self.as_mut_bytes()[HEIGHT] = value;
     }
+    fn damage_mut(&mut self) -> &mut u8 {
+        &mut self.as_mut_bytes()[DAMAGE]
+    }
     fn set_damage(&mut self, value: u8) {
         self.as_mut_bytes()[DAMAGE] = value;
     }
+    fn visibility_mut(&mut self) -> &mut u8 {
+        &mut self.as_mut_bytes()[VISIBILITY]
+    }
     fn set_visibility(&mut self, value: u8) {
         self.as_mut_bytes()[VISIBILITY] = value;
+    }
+    fn brightness_mut(&mut self) -> &mut u8 {
+        &mut self.as_mut_bytes()[BRIGHTNESS]
     }
     fn set_brightness(&mut self, value: u8) {
         self.as_mut_bytes()[BRIGHTNESS] = value;

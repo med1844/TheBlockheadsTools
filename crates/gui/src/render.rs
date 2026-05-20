@@ -700,54 +700,21 @@ impl egui_wgpu::CallbackTrait for Render3dCallback {
     }
 }
 
-pub struct ItemSelectorCallback {
-    pub hovered_index: Option<u32>,
-    pub selected_index: u32,
-    /// Viewport in grid-pixel space: origin = scroll offset, size = visible area.
-    pub viewport: egui::Rect,
-    pub pixels_per_point: f32,
-}
-
-impl egui_wgpu::CallbackTrait for ItemSelectorCallback {
-    fn prepare(
-        &self,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        _screen_descriptor: &egui_wgpu::ScreenDescriptor,
-        _egui_encoder: &mut wgpu::CommandEncoder,
-        callback_resources: &mut egui_wgpu::CallbackResources,
-    ) -> Vec<wgpu::CommandBuffer> {
-        let r: &mut RenderResources = callback_resources.get_mut().unwrap();
-        r.item_grid.prepare(
-            device,
-            queue,
-            self.hovered_index,
-            Some(self.selected_index),
-            self.viewport,
-            self.pixels_per_point,
-            None,
-        );
-        Vec::new()
-    }
-
-    fn paint(
-        &self,
-        _info: egui::PaintCallbackInfo,
-        render_pass: &mut wgpu::RenderPass<'static>,
-        callback_resources: &egui_wgpu::CallbackResources,
-    ) {
-        let r: &RenderResources = callback_resources.get().unwrap();
-        r.item_grid.render(render_pass, None);
-    }
+pub enum ItemGridInstances {
+    Items,
+    Custom {
+        instances: Vec<DwItemInstanceRaw>, // we are doing malloc per frame :(
+    },
 }
 
 pub struct ItemGridCallback {
     pub hovered_index: Option<u32>,
     pub selected_index: Option<u32>,
+    /// Viewport in grid-pixel space: origin = scroll offset, size = visible area.
     pub viewport: egui::Rect,
     pub pixels_per_point: f32,
-    pub instances: Vec<DwItemInstanceRaw>, // we are doing malloc per frame :(
     pub id: egui::Id,
+    pub instances: ItemGridInstances,
 }
 
 impl egui_wgpu::CallbackTrait for ItemGridCallback {
@@ -767,7 +734,8 @@ impl egui_wgpu::CallbackTrait for ItemGridCallback {
             self.selected_index,
             self.viewport,
             self.pixels_per_point,
-            Some((self.id, &self.instances)),
+            self.id,
+            &self.instances,
         );
         Vec::new()
     }
@@ -778,6 +746,6 @@ impl egui_wgpu::CallbackTrait for ItemGridCallback {
         callback_resources: &egui_wgpu::CallbackResources,
     ) {
         let r: &RenderResources = callback_resources.get().unwrap();
-        r.item_grid.render(render_pass, Some(&self.id));
+        r.item_grid.render(render_pass, &self.id, &self.instances);
     }
 }

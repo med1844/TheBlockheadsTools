@@ -1,5 +1,5 @@
 use super::{
-    dw_impl::{DwUiContext, InfoUi, ObjFlags},
+    dw_impl::{DwUiContext, InfoUi, ObjFlags, block_content_type_drop_menu, block_type_drop_menu},
     fps_counter::FpsCounter,
     gpu::{
         Camera, GpuCoord, RenderSettings,
@@ -20,7 +20,7 @@ use std::sync::{Arc, Mutex};
 use the_blockheads_tools_lib::{
     self as lib, DynArch,
     game::{
-        block::{Block, BlockView},
+        block::{Block, BlockMut, BlockViewMut},
         chunk::{Chunk, Chunks},
         coord::{BlockCoord, ChunkCoord},
         db::world_db::{WorldDb, WorldDbError},
@@ -442,36 +442,82 @@ impl EditorApp {
         }
     }
 
-    fn render_selected_block_info(ui: &mut egui::Ui, block: BlockView<'_>) {
-        let add_row = |ui: &mut egui::Ui, key: &str, value: &str| {
-            ui.label(key);
-            ui.label(egui::RichText::new(value).family(egui::FontFamily::Monospace));
-            ui.end_row();
-        };
-        add_row(
-            ui,
-            "Foreground",
-            &block.fg().map_or_else(
-                |_| block.fg_raw().to_string(),
-                |block_type| block_type.as_str().to_string(),
-            ),
-        );
-        add_row(
-            ui,
-            "Background",
-            &block.bg().map_or_else(
-                |_| block.bg_raw().to_string(),
-                |block_type| block_type.as_str().to_string(),
-            ),
-        );
-        add_row(
-            ui,
-            "Content",
-            &block.content().map_or_else(
-                |_| block.content_raw().to_string(),
-                |content_type| content_type.as_str().to_string(),
-            ),
-        );
+    fn render_selected_block_info(ui: &mut egui::Ui, mut block: BlockViewMut<'_>) -> bool {
+        let mut update_voxel = false;
+        ui.label("foreground");
+        ui.push_id("fg", |ui| {
+            update_voxel |= ui.add(egui::DragValue::new(block.fg_raw_mut())).changed();
+            match block.fg() {
+                Ok(mut fg_type) => {
+                    if block_type_drop_menu(ui, &mut fg_type).changed() {
+                        block.set_fg(fg_type);
+                        update_voxel = true;
+                    }
+                }
+                Err(e) => {
+                    ui.weak(e.to_string());
+                }
+            };
+        });
+        ui.end_row();
+
+        ui.label("background");
+        ui.push_id("bg", |ui| {
+            update_voxel |= ui.add(egui::DragValue::new(block.bg_raw_mut())).changed();
+            match block.bg() {
+                Ok(mut bg_type) => {
+                    if block_type_drop_menu(ui, &mut bg_type).changed() {
+                        block.set_bg(bg_type);
+                        update_voxel = true;
+                    }
+                }
+                Err(e) => {
+                    ui.weak(e.to_string());
+                }
+            };
+        });
+        ui.end_row();
+
+        ui.label("content");
+        ui.push_id("ct", |ui| {
+            update_voxel |= ui
+                .add(egui::DragValue::new(block.content_raw_mut()))
+                .changed();
+            match block.content() {
+                Ok(mut content_type) => {
+                    if block_content_type_drop_menu(ui, &mut content_type).changed() {
+                        block.set_content(content_type);
+                        update_voxel = true;
+                    }
+                }
+                Err(e) => {
+                    ui.weak(e.to_string());
+                }
+            };
+        });
+        ui.end_row();
+
+        ui.label("height")
+            .on_hover_text("The height of water/snow; not rendered here");
+        ui.add(egui::DragValue::new(block.height_mut()));
+        ui.end_row();
+
+        ui.label("damage")
+            .on_hover_text("The gathering progress value");
+        ui.add(egui::DragValue::new(block.damage_mut()));
+        ui.end_row();
+
+        ui.label("visibility")
+            .on_hover_text("The black fog that covers the undiscovered area");
+        ui.add(egui::DragValue::new(block.visibility_mut()));
+        ui.end_row();
+
+        ui.label("brightness")
+            .on_hover_text("Blocks in cave have near-zero brightness");
+        ui.add(egui::DragValue::new(block.brightness_mut()));
+        ui.end_row();
+
+        update_voxel
     }
 
     fn render_settings_window(&mut self, ui: &mut egui::Ui) {
@@ -773,18 +819,25 @@ impl EditorApp {
         }
     }
 
-    fn render_selected_block_info_window(&mut self, egui_ctx: &egui::Context) {
+    fn render_selected_block_info_window(
+        &mut self,
+        egui_ctx: &egui::Context,
+        frame: &mut eframe::Frame,
+    ) {
+        let mut open = true;
         if let Some((chunk_coord, selected_chunk)) =
-            self.interaction_state.selected_block_chunk.as_ref()
+            self.interaction_state.selected_block_chunk.as_mut()
             && let Some(InteractionTarget::Block(selected_block_coord)) =
                 self.interaction_state.select
         {
-            let mut open = true;
-            egui::Window::new(format!("Selected Block in Chunk {}", *chunk_coord))
+            let chunk_coord = *chunk_coord;
+            let mut update_voxel = false;
+            egui::Window::new(format!("Selected Block in Chunk {}", chunk_coord))
                 .id("selected_dynamic_obj_info".into())
                 .open(&mut open)
                 .show(egui_ctx, |ui| {
-                    let block = selected_chunk.view().block_at(selected_block_coord);
+                    let mut chunk_view_mut = selected_chunk.view_mut();
+                    let block_view_mut = chunk_view_mut.block_at_mut(selected_block_coord);
                     ui.separator();
                     ui.heading(format!(
                         "Block {}, {}",
@@ -796,13 +849,21 @@ impl EditorApp {
                         .spacing([40.0, 4.0])
                         .striped(true)
                         .show(ui, |ui| {
-                            Self::render_selected_block_info(ui, block);
+                            update_voxel = Self::render_selected_block_info(ui, block_view_mut);
                         });
                 });
-            if !open {
-                self.interaction_state
-                    .set_select(None, self.world_db.as_mut());
+            if update_voxel && let Some(state) = frame.wgpu_render_state() {
+                let read_renderer = state.renderer.read();
+                let r = read_renderer
+                    .callback_resources
+                    .get::<RenderResources>()
+                    .expect("should have render resources");
+                voxel_util::set_chunk(&state.queue, r.voxel_buf(), chunk_coord, selected_chunk);
             }
+        }
+        if !open {
+            self.interaction_state
+                .set_select(None, self.world_db.as_mut());
         }
     }
 
@@ -984,7 +1045,7 @@ impl eframe::App for EditorApp {
             });
 
         self.render_error_windows(ctx);
-        self.render_selected_block_info_window(ctx);
+        self.render_selected_block_info_window(ctx, frame);
         self.render_selected_dyn_obj_info_window(ctx, frame);
     }
 }

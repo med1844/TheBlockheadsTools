@@ -10,8 +10,8 @@ use super::{
     },
     image_type::ImageType,
     render::{
-        ItemGridCallback, ItemSelectorCallback,
-        item_grid::{COL_PX, ROW_PX, SELECTOR_COLS, SELECTOR_ROWS, SELECTOR_SIZE},
+        ItemGridCallback, ItemGridInstances,
+        item_grid::{COL_PX, ITEM_SELECTOR_COLS, ITEM_SELECTOR_ROWS, ITEM_SELECTOR_SIZE, ROW_PX},
     },
 };
 use eframe::{egui, egui_wgpu};
@@ -22,6 +22,7 @@ use std::{
 };
 use strum::IntoEnumIterator;
 use the_blockheads_tools_lib::game::{
+    block::{BlockContentType, BlockType},
     coord::BlockCoord,
     dynamic_object::{
         AnyDynamicObject, ArtificialLight, DynamicObject, InteractionObject, InteractionObjectType,
@@ -824,8 +825,8 @@ impl ToRow for ItemType {
                 .id(window_id)
                 .open(&mut keep_open)
                 .resizable(true)
-                .default_width(SELECTOR_SIZE.x)
-                .default_height(SELECTOR_SIZE.y + 17.65625) // default label height is 14.65625, spacing is 3
+                .default_width(ITEM_SELECTOR_SIZE.x)
+                .default_height(ITEM_SELECTOR_SIZE.y + 17.65625) // default label height is 14.65625, spacing is 3
                 .show(ui.ctx(), |ui| {
                     // ui.available_size() will return all space available within the window.
                     // It won't save space for ui.label if we put it after the gpu-rendered part.
@@ -856,7 +857,7 @@ impl ToRow for ItemType {
                         .height();
 
                     let (rect, response) = ui.allocate_exact_size(
-                        ui.available_size().min(SELECTOR_SIZE),
+                        ui.available_size().min(ITEM_SELECTOR_SIZE),
                         egui::Sense::all(),
                     );
                     let rect = rect.intersect(ui.ctx().content_rect());
@@ -867,10 +868,10 @@ impl ToRow for ItemType {
                     } = handle_item_grid_drag(
                         ui,
                         scroll_id,
-                        SELECTOR_SIZE,
+                        ITEM_SELECTOR_SIZE,
                         rect,
-                        SELECTOR_COLS as usize,
-                        SELECTOR_ROWS as usize,
+                        ITEM_SELECTOR_COLS as usize,
+                        ITEM_SELECTOR_ROWS as usize,
                         &response,
                     );
                     ui.data_mut(|d| d.insert_temp(hovered_idx_id, hovered_idx));
@@ -886,11 +887,13 @@ impl ToRow for ItemType {
 
                     ui.painter().add(egui_wgpu::Callback::new_paint_callback(
                         rect,
-                        ItemSelectorCallback {
+                        ItemGridCallback {
                             hovered_index: hovered_idx.map(|i| i as u32),
-                            selected_index: self.to_idx() as u32,
+                            selected_index: Some(self.to_idx() as u32),
                             viewport,
                             pixels_per_point: ui.pixels_per_point(),
+                            id: ui.id(),
+                            instances: ItemGridInstances::Items,
                         },
                     ));
 
@@ -2011,8 +2014,8 @@ impl ToGrid for Item {
                         selected_index: selected_idx.map(|i| i as u32),
                         viewport,
                         pixels_per_point: ui.pixels_per_point(),
-                        instances,
                         id: ui.id(),
+                        instances: ItemGridInstances::Custom { instances },
                     },
                 ));
 
@@ -2208,8 +2211,8 @@ impl ToGrid for Chest {
                         selected_index: selected_idx.map(|i| i as u32),
                         viewport,
                         pixels_per_point: ui.pixels_per_point(),
-                        instances,
                         id: ui.id(),
+                        instances: ItemGridInstances::Custom { instances },
                     },
                 ));
 
@@ -2689,3 +2692,211 @@ impl BuildDwMesh for TomatoPlant {
         Ok(())
     }
 }
+
+pub(crate) fn block_type_drop_menu(ui: &mut egui::Ui, b: &mut BlockType) -> egui::Response {
+    use BlockType::*;
+    wrap_combo_box_resp(
+        egui::ComboBox::from_id_salt(ui.id().with("block_type_combo_box"))
+            .selected_text(format!("{:?}", b))
+            .show_ui(ui, |ui| {
+                ui.selectable_value(b, Stone, "Stone")
+                    | ui.selectable_value(b, Air, "Air")
+                    | ui.selectable_value(b, Water, "Water")
+                    | ui.selectable_value(b, Ice, "Ice")
+                    | ui.selectable_value(b, Snow, "Snow")
+                    | ui.selectable_value(b, Dirt, "Dirt")
+                    | ui.selectable_value(b, DesertSand, "DesertSand")
+                    | ui.selectable_value(b, BeachSand, "BeachSand")
+                    | ui.selectable_value(b, Wood, "Wood")
+                    | ui.selectable_value(b, MinedStone, "MinedStone")
+                    | ui.selectable_value(b, RedBrick, "RedBrick")
+                    | ui.selectable_value(b, Limestone, "Limestone")
+                    | ui.selectable_value(b, MinedLimestone, "MinedLimestone")
+                    | ui.selectable_value(b, Marble, "Marble")
+                    | ui.selectable_value(b, MinedMarble, "MinedMarble")
+                    | ui.selectable_value(b, TimeCrystal, "TimeCrystal")
+                    | ui.selectable_value(b, SandStone, "SandStone")
+                    | ui.selectable_value(b, MinedSandStone, "MinedSandStone")
+                    | ui.selectable_value(b, RedMarble, "RedMarble")
+                    | ui.selectable_value(b, MinedRedMarble, "MinedRedMarble")
+                    | ui.selectable_value(b, Glass, "Glass")
+                    | ui.selectable_value(b, SpawnPortalBase, "SpawnPortalBase")
+                    | ui.selectable_value(b, GoldBlock, "GoldBlock")
+                    | ui.selectable_value(b, GrassDirt, "GrassDirt")
+                    | ui.selectable_value(b, SnowDirt, "SnowDirt")
+                    | ui.selectable_value(b, LapisLazuli, "LapisLazuli")
+                    | ui.selectable_value(b, MinedLapisLazuli, "MinedLapisLazuli")
+                    | ui.selectable_value(b, Lava, "Lava")
+                    | ui.selectable_value(b, ReinforcedPlatform, "ReinforcedPlatform")
+                    | ui.selectable_value(b, SpawnPortalBaseAmethyst, "SpawnPortalBaseAmethyst")
+                    | ui.selectable_value(b, SpawnPortalBaseSapphire, "SpawnPortalBaseSapphire")
+                    | ui.selectable_value(b, SpawnPortalBaseEmerald, "SpawnPortalBaseEmerald")
+                    | ui.selectable_value(b, SpawnPortalBaseRuby, "SpawnPortalBaseRuby")
+                    | ui.selectable_value(b, SpawnPortalBaseDiamond, "SpawnPortalBaseDiamond")
+                    | ui.selectable_value(b, NorthPole, "NorthPole")
+                    | ui.selectable_value(b, SouthPole, "SouthPole")
+                    | ui.selectable_value(b, WestPole, "WestPole")
+                    | ui.selectable_value(b, EastPole, "EastPole")
+                    | ui.selectable_value(b, PortalBase, "PortalBase")
+                    | ui.selectable_value(b, PortalBaseAmethyst, "PortalBaseAmethyst")
+                    | ui.selectable_value(b, PortalBaseSapphire, "PortalBaseSapphire")
+                    | ui.selectable_value(b, PortalBaseEmerald, "PortalBaseEmerald")
+                    | ui.selectable_value(b, PortalBaseRuby, "PortalBaseRuby")
+                    | ui.selectable_value(b, PortalBaseDiamond, "PortalBaseDiamond")
+                    | ui.selectable_value(b, Compost, "Compost")
+                    | ui.selectable_value(b, GrassCompost, "GrassCompost")
+                    | ui.selectable_value(b, SnowCompost, "SnowCompost")
+                    | ui.selectable_value(b, Basalt, "Basalt")
+                    | ui.selectable_value(b, MinedBasalt, "MinedBasalt")
+                    | ui.selectable_value(b, CopperBlock, "CopperBlock")
+                    | ui.selectable_value(b, TinBlock, "TinBlock")
+                    | ui.selectable_value(b, BronzeBlock, "BronzeBlock")
+                    | ui.selectable_value(b, IronBlock, "IronBlock")
+                    | ui.selectable_value(b, SteelBlock, "SteelBlock")
+                    | ui.selectable_value(b, BlackSand, "BlackSand")
+                    | ui.selectable_value(b, BlackGlass, "BlackGlass")
+                    | ui.selectable_value(b, TradePortalBase, "TradePortalBase")
+                    | ui.selectable_value(b, TradePortalBaseAmethyst, "TradePortalBaseAmethyst")
+                    | ui.selectable_value(b, TradePortalBaseSapphire, "TradePortalBaseSapphire")
+                    | ui.selectable_value(b, TradePortalBaseEmerald, "TradePortalBaseEmerald")
+                    | ui.selectable_value(b, TradePortalBaseRuby, "TradePortalBaseRuby")
+                    | ui.selectable_value(b, TradePortalBaseDiamond, "TradePortalBaseDiamond")
+                    | ui.selectable_value(b, PlatinumBlock, "PlatinumBlock")
+                    | ui.selectable_value(b, TitaniumBlock, "TitaniumBlock")
+                    | ui.selectable_value(b, CarbonFiberBlock, "CarbonFiberBlock")
+                    | ui.selectable_value(b, Gravel, "Gravel")
+                    | ui.selectable_value(b, AmethystBlock, "AmethystBlock")
+                    | ui.selectable_value(b, SapphireBlock, "SapphireBlock")
+                    | ui.selectable_value(b, EmeraldBlock, "EmeraldBlock")
+                    | ui.selectable_value(b, RubyBlock, "RubyBlock")
+                    | ui.selectable_value(b, DiamondBlock, "DiamondBlock")
+                    | ui.selectable_value(b, Plaster, "Plaster")
+                    | ui.selectable_value(b, LuminousPlaster, "LuminousPlaster")
+            }),
+    )
+}
+
+pub(crate) fn block_content_type_drop_menu(
+    ui: &mut egui::Ui,
+    b: &mut BlockContentType,
+) -> egui::Response {
+    use BlockContentType::*;
+    wrap_combo_box_resp(
+        egui::ComboBox::from_id_salt(ui.id().with("block_content_type_combo_box"))
+            .selected_text(format!("{:?}", b))
+            .show_ui(ui, |ui| {
+                ui.selectable_value(b, Nothing, "Nothing")
+                    | ui.selectable_value(b, Flint, "Flint")
+                    | ui.selectable_value(b, Clay, "Clay")
+                    | ui.selectable_value(b, AppleTreeLeaf, "AppleTreeLeaf")
+                    | ui.selectable_value(b, AppleTreeTrunk, "AppleTreeTrunk")
+                    | ui.selectable_value(b, AppleTreeTrunkLeaf, "AppleTreeTrunkLeaf")
+                    | ui.selectable_value(b, PineTreeLeaf, "PineTreeLeaf")
+                    | ui.selectable_value(b, PineTreeTrunk, "PineTreeTrunk")
+                    | ui.selectable_value(b, PineTreeTrunkLeaf, "PineTreeTrunkLeaf")
+                    | ui.selectable_value(b, MapleTreeLeaf, "MapleTreeLeaf")
+                    | ui.selectable_value(b, MapleTreeTrunk, "MapleTreeTrunk")
+                    | ui.selectable_value(b, MapleTreeTrunkLeaf, "MapleTreeTrunkLeaf")
+                    | ui.selectable_value(b, MangoTreeLeaf, "MangoTreeLeaf")
+                    | ui.selectable_value(b, MangoTreeTrunk, "MangoTreeTrunk")
+                    | ui.selectable_value(b, MangoTreeTrunkLeaf, "MangoTreeTrunkLeaf")
+                    | ui.selectable_value(b, CoconutTreeLeaf, "CoconutTreeLeaf")
+                    | ui.selectable_value(b, CoconutTreeTrunk, "CoconutTreeTrunk")
+                    | ui.selectable_value(b, OrangeTreeLeaf, "OrangeTreeLeaf")
+                    | ui.selectable_value(b, OrangeTreeTrunk, "OrangeTreeTrunk")
+                    | ui.selectable_value(b, OrangeTreeTrunkLeaf, "OrangeTreeTrunkLeaf")
+                    | ui.selectable_value(b, CherryTreeLeaf, "CherryTreeLeaf")
+                    | ui.selectable_value(b, CherryTreeTrunk, "CherryTreeTrunk")
+                    | ui.selectable_value(b, CherryTreeTrunkLeaf, "CherryTreeTrunkLeaf")
+                    | ui.selectable_value(b, CoffeeTreeLeaf, "CoffeeTreeLeaf")
+                    | ui.selectable_value(b, CoffeeTreeTrunk, "CoffeeTreeTrunk")
+                    | ui.selectable_value(b, CoffeeTreeTrunkLeaf, "CoffeeTreeTrunkLeaf")
+                    | ui.selectable_value(b, DeadPineTreeTrunk, "DeadPineTreeTrunk")
+                    | ui.selectable_value(b, DeadPineTreeLeaf, "DeadPineTreeLeaf")
+                    | ui.selectable_value(b, DeadOrangeTreeLeaf, "DeadOrangeTreeLeaf")
+                    | ui.selectable_value(b, DeadOrangeTreeTrunk, "DeadOrangeTreeTrunk")
+                    | ui.selectable_value(b, DeadCherryTreeLeaf, "DeadCherryTreeLeaf")
+                    | ui.selectable_value(b, DeadCherryTreeTrunk, "DeadCherryTreeTrunk")
+                    | ui.selectable_value(b, Cactus, "Cactus")
+                    | ui.selectable_value(b, DeadCactus, "DeadCactus")
+                    | ui.selectable_value(b, Workbench, "Workbench")
+                    | ui.selectable_value(b, WorkbenchSprite, "WorkbenchSprite")
+                    | ui.selectable_value(b, Sprite, "Sprite")
+                    | ui.selectable_value(b, CopperOre, "CopperOre")
+                    | ui.selectable_value(b, TinOre, "TinOre")
+                    | ui.selectable_value(b, IronOre, "IronOre")
+                    | ui.selectable_value(b, Oil, "Oil")
+                    | ui.selectable_value(b, Coal, "Coal")
+                    | ui.selectable_value(b, GoldNuggets, "GoldNuggets")
+                    | ui.selectable_value(b, LimeTreeLeaf, "LimeTreeLeaf")
+                    | ui.selectable_value(b, LimeTreeTrunk, "LimeTreeTrunk")
+                    | ui.selectable_value(b, LimeTreeTrunkLeaf, "LimeTreeTrunkLeaf")
+                    | ui.selectable_value(b, DeadLimeTreeLeaf, "DeadLimeTreeLeaf")
+                    | ui.selectable_value(b, DeadLimeTreeTrunk, "DeadLimeTreeTrunk")
+                    | ui.selectable_value(b, GoldChest, "GoldChest")
+                    | ui.selectable_value(b, PlatinumOre, "PlatinumOre")
+                    | ui.selectable_value(b, TitaniumOre, "TitaniumOre")
+                    | ui.selectable_value(b, AmethystTreeTrunk, "AmethystTreeTrunk")
+                    | ui.selectable_value(b, AmethystTreeLeaf, "AmethystTreeLeaf")
+                    | ui.selectable_value(b, AmethystTreeTrunkLeaf, "AmethystTreeTrunkLeaf")
+                    | ui.selectable_value(b, SapphireTreeTrunk, "SapphireTreeTrunk")
+                    | ui.selectable_value(b, SapphireTreeLeaf, "SapphireTreeLeaf")
+                    | ui.selectable_value(b, SapphireTreeTrunkLeaf, "SapphireTreeTrunkLeaf")
+                    | ui.selectable_value(b, EmeraldTreeTrunk, "EmeraldTreeTrunk")
+                    | ui.selectable_value(b, EmeraldTreeLeaf, "EmeraldTreeLeaf")
+                    | ui.selectable_value(b, EmeraldTreeTrunkLeaf, "EmeraldTreeTrunkLeaf")
+                    | ui.selectable_value(b, RubyTreeTrunk, "RubyTreeTrunk")
+                    | ui.selectable_value(b, RubyTreeLeaf, "RubyTreeLeaf")
+                    | ui.selectable_value(b, RubyTreeTrunkLeaf, "RubyTreeTrunkLeaf")
+                    | ui.selectable_value(b, DiamondTreeTrunk, "DiamondTreeTrunk")
+                    | ui.selectable_value(b, DiamondTreeLeaf, "DiamondTreeLeaf")
+                    | ui.selectable_value(b, DiamondTreeTrunkLeaf, "DiamondTreeTrunkLeaf")
+            }),
+    )
+}
+
+// impl<'v> ToGrid for BlockViewMut<'v> {
+//     fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut DwUiContext) {
+//         ui.label("foreground");
+//         ui.add(egui::DragValue::new(self.fg_raw_mut()));
+//         match self.fg() {
+//             Ok(mut fg_type) => {
+//                 if block_type_drop_menu(ui, &mut fg_type).changed() {
+//                     self.set_fg(fg_type);
+//                 }
+//             }
+//             Err(e) => {
+//                 ui.weak(e.to_string());
+//             }
+//         };
+//         ui.end_row();
+
+//         ui.label("background");
+//         ui.add(egui::DragValue::new(self.bg_raw_mut()));
+//         match self.bg() {
+//             Ok(mut bg_type) => {
+//                 if block_type_drop_menu(ui, &mut bg_type).changed() {
+//                     self.set_bg(bg_type);
+//                 }
+//             }
+//             Err(e) => {
+//                 ui.weak(e.to_string());
+//             }
+//         };
+//         ui.end_row();
+
+//         ui.label("content");
+//         ui.add(egui::DragValue::new(self.content_raw_mut()));
+//         match self.content() {
+//             Ok(mut content_type) => {
+//                 if block_content_type_drop_menu(ui, &mut content_type).changed() {
+//                     self.set_content(content_type);
+//                 }
+//             }
+//             Err(e) => {
+//                 ui.weak(e.to_string());
+//             }
+//         };
+//         ui.end_row();
+//     }
+// }

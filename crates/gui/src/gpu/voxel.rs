@@ -147,7 +147,7 @@ pub enum VoxelType {
 }
 
 impl VoxelType {
-    pub const MAX_VALUE: u16 = 187;
+    pub const MAX_VALUE: u16 = 138;
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -626,7 +626,6 @@ pub mod voxel_util {
         queue.write_buffer(voxel_buffer, 0, bytemuck::cast_slice(&world_voxel));
     }
 
-    #[allow(dead_code)] // will be used once we support edit modes
     pub fn set_chunk<I: Into<ChunkCoord>>(
         queue: &wgpu::Queue,
         voxel_buffer: &wgpu::Buffer,

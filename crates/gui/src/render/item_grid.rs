@@ -1,6 +1,6 @@
 use super::{
     super::gpu::dw::{DwItem, DwItemInstanceRaw},
-    DwIconVertex, Texture,
+    DwIconVertex, ItemGridInstances, Texture,
 };
 use eframe::{
     egui,
@@ -14,11 +14,12 @@ const SCALE: f32 = 2.0;
 pub const COL_PX: f32 = 16.0 * SCALE;
 pub const ROW_PX: f32 = 16.0 * SCALE;
 
-pub const SELECTOR_COLS: u32 = 32;
-pub const SELECTOR_ROWS: u32 = 16;
-
-pub const SELECTOR_SIZE: egui::Vec2 =
-    egui::Vec2::new(SELECTOR_COLS as f32 * COL_PX, SELECTOR_ROWS as f32 * ROW_PX);
+pub const ITEM_SELECTOR_COLS: u32 = 32;
+pub const ITEM_SELECTOR_ROWS: u32 = 16;
+pub const ITEM_SELECTOR_SIZE: egui::Vec2 = egui::Vec2::new(
+    ITEM_SELECTOR_COLS as f32 * COL_PX,
+    ITEM_SELECTOR_ROWS as f32 * ROW_PX,
+);
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
@@ -38,16 +39,13 @@ pub struct ItemGridRenderer {
     bind_group: wgpu::BindGroup,
     vertex_buf: wgpu::Buffer,
     index_buf: wgpu::Buffer,
-    uniform_buf: wgpu::Buffer,
-    uniform_bind_group: wgpu::BindGroup,
+
+    // item selector contains fixed amount of instances
+    item_selector_instance_buf: (wgpu::Buffer, u32),
 
     uniform_bind_groups: HashMap<egui::Id, wgpu::BindGroup>,
     uniform_bind_group_layout: wgpu::BindGroupLayout,
     item_instance_bufs: HashMap<egui::Id, (wgpu::Buffer, u32)>,
-
-    // item selector contains fixed amount of instances
-    selector_instance_buf: wgpu::Buffer,
-    num_selector_instances: u32,
 }
 
 impl ItemGridRenderer {
@@ -165,13 +163,6 @@ impl ItemGridRenderer {
             label: Some("item_grid_bind_group_layout"),
         });
 
-        let uniform_buf = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Item Grid Uniforms Buffer"),
-            size: std::mem::size_of::<ItemGridUniforms>() as wgpu::BufferAddress,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-
         let uniform_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 entries: &[wgpu::BindGroupLayoutEntry {
@@ -184,17 +175,8 @@ impl ItemGridRenderer {
                     },
                     count: None,
                 }],
-                label: Some("uniform_bind_group_layout"),
+                label: Some("items_uniform_bind_group_layout"),
             });
-
-        let uniform_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &uniform_bind_group_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: uniform_buf.as_entire_binding(),
-            }],
-            label: Some("uniform_bind_group"),
-        });
 
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &bind_group_layout,
@@ -291,38 +273,34 @@ impl ItemGridRenderer {
             usage: wgpu::BufferUsages::INDEX,
         });
 
-        let instances: Vec<DwItemInstanceRaw> = ItemType::iter()
+        let item_selector_instances: Vec<DwItemInstanceRaw> = ItemType::iter()
             .enumerate()
             .map(|(i, item_type)| {
-                let col = (i as u32) % SELECTOR_COLS;
-                let row = (i as u32) / SELECTOR_COLS;
+                let col = (i as u32) % ITEM_SELECTOR_COLS;
+                let row = (i as u32) / ITEM_SELECTOR_COLS;
                 DwItem::from_item_type([col, row].map(|v| v as f32), item_type)
                     .grid_instance(i as u32)
             })
             .collect();
-
-        let instance_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Item Selector Instance Buffer"),
-            contents: bytemuck::cast_slice(&instances),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
-
-        let num_instances = instances.len() as u32;
+        let item_selector_instance_buf =
+            device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Item Selector Instance Buffer"),
+                contents: bytemuck::cast_slice(&item_selector_instances),
+                usage: wgpu::BufferUsages::VERTEX,
+            });
+        let item_selector_num_instances = item_selector_instances.len() as u32;
 
         Self {
             pipeline,
             bind_group,
             vertex_buf,
             index_buf,
-            uniform_buf,
-            uniform_bind_group,
+
+            item_selector_instance_buf: (item_selector_instance_buf, item_selector_num_instances),
 
             uniform_bind_groups: HashMap::new(),
             uniform_bind_group_layout,
             item_instance_bufs: HashMap::new(),
-
-            selector_instance_buf: instance_buf,
-            num_selector_instances: num_instances,
         }
     }
 
@@ -330,12 +308,13 @@ impl ItemGridRenderer {
     pub fn prepare(
         &mut self,
         device: &wgpu::Device,
-        queue: &wgpu::Queue,
+        _queue: &wgpu::Queue,
         hovered_index: Option<u32>,
         selected_index: Option<u32>,
         viewport: egui::Rect,
         pixels_per_point: f32,
-        id_instances: Option<(egui::Id, &[DwItemInstanceRaw])>,
+        id: egui::Id,
+        instances: &ItemGridInstances,
     ) {
         let viewport_ppp = viewport * pixels_per_point;
         let uniforms = ItemGridUniforms {
@@ -345,22 +324,22 @@ impl ItemGridRenderer {
             viewport_size: viewport_ppp.size().into(),
             cell_size: [COL_PX * pixels_per_point, ROW_PX * pixels_per_point],
         };
-        if let Some((id, instances)) = id_instances {
-            let uniform_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Item Grid Uniforms Buffer"),
-                contents: bytemuck::cast_slice(&[uniforms]),
-                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            });
-            let uniform_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-                layout: &self.uniform_bind_group_layout,
-                entries: &[wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: uniform_buf.as_entire_binding(),
-                }],
-                label: Some("uniform_bind_group"),
-            });
-            self.uniform_bind_groups.insert(id, uniform_bind_group);
+        let uniform_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Item Grid Uniforms Buffer"),
+            contents: bytemuck::cast_slice(&[uniforms]),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+        let uniform_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &self.uniform_bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: uniform_buf.as_entire_binding(),
+            }],
+            label: Some("uniform_bind_group"),
+        });
+        self.uniform_bind_groups.insert(id, uniform_bind_group);
 
+        if let ItemGridInstances::Custom { instances } = instances {
             let instance_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some("Chest Instance Buffer"),
                 contents: bytemuck::cast_slice(instances),
@@ -369,19 +348,24 @@ impl ItemGridRenderer {
             let num_instances = instances.len() as u32;
             self.item_instance_bufs
                 .insert(id, (instance_buf, num_instances));
-        } else {
-            queue.write_buffer(&self.uniform_buf, 0, bytemuck::cast_slice(&[uniforms]));
         }
     }
 
-    pub fn render(&self, render_pass: &mut wgpu::RenderPass<'_>, id: Option<&egui::Id>) {
-        let (instance_buf, num_instances) = id
-            .and_then(|id| self.item_instance_bufs.get(id).map(|(a, b)| (a, b)))
-            .unwrap_or((&self.selector_instance_buf, &self.num_selector_instances));
-        let uniform_bind_group = id
-            .and_then(|id| self.uniform_bind_groups.get(id))
-            .unwrap_or(&self.uniform_bind_group);
-        if *num_instances > 0 {
+    pub fn render(
+        &self,
+        render_pass: &mut wgpu::RenderPass<'_>,
+        id: &egui::Id,
+        instances: &ItemGridInstances,
+    ) {
+        let instance_buf_num = match instances {
+            ItemGridInstances::Items => Some(&self.item_selector_instance_buf),
+            ItemGridInstances::Custom { .. } => self.item_instance_bufs.get(id),
+        };
+        let uniform_bind_group = self.uniform_bind_groups.get(id);
+        if let Some(uniform_bind_group) = uniform_bind_group
+            && let Some((instance_buf, num_instances)) = instance_buf_num
+            && *num_instances > 0
+        {
             render_pass.set_pipeline(&self.pipeline);
             render_pass.set_bind_group(0, &self.bind_group, &[]);
             render_pass.set_bind_group(1, uniform_bind_group, &[]);
