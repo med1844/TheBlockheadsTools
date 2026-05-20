@@ -99,7 +99,7 @@ struct InteractionState {
     hover: Option<InteractionTarget>,
     select: Option<InteractionTarget>,
 
-    selected_block_chunk: Option<Chunk>,
+    selected_block_chunk: Option<(ChunkCoord, Chunk)>,
     hover_on_dyn_obj_id: Arc<Mutex<Option<(DwChunkObjId, ChunkCoord)>>>,
 
     selected_block_gpu: GpuCoord<BlockCoord>,
@@ -135,22 +135,46 @@ impl InteractionState {
         self.hover_on_block_gpu.update(None);
     }
 
-    fn copy_hover_to_select(&mut self, world_db: Option<&WorldDb>) {
-        self.select = match self.select == self.hover {
-            true => None,
-            false => self.hover,
-        };
-        if let Some(InteractionTarget::Block(block_coord)) = self.select
-            && let Some(world_db) = world_db
-            && let Some(compressed_chunk) = world_db.chunks.chunk_at(block_coord)
-            && let Ok(chunk) = compressed_chunk.decompress()
+    fn dump_chunk(&mut self, world_db: &mut WorldDb) {
+        if let Some((chunk_coord, chunk)) = self.selected_block_chunk.take()
+            && let Ok(compressed_chunk) = chunk.compress()
         {
-            self.selected_block_gpu.update(Some(block_coord));
-            self.selected_block_chunk = Some(chunk);
-        } else {
-            self.selected_block_gpu.update(None);
-            self.selected_block_chunk = None;
+            world_db.chunks.set_chunk_at(chunk_coord, compressed_chunk);
         }
+        self.selected_block_gpu.update(None);
+    }
+
+    fn set_select(&mut self, select: Option<InteractionTarget>, world_db: Option<&mut WorldDb>) {
+        self.select = select;
+        if let Some(world_db) = world_db {
+            if let Some(InteractionTarget::Block(block_coord)) = self.select {
+                let should_update_chunk = match self.selected_block_chunk.as_ref() {
+                    Some((old_chunk_coord, _)) => *old_chunk_coord != block_coord.into(),
+                    None => true,
+                };
+                if should_update_chunk {
+                    self.dump_chunk(world_db);
+                    if let Some(compressed_chunk) = world_db.chunks.chunk_at(block_coord)
+                        && let Ok(chunk) = compressed_chunk.decompress()
+                    {
+                        self.selected_block_chunk = Some((block_coord.into(), chunk));
+                    }
+                }
+                self.selected_block_gpu.update(Some(block_coord));
+            } else {
+                self.dump_chunk(world_db);
+            }
+        }
+    }
+
+    fn copy_hover_to_select(&mut self, world_db: Option<&mut WorldDb>) {
+        self.set_select(
+            match self.select == self.hover {
+                true => None,
+                false => self.hover,
+            },
+            world_db,
+        );
     }
 
     fn hover_on_id_uniform(&self) -> DwChunkObjIdUniform {
@@ -500,26 +524,6 @@ impl EditorApp {
             egui::Slider::new(&mut self.render_settings.min_depth_factor, 0.0..=1.0)
                 .text("Min Depth Factor"),
         );
-
-        if let Some(selected_chunk) = self.interaction_state.selected_block_chunk.as_ref()
-            && let Some(InteractionTarget::Block(selected_block_coord)) =
-                self.interaction_state.select
-        {
-            let block = selected_chunk.view().block_at(selected_block_coord);
-            ui.separator();
-            ui.heading(format!(
-                "Block {}, {}",
-                selected_block_coord.x(),
-                selected_block_coord.y(),
-            ));
-            egui::Grid::new("my_grid")
-                .num_columns(2)
-                .spacing([40.0, 4.0])
-                .striped(true)
-                .show(ui, |ui| {
-                    Self::render_selected_block_info(ui, block);
-                });
-        }
     }
 
     fn update_camera_pos(&mut self, ui: &mut egui::Ui, response: &egui::Response) {
@@ -597,7 +601,7 @@ impl EditorApp {
 
         if response.clicked_by(egui::PointerButton::Primary) {
             self.interaction_state
-                .copy_hover_to_select(self.world_db.as_ref());
+                .copy_hover_to_select(self.world_db.as_mut());
         }
     }
 
@@ -765,6 +769,39 @@ impl EditorApp {
             let read_renderer = state.renderer.read();
             if let Some(r) = read_renderer.callback_resources.get::<RenderResources>() {
                 r.try_read_id();
+            }
+        }
+    }
+
+    fn render_selected_block_info_window(&mut self, egui_ctx: &egui::Context) {
+        if let Some((chunk_coord, selected_chunk)) =
+            self.interaction_state.selected_block_chunk.as_ref()
+            && let Some(InteractionTarget::Block(selected_block_coord)) =
+                self.interaction_state.select
+        {
+            let mut open = true;
+            egui::Window::new(format!("Selected Block in Chunk {}", *chunk_coord))
+                .id("selected_dynamic_obj_info".into())
+                .open(&mut open)
+                .show(egui_ctx, |ui| {
+                    let block = selected_chunk.view().block_at(selected_block_coord);
+                    ui.separator();
+                    ui.heading(format!(
+                        "Block {}, {}",
+                        selected_block_coord.x(),
+                        selected_block_coord.y(),
+                    ));
+                    egui::Grid::new("my_grid")
+                        .num_columns(2)
+                        .spacing([40.0, 4.0])
+                        .striped(true)
+                        .show(ui, |ui| {
+                            Self::render_selected_block_info(ui, block);
+                        });
+                });
+            if !open {
+                self.interaction_state
+                    .set_select(None, self.world_db.as_mut());
             }
         }
     }
@@ -947,6 +984,7 @@ impl eframe::App for EditorApp {
             });
 
         self.render_error_windows(ctx);
+        self.render_selected_block_info_window(ctx);
         self.render_selected_dyn_obj_info_window(ctx, frame);
     }
 }

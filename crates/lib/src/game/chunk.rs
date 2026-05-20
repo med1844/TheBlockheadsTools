@@ -228,6 +228,12 @@ impl Chunks {
             .and_then(|out| out.as_ref())
     }
 
+    pub fn chunk_at_mut<I: Into<ChunkCoord>>(&mut self, coord: I) -> Option<&mut CompressedChunk> {
+        self.0
+            .get_mut(Self::to_index(coord.into()))
+            .and_then(|out| out.as_mut())
+    }
+
     pub fn set_chunk_at<I: Into<ChunkCoord>>(&mut self, coord: I, chunk: CompressedChunk) {
         self.0[Self::to_index(coord.into())] = Some(chunk);
     }
