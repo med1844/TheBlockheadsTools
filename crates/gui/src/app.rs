@@ -306,7 +306,7 @@ impl EditorApp {
             .as_ref()
             .map(|db| db.main.world_v2.world_width_macro)
             .unwrap_or(0);
-        if new_world_width_macro > old_world_width_macro {
+        if new_world_width_macro != old_world_width_macro {
             render_resources.replace_voxel_buf(
                 device,
                 queue,
