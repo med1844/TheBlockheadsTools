@@ -183,16 +183,9 @@ impl Camera {
     pub fn visible_world_region_2d(&self, screen_size: (f32, f32)) -> [glam::Vec2; 2] {
         let (width, height) = screen_size;
 
-        let top_right = self.viewport_to_xy_at_z(
-            (width, 0.0),
-            screen_size,
-            Self::MAX_BLOCK_Z - self.world_offset.z,
-        );
-        let bottom_left = self.viewport_to_xy_at_z(
-            (0.0, height),
-            screen_size,
-            Self::MAX_BLOCK_Z - self.world_offset.z,
-        );
+        let top_right = self.viewport_to_xy_at_z((width, 0.0), screen_size, -self.world_offset.z);
+        let bottom_left =
+            self.viewport_to_xy_at_z((0.0, height), screen_size, -self.world_offset.z);
 
         [
             bottom_left + self.world_offset.xy(),
