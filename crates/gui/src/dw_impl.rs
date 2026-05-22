@@ -1656,9 +1656,28 @@ impl BuildDwMesh for Workbench {
             WorkbenchType::Undefined => {
                 builder.add_item(DwItem::from_item_type(self.float_pos, ItemType::Unknown))
             }
-            WorkbenchType::BasicPortal | WorkbenchType::PlacedPortal => builder.add_face(
-                DwFace::new_sprite(ImageType::Portal0, [0.5, 0.0], self.float_pos, [1, 2], 2.0),
-            ),
+            WorkbenchType::BasicPortal | WorkbenchType::PlacedPortal => {
+                builder.add_face(DwFace::new_sprite(
+                    match self.level {
+                        0 => ImageType::Portal0,
+                        1 => ImageType::PortalAmethyst0,
+                        2 => ImageType::PortalSapphire0,
+                        3 => ImageType::PortalEmerald0,
+                        4 => ImageType::PortalRuby0,
+                        5 => ImageType::PortalDiamond0,
+                        _ => InvalidWorkbenchLevelSnafu {
+                            workbench_type: self.workbench_type,
+                            level: self.level,
+                            maximum: 6,
+                        }
+                        .fail()?,
+                    },
+                    [0.5, 0.0],
+                    self.float_pos,
+                    [1, 2],
+                    2.0,
+                ))
+            }
             WorkbenchType::Workbench => builder.add_block(DwBlock::new(
                 block_coord,
                 match self.level {
