@@ -1,14 +1,50 @@
-use super::{
-    super::super::util::serde::{deserialize_some, serialize_some},
-    DynamicObject,
-};
+use super::{super::item::Inventory, DynamicObject};
+use crate::util::serde::{deserialize_some, serialize_some};
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Blockhead {
+pub(crate) struct BlockheadXml {
     #[serde(flatten)]
+    obj: DynamicObject,
+    actions: plist::Value,
+    clothing_increment_timer: u64,
+    double_time_unlocked: bool,
+    interaction_item_index: i64, // could be -1... my god
+    interaction_item_sub_index: i64,
+    name: String,
+    selected_tool_index: u64,
+    skin_options: plist::Data,
+    state: plist::Data,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_some",
+        serialize_with = "serialize_some",
+        skip_serializing_if = "Option::is_none",
+        rename = "finalGoalSquare.x"
+    )]
+    final_goal_square_x: Option<u64>,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_some",
+        serialize_with = "serialize_some",
+        skip_serializing_if = "Option::is_none",
+        rename = "finalGoalSquare.y"
+    )]
+    final_goal_square_y: Option<u64>,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_some",
+        serialize_with = "serialize_some",
+        skip_serializing_if = "Option::is_none"
+    )]
+    load_requires_recalculation: Option<bool>,
+}
+inherit!(BlockheadXml -> DynamicObject, obj);
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Blockhead {
     obj: DynamicObject,
     pub actions: plist::Value,
     pub clothing_increment_timer: u64,
@@ -19,39 +55,61 @@ pub struct Blockhead {
     pub selected_tool_index: u64,
     pub skin_options: plist::Data,
     pub state: plist::Data,
-    #[serde(
-        default,
-        deserialize_with = "deserialize_some",
-        serialize_with = "serialize_some",
-        skip_serializing_if = "Option::is_none",
-        rename = "finalGoalSquare.x"
-    )]
     pub final_goal_square_x: Option<u64>,
-    #[serde(
-        default,
-        deserialize_with = "deserialize_some",
-        serialize_with = "serialize_some",
-        skip_serializing_if = "Option::is_none",
-        rename = "finalGoalSquare.y"
-    )]
     pub final_goal_square_y: Option<u64>,
-    #[serde(
-        default,
-        deserialize_with = "deserialize_some",
-        serialize_with = "serialize_some",
-        skip_serializing_if = "Option::is_none"
-    )]
     pub load_requires_recalculation: Option<bool>,
+    pub inventory: Inventory,
 }
 inherit!(Blockhead -> DynamicObject, obj);
 
+impl Blockhead {
+    pub(crate) fn from_xml_and_inventory(xml: BlockheadXml, inventory: Inventory) -> Self {
+        Self {
+            obj: xml.obj,
+            actions: xml.actions,
+            clothing_increment_timer: xml.clothing_increment_timer,
+            double_time_unlocked: xml.double_time_unlocked,
+            interaction_item_index: xml.interaction_item_index,
+            interaction_item_sub_index: xml.interaction_item_sub_index,
+            name: xml.name,
+            selected_tool_index: xml.selected_tool_index,
+            skin_options: xml.skin_options,
+            state: xml.state,
+            final_goal_square_x: xml.final_goal_square_x,
+            final_goal_square_y: xml.final_goal_square_y,
+            load_requires_recalculation: xml.load_requires_recalculation,
+            inventory,
+        }
+    }
+}
+
+impl From<&Blockhead> for BlockheadXml {
+    fn from(value: &Blockhead) -> Self {
+        Self {
+            obj: value.obj.clone(),
+            actions: value.actions.clone(),
+            clothing_increment_timer: value.clothing_increment_timer,
+            double_time_unlocked: value.double_time_unlocked,
+            interaction_item_index: value.interaction_item_index,
+            interaction_item_sub_index: value.interaction_item_sub_index,
+            name: value.name.clone(),
+            selected_tool_index: value.selected_tool_index,
+            skin_options: value.skin_options.clone(),
+            state: value.state.clone(),
+            final_goal_square_x: value.final_goal_square_x,
+            final_goal_square_y: value.final_goal_square_y,
+            load_requires_recalculation: value.load_requires_recalculation,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{super::DynamicObjectList, Blockhead};
+    use super::{super::DynamicObjectList, BlockheadXml};
     use crate::util::plist::{diff_plist_keys, to_xml_plist};
 
     #[test]
-    fn blockhead_round_trip_test() {
+    fn blockhead_xml_round_trip_test() {
         let blockheads_data = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
 <!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
 <plist version=\"1.0\">
@@ -135,10 +193,10 @@ mod tests {
         </array>
 </dict>
 </plist>";
-        let blockheads: DynamicObjectList<Blockhead> =
+        let blockheads: DynamicObjectList<BlockheadXml> =
             plist::from_reader_xml(blockheads_data.as_bytes()).expect("should deserialize");
         let round_trip_blockheads_data = to_xml_plist(&blockheads).expect("should serialize");
-        let round_trip_blockheads: DynamicObjectList<Blockhead> =
+        let round_trip_blockheads: DynamicObjectList<BlockheadXml> =
             plist::from_reader_xml(round_trip_blockheads_data.as_slice())
                 .expect("should deserialize");
         assert_eq!(blockheads, round_trip_blockheads);

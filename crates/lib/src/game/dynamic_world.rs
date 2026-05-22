@@ -492,7 +492,6 @@ impl DynamicWorld {
                             coord,
                         })?;
                     entry.chest = chest_metas
-                        .into_inner()
                         .into_iter()
                         .map(|chest_meta| {
                             let id = *chest_meta.unique_id.inner();

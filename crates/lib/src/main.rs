@@ -13,10 +13,10 @@ fn main() -> Result<(), Whatever> {
     let db_data = fs::read(std::path::Path::new(db_path).join("data.mdb")).unwrap();
     let env = Env::new(&db_data).unwrap();
     let rtxn = env.read_txn().unwrap();
-    let dw_db = env
-        .open_database::<Str, Bytes>(&rtxn, Some("dw"))
-        .unwrap()
-        .unwrap();
+    // let dw_db = env
+    //     .open_database::<Str, Bytes>(&rtxn, Some("dw"))
+    //     .unwrap()
+    //     .unwrap();
     let main_db = env
         .open_database::<Str, Bytes>(&rtxn, Some("main"))
         .unwrap()

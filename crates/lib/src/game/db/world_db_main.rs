@@ -1,26 +1,29 @@
 use super::{
     super::{
-        super::util::plist::to_xml_plist,
-        dynamic_object::{DynamicObjectList, UniqueID, blockhead::Blockhead},
+        dynamic_object::{
+            DynamicObjectList,
+            blockhead::{Blockhead, BlockheadXml},
+        },
         item::{Inventory, ItemError},
     },
     dynamic_world_v2::DynamicWorldV2,
     world_v2::WorldV2,
 };
+use crate::util::plist::to_xml_plist;
 use lmdb_rs::{
     codec::types::{Bytes, Str},
     database::Database,
     txn::{RoTxn, RwTxn},
 };
 use snafu::{OptionExt, ResultExt, Snafu};
-use std::{collections::HashMap, io::Write};
+use std::io::Write;
 
 #[derive(Debug, Snafu)]
 pub enum MainError {
     #[snafu(display("Failed to get entry {key} from database"))]
     GetEntry {
         source: lmdb_rs::error::DatabaseError,
-        key: &'static str,
+        key: String,
     },
     #[snafu(display("Key {key} doesn't exist in database"))]
     MissingKey { key: &'static str },
@@ -51,6 +54,8 @@ pub enum MainError {
     SaveBlockheadInventory { unique_id: u64, source: ItemError },
     #[snafu(display("Failed to parse inventory of blockhead with unique id = {unique_id}"))]
     ParseBlockheadInventory { unique_id: u64, source: ItemError },
+    #[snafu(display("Can't find inventory of blockhead with unique id = {unique_id} in db"))]
+    BlockheadInventoryNotFound { unique_id: u64 },
     #[snafu(display("Failed to deserialize `blockheads`"))]
     DeserializeBlockheads { source: plist::Error },
     #[snafu(display("Failed to serialize `blockheads`"))]
@@ -69,10 +74,9 @@ type Result<T> = std::result::Result<T, MainError>;
 
 #[derive(Debug)]
 pub struct Main {
-    pub blockheads: DynamicObjectList<Blockhead>,
+    pub blockheads: Vec<Blockhead>,
     pub dynamic_world_v2: DynamicWorldV2,
     pub world_v2: WorldV2,
-    pub blockhead_inventories: HashMap<UniqueID, Inventory>,
 }
 
 impl Main {
@@ -85,36 +89,42 @@ impl Main {
         let blockheads = get("blockheads")?;
         let dynamic_world_v2 = get("dynamicWorldv2")?;
         let world_v2 = get("worldv2")?;
-        let mut blockhead_inventories = HashMap::new();
-        for entry in db.iter(rtxn).context(IterateDatabaseSnafu)? {
-            let (key, value) = entry.context(DecodeEntrySnafu)?;
-            if let Some(blockhead_id_str) = key
-                .strip_prefix("blockhead_")
-                .and_then(|key| key.strip_suffix("_inventory"))
-                && let Ok(blockhead_id) = blockhead_id_str.parse()
-            {
-                let value =
-                    plist::from_reader_xml(value).context(DeserializeBlockheadInventorySnafu {
+
+        let blockhead_xmls: DynamicObjectList<BlockheadXml> =
+            plist::from_reader_xml(blockheads).context(DeserializeBlockheadsSnafu)?;
+        let blockheads = blockhead_xmls
+            .into_iter()
+            .map(|xml| -> Result<Blockhead> {
+                let blockhead_id = *xml.unique_id.inner();
+                let key = format!("blockhead_{}_inventory", blockhead_id);
+                let inventory_bytes = db
+                    .get(rtxn, &key)
+                    .context(GetEntrySnafu { key: key.clone() })?
+                    .context(BlockheadInventoryNotFoundSnafu {
                         unique_id: blockhead_id,
                     })?;
+                let value = plist::from_reader_xml(inventory_bytes).context(
+                    DeserializeBlockheadInventorySnafu {
+                        unique_id: blockhead_id,
+                    },
+                )?;
                 let inventory =
                     Inventory::try_from_value(value).context(ParseBlockheadInventorySnafu {
                         unique_id: blockhead_id,
                     })?;
-                let _ = blockhead_inventories.insert(UniqueID::new(blockhead_id), inventory);
-            }
-        }
+                Ok(Blockhead::from_xml_and_inventory(xml, inventory))
+            })
+            .collect::<Result<Vec<Blockhead>>>()?;
         Ok(Self {
-            blockheads: plist::from_reader_xml(blockheads).context(DeserializeBlockheadsSnafu)?,
+            blockheads,
             dynamic_world_v2: plist::from_reader_xml(dynamic_world_v2)
                 .context(DeserializeDynamicWorldV2Snafu)?,
             world_v2: plist::from_bytes(world_v2).context(DeserializeWorldV2Snafu)?,
-            blockhead_inventories,
         })
     }
 
     pub fn to_db<W: Write>(&self, db: &Database<Str, Bytes>, wtxn: &mut RwTxn<W>) -> Result<()> {
-        let mut put = |key: &'static str, bytes: &[u8]| {
+        let put = |key: &'static str, bytes: &[u8], wtxn: &mut RwTxn<W>| {
             db.put(wtxn, key, bytes).context(PutEntrySnafu {
                 key: key.to_owned(),
             })
@@ -124,31 +134,41 @@ impl Main {
             to_xml_plist(&self.dynamic_world_v2)
                 .context(SerializeDynamicWorldV2Snafu)?
                 .as_slice(),
-        )?;
-        put(
-            "blockheads",
-            to_xml_plist(&self.blockheads)
-                .context(SerializeBlockheadsSnafu)?
-                .as_slice(),
+            wtxn,
         )?;
         put(
             "worldv2",
             to_xml_plist(&self.world_v2)
                 .context(SerializeWorldV2Snafu)?
                 .as_slice(),
+            wtxn,
         )?;
-        for (unique_id, inventory) in self.blockhead_inventories.iter() {
-            let inventory_value = inventory.to_value().context(SaveBlockheadInventorySnafu {
-                unique_id: *unique_id.inner(),
-            })?;
-            let inventory_bytes =
-                to_xml_plist(&inventory_value).context(SerializeBlockheadInventorySnafu {
-                    unique_id: *unique_id.inner(),
-                })?;
-            let key = format!("blockhead_{}_inventory", unique_id.inner());
-            db.put(wtxn, key.as_str(), inventory_bytes.as_slice())
-                .context(PutEntrySnafu { key })?;
-        }
+
+        let blockhead_xmls = self
+            .blockheads
+            .iter()
+            .map(|blockhead| {
+                let unique_id = *blockhead.unique_id.inner();
+                let xml: BlockheadXml = blockhead.into();
+                let inventory_value = blockhead
+                    .inventory
+                    .to_value()
+                    .context(SaveBlockheadInventorySnafu { unique_id })?;
+                let inventory_bytes = to_xml_plist(&inventory_value)
+                    .context(SerializeBlockheadInventorySnafu { unique_id })?;
+                let key = format!("blockhead_{}_inventory", unique_id);
+                db.put(wtxn, key.as_str(), inventory_bytes.as_slice())
+                    .context(PutEntrySnafu { key })?;
+                Ok(xml)
+            })
+            .collect::<Result<DynamicObjectList<BlockheadXml>>>()?;
+        put(
+            "blockheads",
+            to_xml_plist(&blockhead_xmls)
+                .context(SerializeBlockheadsSnafu)?
+                .as_slice(),
+            wtxn,
+        )?;
         Ok(())
     }
 }
