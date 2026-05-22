@@ -5,7 +5,8 @@ use super::{
         dw::{
             BuildDwMesh, BuildDwMeshError, CoordOutOfBoundSnafu, DwBlock, DwCapacity,
             DwChunkBufBuilder, DwFace, DwItem, DwItemInstanceRaw, DwQuad, FaceDirection,
-            InvalidItemTypeForDoorSnafu, InvalidItemTypeForTorchSnafu, InvalidWorkbenchLevelSnafu,
+            InvalidItemTypeForDoorSnafu, InvalidItemTypeForTorchSnafu,
+            InvalidItemTypeForWindowSnafu, InvalidWorkbenchLevelSnafu,
         },
     },
     image_type::ImageType,
@@ -30,7 +31,7 @@ use the_blockheads_tools_lib::game::{
         animal::{DodoBreed, Egg},
         chest::{Chest, ChestSlots, ChestType},
         craft::{
-            Door, Ladder, Sign, SignConnectionType, Torch, TorchConnectionType, Wire,
+            Door, Ladder, Sign, SignConnectionType, Torch, TorchConnectionType, Window, Wire,
             WireConfiguration, WireSolidConfiguration,
         },
         plant::{
@@ -1294,6 +1295,47 @@ impl BuildDwMesh for Egg {
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         // TODO add render egg with real breed textures
         builder.add_item(DwItem::from_item_type(self.float_pos, ItemType::DodoEgg));
+        Ok(())
+    }
+}
+
+impl ToGrid for Window {
+    fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut DwUiContext) {
+        self.item_type.add_row("itemType", ui);
+    }
+}
+
+impl InfoUi for Window {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        let obj = self.deref_mut();
+        obj.info(ui, context);
+
+        ui.vertical(|ui| {
+            ui.heading("Window");
+            ui.separator();
+            self.add_grid("window_grid", ui, context);
+        });
+    }
+}
+
+impl BuildDwMesh for Window {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 0, quads: 1 });
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        builder.add_face(DwFace::new_sprite(
+            match self.item_type {
+                ItemType::Window => ImageType::Window,
+                ItemType::BlackWindow => ImageType::BlackWindow,
+                _ => InvalidItemTypeForWindowSnafu {
+                    item_type: self.item_type,
+                    window: self.clone(),
+                }
+                .fail()?,
+            },
+            [0.5, 0.0],
+            self.float_pos,
+            [1, 1],
+            1.0,
+        ));
         Ok(())
     }
 }

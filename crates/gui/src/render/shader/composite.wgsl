@@ -126,25 +126,33 @@ fn fs_composite(in: VertexOutput) -> @location(0) vec4<f32> {
     let is_m_trans = m_translucent.a > 0.0;
     let is_v_trans = v_translucent.a > 0.0;
 
+    let flags = textureLoad(flags_texture, pixel_coords, 0).r;
+    // transparent mesh pixel can get occluded by opaque pixels in other objects
+    // voxel won't because we are already doing ray marching
+    let is_m_opaque = (flags & (1u << 2u)) != 0u;
+
     if (is_m_trans && is_v_trans) {
         if (m_depth > v_trans_d) {
             // Mesh is further than voxel. Blend mesh first, then voxel.
-            if (m_depth < surf.depth) { composed = blend_premultiplied(composed, m_translucent); }
+            if (!is_m_opaque && m_depth < surf.depth) { composed = blend_premultiplied(composed, m_translucent); }
             if (v_trans_d < surf.depth) { composed = blend_premultiplied(composed, v_translucent); }
         } else {
             // Voxel is further than mesh. Blend voxel first, then mesh.
             if (v_trans_d < surf.depth) { composed = blend_premultiplied(composed, v_translucent); }
-            if (m_depth < surf.depth) { composed = blend_premultiplied(composed, m_translucent); }
+            if (!is_m_opaque && m_depth < surf.depth) { composed = blend_premultiplied(composed, m_translucent); }
         }
     } else if (is_m_trans) {
-        if (m_depth < surf.depth + 1e-3) { composed = blend_premultiplied(composed, m_translucent); }
+        if (!is_m_opaque && m_depth < surf.depth + 1e-3) {
+            composed = blend_premultiplied(composed, m_translucent);
+        }
     } else if (is_v_trans) {
-        if (v_trans_d < surf.depth) { composed = blend_premultiplied(composed, v_translucent); }
+        if (v_trans_d < surf.depth) {
+            composed = blend_premultiplied(composed, v_translucent);
+        }
     }
 
     // Flags (highlights)
     var highlight = vec4<f32>(0.0);
-    let flags = textureLoad(flags_texture, pixel_coords, 0).r;
     if ((flags & 1u) != 0u) { // Hovered
         highlight = to_premultiplied(vec4<f32>(1.0, 1.0, 1.0, 0.25));
     }

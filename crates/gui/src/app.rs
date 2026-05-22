@@ -935,7 +935,7 @@ impl EditorApp {
                 CarrotPlant => draw_window(title, dw_chunk.carrot_plant.get_mut(id.index), ctx),
                 // Donkey => {}
                 Egg => draw_window(title, dw_chunk.egg.get_mut(id.index), ctx),
-                // Window => {}
+                Window => draw_window(title, dw_chunk.window.get_mut(id.index), ctx),
                 // Boat => {}
                 ChilliPlant => draw_window(title, dw_chunk.chilli_plant.get_mut(id.index), ctx),
                 KelpPlant => draw_window(title, dw_chunk.kelp_plant.get_mut(id.index), ctx),

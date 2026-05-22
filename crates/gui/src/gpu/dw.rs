@@ -11,7 +11,7 @@ use the_blockheads_tools_lib::game::{
     dynamic_object::{
         AnyDynamicObject, DynamicObjectType,
         chest::ChestType,
-        craft::{Door, Torch},
+        craft::{Door, Torch, Window},
         workbench::WorkbenchType,
     },
     dynamic_world::ChunkDynamicObjects,
@@ -986,6 +986,11 @@ pub enum BuildDwMeshError {
         item_type: ItemType,
         torch: Box<Torch>,
     },
+    #[snafu(display("Item type {item_type:?} is not window: {window:?}"))]
+    InvalidItemTypeForWindow {
+        item_type: ItemType,
+        window: Box<Window>,
+    },
 }
 
 #[derive(Default, Clone, Copy)]
@@ -1395,7 +1400,7 @@ impl DwChunkBuf {
         add(chunk.carrot_plant.iter(), CarrotPlant, &mut builder);
         // add(chunk.donkey.iter(), Donkey, &mut builder);
         add(chunk.egg.iter(), Egg, &mut builder);
-        // add(chunk.window.iter(), Window, &mut builder);
+        add(chunk.window.iter(), Window, &mut builder);
         // add(chunk.boat.iter(), Boat, &mut builder);
         add(chunk.chilli_plant.iter(), ChilliPlant, &mut builder);
         add(chunk.kelp_plant.iter(), KelpPlant, &mut builder);
