@@ -428,10 +428,14 @@ impl VoxelType {
 impl VoxelType {
     fn fg_from_block_inner<'b>(block: BlockView<'b>) -> Result<Self, BlockError> {
         Ok(match (block.fg()?, block.content()?) {
-            (BlockType::Air, _) | (_, BlockContentType::Sprite) => Self::Air,
+            (BlockType::Air, _) => Self::Air,
             (BlockType::Snow, _) => Self::Snow,
             (BlockType::Water, _) => Self::Water,
-            (block_type, BlockContentType::Nothing) => block_type.into(),
+            (block_type, BlockContentType::Nothing)
+            | (block_type, BlockContentType::Workbench)
+            | (block_type, BlockContentType::WorkbenchSprite)
+            | (block_type, BlockContentType::Sprite)
+            | (block_type, BlockContentType::Wire) => block_type.into(),
             (BlockType::Dirt, BlockContentType::Clay) => Self::DirtClay,
             (BlockType::Dirt, BlockContentType::Flint) => Self::DirtFlint,
             (BlockType::GrassDirt, BlockContentType::Clay) => Self::GrassDirtClay,
@@ -469,7 +473,8 @@ impl VoxelType {
             | BlockContentType::Oil => Self::fg_from_block_inner(block)?,
             BlockContentType::Workbench
             | BlockContentType::WorkbenchSprite
-            | BlockContentType::Sprite => Self::Air,
+            | BlockContentType::Sprite
+            | BlockContentType::Wire => Self::Air,
             BlockContentType::AppleTreeLeaf => Self::AppleTreeLeaf,
             BlockContentType::AppleTreeTrunk => Self::AppleTreeTrunk,
             BlockContentType::AppleTreeTrunkLeaf => Self::AppleTreeTrunkLeaf,

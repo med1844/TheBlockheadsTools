@@ -172,6 +172,7 @@ pub enum BlockContentType {
     DeadLimeTreeLeaf = 92,
     DeadLimeTreeTrunk = 93,
     GoldChest = 94,
+    Wire = 96,
     PlatinumOre = 106,
     TitaniumOre = 107,
     AmethystTreeTrunk = 109,

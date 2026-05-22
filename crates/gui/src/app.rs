@@ -942,7 +942,7 @@ impl EditorApp {
                 // ClownFish => {}
                 // Shark => {}
                 LimeTree => draw_window(title, dw_chunk.lime_tree.get_mut(id.index), ctx),
-                // Wire => {}
+                Wire => draw_window(title, dw_chunk.wire.get_mut(id.index), ctx),
                 // CaveTroll => {}
                 // Rail => {}
                 // HandCar => {}

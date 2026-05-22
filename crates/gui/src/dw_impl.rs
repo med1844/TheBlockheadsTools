@@ -29,7 +29,10 @@ use the_blockheads_tools_lib::game::{
         LightDirection, UniqueID,
         animal::{DodoBreed, Egg},
         chest::{Chest, ChestSlots, ChestType},
-        craft::{Door, Ladder, Sign, SignConnectionType, Torch, TorchConnectionType},
+        craft::{
+            Door, Ladder, Sign, SignConnectionType, Torch, TorchConnectionType, Wire,
+            WireConfiguration, WireSolidConfiguration,
+        },
         plant::{
             CarrotPlant, ChilliPlant, CornPlant, FlaxPlant, KelpPlant, NormalPlant, Plant,
             SunflowerPlant, TomatoPlant, TulipPlant, VinePlant, WheatPlant,
@@ -1414,6 +1417,89 @@ impl BuildDwMesh for LimeTree {
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         builder.add_item(DwItem::from_item_type(self.float_pos, ItemType::Lime));
+        Ok(())
+    }
+}
+
+impl ToRow for WireConfiguration {
+    fn to_row(&mut self, ui: &mut egui::Ui) -> egui::Response {
+        wrap_combo_box_resp(
+            egui::ComboBox::from_id_salt("wire_configuration_combo_box")
+                .selected_text(format!("{:?}", self))
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(self, Self::Undefined, "Undefined")
+                        | ui.selectable_value(self, Self::AllConnections, "AllConnections")
+                        | ui.selectable_value(self, Self::NoConnections, "NoConnections")
+                        | ui.selectable_value(self, Self::AboveBelowOnly, "AboveBelowOnly")
+                        | ui.selectable_value(self, Self::AboveBelowLeft, "AboveBelowLeft")
+                        | ui.selectable_value(self, Self::AboveBelowRight, "AboveBelowRight")
+                        | ui.selectable_value(self, Self::LeftRightOnly, "LeftRightOnly")
+                        | ui.selectable_value(self, Self::LeftRightUp, "LeftRightUp")
+                        | ui.selectable_value(self, Self::LeftRightDown, "LeftRightDown")
+                        | ui.selectable_value(self, Self::LeftDown, "LeftDown")
+                        | ui.selectable_value(self, Self::LeftUp, "LeftUp")
+                        | ui.selectable_value(self, Self::RightDown, "RightDown")
+                        | ui.selectable_value(self, Self::RightUp, "RightUp")
+                }),
+        )
+    }
+}
+
+impl ToRow for WireSolidConfiguration {
+    fn to_row(&mut self, ui: &mut egui::Ui) -> egui::Response {
+        wrap_combo_box_resp(
+            egui::ComboBox::from_id_salt("wire_solid_configuration_combo_box")
+                .selected_text(format!("{:?}", self))
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(self, Self::Undefined, "Undefined")
+                        | ui.selectable_value(self, Self::NotSolid, "NotSolid")
+                        | ui.selectable_value(self, Self::AllConnections, "AllConnections")
+                        | ui.selectable_value(self, Self::ThisTileOnly, "ThisTileOnly")
+                        | ui.selectable_value(self, Self::AboveBelowOnly, "AboveBelowOnly")
+                        | ui.selectable_value(self, Self::AboveBelowLeft, "AboveBelowLeft")
+                        | ui.selectable_value(self, Self::AboveBelowRight, "AboveBelowRight")
+                        | ui.selectable_value(self, Self::LeftRightOnly, "LeftRightOnly")
+                        | ui.selectable_value(self, Self::LeftOnly, "LeftOnly")
+                        | ui.selectable_value(self, Self::LeftRightUp, "LeftRightUp")
+                        | ui.selectable_value(self, Self::LeftRightDown, "LeftRightDown")
+                        | ui.selectable_value(self, Self::LeftDown, "LeftDown")
+                        | ui.selectable_value(self, Self::LeftUp, "LeftUp")
+                        | ui.selectable_value(self, Self::RightDown, "RightDown")
+                        | ui.selectable_value(self, Self::RightUp, "RightUp")
+                        | ui.selectable_value(self, Self::RightOnly, "RightOnly")
+                        | ui.selectable_value(self, Self::UpOnly, "UpOnly")
+                        | ui.selectable_value(self, Self::DownOnly, "DownOnly")
+                }),
+        )
+    }
+}
+
+impl ToGrid for Wire {
+    fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut DwUiContext) {
+        self.item_type.add_row("itemType", ui);
+        self.configuration.add_row("configuration", ui);
+        self.solid_configuration.add_row("solidConfiguration", ui);
+    }
+}
+
+impl InfoUi for Wire {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        let obj = self.deref_mut();
+        obj.info(ui, context);
+
+        ui.vertical(|ui| {
+            ui.heading("Wire");
+            ui.separator();
+            self.add_grid("wire_grid", ui, context);
+        });
+    }
+}
+
+impl BuildDwMesh for Wire {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 1, quads: 0 });
+
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        builder.add_item(DwItem::from_item_type(self.float_pos, ItemType::CopperWire));
         Ok(())
     }
 }
@@ -2854,49 +2940,3 @@ pub(crate) fn block_content_type_drop_menu(
             }),
     )
 }
-
-// impl<'v> ToGrid for BlockViewMut<'v> {
-//     fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut DwUiContext) {
-//         ui.label("foreground");
-//         ui.add(egui::DragValue::new(self.fg_raw_mut()));
-//         match self.fg() {
-//             Ok(mut fg_type) => {
-//                 if block_type_drop_menu(ui, &mut fg_type).changed() {
-//                     self.set_fg(fg_type);
-//                 }
-//             }
-//             Err(e) => {
-//                 ui.weak(e.to_string());
-//             }
-//         };
-//         ui.end_row();
-
-//         ui.label("background");
-//         ui.add(egui::DragValue::new(self.bg_raw_mut()));
-//         match self.bg() {
-//             Ok(mut bg_type) => {
-//                 if block_type_drop_menu(ui, &mut bg_type).changed() {
-//                     self.set_bg(bg_type);
-//                 }
-//             }
-//             Err(e) => {
-//                 ui.weak(e.to_string());
-//             }
-//         };
-//         ui.end_row();
-
-//         ui.label("content");
-//         ui.add(egui::DragValue::new(self.content_raw_mut()));
-//         match self.content() {
-//             Ok(mut content_type) => {
-//                 if block_content_type_drop_menu(ui, &mut content_type).changed() {
-//                     self.set_content(content_type);
-//                 }
-//             }
-//             Err(e) => {
-//                 ui.weak(e.to_string());
-//             }
-//         };
-//         ui.end_row();
-//     }
-// }

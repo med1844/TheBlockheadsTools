@@ -1402,7 +1402,7 @@ impl DwChunkBuf {
         // add(chunk.clown_fish.iter(), ClownFish, &mut builder);
         // add(chunk.shark.iter(), Shark, &mut builder);
         add(chunk.lime_tree.iter(), LimeTree, &mut builder);
-        // add(chunk.wire.iter(), Wire, &mut builder);
+        add(chunk.wire.iter(), Wire, &mut builder);
         // add(chunk.cave_troll.iter(), CaveTroll, &mut builder);
         // add(chunk.rail.iter(), Rail, &mut builder);
         // add(chunk.hand_car.iter(), HandCar, &mut builder);
