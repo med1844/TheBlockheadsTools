@@ -22,10 +22,18 @@ pub(crate) enum ResizeOutcome {
 
 pub(crate) struct GeometryBuffer {
     size: (u32, u32),
-    uv: Texture,
-    // Semi-transparent voxel pixels (alpha < 1.0) accumulated during ray marching.
-    translucency: Texture,
-    normal: Texture,
+    mesh_uv: Texture,
+    mesh_normal: Texture,
+    mesh_translucency: Texture,
+    voxel_uv: Texture,
+    voxel_normal: Texture,
+    voxel_translucency: Texture,
+    voxel_translucent_depth: Texture,
+    // 1 << 0 = hovered
+    // 1 << 1 = selected
+    // 1 << 2 = mesh_opaque
+    // 1 << 3 = voxel_opaque
+    mesh_flags: Texture,
     flags: Texture,
     ssao_raw: Texture,
     ssao_blur: Texture,
@@ -43,19 +51,55 @@ impl GeometryBuffer {
     pub const DEFAULT_HEIGHT: u32 = 1080;
 
     pub fn new(size: (u32, u32), device: &wgpu::Device) -> Self {
-        let uv_texture = Texture::new(
+        let mesh_uv = Texture::new(
+            size,
+            device,
+            wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            wgpu::TextureFormat::Rg16Float,
+        );
+        let mesh_normal = Texture::new(
             size,
             device,
             wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
             wgpu::TextureFormat::Rgba16Float,
         );
-        let normal_texture = Texture::new(
+        let mesh_translucency = Texture::new(
+            size,
+            device,
+            wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            wgpu::TextureFormat::Bgra8Unorm,
+        );
+        let voxel_uv = Texture::new(
+            size,
+            device,
+            wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            wgpu::TextureFormat::Rg16Float,
+        );
+        let voxel_normal = Texture::new(
             size,
             device,
             wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
             wgpu::TextureFormat::Rgba16Float,
         );
-        let flags_texture = Texture::new(
+        let voxel_translucency = Texture::new(
+            size,
+            device,
+            wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            wgpu::TextureFormat::Bgra8Unorm,
+        );
+        let voxel_translucent_depth = Texture::new(
+            size,
+            device,
+            wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            wgpu::TextureFormat::R16Float,
+        );
+        let mesh_flags = Texture::new(
+            size,
+            device,
+            wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            wgpu::TextureFormat::R8Uint,
+        );
+        let flags = Texture::new(
             size,
             device,
             wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
@@ -93,12 +137,6 @@ impl GeometryBuffer {
                 | wgpu::TextureUsages::TEXTURE_BINDING,
             ID_TEXTURE_FORMAT,
         );
-        let translucency_texture = Texture::new(
-            size,
-            device,
-            wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
-            wgpu::TextureFormat::Bgra8Unorm,
-        );
         let voxel_depth_float_view =
             voxel_depth
                 .texture
@@ -108,10 +146,15 @@ impl GeometryBuffer {
                 });
         Self {
             size,
-            uv: uv_texture,
-            translucency: translucency_texture,
-            normal: normal_texture,
-            flags: flags_texture,
+            mesh_uv,
+            mesh_normal,
+            mesh_translucency,
+            voxel_uv,
+            voxel_normal,
+            voxel_translucency,
+            voxel_translucent_depth,
+            mesh_flags,
+            flags,
             ssao_raw: ssao_raw_texture,
             ssao_blur: ssao_blur_texture,
             voxel_depth,
@@ -280,6 +323,8 @@ impl RenderResources {
                 &albedo_texture,
                 &render_settings_buf,
                 &world_dim_x_buf,
+                &hover_on_id_buf,
+                &selected_id_buf,
             ),
             grid: grid::GridRenderer::new(
                 device,
@@ -503,7 +548,7 @@ impl egui_wgpu::CallbackTrait for Render3dCallback {
                 label: Some("mesh pass"),
                 color_attachments: &[
                     Some(wgpu::RenderPassColorAttachment {
-                        view: &r.g_buffer.uv.view,
+                        view: &r.g_buffer.mesh_uv.view,
                         depth_slice: None,
                         resolve_target: None,
                         ops: wgpu::Operations {
@@ -512,7 +557,7 @@ impl egui_wgpu::CallbackTrait for Render3dCallback {
                         },
                     }),
                     Some(wgpu::RenderPassColorAttachment {
-                        view: &r.g_buffer.normal.view,
+                        view: &r.g_buffer.mesh_normal.view,
                         depth_slice: None,
                         resolve_target: None,
                         ops: wgpu::Operations {
@@ -530,7 +575,16 @@ impl egui_wgpu::CallbackTrait for Render3dCallback {
                         },
                     }),
                     Some(wgpu::RenderPassColorAttachment {
-                        view: &r.g_buffer.translucency.view,
+                        view: &r.g_buffer.mesh_translucency.view,
+                        depth_slice: None,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                            store: wgpu::StoreOp::Store,
+                        },
+                    }),
+                    Some(wgpu::RenderPassColorAttachment {
+                        view: &r.g_buffer.mesh_flags.view,
                         depth_slice: None,
                         resolve_target: None,
                         ops: wgpu::Operations {
@@ -557,32 +611,62 @@ impl egui_wgpu::CallbackTrait for Render3dCallback {
 
         {
             let mut render_pass = egui_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("mesh translucent depth pass"),
+                color_attachments: &[],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: &r.g_buffer.mesh_depth.view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    }),
+                    stencil_ops: None,
+                }),
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            });
+            if self.render_settings.render_dw_mesh {
+                r.dw_mesh
+                    .render_translucent_depth(&mut render_pass, &self.dw_chunks);
+            }
+        }
+
+        {
+            let mut render_pass = egui_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("voxel pass"),
                 color_attachments: &[
                     Some(wgpu::RenderPassColorAttachment {
-                        view: &r.g_buffer.uv.view,
+                        view: &r.g_buffer.voxel_uv.view,
                         depth_slice: None,
                         resolve_target: None,
                         ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Load,
+                            load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
                             store: wgpu::StoreOp::Store,
                         },
                     }),
                     Some(wgpu::RenderPassColorAttachment {
-                        view: &r.g_buffer.normal.view,
+                        view: &r.g_buffer.voxel_normal.view,
                         depth_slice: None,
                         resolve_target: None,
                         ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Load,
+                            load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
                             store: wgpu::StoreOp::Store,
                         },
                     }),
                     Some(wgpu::RenderPassColorAttachment {
-                        view: &r.g_buffer.translucency.view,
+                        view: &r.g_buffer.voxel_translucency.view,
                         depth_slice: None,
                         resolve_target: None,
                         ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Load,
+                            load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                            store: wgpu::StoreOp::Store,
+                        },
+                    }),
+                    Some(wgpu::RenderPassColorAttachment {
+                        view: &r.g_buffer.voxel_translucent_depth.view,
+                        depth_slice: None,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
                             store: wgpu::StoreOp::Store,
                         },
                     }),

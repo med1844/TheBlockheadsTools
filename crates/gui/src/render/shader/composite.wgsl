@@ -2,18 +2,29 @@
 
 //!include camera_uniform.wgsl
 
-@group(0) @binding(0) var uv_texture:           texture_2d<f32>;
-@group(0) @binding(1) var uv_sampler:           sampler;
-@group(0) @binding(2) var normal_texture:       texture_2d<f32>;
-@group(0) @binding(3) var normal_sampler:       sampler;
-@group(0) @binding(4) var ssao_texture:         texture_2d<f32>;
-@group(0) @binding(5) var ssao_sampler:         sampler;
-@group(0) @binding(6) var translucency_texture: texture_2d<f32>;
-@group(0) @binding(7) var translucency_sampler: sampler;
-@group(0) @binding(8) var overlay_texture:      texture_2d<f32>;
-@group(0) @binding(9) var overlay_sampler:      sampler;
-@group(0) @binding(10) var flags_texture:        texture_2d<u32>;
-@group(0) @binding(11) var voxel_depth_texture:  texture_depth_2d;
+@group(0) @binding(0) var mesh_uv_texture:           texture_2d<f32>;
+@group(0) @binding(1) var mesh_uv_sampler:           sampler;
+@group(0) @binding(2) var mesh_normal_texture:       texture_2d<f32>;
+@group(0) @binding(3) var mesh_normal_sampler:       sampler;
+@group(0) @binding(4) var voxel_uv_texture:          texture_2d<f32>;
+@group(0) @binding(5) var voxel_uv_sampler:          sampler;
+@group(0) @binding(6) var voxel_normal_texture:      texture_2d<f32>;
+@group(0) @binding(7) var voxel_normal_sampler:      sampler;
+@group(0) @binding(8) var mesh_translucency_texture: texture_2d<f32>;
+@group(0) @binding(9) var mesh_translucency_sampler: sampler;
+@group(0) @binding(10) var voxel_translucency_texture: texture_2d<f32>;
+@group(0) @binding(11) var voxel_translucency_sampler: sampler;
+@group(0) @binding(12) var voxel_translucent_depth_texture: texture_2d<f32>;
+@group(0) @binding(13) var voxel_translucent_depth_sampler: sampler;
+@group(0) @binding(14) var ssao_texture:         texture_2d<f32>;
+@group(0) @binding(15) var ssao_sampler:         sampler;
+@group(0) @binding(16) var overlay_texture:      texture_2d<f32>;
+@group(0) @binding(17) var overlay_sampler:      sampler;
+@group(0) @binding(18) var flags_texture:        texture_2d<u32>;
+@group(0) @binding(19) var mesh_depth_texture:   texture_depth_2d;
+@group(0) @binding(20) var voxel_depth_texture:  texture_depth_2d;
+
+//!include surface.wgsl
 
 @group(1) @binding(0) var<uniform> render_settings: RenderSettings;
 @group(1) @binding(1) var<uniform> camera:      CameraUniform;
@@ -44,25 +55,21 @@ fn vs_composite(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
 
 //!include lighting.wgsl
 
-fn calculate_solid_color(in: VertexOutput, raw_depth: f32) -> vec4<f32> {
-    let raw_uv = textureSampleLevel(uv_texture, uv_sampler, in.uv, 0.0).rg;
-    let normal_data = textureSampleLevel(normal_texture, normal_sampler, in.uv, 0.0).rgb;
-    let ssao_raw = textureSampleLevel(ssao_texture, ssao_sampler, in.uv, 0.0).r;
-
+fn calculate_deferred_light(uv_data: vec2<f32>, normal_data: vec4<f32>, raw_depth: f32, in_uv: vec2<f32>, ssao_raw: f32) -> vec4<f32> {
     // Reconstruct world position
-    let ndc = vec2<f32>(in.uv.x * 2.0 - 1.0, (1.0 - in.uv.y) * 2.0 - 1.0);
+    let ndc = vec2<f32>(in_uv.x * 2.0 - 1.0, (1.0 - in_uv.y) * 2.0 - 1.0);
     let clip_pos = vec4<f32>(ndc, raw_depth, 1.0);
     let world_pos_homo = camera.inv_view_proj * clip_pos;
     let world_pos = world_pos_homo.xyz / world_pos_homo.w;
 
     // Sample material
-    let albedo_color = textureSampleLevel(tile_map, tile_map_sampler, raw_uv, 0.0);
-    let reflect_val = textureSampleLevel(tile_reflect, tile_reflect_sampler, raw_uv, 0.0).r;
+    let albedo_color = textureSampleLevel(tile_map, tile_map_sampler, uv_data, 0.0);
+    let reflect_val = textureSampleLevel(tile_reflect, tile_reflect_sampler, uv_data, 0.0).r;
 
     // Normal perturbation
-    var normal = normalize(normal_data);
+    var normal = normalize(normal_data.rgb);
     if (render_settings.enable_destruct != 0u) {
-        let destruct_color = textureSampleLevel(tile_destruct, tile_destruct_sampler, raw_uv, 0.0).rgb;
+        let destruct_color = textureSampleLevel(tile_destruct, tile_destruct_sampler, uv_data, 0.0).rgb;
         normal = perturb_normal(normal, destruct_color);
     }
 
@@ -77,39 +84,77 @@ fn calculate_solid_color(in: VertexOutput, raw_depth: f32) -> vec4<f32> {
     return vec4<f32>(solid_rgb, 1.0);
 }
 
-fn blend_alpha(a: vec4<f32>, b: vec4<f32>) -> vec4<f32> {
-    let rgb = mix(a.rgb, b.rgb, b.a);
-    return vec4<f32>(rgb, a.a + b.a * (1.0 - a.a));
+// Blends a premultiplied src color over an un-premultiplied dst color
+fn blend_premultiplied(dst: vec4<f32>, src_premult: vec4<f32>) -> vec4<f32> {
+    let rgb = dst.rgb * (1.0 - src_premult.a) + src_premult.rgb;
+    let a = src_premult.a + dst.a * (1.0 - src_premult.a);
+    return vec4<f32>(rgb, a);
+}
+
+fn to_premultiplied(color: vec4<f32>) -> vec4<f32> {
+    return vec4<f32>(color.rgb * color.a, color.a);
 }
 
 @fragment
 fn fs_composite(in: VertexOutput) -> @location(0) vec4<f32> {
-    let screen_size = vec2<f32>(textureDimensions(uv_texture));
+    let screen_size = vec2<f32>(textureDimensions(mesh_uv_texture));
     let pixel_coords = vec2<i32>(in.uv * screen_size);
-    let raw_depth = textureLoad(voxel_depth_texture, pixel_coords, 0);
+    let surf = get_surface(in.uv, screen_size);
+
+    let m_uv_data = textureLoad(mesh_uv_texture, pixel_coords, 0).rg;
+    let v_uv_data = textureLoad(voxel_uv_texture, pixel_coords, 0).rg;
+    let ssao_raw = textureLoad(ssao_texture, pixel_coords, 0).r;
 
     var solid_color = vec4<f32>(0.0);
-    if (raw_depth < 1.0) {
-        solid_color = calculate_solid_color(in, raw_depth);
+
+    if (surf.has_opaque) {
+        if (surf.is_mesh) {
+            solid_color = calculate_deferred_light(m_uv_data, vec4<f32>(surf.normal, 1.0), surf.depth, in.uv, ssao_raw);
+        } else if (surf.is_voxel) {
+            solid_color = calculate_deferred_light(v_uv_data, vec4<f32>(surf.normal, 1.0), surf.depth, in.uv, ssao_raw);
+        }
     }
 
     // Translucency blend
-    let translucent = textureSample(translucency_texture, translucency_sampler, in.uv);
-    let composed = blend_alpha(solid_color, translucent);
+    let m_translucent = textureLoad(mesh_translucency_texture, pixel_coords, 0);
+    let v_translucent = textureLoad(voxel_translucency_texture, pixel_coords, 0);
+    let m_depth = textureLoad(mesh_depth_texture, pixel_coords, 0);
+    let v_trans_d = textureLoad(voxel_translucent_depth_texture, pixel_coords, 0).r;
+
+    var composed = solid_color;
+
+    let is_m_trans = m_translucent.a > 0.0;
+    let is_v_trans = v_translucent.a > 0.0;
+
+    if (is_m_trans && is_v_trans) {
+        if (m_depth > v_trans_d) {
+            // Mesh is further than voxel. Blend mesh first, then voxel.
+            if (m_depth < surf.depth) { composed = blend_premultiplied(composed, m_translucent); }
+            if (v_trans_d < surf.depth) { composed = blend_premultiplied(composed, v_translucent); }
+        } else {
+            // Voxel is further than mesh. Blend voxel first, then mesh.
+            if (v_trans_d < surf.depth) { composed = blend_premultiplied(composed, v_translucent); }
+            if (m_depth < surf.depth) { composed = blend_premultiplied(composed, m_translucent); }
+        }
+    } else if (is_m_trans) {
+        if (m_depth < surf.depth + 1e-3) { composed = blend_premultiplied(composed, m_translucent); }
+    } else if (is_v_trans) {
+        if (v_trans_d < surf.depth) { composed = blend_premultiplied(composed, v_translucent); }
+    }
 
     // Flags (highlights)
     var highlight = vec4<f32>(0.0);
     let flags = textureLoad(flags_texture, pixel_coords, 0).r;
     if ((flags & 1u) != 0u) { // Hovered
-        highlight = vec4<f32>(1.0, 1.0, 1.0, 0.25);
+        highlight = to_premultiplied(vec4<f32>(1.0, 1.0, 1.0, 0.25));
     }
     if ((flags & 2u) != 0u) { // Selected
-        highlight = vec4<f32>(1.0, 1.0, 0.0, 0.3);
+        highlight = to_premultiplied(vec4<f32>(1.0, 1.0, 0.0, 0.3));
     }
 
     // Overlay blend
-    let overlay = textureSample(overlay_texture, overlay_sampler, in.uv);
-    let blended = blend_alpha(composed, blend_alpha(overlay, highlight));
+    let overlay = textureSample(overlay_texture, overlay_sampler, in.uv); // premultiplied by pipeline
+    let blended = blend_premultiplied(blend_premultiplied(composed, overlay), highlight);
 
     // Gamma correction
     let gamma = 2.2;

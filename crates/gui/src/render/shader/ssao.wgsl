@@ -1,10 +1,10 @@
 //!include camera_uniform.wgsl
 
 @group(0) @binding(0) var<uniform> camera: CameraUniform;
-@group(0) @binding(1) var normal_texture: texture_2d<f32>;
-@group(0) @binding(2) var normal_sampler: sampler;
-@group(0) @binding(3) var depth_texture: texture_depth_2d;
-@group(0) @binding(4) var depth_sampler: sampler;
+@group(0) @binding(1) var voxel_normal_texture: texture_2d<f32>;
+@group(0) @binding(2) var voxel_normal_sampler: sampler;
+@group(0) @binding(3) var voxel_depth_texture: texture_depth_2d;
+@group(0) @binding(4) var voxel_depth_sampler: sampler;
 
 struct SsaoUniform {
     kernel_size: u32,
@@ -17,6 +17,17 @@ struct SsaoUniform {
 @group(0) @binding(5) var<uniform> ssao_data: SsaoUniform;
 @group(0) @binding(6) var noise_texture: texture_2d<f32>;
 @group(0) @binding(7) var noise_sampler: sampler;
+@group(0) @binding(8) var mesh_depth_texture: texture_depth_2d;
+@group(0) @binding(9) var mesh_depth_sampler: sampler;
+@group(0) @binding(10) var mesh_normal_texture: texture_2d<f32>;
+@group(0) @binding(11) var mesh_normal_sampler: sampler;
+@group(0) @binding(12) var mesh_uv_texture: texture_2d<f32>;
+@group(0) @binding(13) var mesh_uv_sampler: sampler;
+@group(0) @binding(14) var voxel_uv_texture: texture_2d<f32>;
+@group(0) @binding(15) var voxel_uv_sampler: sampler;
+@group(0) @binding(16) var flags_texture: texture_2d<u32>;
+
+//!include surface.wgsl
 
 // We will tile the 4x4 noise texture over the screen
 const RADIUS: f32 = 0.5; // Sampling radius in world space units
@@ -62,7 +73,7 @@ fn project_to_uv(local_pos: vec3<f32>) -> vec2<f32> {
 
 // Function to fetch and map the randomized tangential rotation scale correctly
 fn get_random_vec(uv: vec2<f32>) -> vec3<f32> {
-    let screen_dim = vec2<f32>(textureDimensions(depth_texture, 0));
+    let screen_dim = vec2<f32>(textureDimensions(voxel_depth_texture, 0));
     let noise_dim = vec2<f32>(textureDimensions(noise_texture, 0));
     let noise_uv = uv * (screen_dim / noise_dim);
     let noise_vec_raw = textureSampleLevel(noise_texture, noise_sampler, noise_uv, 0.0).xy;
@@ -85,12 +96,14 @@ fn evaluate_sample_occlusion(local_pos: vec3<f32>, sample_local_pos: vec3<f32>) 
         return 0.0;
     }
 
-    let sample_depth_raw = textureSampleLevel(depth_texture, depth_sampler, offset_uv, 0);
-    if (sample_depth_raw >= 1.0) {
+    let screen_size = vec2<f32>(textureDimensions(voxel_depth_texture, 0));
+    let sample_depth = get_surface_depth_only(offset_uv, screen_size);
+    
+    if (sample_depth >= 1.0) {
         return 0.0;
     }
 
-    let actual_sample_local_pos = reconstruct_local_pos(offset_uv, sample_depth_raw);
+    let actual_sample_local_pos = reconstruct_local_pos(offset_uv, sample_depth);
 
     let range_check = smoothstep(0.0, 1.0, RADIUS / abs(local_pos.z - actual_sample_local_pos.z));
     let dist_to_sample = length(actual_sample_local_pos - camera.camera_pos.xyz);
@@ -106,14 +119,15 @@ fn evaluate_sample_occlusion(local_pos: vec3<f32>, sample_local_pos: vec3<f32>) 
 
 @fragment
 fn fs_ssao(in: VertexOutput) -> @location(0) f32 {
-    let depth = textureSampleLevel(depth_texture, depth_sampler, in.uv, 0);
-    if (depth >= 1.0) {
+    let screen_size = vec2<f32>(textureDimensions(voxel_depth_texture, 0));
+    let surf = get_surface(in.uv, screen_size);
+
+    if (!surf.has_opaque || surf.depth >= 1.0) {
         return 1.0; // Sky is not occluded
     }
 
-    let local_pos = reconstruct_local_pos(in.uv, depth);
-    let normal_spec = textureSampleLevel(normal_texture, normal_sampler, in.uv, 0.0);
-    let normal = normalize(normal_spec.xyz);
+    let local_pos = reconstruct_local_pos(in.uv, surf.depth);
+    let normal = normalize(surf.normal);
 
     let random_vec = get_random_vec(in.uv);
 

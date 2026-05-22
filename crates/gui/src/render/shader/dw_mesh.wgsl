@@ -27,12 +27,15 @@ struct VertexOutput {
 
 @group(0) @binding(3) var<uniform> render_settings: RenderSettings;
 @group(0) @binding(4) var<uniform> world_dim_x: u32;
+@group(0) @binding(5) var<uniform> hover_on_id: IdUniform;
+@group(0) @binding(6) var<uniform> selected_id: IdUniform;
 
 struct FragmentOutput {
-    @location(0) uv: vec4<f32>,
+    @location(0) uv: vec2<f32>,
     @location(1) normal: vec4<f32>,
     @location(2) id: vec2<u32>,
     @location(3) translucency: vec4<f32>,
+    @location(4) mesh_flags: u32,
     @builtin(frag_depth) depth: f32,
 }
 
@@ -74,6 +77,25 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     var output: FragmentOutput;
     output.id = vec2<u32>(in.id, in.chunk);
 
+    var mesh_flags = 0u;
+    if (in.id != 0u || in.chunk != 0u) {
+        let hovered = hover_on_id.is_some != 0u
+            && in.chunk == hover_on_id.chunk
+            && in.id == hover_on_id.id;
+
+        if (hovered) {
+            mesh_flags |= 1u;
+        }
+
+        let selected = selected_id.is_some != 0u
+            && in.chunk == selected_id.chunk
+            && in.id == selected_id.id;
+
+        if (selected) {
+            mesh_flags |= 2u;
+        }
+    }
+
     if (color.a < 1.0) {
         // Translucent mesh pixel
         let view_dir = normalize(camera.camera_pos.xyz - (in.world_pos - camera.world_offset.xyz));
@@ -81,16 +103,32 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
         output.translucency = vec4<f32>(lit_rgb, color.a);
 
         // Clear other targets
-        output.uv = vec4<f32>(0.0);
+        output.uv = vec2<f32>(0.0);
         output.normal = vec4<f32>(0.0, 0.0, 1.0, 0.0);
+        output.mesh_flags = mesh_flags;
         output.depth = 1.0; // Don't write to depth
     } else {
         // Opaque mesh pixel
         output.depth = in.clip_position.z;
-        output.uv = vec4<f32>(in.tex_coords, 0.0, 1.0);
+        output.uv = in.tex_coords;
         output.normal = vec4<f32>(in.normal, 1.0);
         output.translucency = vec4<f32>(0.0);
+        output.mesh_flags = mesh_flags | (1u << 2u); // Bit 2 is mesh_opaque
     }
 
     return output;
+}
+
+@fragment
+fn fs_translucent_depth(in: VertexOutput) -> @builtin(frag_depth) f32 {
+    let color = textureSample(tilemap_texture, tilemap_sampler, in.tex_coords);
+
+    // Discard fully opaque pixels (they already wrote depth in main pass)
+    // Discard fully transparent pixels (they shouldn't write depth)
+    if (color.a >= 1.0 || color.a == 0.0) {
+        discard;
+    }
+
+    // Write actual depth for translucent pixels
+    return in.clip_position.z;
 }

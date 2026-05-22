@@ -2,6 +2,7 @@ use super::{DwChunkBuf, DwVertex, ID_TEXTURE_FORMAT, Texture};
 
 pub struct DwMeshRenderer {
     pipeline: wgpu::RenderPipeline,
+    translucent_depth_pipeline: wgpu::RenderPipeline,
     bind_group: wgpu::BindGroup,
 }
 
@@ -12,6 +13,8 @@ impl DwMeshRenderer {
         albedo_texture: &Texture,
         render_settings_buf: &wgpu::Buffer,
         world_dim_x_buf: &wgpu::Buffer,
+        hover_on_id_buf: &wgpu::Buffer,
+        selected_id_buf: &wgpu::Buffer,
     ) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("DW Sprite Shader"),
@@ -74,6 +77,28 @@ impl DwMeshRenderer {
                     },
                     count: None,
                 },
+                // Hover On ID
+                wgpu::BindGroupLayoutEntry {
+                    binding: 5,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                // Selected ID
+                wgpu::BindGroupLayoutEntry {
+                    binding: 6,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
             ],
         });
 
@@ -100,6 +125,14 @@ impl DwMeshRenderer {
                     binding: 4,
                     resource: world_dim_x_buf.as_entire_binding(),
                 },
+                wgpu::BindGroupEntry {
+                    binding: 5,
+                    resource: hover_on_id_buf.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 6,
+                    resource: selected_id_buf.as_entire_binding(),
+                },
             ],
             label: Some("dw_bind_group"),
         });
@@ -125,7 +158,7 @@ impl DwMeshRenderer {
                 targets: &[
                     // slot 0: uv
                     Some(wgpu::ColorTargetState {
-                        format: wgpu::TextureFormat::Rgba16Float,
+                        format: wgpu::TextureFormat::Rg16Float,
                         blend: None,
                         write_mask: wgpu::ColorWrites::ALL,
                     }),
@@ -147,6 +180,12 @@ impl DwMeshRenderer {
                         blend: Some(wgpu::BlendState::ALPHA_BLENDING),
                         write_mask: wgpu::ColorWrites::ALL,
                     }),
+                    // slot 4: mesh_flags
+                    Some(wgpu::ColorTargetState {
+                        format: wgpu::TextureFormat::R8Uint,
+                        blend: None,
+                        write_mask: wgpu::ColorWrites::ALL,
+                    }),
                 ],
                 compilation_options: Default::default(),
             }),
@@ -163,14 +202,59 @@ impl DwMeshRenderer {
             cache: None,
         });
 
+        let translucent_depth_pipeline =
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("DW Translucent Depth Pipeline"),
+                layout: Some(&pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &shader,
+                    entry_point: Some("vs_main"),
+                    buffers: &[DwVertex::desc()],
+                    compilation_options: Default::default(),
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &shader,
+                    entry_point: Some("fs_translucent_depth"),
+                    targets: &[],
+                    compilation_options: Default::default(),
+                }),
+                primitive: wgpu::PrimitiveState::default(),
+                depth_stencil: Some(wgpu::DepthStencilState {
+                    format: wgpu::TextureFormat::Depth32Float,
+                    depth_write_enabled: true,
+                    depth_compare: wgpu::CompareFunction::LessEqual,
+                    stencil: wgpu::StencilState::default(),
+                    bias: wgpu::DepthBiasState::default(),
+                }),
+                multisample: wgpu::MultisampleState::default(),
+                multiview: None,
+                cache: None,
+            });
+
         Self {
             pipeline,
+            translucent_depth_pipeline,
             bind_group,
         }
     }
 
     pub fn render(&self, rpass: &mut wgpu::RenderPass<'_>, dw_buf: &[DwChunkBuf]) {
         rpass.set_pipeline(&self.pipeline);
+        rpass.set_bind_group(0, &self.bind_group, &[]);
+        for dw_chunk_buf in dw_buf {
+            if dw_chunk_buf.faces_num_indices > 0 {
+                rpass.set_vertex_buffer(0, dw_chunk_buf.faces_vertex_buf.slice(..));
+                rpass.set_index_buffer(
+                    dw_chunk_buf.faces_index_buf.slice(..),
+                    wgpu::IndexFormat::Uint32,
+                );
+                rpass.draw_indexed(0..dw_chunk_buf.faces_num_indices, 0, 0..1);
+            }
+        }
+    }
+
+    pub fn render_translucent_depth(&self, rpass: &mut wgpu::RenderPass<'_>, dw_buf: &[DwChunkBuf]) {
+        rpass.set_pipeline(&self.translucent_depth_pipeline);
         rpass.set_bind_group(0, &self.bind_group, &[]);
         for dw_chunk_buf in dw_buf {
             if dw_chunk_buf.faces_num_indices > 0 {

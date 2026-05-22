@@ -268,7 +268,7 @@ impl VoxelRenderer {
                         binding: 0,
                         visibility: wgpu::ShaderStages::FRAGMENT,
                         ty: wgpu::BindingType::Texture {
-                            sample_type: wgpu::TextureSampleType::Depth,
+                            sample_type: wgpu::TextureSampleType::Uint,
                             view_dimension: wgpu::TextureViewDimension::D2,
                             multisampled: false,
                         },
@@ -276,12 +276,6 @@ impl VoxelRenderer {
                     },
                     wgpu::BindGroupLayoutEntry {
                         binding: 1,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
-                        count: None,
-                    },
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 2,
                         visibility: wgpu::ShaderStages::FRAGMENT,
                         ty: wgpu::BindingType::Texture {
                             sample_type: wgpu::TextureSampleType::Uint,
@@ -342,13 +336,13 @@ impl VoxelRenderer {
                 module: &shader,
                 entry_point: Some("fs_main"),
                 targets: &[
-                    // slot 0: uv. only r and g is filled. set a=1.0 to overwrite mesh output.
+                    // slot 0: uv
                     Some(wgpu::ColorTargetState {
-                        format: wgpu::TextureFormat::Rgba16Float,
-                        blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                        format: wgpu::TextureFormat::Rg16Float,
+                        blend: None,
                         write_mask: wgpu::ColorWrites::ALL,
                     }),
-                    // slot 1: normal. set a=1.0 to overwrite mesh output, a=0.0 to keep it
+                    // slot 1: normal
                     Some(wgpu::ColorTargetState {
                         format: wgpu::TextureFormat::Rgba16Float,
                         blend: Some(wgpu::BlendState::ALPHA_BLENDING),
@@ -360,7 +354,13 @@ impl VoxelRenderer {
                         blend: Some(wgpu::BlendState::ALPHA_BLENDING),
                         write_mask: wgpu::ColorWrites::ALL,
                     }),
-                    // slot 3: flags
+                    // slot 3: translucent depth
+                    Some(wgpu::ColorTargetState {
+                        format: wgpu::TextureFormat::R16Float,
+                        blend: None,
+                        write_mask: wgpu::ColorWrites::ALL,
+                    }),
+                    // slot 4: flags
                     Some(wgpu::ColorTargetState {
                         format: wgpu::TextureFormat::R8Uint,
                         blend: None,
@@ -408,15 +408,11 @@ impl VoxelRenderer {
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&g_buffer.mesh_depth.view),
+                    resource: wgpu::BindingResource::TextureView(&g_buffer.dyn_obj_id.view),
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
-                    resource: wgpu::BindingResource::Sampler(&g_buffer.mesh_depth.sampler),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: wgpu::BindingResource::TextureView(&g_buffer.dyn_obj_id.view),
+                    resource: wgpu::BindingResource::TextureView(&g_buffer.mesh_flags.view),
                 },
             ],
             label: Some("Voxel Buffer Bind Group"),
