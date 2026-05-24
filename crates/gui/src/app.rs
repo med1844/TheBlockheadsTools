@@ -20,11 +20,11 @@ use std::sync::{Arc, Mutex};
 use the_blockheads_tools_lib::{
     DynArch,
     game::{
-        block::{Block, BlockMut, BlockViewMut},
+        block::{Block, BlockContentType, BlockMut, BlockType, BlockViewMut, NUM_BYTES_PER_BLOCK},
         chunk::{Chunk, Chunks},
         coord::{BlockCoord, ChunkCoord},
         db::world_db::{WorldDb, WorldDbError},
-        dynamic_object::DynamicObjectType,
+        dynamic_object::{AnyDynamicObject, DynamicObjectType},
         dynamic_world::{ChunkDynamicObjects, DynamicWorld},
     },
 };
@@ -210,6 +210,83 @@ pub enum EditorAppError {
 
 type Result<T> = std::result::Result<T, EditorAppError>;
 
+// Different mode has different interaction logic
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
+enum Mode {
+    // drag: move around
+    // hover: hover on block / dw object
+    // left click: select block / dw object
+    // scroll: zoom in / out
+    #[default]
+    View,
+
+    // drag: draw blocks
+    // hover: hover on block / dw object
+    // left click: select block / dw object, if none then draw block A / add dw object
+    // middle click: sample block / dw object as reference
+    // right click: draw block B / delete dw_object
+    // scroll: zoom in / out
+    Pen,
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
+enum PenDrawTarget {
+    #[default]
+    Block,
+    DwObj,
+}
+
+#[derive(Debug, Clone)]
+struct BlockData([u8; NUM_BYTES_PER_BLOCK]);
+
+impl BlockData {
+    fn view_mut(&mut self) -> BlockViewMut<'_> {
+        BlockViewMut::new(&mut self.0)
+    }
+
+    fn new(fg: BlockType, bg: BlockType, content: BlockContentType) -> Self {
+        let mut data = Self([0; NUM_BYTES_PER_BLOCK]);
+        let mut view_mut = data.view_mut();
+        view_mut.set_fg(fg);
+        view_mut.set_bg(bg);
+        view_mut.set_content(content);
+        data
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+enum PrimaryTarget {
+    #[default]
+    A,
+    B,
+}
+
+#[derive(Debug, Clone)]
+struct PenModeSettings {
+    block_a: BlockData,
+    block_b: BlockData,
+    // primary => binds to left click, not primary => binds to right click
+    primary_block: PrimaryTarget,
+    dyn_obj: AnyDynamicObject,
+    target: PenDrawTarget,
+}
+
+impl Default for PenModeSettings {
+    fn default() -> Self {
+        Self {
+            block_a: BlockData::new(
+                BlockType::Stone,
+                BlockType::Wood,
+                BlockContentType::TitaniumOre,
+            ),
+            block_b: BlockData::new(BlockType::Air, BlockType::Air, BlockContentType::Nothing),
+            primary_block: PrimaryTarget::default(),
+            dyn_obj: AnyDynamicObject::default(),
+            target: PenDrawTarget::default(),
+        }
+    }
+}
+
 pub struct EditorApp {
     world_db: Option<WorldDb>,
     dw_buf: DwBuf,
@@ -217,6 +294,8 @@ pub struct EditorApp {
 
     show_settings: bool,
     fps_counter: FpsCounter,
+    mode: Mode,
+    pen_mode_settings: PenModeSettings,
 
     interaction_state: InteractionState,
 
@@ -266,6 +345,8 @@ impl EditorApp {
 
             show_settings: false,
             fps_counter: FpsCounter::new(2.0),
+            mode: Mode::default(),
+            pen_mode_settings: PenModeSettings::default(),
 
             interaction_state,
 
@@ -344,9 +425,6 @@ impl EditorApp {
 
     fn render_menu_bar(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
         egui::MenuBar::new().ui(ui, |ui| {
-            ui.toggle_value(&mut self.show_settings, "Settings");
-            ui.toggle_value(&mut self.render_settings.show_grid, "Grid");
-            ui.separator();
             ui.menu_button("File", |ui| {
                 #[cfg(not(target_arch = "wasm32"))]
                 {
@@ -409,6 +487,25 @@ impl EditorApp {
                     }
                 }
             });
+
+            ui.separator();
+            ui.toggle_value(&mut self.render_settings.show_grid, "Grid");
+            ui.toggle_value(&mut self.show_settings, "Settings");
+
+            ui.separator();
+            if ui
+                .toggle_value(&mut (self.mode == Mode::View), "View")
+                .changed()
+            {
+                self.mode = Mode::View;
+            }
+            if ui
+                .toggle_value(&mut (self.mode == Mode::Pen), "Pen")
+                .changed()
+            {
+                self.mode = Mode::Pen;
+            }
+
             ui.separator();
             ui.label("Viewport center:");
             ui.add(
@@ -446,80 +543,86 @@ impl EditorApp {
         }
     }
 
-    fn render_selected_block_info(ui: &mut egui::Ui, mut block: BlockViewMut<'_>) -> bool {
+    fn render_block_info(ui: &mut egui::Ui, mut block: BlockViewMut<'_>) -> bool {
         let mut update_voxel = false;
-        ui.label("foreground");
-        ui.push_id("fg", |ui| {
-            update_voxel |= ui.add(egui::DragValue::new(block.fg_raw_mut())).changed();
-            match block.fg() {
-                Ok(mut fg_type) => {
-                    if block_type_drop_menu(ui, &mut fg_type).changed() {
-                        block.set_fg(fg_type);
-                        update_voxel = true;
-                    }
-                }
-                Err(e) => {
-                    ui.weak(e.to_string());
-                }
-            };
-        });
-        ui.end_row();
+        egui::Grid::new("my_grid")
+            .num_columns(3)
+            .spacing([40.0, 4.0])
+            .striped(true)
+            .show(ui, |ui| {
+                ui.label("foreground");
+                ui.push_id("fg", |ui| {
+                    update_voxel |= ui.add(egui::DragValue::new(block.fg_raw_mut())).changed();
+                    match block.fg() {
+                        Ok(mut fg_type) => {
+                            if block_type_drop_menu(ui, &mut fg_type).changed() {
+                                block.set_fg(fg_type);
+                                update_voxel = true;
+                            }
+                        }
+                        Err(e) => {
+                            ui.weak(e.to_string());
+                        }
+                    };
+                });
+                ui.end_row();
 
-        ui.label("background");
-        ui.push_id("bg", |ui| {
-            update_voxel |= ui.add(egui::DragValue::new(block.bg_raw_mut())).changed();
-            match block.bg() {
-                Ok(mut bg_type) => {
-                    if block_type_drop_menu(ui, &mut bg_type).changed() {
-                        block.set_bg(bg_type);
-                        update_voxel = true;
-                    }
-                }
-                Err(e) => {
-                    ui.weak(e.to_string());
-                }
-            };
-        });
-        ui.end_row();
+                ui.label("background");
+                ui.push_id("bg", |ui| {
+                    update_voxel |= ui.add(egui::DragValue::new(block.bg_raw_mut())).changed();
+                    match block.bg() {
+                        Ok(mut bg_type) => {
+                            if block_type_drop_menu(ui, &mut bg_type).changed() {
+                                block.set_bg(bg_type);
+                                update_voxel = true;
+                            }
+                        }
+                        Err(e) => {
+                            ui.weak(e.to_string());
+                        }
+                    };
+                });
+                ui.end_row();
 
-        ui.label("content");
-        ui.push_id("ct", |ui| {
-            update_voxel |= ui
-                .add(egui::DragValue::new(block.content_raw_mut()))
-                .changed();
-            match block.content() {
-                Ok(mut content_type) => {
-                    if block_content_type_drop_menu(ui, &mut content_type).changed() {
-                        block.set_content(content_type);
-                        update_voxel = true;
-                    }
-                }
-                Err(e) => {
-                    ui.weak(e.to_string());
-                }
-            };
-        });
-        ui.end_row();
+                ui.label("content");
+                ui.push_id("ct", |ui| {
+                    update_voxel |= ui
+                        .add(egui::DragValue::new(block.content_raw_mut()))
+                        .changed();
+                    match block.content() {
+                        Ok(mut content_type) => {
+                            if block_content_type_drop_menu(ui, &mut content_type).changed() {
+                                block.set_content(content_type);
+                                update_voxel = true;
+                            }
+                        }
+                        Err(e) => {
+                            ui.weak(e.to_string());
+                        }
+                    };
+                });
+                ui.end_row();
 
-        ui.label("height")
-            .on_hover_text("The height of water/snow; not rendered here");
-        ui.add(egui::DragValue::new(block.height_mut()));
-        ui.end_row();
+                ui.label("height")
+                    .on_hover_text("The height of water/snow; not rendered here");
+                ui.add(egui::DragValue::new(block.height_mut()));
+                ui.end_row();
 
-        ui.label("damage")
-            .on_hover_text("The gathering progress value");
-        ui.add(egui::DragValue::new(block.damage_mut()));
-        ui.end_row();
+                ui.label("damage")
+                    .on_hover_text("The gathering progress value");
+                ui.add(egui::DragValue::new(block.damage_mut()));
+                ui.end_row();
 
-        ui.label("visibility")
-            .on_hover_text("The black fog that covers the undiscovered area");
-        ui.add(egui::DragValue::new(block.visibility_mut()));
-        ui.end_row();
+                ui.label("visibility")
+                    .on_hover_text("The black fog that covers the undiscovered area");
+                ui.add(egui::DragValue::new(block.visibility_mut()));
+                ui.end_row();
 
-        ui.label("brightness")
-            .on_hover_text("Blocks in cave have near-zero brightness");
-        ui.add(egui::DragValue::new(block.brightness_mut()));
-        ui.end_row();
+                ui.label("brightness")
+                    .on_hover_text("Blocks in cave have near-zero brightness");
+                ui.add(egui::DragValue::new(block.brightness_mut()));
+                ui.end_row();
+            });
 
         update_voxel
     }
@@ -582,7 +685,8 @@ impl EditorApp {
             self.world_viewport_rect.height(),
         );
 
-        if response.dragged_by(egui::PointerButton::Primary)
+        if matches!(self.mode, Mode::View)
+            && response.dragged_by(egui::PointerButton::Primary)
             && let Some(cur_pos) = response.interact_pointer_pos()
         {
             let delta = response.drag_delta();
@@ -649,7 +753,7 @@ impl EditorApp {
             }
         }
 
-        if response.clicked_by(egui::PointerButton::Primary) {
+        if matches!(self.mode, Mode::View) && response.clicked_by(egui::PointerButton::Primary) {
             self.interaction_state
                 .copy_hover_to_select(self.world_db.as_mut());
         }
@@ -659,6 +763,80 @@ impl EditorApp {
         self.mouse_pos = response.hover_pos().map(|pos| {
             ((pos - self.world_viewport_rect.min) * response.ctx.pixels_per_point()).into()
         });
+    }
+
+    fn is_drawing_block(&self) -> bool {
+        matches!(self.mode, Mode::Pen)
+            && matches!(self.pen_mode_settings.target, PenDrawTarget::Block)
+    }
+
+    fn is_drawing_dyn_obj(&self) -> bool {
+        matches!(self.mode, Mode::Pen)
+            && matches!(self.pen_mode_settings.target, PenDrawTarget::DwObj)
+    }
+
+    fn handle_draw(&mut self, response: &egui::Response) {
+        if self.is_drawing_block()
+            && let Some(InteractionTarget::Block(block_coord)) = self.interaction_state.hover
+        {
+            if response.clicked_by(egui::PointerButton::Primary)
+                || response.dragged_by(egui::PointerButton::Primary)
+            {
+                dbg!("draw block at {} with block A", block_coord);
+            }
+            if response.clicked_by(egui::PointerButton::Middle) {
+                dbg!("sample block at {}", block_coord);
+            }
+            if response.clicked_by(egui::PointerButton::Secondary)
+                || response.dragged_by(egui::PointerButton::Secondary)
+            {
+                dbg!("draw block at {} with block B", block_coord);
+            }
+        }
+        if self.is_drawing_dyn_obj() {
+            if response.clicked_by(egui::PointerButton::Primary) {
+                if let Some(InteractionTarget::DynamicObject { chunk_coord, id }) =
+                    self.interaction_state.hover
+                {
+                    dbg!(
+                        "select obj {}-th {:?} at {}",
+                        id.index,
+                        id.obj_type,
+                        chunk_coord
+                    );
+                } else if let Some(pos) = response.hover_pos() {
+                    let [x, y] = self
+                        .camera
+                        .mouse_at(
+                            (pos - self.world_viewport_rect.min).into(),
+                            self.world_viewport_rect.size().into(),
+                        )
+                        .to_array();
+
+                    dbg!("draw obj at {}", (x, y));
+                }
+            }
+            if let Some(InteractionTarget::DynamicObject { chunk_coord, id }) =
+                self.interaction_state.hover
+            {
+                if response.clicked_by(egui::PointerButton::Middle) {
+                    dbg!(
+                        "sample obj {}-th {:?} at {}",
+                        id.index,
+                        id.obj_type,
+                        chunk_coord
+                    );
+                }
+                if response.clicked_by(egui::PointerButton::Secondary) {
+                    dbg!(
+                        "delete obj {}-th {:?} at {}",
+                        id.index,
+                        id.obj_type,
+                        chunk_coord
+                    );
+                }
+            }
+        }
     }
 
     fn render_3d_viewport(&mut self, ui: &mut egui::Ui) {
@@ -672,6 +850,7 @@ impl EditorApp {
         self.update_mouse_pos(&response);
         self.update_interaction_state(&response);
         self.update_camera_pos(ui, &response);
+        self.handle_draw(&response);
 
         let [min_coords, max_coords] = self.camera.visible_world_region_2d(rect.size().into());
         let center = self.camera.world_offset().xy();
@@ -850,13 +1029,7 @@ impl EditorApp {
                         selected_block_coord.x(),
                         selected_block_coord.y(),
                     ));
-                    egui::Grid::new("my_grid")
-                        .num_columns(2)
-                        .spacing([40.0, 4.0])
-                        .striped(true)
-                        .show(ui, |ui| {
-                            update_voxel = Self::render_selected_block_info(ui, block_view_mut);
-                        });
+                    update_voxel = Self::render_block_info(ui, block_view_mut);
                 });
             if update_voxel && let Some(state) = frame.wgpu_render_state() {
                 let read_renderer = state.renderer.read();
@@ -1066,6 +1239,86 @@ impl EditorApp {
             }
         }
     }
+
+    // helper function for the pen mode
+    fn render_block_slot(
+        ui: &mut egui::Ui,
+        title: &str,
+        id: &str,
+        primary_block: &mut PrimaryTarget,
+        target: PrimaryTarget,
+        block_view_mut: BlockViewMut,
+    ) {
+        ui.vertical(|ui| {
+            ui.horizontal(|ui| {
+                ui.heading(title);
+                ui.selectable_value(
+                    primary_block,
+                    target,
+                    if *primary_block == target {
+                        "Primary"
+                    } else {
+                        "Secondary"
+                    },
+                );
+            });
+            ui.push_id(id, |ui| {
+                Self::render_block_info(ui, block_view_mut);
+            });
+        });
+    }
+
+    fn render_pen_mode_window(&mut self, ctx: &egui::Context) {
+        egui::Window::new("Pen Mode Settings")
+            .id("pen_mode_settings_window".into())
+            .anchor(egui::Align2::RIGHT_BOTTOM, egui::Vec2::splat(-10.0))
+            .show(ctx, |ui| {
+                ui.horizontal(|ui| {
+                    ui.selectable_value(
+                        &mut self.pen_mode_settings.target,
+                        PenDrawTarget::Block,
+                        "Block",
+                    );
+                    ui.selectable_value(
+                        &mut self.pen_mode_settings.target,
+                        PenDrawTarget::DwObj,
+                        "Dynamic Object",
+                    );
+                });
+
+                ui.separator();
+
+                let primary_block = &mut self.pen_mode_settings.primary_block;
+                match self.pen_mode_settings.target {
+                    PenDrawTarget::Block => {
+                        ui.horizontal(|ui| {
+                            Self::render_block_slot(
+                                ui,
+                                "Block A",
+                                "block_a",
+                                primary_block,
+                                PrimaryTarget::A,
+                                self.pen_mode_settings.block_a.view_mut(),
+                            );
+                            ui.separator();
+                            Self::render_block_slot(
+                                ui,
+                                "Block B",
+                                "block_b",
+                                primary_block,
+                                PrimaryTarget::B,
+                                self.pen_mode_settings.block_b.view_mut(),
+                            );
+                        });
+                    }
+                    PenDrawTarget::DwObj => {
+                        self.pen_mode_settings
+                            .dyn_obj
+                            .info(ui, &mut DwUiContext::default());
+                    }
+                };
+            });
+    }
 }
 
 impl eframe::App for EditorApp {
@@ -1094,5 +1347,8 @@ impl eframe::App for EditorApp {
         self.render_error_windows(ctx);
         self.render_selected_block_info_window(ctx, frame);
         self.render_selected_dyn_obj_info_window(ctx, frame);
+        if self.mode == Mode::Pen {
+            self.render_pen_mode_window(ctx);
+        }
     }
 }

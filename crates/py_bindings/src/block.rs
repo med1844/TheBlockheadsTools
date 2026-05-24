@@ -258,7 +258,9 @@ impl BlockPy {
     }
 
     fn set_fg(&self, py: Python<'_>, block_type: &BlockTypePy) {
-        self.write(py, |mut block_view_mut| block_view_mut.set_fg(*block_type))
+        self.write(py, |mut block_view_mut| {
+            block_view_mut.set_fg((*block_type).into())
+        })
     }
 
     fn bg(&self, py: Python<'_>) -> PyResult<BlockTypePy> {
@@ -272,7 +274,9 @@ impl BlockPy {
     }
 
     fn set_bg(&self, py: Python<'_>, block_type: &BlockTypePy) {
-        self.write(py, |mut block_view_mut| block_view_mut.set_bg(*block_type))
+        self.write(py, |mut block_view_mut| {
+            block_view_mut.set_bg((*block_type).into())
+        })
     }
 
     fn content(&self, py: Python<'_>) -> PyResult<BlockContentTypePy> {
@@ -287,7 +291,7 @@ impl BlockPy {
 
     fn set_content(&self, py: Python<'_>, block_content_type: &BlockContentTypePy) {
         self.write(py, |mut block_view_mut| {
-            block_view_mut.set_content(*block_content_type)
+            block_view_mut.set_content((*block_content_type).into())
         })
     }
 

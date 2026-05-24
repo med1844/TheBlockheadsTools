@@ -61,6 +61,7 @@ pub struct ObjFlags {
 mod context {
     use super::ObjFlags;
 
+    #[derive(Debug, Default)]
     pub struct DwUiContext {
         world_width: u32,
         cyclic: bool,
@@ -170,19 +171,24 @@ impl<T: ToRow + Default> ToRow for Option<T> {
     }
 }
 
-impl<T: ToGrid + Default> ToGrid for Option<T> {
+impl<T: ToGrid + Clone + Default + Send + Sync + 'static> ToGrid for Option<T> {
     fn to_grid(&mut self, _: &mut egui::Ui, _: &mut DwUiContext) {}
 
     fn add_grid<H: Hash>(&mut self, id: H, ui: &mut egui::Ui, context: &mut DwUiContext) {
         let mut is_some = self.is_some();
-
+        let storage_id = ui.make_persistent_id(&id);
         ui.vertical(|ui| {
             // Checkbox to toggle if the Option is None or Some
             if ui.checkbox(&mut is_some, "").changed() {
                 if is_some {
-                    *self = Some(T::default());
+                    let restored_data = ui
+                        .data_mut(|d| d.get_temp::<T>(storage_id))
+                        .unwrap_or_else(T::default);
+                    *self = Some(restored_data);
                 } else {
-                    *self = None;
+                    if let Some(abandoned_data) = self.take() {
+                        ui.data_mut(|d| d.insert_temp(storage_id, abandoned_data));
+                    }
                 }
             }
 
@@ -2131,6 +2137,124 @@ fn paint_slots(
     }
 }
 
+impl ToGrid for AnyDynamicObject {
+    fn to_grid(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        ui.vertical(|ui| {
+            let current_variant_name: &'static str = (self as &Self).into();
+
+            egui::ComboBox::from_id_salt("dyn_obj_combo")
+                .selected_text(current_variant_name)
+                .show_ui(ui, |ui| {
+                    let mut changed = false;
+
+                    let mut selectable_variant =
+                        |ui: &mut egui::Ui,
+                         name: &str,
+                         is_selected: bool,
+                         new_variant: fn() -> AnyDynamicObject,
+                         dyn_obj: &mut AnyDynamicObject| {
+                            if ui.selectable_label(is_selected, name).clicked() {
+                                *dyn_obj = new_variant();
+                                changed = true;
+                            }
+                        };
+
+                    selectable_variant(
+                        ui,
+                        "Ladder",
+                        matches!(self, AnyDynamicObject::Ladder(_)),
+                        || AnyDynamicObject::Ladder(Box::default()),
+                        self,
+                    );
+                    selectable_variant(
+                        ui,
+                        "Door",
+                        matches!(self, AnyDynamicObject::Door(_)),
+                        || AnyDynamicObject::Door(Box::default()),
+                        self,
+                    );
+                    selectable_variant(
+                        ui,
+                        "Bed",
+                        matches!(self, AnyDynamicObject::Bed(_)),
+                        || AnyDynamicObject::Bed(Box::default()),
+                        self,
+                    );
+                    selectable_variant(
+                        ui,
+                        "Egg",
+                        matches!(self, AnyDynamicObject::Egg(_)),
+                        || AnyDynamicObject::Egg(Box::default()),
+                        self,
+                    );
+                    selectable_variant(
+                        ui,
+                        "Workbench",
+                        matches!(self, AnyDynamicObject::Workbench(_)),
+                        || AnyDynamicObject::Workbench(Box::default()),
+                        self,
+                    );
+                    selectable_variant(
+                        ui,
+                        "Chest",
+                        matches!(self, AnyDynamicObject::Chest(_)),
+                        || AnyDynamicObject::Chest(Box::default()),
+                        self,
+                    );
+                    selectable_variant(
+                        ui,
+                        "Sign",
+                        matches!(self, AnyDynamicObject::Sign(_)),
+                        || AnyDynamicObject::Sign(Box::default()),
+                        self,
+                    );
+                    selectable_variant(
+                        ui,
+                        "TrainStation",
+                        matches!(self, AnyDynamicObject::TrainStation(_)),
+                        || AnyDynamicObject::TrainStation(Box::default()),
+                        self,
+                    );
+
+                    context.flags.rebuild_mesh |= changed;
+                });
+
+            ui.horizontal(|ui| match self {
+                AnyDynamicObject::Ladder(ladder) => {
+                    ladder.add_grid("ladder_grid", ui, context);
+                }
+                AnyDynamicObject::Door(door) => {
+                    door.add_grid("door_grid", ui, context);
+                }
+                AnyDynamicObject::Bed(bed) => {
+                    bed.add_grid("bed_grid", ui, context);
+                }
+                AnyDynamicObject::Egg(egg) => {
+                    egg.add_grid("egg_grid", ui, context);
+                }
+                AnyDynamicObject::Workbench(workbench) => {
+                    workbench.add_grid("workbench_grid", ui, context);
+                }
+                AnyDynamicObject::Chest(chest) => {
+                    chest.add_grid("chest_grid", ui, context);
+                }
+                AnyDynamicObject::Sign(sign) => {
+                    sign.add_grid("sign_grid", ui, context);
+                }
+                AnyDynamicObject::TrainStation(train_station) => {
+                    train_station.add_grid("train_station_grid", ui, context);
+                }
+            });
+        });
+    }
+}
+
+impl InfoUi for AnyDynamicObject {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        self.add_grid("any_dynamic_object_grid", ui, context);
+    }
+}
+
 impl ToGrid for Item {
     fn to_grid(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         self.type_id.add_row("typeId", ui);
@@ -2165,141 +2289,13 @@ impl ToGrid for Item {
         }
         ui.end_row();
 
-        ui.label("dynamicObject");
-        ui.vertical(|ui| {
-            let current_variant_name = match &self.dynamic_object {
-                None => "None",
-                Some(obj) => obj.into(),
-            };
-
-            egui::ComboBox::from_id_salt("dyn_obj_combo")
-                .selected_text(current_variant_name)
-                .show_ui(ui, |ui| {
-                    let mut changed = false;
-
-                    let mut selectable_variant =
-                        |ui: &mut egui::Ui,
-                         name: &str,
-                         is_selected: bool,
-                         new_variant: fn() -> Option<AnyDynamicObject>,
-                         new_item_type: Option<ItemType>,
-                         item: &mut Item| {
-                            if ui.selectable_label(is_selected, name).clicked() {
-                                item.dynamic_object = new_variant();
-                                if let Some(new_item_type) = new_item_type {
-                                    item.set_item_type(new_item_type);
-                                }
-                                changed = true;
-                            }
-                        };
-
-                    selectable_variant(
-                        ui,
-                        "None",
-                        self.dynamic_object.is_none(),
-                        || None,
-                        None,
-                        self,
-                    );
-                    selectable_variant(
-                        ui,
-                        "Ladder",
-                        matches!(self.dynamic_object, Some(AnyDynamicObject::Ladder(_))),
-                        || Some(AnyDynamicObject::Ladder(Box::default())),
-                        Some(ItemType::Ladder),
-                        self,
-                    );
-                    selectable_variant(
-                        ui,
-                        "Door",
-                        matches!(self.dynamic_object, Some(AnyDynamicObject::Door(_))),
-                        || Some(AnyDynamicObject::Door(Box::default())),
-                        Some(ItemType::Door),
-                        self,
-                    );
-                    selectable_variant(
-                        ui,
-                        "Bed",
-                        matches!(self.dynamic_object, Some(AnyDynamicObject::Bed(_))),
-                        || Some(AnyDynamicObject::Bed(Box::default())),
-                        Some(ItemType::Bed),
-                        self,
-                    );
-                    selectable_variant(
-                        ui,
-                        "Egg",
-                        matches!(self.dynamic_object, Some(AnyDynamicObject::Egg(_))),
-                        || Some(AnyDynamicObject::Egg(Box::default())),
-                        Some(ItemType::DodoEgg),
-                        self,
-                    );
-                    selectable_variant(
-                        ui,
-                        "Workbench",
-                        matches!(self.dynamic_object, Some(AnyDynamicObject::Workbench(_))),
-                        || Some(AnyDynamicObject::Workbench(Box::default())),
-                        Some(ItemType::WorkBench),
-                        self,
-                    );
-                    selectable_variant(
-                        ui,
-                        "Chest",
-                        matches!(self.dynamic_object, Some(AnyDynamicObject::Chest(_))),
-                        || Some(AnyDynamicObject::Chest(Box::default())),
-                        Some(ItemType::Chest),
-                        self,
-                    );
-                    selectable_variant(
-                        ui,
-                        "Sign",
-                        matches!(self.dynamic_object, Some(AnyDynamicObject::Sign(_))),
-                        || Some(AnyDynamicObject::Sign(Box::default())),
-                        Some(ItemType::Sign),
-                        self,
-                    );
-                    selectable_variant(
-                        ui,
-                        "TrainStation",
-                        matches!(self.dynamic_object, Some(AnyDynamicObject::TrainStation(_))),
-                        || Some(AnyDynamicObject::TrainStation(Box::default())),
-                        Some(ItemType::TrainStation),
-                        self,
-                    );
-
-                    context.flags.rebuild_mesh |= changed;
-                });
-
-            if let Some(dyn_obj) = &mut self.dynamic_object {
-                ui.horizontal(|ui| match dyn_obj {
-                    AnyDynamicObject::Ladder(ladder) => {
-                        ladder.add_grid("ladder_grid", ui, context);
-                    }
-                    AnyDynamicObject::Door(door) => {
-                        door.add_grid("door_grid", ui, context);
-                    }
-                    AnyDynamicObject::Bed(bed) => {
-                        bed.add_grid("bed_grid", ui, context);
-                    }
-                    AnyDynamicObject::Egg(egg) => {
-                        egg.add_grid("egg_grid", ui, context);
-                    }
-                    AnyDynamicObject::Workbench(workbench) => {
-                        workbench.add_grid("workbench_grid", ui, context);
-                    }
-                    AnyDynamicObject::Chest(chest) => {
-                        chest.add_grid("chest_grid", ui, context);
-                    }
-                    AnyDynamicObject::Sign(sign) => {
-                        sign.add_grid("sign_grid", ui, context);
-                    }
-                    AnyDynamicObject::TrainStation(train_station) => {
-                        train_station.add_grid("train_station_grid", ui, context);
-                    }
-                });
-                ui.end_row();
-            }
-        });
-        ui.end_row();
+        grid_as_row(
+            &mut self.dynamic_object,
+            "dynamicObject",
+            "any_dyn_obj_grid",
+            ui,
+            context,
+        );
     }
 }
 

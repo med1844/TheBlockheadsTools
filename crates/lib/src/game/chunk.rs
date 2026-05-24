@@ -1,6 +1,6 @@
 use super::{
     super::util::gzip::{compress_into, decompress_exact_into, decompress_into},
-    block::{BlockView, BlockViewMut},
+    block::{BlockView, BlockViewMut, NUM_BYTES_PER_BLOCK},
     coord::{BlockCoord, ChunkCoord, ChunkOffset},
 };
 use lmdb_rs::{
@@ -19,12 +19,11 @@ pub struct ChunkView<'a>(&'a ChunkBytes);
 impl<'a> ChunkView<'a> {
     pub fn block_at<O: ChunkOffset>(&self, coord: O) -> BlockView<'a> {
         let offset = coord.to_offset();
-        let slice =
-            <&[u8; 64]>::try_from(&self.0.as_slice()[offset..offset + Chunk::NUM_BYTES_PER_BLOCK])
-                .expect(
-                    "Return value of `ChunkBlockCoord.to_offset()` is guaranteed \
+        let slice = <&[u8; 64]>::try_from(&self.0.as_slice()[offset..offset + NUM_BYTES_PER_BLOCK])
+            .expect(
+                "Return value of `ChunkBlockCoord.to_offset()` is guaranteed \
                 to be smaller than chunk bytes len - 32",
-                );
+            );
         BlockView::new(slice)
     }
 }
@@ -36,7 +35,7 @@ impl<'a> ChunkViewMut<'a> {
     pub fn block_at_mut<O: ChunkOffset>(&'_ mut self, coord: O) -> BlockViewMut<'_> {
         let offset = coord.to_offset();
         let slice = <&mut [u8; 64]>::try_from(
-            &mut self.0.as_mut_slice()[offset..offset + Chunk::NUM_BYTES_PER_BLOCK],
+            &mut self.0.as_mut_slice()[offset..offset + NUM_BYTES_PER_BLOCK],
         )
         .expect(
             "Return value of `ChunkBlockCoord.to_offset()` is guaranteed \
@@ -68,9 +67,8 @@ pub struct Chunk(Box<ChunkBytes>); // 5 unknown bytes
 impl Chunk {
     pub const NUM_BLOCK_PER_ROW: usize = 32;
     pub const NUM_BLOCK_PER_COL: usize = 32;
-    pub const NUM_BYTES_PER_BLOCK: usize = 64;
     pub const NUM_BYTES: usize =
-        Self::NUM_BLOCK_PER_ROW * Self::NUM_BLOCK_PER_COL * Self::NUM_BYTES_PER_BLOCK + 5;
+        Self::NUM_BLOCK_PER_ROW * Self::NUM_BLOCK_PER_COL * NUM_BYTES_PER_BLOCK + 5;
 
     pub fn new_empty() -> Self {
         Self(Box::new([0; Self::NUM_BYTES]))
@@ -255,9 +253,13 @@ impl Chunks {
 
 #[cfg(test)]
 mod tests {
-    use super::{Chunk, ChunkCoord, ChunkIndexIter, Chunks, CompressedChunk};
-    use crate::game::block::{Block, BlockMut};
-    use crate::game::coord::BlockCoord;
+    use super::{
+        super::{
+            block::{Block, BlockMut},
+            coord::BlockCoord,
+        },
+        Chunk, ChunkCoord, ChunkIndexIter, Chunks, CompressedChunk,
+    };
     use flate2::Compression;
     use flate2::write::GzEncoder;
     use std::io::Write;
@@ -322,7 +324,7 @@ mod tests {
         {
             let mut slice = chunk.view_mut();
             let mut block = slice.block_at_mut(local_coord);
-            block.set_fg(0xF0);
+            *block.fg_raw_mut() = 0xF0;
         }
 
         let mut encoder = GzEncoder::new(Vec::new(), Compression::default());

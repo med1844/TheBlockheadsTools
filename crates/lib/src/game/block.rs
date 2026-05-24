@@ -212,9 +212,11 @@ const DAMAGE: usize = 5;
 const VISIBILITY: usize = 6;
 const BRIGHTNESS: usize = 7;
 
+pub const NUM_BYTES_PER_BLOCK: usize = 64;
+
 pub trait Block {
     // required
-    fn as_bytes(&self) -> &[u8; 64];
+    fn as_bytes(&self) -> &[u8; NUM_BYTES_PER_BLOCK];
 
     // provided
     fn fg_raw(&self) -> u8 {
@@ -255,25 +257,25 @@ pub trait Block {
 
 pub trait BlockMut {
     // required
-    fn as_mut_bytes(&mut self) -> &mut [u8; 64];
+    fn as_mut_bytes(&mut self) -> &mut [u8; NUM_BYTES_PER_BLOCK];
 
     // provided
     fn fg_raw_mut(&mut self) -> &mut u8 {
         &mut self.as_mut_bytes()[FG]
     }
-    fn set_fg<I: Into<u8>>(&mut self, value: I) {
+    fn set_fg(&mut self, value: BlockType) {
         self.as_mut_bytes()[FG] = value.into();
     }
     fn bg_raw_mut(&mut self) -> &mut u8 {
         &mut self.as_mut_bytes()[BG]
     }
-    fn set_bg<I: Into<u8>>(&mut self, value: I) {
+    fn set_bg(&mut self, value: BlockType) {
         self.as_mut_bytes()[BG] = value.into();
     }
     fn content_raw_mut(&mut self) -> &mut u8 {
         &mut self.as_mut_bytes()[CONTENT]
     }
-    fn set_content<I: Into<u8>>(&mut self, value: I) {
+    fn set_content(&mut self, value: BlockContentType) {
         self.as_mut_bytes()[CONTENT] = value.into();
     }
     fn height_mut(&mut self) -> &mut u8 {
@@ -306,7 +308,7 @@ pub trait BlockMut {
 pub struct BlockView<'chunk>(&'chunk [u8; 64]);
 
 impl<'chunk> BlockView<'chunk> {
-    pub(crate) fn new(slice: &'chunk [u8; 64]) -> Self {
+    pub fn new(slice: &'chunk [u8; 64]) -> Self {
         Self(slice)
     }
 }
@@ -320,7 +322,7 @@ impl<'chunk> Block for BlockView<'chunk> {
 pub struct BlockViewMut<'chunk>(&'chunk mut [u8; 64]);
 
 impl<'chunk> BlockViewMut<'chunk> {
-    pub(crate) fn new(slice: &'chunk mut [u8; 64]) -> Self {
+    pub fn new(slice: &'chunk mut [u8; 64]) -> Self {
         Self(slice)
     }
 }

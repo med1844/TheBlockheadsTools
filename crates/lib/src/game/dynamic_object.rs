@@ -347,6 +347,12 @@ pub enum AnyDynamicObject {
     TrainStation(Box<train::TrainStation>), // ID = 49
 }
 
+impl Default for AnyDynamicObject {
+    fn default() -> Self {
+        AnyDynamicObject::Ladder(Box::default())
+    }
+}
+
 impl AnyDynamicObject {
     pub fn try_from_save_dict(item_type: ItemType, value: plist::Value) -> Result<Self> {
         match item_type {
