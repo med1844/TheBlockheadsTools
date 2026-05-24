@@ -986,9 +986,13 @@ impl EditorApp {
             );
             let ctx = (egui_ctx, context);
             let draw_result = match id.obj_type {
-                ObjectType::DynamicObject(dyn_obj_type) => dw
-                    .chunk_at_mut(chunk_coord)
-                    .map(|dw_chunk| draw_dyn_obj_window(dyn_obj_type, id.index, dw_chunk, ctx)),
+                ObjectType::DynamicObject(dyn_obj_type) => {
+                    if let Some(dw_chunk) = dw.chunk_at_mut(chunk_coord) {
+                        Some(draw_dyn_obj_window(dyn_obj_type, id.index, dw_chunk, ctx))
+                    } else {
+                        None
+                    }
+                }
                 ObjectType::Blockhead => Some(draw_window(
                     "Blockhead",
                     world_db.main.blockheads.get_mut(id.index),
@@ -1030,10 +1034,8 @@ impl EditorApp {
                     };
                 if let Some(state) = frame.wgpu_render_state() {
                     // handle obj move & dst chunk re-render
-                    let expect_chunk_reason =
-                        "chunk must be Some to have ID read from GPU to have that chunk_coord";
-                    match flags {
-                        ObjFlags::PosChangedTo { x, y } => match id.obj_type {
+                    if let Some((x, y)) = flags.pos_changed_to {
+                        match id.obj_type {
                             ObjectType::DynamicObject(dyn_obj_ty) => {
                                 move_dyn_obj(
                                     x,
@@ -1044,8 +1046,6 @@ impl EditorApp {
                                     dw,
                                     &state.device,
                                 );
-                                let dw_chunk = dw.chunk_at(chunk_coord).expect(expect_chunk_reason);
-                                self.dw_buf.set_chunk(&state.device, chunk_coord, dw_chunk);
                             }
                             ObjectType::Blockhead => {
                                 if let Some(blockhead) = world_db.main.blockheads.get_mut(id.index)
@@ -1055,12 +1055,12 @@ impl EditorApp {
                                 self.dw_buf
                                     .set_blockheads(&state.device, &world_db.main.blockheads);
                             }
-                        },
-                        ObjFlags::RebuildMesh => {
-                            let dw_chunk = dw.chunk_at(chunk_coord).expect(expect_chunk_reason);
-                            self.dw_buf.set_chunk(&state.device, chunk_coord, dw_chunk);
                         }
-                        ObjFlags::NoChange => {}
+                    }
+                    if flags.rebuild_mesh
+                        && let Some(dw_chunk) = dw.chunk_at(chunk_coord)
+                    {
+                        self.dw_buf.set_chunk(&state.device, chunk_coord, dw_chunk);
                     }
                 }
             }

@@ -15,12 +15,12 @@ use super::{
         item_grid::{COL_PX, ITEM_SELECTOR_COLS, ITEM_SELECTOR_ROWS, ITEM_SELECTOR_SIZE, ROW_PX},
     },
 };
-use eframe::{egui, egui_wgpu};
-use snafu::ResultExt;
-use std::{
-    hash::Hash,
-    ops::{BitOrAssign, DerefMut},
+use eframe::{
+    egui::{self},
+    egui_wgpu,
 };
+use snafu::ResultExt;
+use std::{hash::Hash, ops::DerefMut};
 use strum::IntoEnumIterator;
 use the_blockheads_tools_lib::game::{
     block::{BlockContentType, BlockType},
@@ -52,27 +52,9 @@ use the_blockheads_tools_lib::game::{
 const CUBE_NUM_FACES: usize = 6;
 
 #[derive(Debug, Default, PartialEq)]
-pub enum ObjFlags {
-    PosChangedTo {
-        x: f32,
-        y: f32,
-    },
-    RebuildMesh,
-    #[default]
-    NoChange,
-}
-
-impl BitOrAssign for ObjFlags {
-    fn bitor_assign(&mut self, rhs: Self) {
-        match (self, rhs) {
-            (lhs @ Self::PosChangedTo { .. }, rhs @ Self::PosChangedTo { .. })
-            | (lhs @ Self::RebuildMesh, rhs @ Self::PosChangedTo { .. })
-            | (lhs @ Self::NoChange, rhs) => *lhs = rhs,
-            (Self::PosChangedTo { .. }, Self::RebuildMesh)
-            | (Self::RebuildMesh, Self::RebuildMesh)
-            | (_, Self::NoChange) => {}
-        }
-    }
+pub struct ObjFlags {
+    pub pos_changed_to: Option<(f32, f32)>,
+    pub rebuild_mesh: bool,
 }
 
 // helper mod to keep read-only fields private
@@ -280,10 +262,8 @@ impl ToGrid for DynamicObject {
             (false, false) => {}
         }
         if float_pos_changed | int_pos_changed {
-            context.flags |= ObjFlags::PosChangedTo {
-                x: self.float_pos[0],
-                y: self.float_pos[1],
-            };
+            context.flags.pos_changed_to = Some(self.float_pos.into());
+            context.flags.rebuild_mesh = true;
         }
 
         self.unique_id.add_row("uniqueID", ui);
@@ -588,9 +568,7 @@ impl ToGrid for Plant {
         self.gather_progress.add_row("gatherProgress", ui);
         self.has_flowered_this_season
             .add_row("hasFloweredThisSeason", ui);
-        if self.flowering.add_row("flowering", ui).changed() {
-            context.flags |= ObjFlags::RebuildMesh;
-        }
+        context.flags.rebuild_mesh |= self.flowering.add_row("flowering", ui).changed();
         self.frozen.add_row("frozen", ui);
         self.age.add_row("age", ui);
         self.max_age.add_row("maxAge", ui);
@@ -758,7 +736,7 @@ impl BuildDwMesh for CornPlant {
     }
 }
 
-struct ItemGridResult {
+struct HandleItemGridDragResult {
     hovered_idx: Option<usize>,
     viewport: egui::Rect,
 }
@@ -771,7 +749,7 @@ fn handle_item_grid_drag(
     num_col: usize,
     num_row: usize,
     response: &egui::Response,
-) -> ItemGridResult {
+) -> HandleItemGridDragResult {
     let mut scroll_offset: egui::Vec2 =
         ui.data_mut(|d| d.get_temp(scroll_id).unwrap_or(egui::Vec2::ZERO));
     let mut drag_delta = response.drag_delta();
@@ -801,7 +779,7 @@ fn handle_item_grid_drag(
         }
     }
 
-    ItemGridResult {
+    HandleItemGridDragResult {
         hovered_idx,
         viewport,
     }
@@ -867,7 +845,7 @@ impl ToRow for ItemType {
                     );
                     let rect = rect.intersect(ui.ctx().content_rect());
 
-                    let ItemGridResult {
+                    let HandleItemGridDragResult {
                         hovered_idx,
                         viewport,
                     } = handle_item_grid_drag(
@@ -939,10 +917,8 @@ impl ToGrid for Torch {
             ui,
             context,
         );
-        if self.connection_type.add_row("connectionType", ui).changed() {
-            context.flags |= ObjFlags::RebuildMesh;
-        }
-        self.item_type.add_row("itemType", ui);
+        context.flags.rebuild_mesh |= self.connection_type.add_row("connectionType", ui).changed();
+        context.flags.rebuild_mesh |= self.item_type.add_row("itemType", ui).changed();
         self.data_a.add_row("dataA", ui);
         self.data_b.add_row("dataB", ui);
     }
@@ -1126,8 +1102,8 @@ impl BuildDwMesh for Ladder {
 }
 
 impl ToGrid for Door {
-    fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut DwUiContext) {
-        self.item_type.add_row("itemType", ui);
+    fn to_grid(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        context.flags.rebuild_mesh |= self.item_type.add_row("itemType", ui).changed();
         self.blocked.add_row("blocked", ui);
         self.iron_place_client_id.add_row("ironPlaceClientId", ui);
     }
@@ -1301,8 +1277,8 @@ impl BuildDwMesh for Egg {
 }
 
 impl ToGrid for Window {
-    fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut DwUiContext) {
-        self.item_type.add_row("itemType", ui);
+    fn to_grid(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        context.flags.rebuild_mesh |= self.item_type.add_row("itemType", ui).changed();
     }
 }
 
@@ -1370,13 +1346,10 @@ impl BuildDwMesh for ChilliPlant {
 impl ToGrid for KelpPlant {
     fn to_grid(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         self.growth_timer.add_row("growthTimer", ui);
-        if self
+        context.flags.rebuild_mesh |= self
             .number_of_occupied_tiles_above
             .add_row("numberOfOccupiedTilesAbove", ui)
-            .changed()
-        {
-            context.flags |= ObjFlags::RebuildMesh;
-        }
+            .changed();
     }
 }
 
@@ -1573,9 +1546,7 @@ impl ToGrid for InteractionObject {
         self.interaction_object_type
             .add_row("interactionObjectType", ui);
         self.is_in_use.add_row("isInUse", ui);
-        if self.flipped.add_row("flipped", ui).changed() {
-            context.flags |= ObjFlags::RebuildMesh;
-        }
+        context.flags.rebuild_mesh |= self.flipped.add_row("flipped", ui).changed();
         self.paint_color.add_row("paintColor", ui);
     }
 }
@@ -1653,14 +1624,10 @@ impl ToGrid for Workbench {
         self.hurry_timer.add_row("hurryTimer", ui);
         self.hurrying.add_row("hurrying", ui);
         self.last_world_time.add_row("lastWorldTime", ui);
-        if self.level.add_row("level", ui).changed() {
-            context.flags |= ObjFlags::RebuildMesh;
-        }
+        context.flags.rebuild_mesh |= self.level.add_row("level", ui).changed();
         self.save_time.add_row("saveTime", ui);
         self.selected_index.add_row("selectedIndex", ui);
-        if self.workbench_type.add_row("workbenchType", ui).changed() {
-            context.flags |= ObjFlags::RebuildMesh;
-        }
+        context.flags.rebuild_mesh |= self.workbench_type.add_row("workbenchType", ui).changed();
         self.x_scroll.add_row("xScroll", ui);
         grid_as_row(
             &mut self.light_dict,
@@ -2070,6 +2037,61 @@ impl BuildDwMesh for Workbench {
     }
 }
 
+fn toggle_selected_index(
+    ui: &mut egui::Ui,
+    selected_idx_id: egui::Id,
+    hovered_idx: Option<usize>,
+    response: &egui::Response,
+) -> Option<usize> {
+    let mut selected_idx: Option<usize> =
+        ui.data_mut(|d| d.get_temp::<Option<usize>>(selected_idx_id).flatten());
+    if response.clicked() {
+        // toggle
+        if selected_idx == hovered_idx {
+            selected_idx = None;
+        } else {
+            selected_idx = hovered_idx;
+        }
+    }
+    ui.data_mut(|d| d.insert_temp(selected_idx_id, selected_idx));
+    selected_idx
+}
+
+fn paint_item_grid(
+    id: egui::Id,
+    instances: ItemGridInstances,
+    size: (usize, usize),
+    ui: &mut egui::Ui,
+) -> Option<usize> {
+    let scroll_id = id.with("scroll_offset");
+    let selected_idx_id = id.with("selected_idx");
+
+    let (num_col, num_row) = size;
+    let size = egui::Vec2::new(COL_PX * num_col as f32, ROW_PX * num_row as f32);
+    let (rect, response) = ui.allocate_exact_size(size, egui::Sense::all());
+    let rect = rect.intersect(ui.ctx().content_rect());
+    let HandleItemGridDragResult {
+        hovered_idx,
+        viewport,
+    } = handle_item_grid_drag(ui, scroll_id, size, rect, num_col, num_row, &response);
+
+    let selected_idx = toggle_selected_index(ui, selected_idx_id, hovered_idx, &response);
+
+    ui.painter().add(egui_wgpu::Callback::new_paint_callback(
+        rect,
+        ItemGridCallback {
+            hovered_index: hovered_idx.map(|i| i as u32),
+            selected_index: selected_idx.map(|i| i as u32),
+            viewport,
+            pixels_per_point: ui.pixels_per_point(),
+            id: ui.id(),
+            instances,
+        },
+    ));
+
+    selected_idx
+}
+
 fn slots_to_item_instances<'a, I: Iterator<Item = &'a Slot>>(
     slots: I,
     num_col: usize,
@@ -2091,37 +2113,32 @@ fn slots_to_item_instances<'a, I: Iterator<Item = &'a Slot>>(
         .collect()
 }
 
-fn toggle_selected_index(
+fn paint_slots(
+    id: egui::Id,
+    slots: &mut [Slot],
+    size: (usize, usize),
     ui: &mut egui::Ui,
-    selected_idx_id: egui::Id,
-    hovered_idx: Option<usize>,
-    response: &egui::Response,
-) -> Option<usize> {
-    let mut selected_idx: Option<usize> =
-        ui.data_mut(|d| d.get_temp::<Option<usize>>(selected_idx_id).flatten());
-    if response.clicked() {
-        // toggle
-        if selected_idx == hovered_idx {
-            selected_idx = None;
-        } else {
-            selected_idx = hovered_idx;
-        }
+    context: &mut DwUiContext,
+) {
+    let (num_col, _) = size;
+    let instances = slots_to_item_instances(slots.iter(), num_col);
+    let selected_idx = paint_item_grid(id, ItemGridInstances::Custom { instances }, size, ui);
+    if let Some(idx) = selected_idx
+        && let Some(slot) = slots.get_mut(idx)
+    {
+        let items = slot.deref_mut();
+        items.add_grid(id.with("selected_slot_items_grid"), ui, context);
     }
-    ui.data_mut(|d| d.insert_temp(selected_idx_id, selected_idx));
-    selected_idx
 }
 
 impl ToGrid for Item {
     fn to_grid(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
-        if self.type_id.add_row("typeId", ui).changed() {
-            context.flags |= ObjFlags::RebuildMesh;
-        }
+        self.type_id.add_row("typeId", ui);
         let item_type = self.item_type();
         match item_type {
             Ok(mut item_type) => {
                 if item_type.add_row("itemType", ui).changed() {
                     self.set_item_type(item_type);
-                    context.flags |= ObjFlags::RebuildMesh;
                 }
             }
             Err(e) => {
@@ -2136,44 +2153,13 @@ impl ToGrid for Item {
 
         ui.label("subItems");
         if let Some(slots) = self.sub_items.as_mut() {
-            ui.vertical(|ui| {
-                let id = ui.id().with("sub_item_item_grid");
-                let scroll_id = id.with("scroll_offset");
-                let selected_idx_id = id.with("selected_idx");
-
-                let (num_col, num_row) = (Self::MAX_SUB_ITEMS, 1usize);
-                let size = egui::Vec2::new(COL_PX * num_col as f32, ROW_PX * num_row as f32);
-                let (rect, response) = ui.allocate_exact_size(size, egui::Sense::all());
-                let rect = rect.intersect(ui.ctx().content_rect());
-                let ItemGridResult {
-                    hovered_idx,
-                    viewport,
-                } = handle_item_grid_drag(ui, scroll_id, size, rect, num_col, num_row, &response);
-
-                let selected_idx =
-                    toggle_selected_index(ui, selected_idx_id, hovered_idx, &response);
-
-                let instances = slots_to_item_instances(slots.iter(), num_col);
-
-                ui.painter().add(egui_wgpu::Callback::new_paint_callback(
-                    rect,
-                    ItemGridCallback {
-                        hovered_index: hovered_idx.map(|i| i as u32),
-                        selected_index: selected_idx.map(|i| i as u32),
-                        viewport,
-                        pixels_per_point: ui.pixels_per_point(),
-                        id: ui.id(),
-                        instances: ItemGridInstances::Custom { instances },
-                    },
-                ));
-
-                if let Some(idx) = selected_idx
-                    && let Some(slot) = slots.get_mut(idx)
-                {
-                    let items = slot.deref_mut();
-                    items.add_grid(id.with("selected_slot_items_grid"), ui, context);
-                }
-            });
+            paint_slots(
+                ui.id().with("sub_item_item_grid"),
+                slots.as_mut_slice(),
+                (Self::MAX_SUB_ITEMS, 1usize),
+                ui,
+                context,
+            );
         } else {
             ui.weak("No subItems");
         }
@@ -2280,9 +2266,7 @@ impl ToGrid for Item {
                         self,
                     );
 
-                    if changed {
-                        context.flags |= ObjFlags::RebuildMesh;
-                    }
+                    context.flags.rebuild_mesh |= changed;
                 });
 
             if let Some(dyn_obj) = &mut self.dynamic_object {
@@ -2324,7 +2308,6 @@ impl ToGrid for Chest {
         self.save_time.add_row("saveTime", ui);
         ui.label("slots");
         ui.vertical(|ui| {
-            let unique_id = self.unique_id;
             if let Some((num_col, num_row, slots)) = match &mut self.slots {
                 ChestSlots::Standard(slots)
                 | ChestSlots::Safe(slots)
@@ -2335,45 +2318,13 @@ impl ToGrid for Chest {
                 }
                 ChestSlots::Portal => None,
             } {
-                let id = ui.id().with("chest_slots_item_grid");
-                let scroll_id = id.with("scroll_offset");
-                let selected_idx_id = id.with("selected_idx");
-
-                let size = egui::Vec2::new(COL_PX * num_col as f32, ROW_PX * num_row as f32);
-                let (rect, response) = ui.allocate_exact_size(size, egui::Sense::all());
-                let rect = rect.intersect(ui.ctx().content_rect());
-                let ItemGridResult {
-                    hovered_idx,
-                    viewport,
-                } = handle_item_grid_drag(ui, scroll_id, size, rect, num_col, num_row, &response);
-
-                let selected_idx =
-                    toggle_selected_index(ui, selected_idx_id, hovered_idx, &response);
-
-                let instances = slots_to_item_instances(slots.iter(), num_col);
-
-                ui.painter().add(egui_wgpu::Callback::new_paint_callback(
-                    rect,
-                    ItemGridCallback {
-                        hovered_index: hovered_idx.map(|i| i as u32),
-                        selected_index: selected_idx.map(|i| i as u32),
-                        viewport,
-                        pixels_per_point: ui.pixels_per_point(),
-                        id: ui.id(),
-                        instances: ItemGridInstances::Custom { instances },
-                    },
-                ));
-
-                if let Some(idx) = selected_idx
-                    && let Some(slot) = slots.get_mut(idx)
-                {
-                    let items = slot.deref_mut();
-                    items.add_grid(
-                        format!("selected_slot_items_grid_{:?}", unique_id),
-                        ui,
-                        context,
-                    );
-                }
+                paint_slots(
+                    ui.id().with("chest_slots_item_grid"),
+                    slots,
+                    (num_col, num_row),
+                    ui,
+                    context,
+                );
             } else {
                 ui.weak("Portal chest has no owned slots");
             }
@@ -2473,9 +2424,7 @@ impl ToRow for SignConnectionType {
 impl ToGrid for Sign {
     fn to_grid(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         self.text.add_row("text", ui);
-        if self.connection_type.add_row("connectionType", ui).changed() {
-            context.flags |= ObjFlags::RebuildMesh;
-        }
+        context.flags.rebuild_mesh |= self.connection_type.add_row("connectionType", ui).changed();
         self.offset_type.add_row("offsetType", ui);
         self.save_time.add_row("saveTime", ui);
     }
@@ -2618,9 +2567,7 @@ impl ToRow for TreeType {
 
 impl ToGrid for GemTree {
     fn to_grid(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
-        if self.gem_tree_type.add_row("gemTreeType", ui).changed() {
-            context.flags |= ObjFlags::RebuildMesh;
-        }
+        context.flags.rebuild_mesh |= self.gem_tree_type.add_row("gemTreeType", ui).changed();
         self.fruit_year.add_row("fruitYear", ui);
     }
 }
@@ -2658,13 +2605,10 @@ impl BuildDwMesh for GemTree {
 impl ToGrid for VinePlant {
     fn to_grid(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         self.growth_timer.add_row("growthTimer", ui);
-        if self
+        context.flags.rebuild_mesh |= self
             .number_of_occupied_tiles_below
             .add_row("numberOfOccupiedTilesBelow", ui)
-            .changed()
-        {
-            context.flags |= ObjFlags::RebuildMesh;
-        }
+            .changed();
     }
 }
 
@@ -3025,45 +2969,17 @@ impl ToGrid for Blockhead {
         self.load_requires_recalculation
             .add_row("loadRequiresRecalculation", ui);
 
-        let slots = self.inventory.deref_mut();
         ui.label("inventory");
         ui.vertical(|ui| {
-            let id = ui.id().with("blockhead_inventory_item_grid");
-            let scroll_id = id.with("scroll_offset");
-            let selected_idx_id = id.with("selected_idx");
-
-            let (num_col, num_row) = (Self::INVENTORY_NUM_SLOTS, 1usize);
-            let size = egui::Vec2::new(COL_PX * num_col as f32, ROW_PX * num_row as f32);
-            let (rect, response) = ui.allocate_exact_size(size, egui::Sense::all());
-            let rect = rect.intersect(ui.ctx().content_rect());
-            let ItemGridResult {
-                hovered_idx,
-                viewport,
-            } = handle_item_grid_drag(ui, scroll_id, size, rect, num_col, num_row, &response);
-
-            let selected_idx = toggle_selected_index(ui, selected_idx_id, hovered_idx, &response);
-
-            let instances = slots_to_item_instances(slots.iter(), num_col);
-
-            ui.painter().add(egui_wgpu::Callback::new_paint_callback(
-                rect,
-                ItemGridCallback {
-                    hovered_index: hovered_idx.map(|i| i as u32),
-                    selected_index: selected_idx.map(|i| i as u32),
-                    viewport,
-                    pixels_per_point: ui.pixels_per_point(),
-                    id: ui.id(),
-                    instances: ItemGridInstances::Custom { instances },
-                },
-            ));
-
-            if let Some(idx) = selected_idx
-                && let Some(slot) = slots.get_mut(idx)
-            {
-                let items = slot.deref_mut();
-                items.add_grid(id.with("selected_slot_items_grid"), ui, context);
-            }
+            paint_slots(
+                ui.id().with("blockhead_inventory_item_grid"),
+                self.inventory.deref_mut().as_mut_slice(),
+                (Self::INVENTORY_NUM_SLOTS, 1usize),
+                ui,
+                context,
+            );
         });
+        ui.end_row();
     }
 }
 
