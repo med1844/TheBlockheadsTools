@@ -547,10 +547,10 @@ impl EditorApp {
 
                     #[cfg(target_arch = "wasm32")]
                     {
-                        self.dirty_chunk_manager.flush(world_db);
+                        self.chunk_cache.flush(world_db);
                         let mut out_bytes = Vec::new();
                         match world_db
-                            .write_to(&mut out_bytes, DynArch::Arch64)
+                            .write_to(&mut out_bytes, arch)
                             .context(SaveWorldDbSnafu)
                         {
                             Ok(()) => {
@@ -784,7 +784,17 @@ impl EditorApp {
         if response.hovered()
             && let Some(pos) = response.hover_pos()
         {
-            let scroll_y = ui.input(|i| i.smooth_scroll_delta.y);
+            // scroll_y measured on platforms
+            #[cfg(target_arch = "wasm32")]
+            const SCROLL_Y: f32 = 90.909;
+
+            #[cfg(not(target_arch = "wasm32"))]
+            const SCROLL_Y: f32 = 40.0;
+
+            const TARGET_SCROLL_Y: f32 = 40.0;
+            const SCROLL_MULTIPLIER: f32 = TARGET_SCROLL_Y / SCROLL_Y;
+
+            let scroll_y = ui.input(|i| i.smooth_scroll_delta.y) * SCROLL_MULTIPLIER;
             if scroll_y.abs() > 0.0 {
                 self.camera.handle_zoom(
                     (pos - self.world_viewport_rect.min).into(),
