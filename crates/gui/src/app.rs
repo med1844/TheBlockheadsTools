@@ -473,32 +473,15 @@ impl EditorApp {
     fn render_menu_bar(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
         egui::MenuBar::new().ui(ui, |ui| {
             ui.menu_button("File", |ui| {
-                #[cfg(not(target_arch = "wasm32"))]
-                {
-                    if ui.button("Open").clicked() {
+                if ui.button("Open").clicked() {
+                    #[cfg(not(target_arch = "wasm32"))]
+                    {
                         self.file_reader
                             .set_open_path(rfd::FileDialog::new().pick_file());
                     }
-                    if ui.button("Save As").clicked() {
-                        // TODO if world_db is empty we should return as error
-                        if let Some(world_db) = self.world_db.as_mut()
-                            && let Some(save_path) = rfd::FileDialog::new().pick_folder()
-                        {
-                            self.chunk_cache.flush(world_db);
-                            if let Err(e) = world_db
-                                .to_path(save_path, DynArch::Arch64)
-                                .context(SaveWorldDbSnafu)
-                            {
-                                // TODO allow user select arch
-                                self.save_err = Some(e);
-                            }
-                        }
-                    }
-                }
 
-                #[cfg(target_arch = "wasm32")]
-                {
-                    if ui.button("Open").clicked() {
+                    #[cfg(target_arch = "wasm32")]
+                    {
                         let sender = self.file_reader.get_sender();
                         let task = rfd::AsyncFileDialog::new().pick_file();
                         let ctx = ui.ctx().clone();
@@ -510,8 +493,42 @@ impl EditorApp {
                             }
                         })
                     }
-                    if ui.button("Export").clicked()
+                }
+                let mut arch = None;
+                ui.menu_button("Save As", |ui| {
+                    if ui
+                        .button("32-bit")
+                        .on_hover_text("Save as 32 bit LMDB file, usually for client.")
+                        .clicked()
+                    {
+                        arch = Some(DynArch::Arch32);
+                    }
+                    if ui
+                        .button("64-bit")
+                        .on_hover_text("Save as 64 bit LMDB file, usually for server.")
+                        .clicked()
+                    {
+                        arch = Some(DynArch::Arch64);
+                    }
+                });
+                if let Some(arch) = arch
+                        // TODO if world_db is empty we should return as error
                         && let Some(world_db) = self.world_db.as_mut()
+                {
+                    #[cfg(not(target_arch = "wasm32"))]
+                    {
+                        if let Some(save_path) = rfd::FileDialog::new().pick_folder() {
+                            self.chunk_cache.flush(world_db);
+                            if let Err(e) =
+                                world_db.to_path(save_path, arch).context(SaveWorldDbSnafu)
+                            {
+                                // TODO allow user select arch
+                                self.save_err = Some(e);
+                            }
+                        }
+                    }
+
+                    #[cfg(target_arch = "wasm32")]
                     {
                         self.dirty_chunk_manager.flush(world_db);
                         let mut out_bytes = Vec::new();
