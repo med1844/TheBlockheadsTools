@@ -2275,13 +2275,15 @@ impl ToGrid for Item {
 
         ui.label("subItems");
         if let Some(slots) = self.sub_items.as_mut() {
-            paint_slots(
-                ui.id().with("sub_item_item_grid"),
-                slots.as_mut_slice(),
-                (Self::MAX_SUB_ITEMS, 1usize),
-                ui,
-                context,
-            );
+            ui.vertical(|ui| {
+                paint_slots(
+                    ui.id().with("sub_item_item_grid"),
+                    slots.as_mut_slice(),
+                    (Self::MAX_SUB_ITEMS, 1usize),
+                    ui,
+                    context,
+                )
+            });
         } else {
             ui.weak("No subItems");
         }
