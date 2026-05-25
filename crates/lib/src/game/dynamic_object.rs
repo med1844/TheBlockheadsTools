@@ -252,6 +252,15 @@ pub struct DynamicObject {
     pub owner_id: Option<String>,
 }
 
+impl DynamicObject {
+    pub fn set_float_pos(&mut self, pos: [f32; 2]) {
+        self.float_pos = pos;
+        let [x, y] = pos;
+        self.pos_x = x.floor() as u32;
+        self.pos_y = y.floor() as u16;
+    }
+}
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize_repr, Deserialize_repr)]
 #[repr(u8)]
 pub enum InteractionObjectType {
@@ -354,6 +363,32 @@ impl Default for AnyDynamicObject {
 }
 
 impl AnyDynamicObject {
+    pub fn set_pos(&mut self, pos: [f32; 2]) {
+        match self {
+            AnyDynamicObject::Ladder(ladder) => ladder.set_float_pos(pos),
+            AnyDynamicObject::Door(door) => door.set_float_pos(pos),
+            AnyDynamicObject::Bed(bed) => bed.set_float_pos(pos),
+            AnyDynamicObject::Egg(egg) => egg.set_float_pos(pos),
+            AnyDynamicObject::Workbench(workbench) => workbench.set_float_pos(pos),
+            AnyDynamicObject::Chest(chest) => chest.set_float_pos(pos),
+            AnyDynamicObject::Sign(sign) => sign.set_float_pos(pos),
+            AnyDynamicObject::TrainStation(train_station) => train_station.set_float_pos(pos),
+        }
+    }
+
+    pub fn set_unique_id(&mut self, unique_id: UniqueID) {
+        match self {
+            AnyDynamicObject::Ladder(ladder) => ladder.unique_id = unique_id,
+            AnyDynamicObject::Door(door) => door.unique_id = unique_id,
+            AnyDynamicObject::Bed(bed) => bed.unique_id = unique_id,
+            AnyDynamicObject::Egg(egg) => egg.unique_id = unique_id,
+            AnyDynamicObject::Workbench(workbench) => workbench.unique_id = unique_id,
+            AnyDynamicObject::Chest(chest) => chest.unique_id = unique_id,
+            AnyDynamicObject::Sign(sign) => sign.unique_id = unique_id,
+            AnyDynamicObject::TrainStation(train_station) => train_station.unique_id = unique_id,
+        }
+    }
+
     pub fn try_from_save_dict(item_type: ItemType, value: plist::Value) -> Result<Self> {
         match item_type {
             ItemType::Chest
@@ -502,6 +537,35 @@ impl AnyDynamicObject {
                 })?
             }
         })
+    }
+}
+
+#[derive(Debug, PartialEq, IntoStaticStr)]
+pub enum AnyDynamicObjectRef<'a> {
+    Ladder(&'a craft::Ladder),             // ID = 19
+    Door(&'a craft::Door),                 // ID = 20
+    Bed(&'a craft::Bed),                   // ID = 23
+    Egg(&'a animal::Egg),                  // ID = 30
+    Workbench(&'a workbench::Workbench),   // ID = 45
+    Chest(&'a chest::Chest),               // ID = 46
+    Sign(&'a craft::Sign),                 // ID = 47
+    TrainStation(&'a train::TrainStation), // ID = 49
+}
+
+impl<'a> AnyDynamicObjectRef<'a> {
+    pub fn to_owned(&self) -> AnyDynamicObject {
+        match *self {
+            AnyDynamicObjectRef::Ladder(x) => AnyDynamicObject::Ladder(Box::new(x.clone())),
+            AnyDynamicObjectRef::Door(x) => AnyDynamicObject::Door(Box::new(x.clone())),
+            AnyDynamicObjectRef::Bed(x) => AnyDynamicObject::Bed(Box::new(x.clone())),
+            AnyDynamicObjectRef::Egg(x) => AnyDynamicObject::Egg(Box::new(x.clone())),
+            AnyDynamicObjectRef::Workbench(x) => AnyDynamicObject::Workbench(Box::new(x.clone())),
+            AnyDynamicObjectRef::Chest(x) => AnyDynamicObject::Chest(Box::new(x.clone())),
+            AnyDynamicObjectRef::Sign(x) => AnyDynamicObject::Sign(Box::new(x.clone())),
+            AnyDynamicObjectRef::TrainStation(x) => {
+                AnyDynamicObject::TrainStation(Box::new(x.clone()))
+            }
+        }
     }
 }
 

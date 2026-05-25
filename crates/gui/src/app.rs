@@ -178,6 +178,7 @@ struct ChunkCache {
     // We can easily add eviction support here if memory usage becomes a concern.
     decompressed_chunks: HashMap<ChunkCoord, Chunk>,
     voxel_outdated: HashSet<ChunkCoord>,
+    mesh_outdated: HashSet<ChunkCoord>,
 }
 
 impl ChunkCache {
@@ -187,6 +188,10 @@ impl ChunkCache {
 
     fn mark_voxel_outdated<I: Into<ChunkCoord>>(&mut self, chunk_coord: I) {
         self.voxel_outdated.insert(chunk_coord.into());
+    }
+
+    fn mark_mesh_outdated<I: Into<ChunkCoord>>(&mut self, chunk_coord: I) {
+        self.mesh_outdated.insert(chunk_coord.into());
     }
 
     fn get_chunk_mut<'a>(
@@ -232,6 +237,14 @@ impl ChunkCache {
         for coord in self.voxel_outdated.drain() {
             if let Some(chunk) = self.decompressed_chunks.get(&coord) {
                 voxel_util::set_chunk(queue, voxel_buf, coord, chunk);
+            }
+        }
+    }
+
+    fn update_meshes(&mut self, device: &wgpu::Device, dw: &mut DynamicWorld, dw_buf: &mut DwBuf) {
+        for coord in self.mesh_outdated.drain() {
+            if let Some(dw_chunk) = dw.chunk_at(coord) {
+                dw_buf.set_chunk(&device, coord, dw_chunk);
             }
         }
     }
@@ -893,41 +906,82 @@ impl EditorApp {
                     }
                 }
                 PenDrawTarget::DwObj => {
+                    let dw = &mut world_db.dw;
                     if response.clicked_by(egui::PointerButton::Primary) {
-                        if let Some(InteractionTarget::DynamicObject { .. }) =
-                            self.interaction_state.hover
-                        {
-                            self.interaction_state.copy_hover_to_select();
-                        } else if let Some(pos) = response.hover_pos() {
-                            let [x, y] = self
-                                .camera
-                                .mouse_at(
-                                    (pos - self.world_viewport_rect.min).into(),
-                                    self.world_viewport_rect.size().into(),
-                                )
-                                .to_array();
-
-                            dbg!("draw obj at {}", (x, y));
+                        match self.interaction_state.hover {
+                            Some(InteractionTarget::DynamicObject { .. }) => {
+                                self.interaction_state.copy_hover_to_select();
+                            }
+                            Some(InteractionTarget::Block(_)) | None => {
+                                if let Some(pos) = response.hover_pos()
+                                    && let [x, y] = self
+                                        .camera
+                                        .mouse_at(
+                                            (pos - self.world_viewport_rect.min).into(),
+                                            self.world_viewport_rect.size().into(),
+                                        )
+                                        .to_array()
+                                    && let Ok(block_coord) =
+                                        BlockCoord::new(x.floor() as u32, y.floor() as u16)
+                                {
+                                    let entry = dw.entry(block_coord);
+                                    let chunk_dyn_objs =
+                                        entry.or_insert_with(ChunkDynamicObjects::default);
+                                    let mut dyn_obj = self.pen_mode_settings.dyn_obj.clone();
+                                    dyn_obj.set_pos([x, y]);
+                                    dyn_obj.set_unique_id(
+                                        world_db.main.dynamic_world_v2.new_unique_id(),
+                                    );
+                                    // TODO: it's not clear if we should reuse AnyDynamicObject for both item and pen mode
+                                    // e.g. no item can ever hold "gatherBlock" object
+                                    // potentially need a dedicated type, for now we stick to AnyDynamicObject
+                                    chunk_dyn_objs.insert(dyn_obj);
+                                    self.chunk_cache.mark_mesh_outdated(block_coord);
+                                }
+                            }
                         }
                     }
                     if let Some(InteractionTarget::DynamicObject { chunk_coord, id }) =
                         self.interaction_state.hover
+                        && let ObjectType::DynamicObject(dyn_obj_ty) = id.obj_type
                     {
-                        if response.clicked_by(egui::PointerButton::Middle) {
-                            dbg!(
-                                "sample obj {}-th {:?} at {}",
-                                id.index,
-                                id.obj_type,
-                                chunk_coord
-                            );
+                        if response.clicked_by(egui::PointerButton::Middle)
+                            && let Some(chunk_dyn_objs) = dw.chunk_at(chunk_coord)
+                            && let Some(any_dyn_obj_ref) = chunk_dyn_objs.get(dyn_obj_ty, id.index)
+                        {
+                            self.pen_mode_settings.dyn_obj = any_dyn_obj_ref.to_owned();
                         }
-                        if response.clicked_by(egui::PointerButton::Secondary) {
-                            dbg!(
-                                "delete obj {}-th {:?} at {}",
-                                id.index,
-                                id.obj_type,
-                                chunk_coord
-                            );
+                        if response.clicked_by(egui::PointerButton::Secondary)
+                            && let Some(chunk_dyn_objs) = dw.chunk_at_mut(chunk_coord)
+                        {
+                            chunk_dyn_objs.remove(dyn_obj_ty, id.index);
+                            self.chunk_cache.mark_mesh_outdated(chunk_coord);
+                            self.interaction_state.clear_hover();
+
+                            if let Some(InteractionTarget::DynamicObject {
+                                chunk_coord: selected_chunk_coord,
+                                id: selected_id,
+                            }) = self.interaction_state.select
+                                && selected_chunk_coord == chunk_coord
+                            {
+                                match id.index.cmp(&selected_id.index) {
+                                    std::cmp::Ordering::Less => {
+                                        self.interaction_state.set_select(Some(
+                                            InteractionTarget::DynamicObject {
+                                                chunk_coord,
+                                                id: DwChunkObjId {
+                                                    obj_type: ObjectType::DynamicObject(dyn_obj_ty),
+                                                    index: selected_id.index - 1,
+                                                },
+                                            },
+                                        ));
+                                    }
+                                    std::cmp::Ordering::Equal => {
+                                        self.interaction_state.set_select(None);
+                                    }
+                                    std::cmp::Ordering::Greater => {}
+                                }
+                            }
                         }
                     }
                 }
@@ -935,7 +989,7 @@ impl EditorApp {
         }
     }
 
-    fn update_voxels(&mut self, frame: &eframe::Frame) {
+    fn update_outdated_voxel_mesh(&mut self, frame: &eframe::Frame) {
         if let Some(state) = frame.wgpu_render_state() {
             let read_renderer = state.renderer.read();
             let r = read_renderer
@@ -943,6 +997,10 @@ impl EditorApp {
                 .get::<RenderResources>()
                 .expect("should have render resources");
             self.chunk_cache.update_voxels(&state.queue, r.voxel_buf());
+            if let Some(world_db) = self.world_db.as_mut() {
+                self.chunk_cache
+                    .update_meshes(&state.device, &mut world_db.dw, &mut self.dw_buf);
+            }
         }
     }
 
@@ -959,7 +1017,7 @@ impl EditorApp {
         self.update_camera_pos(ui, &response);
         self.handle_pen_mode_input(&response);
 
-        self.update_voxels(frame);
+        self.update_outdated_voxel_mesh(frame);
 
         let [min_coords, max_coords] = self.camera.visible_world_region_2d(rect.size().into());
         let center = self.camera.world_offset().xy();
@@ -1277,8 +1335,7 @@ impl EditorApp {
                      chunk_coord: ChunkCoord,
                      dyn_obj_ty: DynamicObjectType,
                      index: usize,
-                     dw: &mut DynamicWorld,
-                     device: &wgpu::Device| {
+                     dw: &mut DynamicWorld| {
                         if let Ok(dst_coord) = BlockCoord::new(x as u32, y as u16)
                             && let (dst_chunk_coord, _) = dst_coord.decompose()
                             && dst_chunk_coord != chunk_coord
@@ -1292,43 +1349,28 @@ impl EditorApp {
                                         id: DwChunkObjId::from_dyn_obj(dyn_obj_ty, new_i),
                                     });
                             }
-
-                            let dst_dw_chunk = dw
-                                .chunk_at(dst_chunk_coord)
-                                .expect("move_element must have created chunk at dst_chunk_coord");
-                            self.dw_buf.set_chunk(device, dst_chunk_coord, dst_dw_chunk);
+                            self.chunk_cache.mark_mesh_outdated(dst_chunk_coord);
                         }
                     };
-                if let Some(state) = frame.wgpu_render_state() {
-                    // handle obj move & dst chunk re-render
-                    if let Some((x, y)) = flags.pos_changed_to {
-                        match id.obj_type {
-                            ObjectType::DynamicObject(dyn_obj_ty) => {
-                                move_dyn_obj(
-                                    x,
-                                    y,
-                                    chunk_coord,
-                                    dyn_obj_ty,
-                                    id.index,
-                                    dw,
-                                    &state.device,
-                                );
+                // handle obj move & dst chunk re-render
+                if let Some((x, y)) = flags.pos_changed_to {
+                    match id.obj_type {
+                        ObjectType::DynamicObject(dyn_obj_ty) => {
+                            move_dyn_obj(x, y, chunk_coord, dyn_obj_ty, id.index, dw);
+                        }
+                        ObjectType::Blockhead => {
+                            if let Some(blockhead) = world_db.main.blockheads.get_mut(id.index) {
+                                blockhead.float_pos = [x, y];
                             }
-                            ObjectType::Blockhead => {
-                                if let Some(blockhead) = world_db.main.blockheads.get_mut(id.index)
-                                {
-                                    blockhead.float_pos = [x, y];
-                                }
+                            if let Some(state) = frame.wgpu_render_state() {
                                 self.dw_buf
                                     .set_blockheads(&state.device, &world_db.main.blockheads);
                             }
                         }
                     }
-                    if flags.rebuild_mesh
-                        && let Some(dw_chunk) = dw.chunk_at(chunk_coord)
-                    {
-                        self.dw_buf.set_chunk(&state.device, chunk_coord, dw_chunk);
-                    }
+                }
+                if flags.rebuild_mesh {
+                    self.chunk_cache.mark_mesh_outdated(chunk_coord);
                 }
             }
         }
