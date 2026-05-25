@@ -185,10 +185,8 @@ impl<T: ToGrid + Clone + Default + Send + Sync + 'static> ToGrid for Option<T> {
                         .data_mut(|d| d.get_temp::<T>(storage_id))
                         .unwrap_or_else(T::default);
                     *self = Some(restored_data);
-                } else {
-                    if let Some(abandoned_data) = self.take() {
-                        ui.data_mut(|d| d.insert_temp(storage_id, abandoned_data));
-                    }
+                } else if let Some(abandoned_data) = self.take() {
+                    ui.data_mut(|d| d.insert_temp(storage_id, abandoned_data));
                 }
             }
 

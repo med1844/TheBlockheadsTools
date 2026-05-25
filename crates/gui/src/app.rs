@@ -194,10 +194,12 @@ impl ChunkCache {
         chunk_coord: ChunkCoord,
         world_db: &WorldDb,
     ) -> Option<&'a mut Chunk> {
-        if !self.decompressed_chunks.contains_key(&chunk_coord) {
+        if let std::collections::hash_map::Entry::Vacant(e) =
+            self.decompressed_chunks.entry(chunk_coord)
+        {
             let compressed_chunk = world_db.chunks.chunk_at(chunk_coord)?;
             let chunk = compressed_chunk.decompress().ok()?;
-            self.decompressed_chunks.insert(chunk_coord, chunk);
+            e.insert(chunk);
         }
         self.decompressed_chunks.get_mut(&chunk_coord)
     }
@@ -1255,13 +1257,9 @@ impl EditorApp {
             );
             let ctx = (egui_ctx, context);
             let draw_result = match id.obj_type {
-                ObjectType::DynamicObject(dyn_obj_type) => {
-                    if let Some(dw_chunk) = dw.chunk_at_mut(chunk_coord) {
-                        Some(draw_dyn_obj_window(dyn_obj_type, id.index, dw_chunk, ctx))
-                    } else {
-                        None
-                    }
-                }
+                ObjectType::DynamicObject(dyn_obj_type) => dw
+                    .chunk_at_mut(chunk_coord)
+                    .map(|dw_chunk| draw_dyn_obj_window(dyn_obj_type, id.index, dw_chunk, ctx)),
                 ObjectType::Blockhead => Some(draw_window(
                     "Blockhead",
                     world_db.main.blockheads.get_mut(id.index),
