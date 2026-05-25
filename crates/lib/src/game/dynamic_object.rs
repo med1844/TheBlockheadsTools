@@ -259,6 +259,13 @@ impl DynamicObject {
         self.pos_x = x.floor() as u32;
         self.pos_y = y.floor() as u16;
     }
+
+    pub fn set_pos(&mut self, pos: (u32, u16)) {
+        let (x, y) = pos;
+        self.pos_x = x;
+        self.pos_y = y;
+        self.float_pos = [x as f32 + 0.5, y as f32];
+    }
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize_repr, Deserialize_repr)]
@@ -363,7 +370,7 @@ impl Default for AnyDynamicObject {
 }
 
 impl AnyDynamicObject {
-    pub fn set_pos(&mut self, pos: [f32; 2]) {
+    pub fn set_float_pos(&mut self, pos: [f32; 2]) {
         match self {
             AnyDynamicObject::Ladder(ladder) => ladder.set_float_pos(pos),
             AnyDynamicObject::Door(door) => door.set_float_pos(pos),
@@ -373,6 +380,19 @@ impl AnyDynamicObject {
             AnyDynamicObject::Chest(chest) => chest.set_float_pos(pos),
             AnyDynamicObject::Sign(sign) => sign.set_float_pos(pos),
             AnyDynamicObject::TrainStation(train_station) => train_station.set_float_pos(pos),
+        }
+    }
+
+    pub fn set_pos(&mut self, pos: (u32, u16)) {
+        match self {
+            AnyDynamicObject::Ladder(ladder) => ladder.set_pos(pos),
+            AnyDynamicObject::Door(door) => door.set_pos(pos),
+            AnyDynamicObject::Bed(bed) => bed.set_pos(pos),
+            AnyDynamicObject::Egg(egg) => egg.set_pos(pos),
+            AnyDynamicObject::Workbench(workbench) => workbench.set_pos(pos),
+            AnyDynamicObject::Chest(chest) => chest.set_pos(pos),
+            AnyDynamicObject::Sign(sign) => sign.set_pos(pos),
+            AnyDynamicObject::TrainStation(train_station) => train_station.set_pos(pos),
         }
     }
 

@@ -244,7 +244,7 @@ impl ChunkCache {
     fn update_meshes(&mut self, device: &wgpu::Device, dw: &mut DynamicWorld, dw_buf: &mut DwBuf) {
         for coord in self.mesh_outdated.drain() {
             if let Some(dw_chunk) = dw.chunk_at(coord) {
-                dw_buf.set_chunk(&device, coord, dw_chunk);
+                dw_buf.set_chunk(device, coord, dw_chunk);
             }
         }
     }
@@ -328,6 +328,7 @@ struct PenModeSettings {
     // primary => binds to left click, not primary => binds to right click
     primary_block: PrimaryTarget,
     dyn_obj: AnyDynamicObject,
+    dyn_obj_snap: bool,
     target: PenDrawTarget,
 }
 
@@ -342,6 +343,7 @@ impl Default for PenModeSettings {
             block_b: BlockData::new(BlockType::Air, BlockType::Air, BlockContentType::Nothing),
             primary_block: PrimaryTarget::default(),
             dyn_obj: AnyDynamicObject::default(),
+            dyn_obj_snap: true,
             target: PenDrawTarget::default(),
         }
     }
@@ -928,7 +930,10 @@ impl EditorApp {
                                     let chunk_dyn_objs =
                                         entry.or_insert_with(ChunkDynamicObjects::default);
                                     let mut dyn_obj = self.pen_mode_settings.dyn_obj.clone();
-                                    dyn_obj.set_pos([x, y]);
+                                    match self.pen_mode_settings.dyn_obj_snap {
+                                        true => dyn_obj.set_pos((block_coord.x(), block_coord.y())),
+                                        false => dyn_obj.set_float_pos([x, y]),
+                                    }
                                     dyn_obj.set_unique_id(
                                         world_db.main.dynamic_world_v2.new_unique_id(),
                                     );
@@ -1448,6 +1453,8 @@ impl EditorApp {
                         });
                     }
                     PenDrawTarget::DwObj => {
+                        ui.checkbox(&mut self.pen_mode_settings.dyn_obj_snap, "Snap to Blocks");
+
                         self.pen_mode_settings
                             .dyn_obj
                             .info(ui, &mut DwUiContext::default());
