@@ -16,7 +16,10 @@ use snafu::prelude::*;
 use std::path::PathBuf;
 #[cfg(target_arch = "wasm32")]
 use std::sync::mpsc::{Receiver, Sender, channel};
-use std::sync::{Arc, Mutex};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 use the_blockheads_tools_lib::{
     DynArch,
     game::{
@@ -101,7 +104,6 @@ struct InteractionState {
     hover: Option<InteractionTarget>,
     select: Option<InteractionTarget>,
 
-    selected_block_chunk: Option<(ChunkCoord, Chunk)>,
     hover_on_dyn_obj_id: Arc<Mutex<Option<(DwChunkObjId, ChunkCoord)>>>,
 
     selected_block_gpu: GpuCoord<BlockCoord>,
@@ -113,7 +115,6 @@ impl Default for InteractionState {
         Self {
             hover: None,
             select: None,
-            selected_block_chunk: None,
             hover_on_dyn_obj_id: Arc::new(Mutex::new(None)),
             selected_block_gpu: GpuCoord::default(),
             hover_on_block_gpu: GpuCoord::default(),
@@ -137,46 +138,20 @@ impl InteractionState {
         self.hover_on_block_gpu.update(None);
     }
 
-    fn dump_chunk(&mut self, world_db: &mut WorldDb) {
-        if let Some((chunk_coord, chunk)) = self.selected_block_chunk.take()
-            && let Ok(compressed_chunk) = chunk.compress()
-        {
-            world_db.chunks.set_chunk_at(chunk_coord, compressed_chunk);
-        }
-        self.selected_block_gpu.update(None);
-    }
-
-    fn set_select(&mut self, select: Option<InteractionTarget>, world_db: Option<&mut WorldDb>) {
+    fn set_select(&mut self, select: Option<InteractionTarget>) {
         self.select = select;
-        if let Some(world_db) = world_db {
-            if let Some(InteractionTarget::Block(block_coord)) = self.select {
-                let should_update_chunk = match self.selected_block_chunk.as_ref() {
-                    Some((old_chunk_coord, _)) => *old_chunk_coord != block_coord.into(),
-                    None => true,
-                };
-                if should_update_chunk {
-                    self.dump_chunk(world_db);
-                    if let Some(compressed_chunk) = world_db.chunks.chunk_at(block_coord)
-                        && let Ok(chunk) = compressed_chunk.decompress()
-                    {
-                        self.selected_block_chunk = Some((block_coord.into(), chunk));
-                    }
-                }
-                self.selected_block_gpu.update(Some(block_coord));
-            } else {
-                self.dump_chunk(world_db);
-            }
+        if let Some(InteractionTarget::Block(block_coord)) = self.select {
+            self.selected_block_gpu.update(Some(block_coord));
+        } else {
+            self.selected_block_gpu.update(None);
         }
     }
 
-    fn copy_hover_to_select(&mut self, world_db: Option<&mut WorldDb>) {
-        self.set_select(
-            match self.select == self.hover {
-                true => None,
-                false => self.hover,
-            },
-            world_db,
-        );
+    fn copy_hover_to_select(&mut self) {
+        self.set_select(match self.select == self.hover {
+            true => None,
+            false => self.hover,
+        });
     }
 
     fn hover_on_id_uniform(&self) -> DwChunkObjIdUniform {
@@ -194,6 +169,54 @@ impl InteractionState {
                 Some((id, chunk_coord)).into()
             }
             _ => None.into(),
+        }
+    }
+}
+
+#[derive(Default)]
+struct DirtyChunkManager {
+    // We can easily add eviction support here if memory usage becomes a concern.
+    dirty_chunks: HashMap<ChunkCoord, Chunk>,
+}
+
+impl DirtyChunkManager {
+    fn new() -> Self {
+        Self::default()
+    }
+
+    fn get_chunk_mut<'a>(
+        &'a mut self,
+        chunk_coord: ChunkCoord,
+        world_db: &WorldDb,
+    ) -> Option<&'a mut Chunk> {
+        if !self.dirty_chunks.contains_key(&chunk_coord) {
+            let compressed_chunk = world_db.chunks.chunk_at(chunk_coord)?;
+            let chunk = compressed_chunk.decompress().ok()?;
+            self.dirty_chunks.insert(chunk_coord, chunk);
+        }
+        self.dirty_chunks.get_mut(&chunk_coord)
+    }
+
+    #[allow(unused)]
+    fn get_or_create_chunk_mut<'a>(
+        &'a mut self,
+        chunk_coord: ChunkCoord,
+        world_db: &WorldDb,
+    ) -> &'a mut Chunk {
+        self.dirty_chunks.entry(chunk_coord).or_insert_with(|| {
+            world_db
+                .chunks
+                .chunk_at(chunk_coord)
+                .and_then(|c| c.decompress().ok())
+                .unwrap_or_else(Chunk::new_empty)
+        })
+    }
+
+    fn flush(&mut self, world_db: &mut WorldDb) {
+        for (coord, chunk) in self.dirty_chunks.drain() {
+            if let Ok(compressed) = chunk.compress() {
+                world_db.chunks.set_chunk_at(coord, compressed);
+            }
         }
     }
 }
@@ -289,6 +312,7 @@ impl Default for PenModeSettings {
 
 pub struct EditorApp {
     world_db: Option<WorldDb>,
+    dirty_chunk_manager: DirtyChunkManager,
     dw_buf: DwBuf,
     camera: Camera,
 
@@ -340,6 +364,7 @@ impl EditorApp {
 
         Self {
             world_db: None,
+            dirty_chunk_manager: DirtyChunkManager::new(),
             dw_buf: DwBuf::new(),
             camera,
 
@@ -434,14 +459,17 @@ impl EditorApp {
                     }
                     if ui.button("Save As").clicked() {
                         // TODO if world_db is empty we should return as error
-                        if let Some(world_db) = self.world_db.as_ref()
+                        if let Some(world_db) = self.world_db.as_mut()
                             && let Some(save_path) = rfd::FileDialog::new().pick_folder()
-                            && let Err(e) = world_db
+                        {
+                            self.dirty_chunk_manager.flush(world_db);
+                            if let Err(e) = world_db
                                 .to_path(save_path, DynArch::Arch64)
                                 .context(SaveWorldDbSnafu)
-                        {
-                            // TODO allow user select arch
-                            self.save_err = Some(e);
+                            {
+                                // TODO allow user select arch
+                                self.save_err = Some(e);
+                            }
                         }
                     }
                 }
@@ -461,8 +489,9 @@ impl EditorApp {
                         })
                     }
                     if ui.button("Export").clicked()
-                        && let Some(world_db) = self.world_db.as_ref()
+                        && let Some(world_db) = self.world_db.as_mut()
                     {
+                        self.dirty_chunk_manager.flush(world_db);
                         let mut out_bytes = Vec::new();
                         match world_db
                             .write_to(&mut out_bytes, DynArch::Arch64)
@@ -754,8 +783,7 @@ impl EditorApp {
         }
 
         if matches!(self.mode, Mode::View) && response.clicked_by(egui::PointerButton::Primary) {
-            self.interaction_state
-                .copy_hover_to_select(self.world_db.as_mut());
+            self.interaction_state.copy_hover_to_select();
         }
     }
 
@@ -1010,12 +1038,13 @@ impl EditorApp {
         frame: &mut eframe::Frame,
     ) {
         let mut open = true;
-        if let Some((chunk_coord, selected_chunk)) =
-            self.interaction_state.selected_block_chunk.as_mut()
-            && let Some(InteractionTarget::Block(selected_block_coord)) =
-                self.interaction_state.select
+        if let Some(InteractionTarget::Block(selected_block_coord)) = self.interaction_state.select
+            && let Some(world_db) = self.world_db.as_ref()
+            && let chunk_coord = selected_block_coord.into()
+            && let Some(selected_chunk) = self
+                .dirty_chunk_manager
+                .get_chunk_mut(chunk_coord, world_db)
         {
-            let chunk_coord = *chunk_coord;
             let mut update_voxel = false;
             egui::Window::new(format!("Selected Block in Chunk {}", chunk_coord))
                 .id("selected_dynamic_obj_info".into())
@@ -1041,8 +1070,7 @@ impl EditorApp {
             }
         }
         if !open {
-            self.interaction_state
-                .set_select(None, self.world_db.as_mut());
+            self.interaction_state.set_select(None);
         }
     }
 
