@@ -1552,6 +1552,8 @@ impl ToGrid for InteractionObject {
         self.is_in_use.add_row("isInUse", ui);
         context.flags.rebuild_mesh |= self.flipped.add_row("flipped", ui).changed();
         self.paint_color.add_row("paintColor", ui);
+        self.save_time.add_row("saveTime", ui);
+        self.owner_name.add_row("ownerName", ui);
     }
 }
 
@@ -1629,7 +1631,6 @@ impl ToGrid for Workbench {
         self.hurrying.add_row("hurrying", ui);
         self.last_world_time.add_row("lastWorldTime", ui);
         context.flags.rebuild_mesh |= self.level.add_row("level", ui).changed();
-        self.save_time.add_row("saveTime", ui);
         self.selected_index.add_row("selectedIndex", ui);
         context.flags.rebuild_mesh |= self.workbench_type.add_row("workbenchType", ui).changed();
         self.x_scroll.add_row("xScroll", ui);
@@ -2301,7 +2302,6 @@ impl ToGrid for Item {
 
 impl ToGrid for Chest {
     fn to_grid(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
-        self.save_time.add_row("saveTime", ui);
         ui.label("slots");
         ui.vertical(|ui| {
             if let Some((num_col, num_row, slots)) = match &mut self.slots {
@@ -2422,7 +2422,6 @@ impl ToGrid for Sign {
         self.text.add_row("text", ui);
         context.flags.rebuild_mesh |= self.connection_type.add_row("connectionType", ui).changed();
         self.offset_type.add_row("offsetType", ui);
-        self.save_time.add_row("saveTime", ui);
     }
 }
 
@@ -2507,7 +2506,6 @@ impl BuildDwMesh for Sign {
 impl ToGrid for TrainStation {
     fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut DwUiContext) {
         self.text.add_row("text", ui);
-        self.save_time.add_row("saveTime", ui);
     }
 }
 

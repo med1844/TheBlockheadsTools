@@ -1,4 +1,4 @@
-use super::item::ItemType;
+use super::{block::BlockType, item::ItemType};
 use crate::util::serde::{deserialize_some, serialize_some};
 use num_enum::TryFromPrimitive;
 use serde::{Deserialize, Serialize};
@@ -293,6 +293,19 @@ pub struct InteractionObject {
     pub is_in_use: bool,
     pub flipped: bool,
     pub paint_color: u16,
+
+    // see -[InteractionObject_getSaveDict]
+    // .objc_str.256 (0x944600) in decompiled server code
+    pub save_time: f32,
+
+    // see 0x914906 in decompiled server code
+    #[serde(
+        default,
+        deserialize_with = "deserialize_some",
+        serialize_with = "serialize_some",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub owner_name: Option<String>,
 }
 inherit!(InteractionObject -> DynamicObject, obj);
 
@@ -303,6 +316,7 @@ impl InteractionObject {
         is_in_use: bool,
         flipped: bool,
         paint_color: u16,
+        save_time: f32,
     ) -> Self {
         Self {
             obj,
@@ -310,8 +324,19 @@ impl InteractionObject {
             is_in_use,
             flipped,
             paint_color,
+            save_time,
+            owner_name: None,
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize_repr, Deserialize_repr)]
+#[repr(u8)]
+pub enum LightDirection {
+    #[default]
+    All = 0,
+    Down = 1,
+    Up = 2,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -332,14 +357,81 @@ pub struct ArtificialLight {
 }
 inherit!(ArtificialLight -> DynamicObject, obj);
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize_repr, Deserialize_repr)]
-#[repr(u8)]
-pub enum LightDirection {
-    #[default]
-    All = 0,
-    Down = 1,
-    Up = 2,
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct FireObjectXml {
+    #[serde(flatten)]
+    obj: DynamicObject,
+    burn_timer: f32,
+    #[serde(rename = "spreadTimer_0")]
+    spread_timer_0: f32,
+    #[serde(rename = "spreadTimer_1")]
+    spread_timer_1: f32,
+    #[serde(rename = "spreadTimer_2")]
+    spread_timer_2: f32,
+    #[serde(rename = "spreadTimer_3")]
+    spread_timer_3: f32,
+    light_dict: ArtificialLight,
 }
+
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct FireObject {
+    obj: DynamicObject,
+    pub burn_timer: f32,
+    pub spread_timer: [f32; 4],
+    pub light_dict: ArtificialLight,
+}
+
+impl From<FireObjectXml> for FireObject {
+    fn from(value: FireObjectXml) -> Self {
+        Self {
+            obj: value.obj,
+            burn_timer: value.burn_timer,
+            spread_timer: [
+                value.spread_timer_0,
+                value.spread_timer_1,
+                value.spread_timer_2,
+                value.spread_timer_3,
+            ],
+            light_dict: value.light_dict,
+        }
+    }
+}
+
+impl From<FireObject> for FireObjectXml {
+    fn from(value: FireObject) -> Self {
+        let [a, b, c, d] = value.spread_timer;
+        Self {
+            obj: value.obj,
+            burn_timer: value.burn_timer,
+            spread_timer_0: a,
+            spread_timer_1: b,
+            spread_timer_2: c,
+            spread_timer_3: d,
+            light_dict: value.light_dict,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GlowBlock {
+    #[serde(flatten)]
+    obj: DynamicObject,
+    pub light_dict: ArtificialLight,
+    pub tile_type: BlockType,
+}
+inherit!(GlowBlock -> DynamicObject, obj);
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GatherBlock {
+    #[serde(flatten)]
+    obj: DynamicObject,
+    pub timer: f32,
+    pub last_known_gather_value: u32,
+}
+inherit!(GatherBlock -> DynamicObject, obj);
 
 pub mod animal;
 pub mod blockhead;
@@ -592,12 +684,14 @@ impl<'a> AnyDynamicObjectRef<'a> {
 #[cfg(test)]
 mod tests {
     use super::{
-        DynamicObjectList, DynamicObjectType,
+        DynamicObjectList, DynamicObjectType, FireObjectXml, GatherBlock, GlowBlock,
         animal::{CaveTroll, ClownFish, Dodo, Donkey, DropBear, Egg, Scorpion, Shark, Yak},
+        chest::ChestXml,
         craft::{
-            Bed, Boat, Column, Door, ElevatorMotor, ElevatorShaft, Ladder, Rail, Sign, Stairs,
-            Torch, TradePortal, TradingPost, Window, Wire,
+            Bed, Boat, Column, Door, ElevatorMotor, ElevatorShaft, Ladder, Mirror, OwnershipSign,
+            Painting, Rail, Sign, Stairs, Torch, TradePortal, TradingPost, Window, Wire,
         },
+        dropped_item::DroppedItemXml,
         plant::{
             CarrotPlant, ChilliPlant, CornPlant, FlaxPlant, KelpPlant, SunflowerPlant, TomatoPlant,
             TulipPlant, VinePlant, WheatPlant,
@@ -653,16 +747,16 @@ mod tests {
         check_round_trip::<SunflowerPlant>(DynamicObjectType::SunflowerPlant).unwrap();
         check_round_trip::<CornPlant>(DynamicObjectType::CornPlant).unwrap();
         check_round_trip::<Dodo>(DynamicObjectType::Dodo).unwrap();
-        // check_round_trip::<DroppedItem>(DynamicObjectType::DroppedItem).unwrap();
-        // check_round_trip::<Fire>(DynamicObjectType::Fire).unwrap();
+        check_round_trip::<DroppedItemXml>(DynamicObjectType::DroppedItem).unwrap();
+        check_round_trip::<FireObjectXml>(DynamicObjectType::Fire).unwrap();
         check_round_trip::<Torch>(DynamicObjectType::Torch).unwrap();
-        // check_round_trip::<GlowBlock>(DynamicObjectType::GlowBlock).unwrap();
+        check_round_trip::<GlowBlock>(DynamicObjectType::GlowBlock).unwrap();
         check_round_trip::<Ladder>(DynamicObjectType::Ladder).unwrap();
         check_round_trip::<Door>(DynamicObjectType::Door).unwrap();
         // check_round_trip::<ArtificialLight>(DynamicObjectType::ArtificialLight).unwrap();
         check_round_trip::<Bed>(DynamicObjectType::Bed).unwrap();
         check_round_trip::<DropBear>(DynamicObjectType::DropBear).unwrap();
-        // check_round_trip::<GatherBlock>(DynamicObjectType::GatherBlock).unwrap();
+        check_round_trip::<GatherBlock>(DynamicObjectType::GatherBlock).unwrap();
         check_round_trip::<CarrotPlant>(DynamicObjectType::CarrotPlant).unwrap();
         check_round_trip::<Donkey>(DynamicObjectType::Donkey).unwrap();
         check_round_trip::<Egg>(DynamicObjectType::Egg).unwrap();
@@ -681,13 +775,13 @@ mod tests {
         check_round_trip::<FreightCar>(DynamicObjectType::FreightCar).unwrap();
         check_round_trip::<PassengerCar>(DynamicObjectType::PassengerCar).unwrap();
         check_round_trip::<Workbench>(DynamicObjectType::Workbench).unwrap();
-        // check_round_trip::<Chest>(DynamicObjectType::Chest).unwrap();
+        check_round_trip::<ChestXml>(DynamicObjectType::Chest).unwrap();
         check_round_trip::<Sign>(DynamicObjectType::Sign).unwrap();
         check_round_trip::<TradingPost>(DynamicObjectType::TradingPost).unwrap();
         check_round_trip::<TrainStation>(DynamicObjectType::TrainStation).unwrap();
         check_round_trip::<TradePortal>(DynamicObjectType::TradePortal).unwrap();
         check_round_trip::<Scorpion>(DynamicObjectType::Scorpion).unwrap();
-        // check_round_trip::<Painting>(DynamicObjectType::Painting).unwrap();
+        check_round_trip::<Painting>(DynamicObjectType::Painting).unwrap();
         check_round_trip::<Column>(DynamicObjectType::Column).unwrap();
         check_round_trip::<Stairs>(DynamicObjectType::Stairs).unwrap();
         check_round_trip::<ElevatorMotor>(DynamicObjectType::ElevatorMotor).unwrap();
@@ -695,10 +789,10 @@ mod tests {
         check_round_trip::<GemTree>(DynamicObjectType::GemTree).unwrap();
         check_round_trip::<VinePlant>(DynamicObjectType::VinePlant).unwrap();
         check_round_trip::<TulipPlant>(DynamicObjectType::TulipPlant).unwrap();
-        // check_round_trip::<OwnershipSign>(DynamicObjectType::OwnershipSign).unwrap();
+        check_round_trip::<OwnershipSign>(DynamicObjectType::OwnershipSign).unwrap();
         check_round_trip::<WheatPlant>(DynamicObjectType::WheatPlant).unwrap();
         check_round_trip::<TomatoPlant>(DynamicObjectType::TomatoPlant).unwrap();
         check_round_trip::<Yak>(DynamicObjectType::Yak).unwrap();
-        // check_round_trip::<Mirror>(DynamicObjectType::Mirror).unwrap();
+        check_round_trip::<Mirror>(DynamicObjectType::Mirror).unwrap();
     }
 }

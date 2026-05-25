@@ -1093,8 +1093,8 @@ impl ChestPy {
                 int_ref.is_in_use,
                 int_ref.flipped,
                 int_ref.paint_color,
+                0.0,
             ),
-            0.0, // dummy save_time
             slots,
         ))
     }
@@ -1203,6 +1203,7 @@ impl WorkbenchPy {
                 int_ref.is_in_use,
                 int_ref.flipped,
                 int_ref.paint_color,
+                slf.save_time,
             ),
             slf.available_electricity,
             slf.craft_progress_count,
@@ -1215,7 +1216,6 @@ impl WorkbenchPy {
             slf.hurrying,
             slf.last_world_time,
             slf.level,
-            slf.save_time,
             slf.selected_index,
             slf.workbench_type.into(),
             slf.x_scroll,

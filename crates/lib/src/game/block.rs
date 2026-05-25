@@ -1,4 +1,5 @@
 use num_enum::TryFromPrimitive;
+use serde_repr::{Deserialize_repr, Serialize_repr};
 use snafu::prelude::*;
 use strum::{Display, IntoStaticStr};
 
@@ -21,9 +22,23 @@ type Result<T> = std::result::Result<T, BlockError>;
 /// An enumeration of block types.
 ///
 /// Records the ID of each type of block.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, IntoStaticStr, Display, TryFromPrimitive)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    PartialEq,
+    Eq,
+    Hash,
+    IntoStaticStr,
+    Display,
+    TryFromPrimitive,
+    Serialize_repr,
+    Deserialize_repr,
+)]
 #[repr(u8)]
 pub enum BlockType {
+    #[default]
     Stone = 1,
     Air = 2,
     Water = 3,

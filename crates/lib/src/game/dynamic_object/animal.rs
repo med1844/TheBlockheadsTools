@@ -23,7 +23,7 @@ pub enum AnimalType {
 pub struct Animal {
     #[serde(flatten)]
     obj: DynamicObject,
-    pub save_time: f64,
+    pub save_time: f32,
     pub age: f32,
     pub breed: u16,
     pub damage: u16,

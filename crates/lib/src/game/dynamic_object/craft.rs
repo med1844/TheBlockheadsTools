@@ -88,7 +88,6 @@ pub struct Bed {
     obj: InteractionObject,
     pub item_type: ItemType,
     pub bedding_color: u16,
-    pub save_time: f64,
 }
 inherit!(Bed -> InteractionObject, obj);
 
@@ -101,7 +100,6 @@ impl Default for Bed {
             },
             item_type: ItemType::Bed,
             bedding_color: Default::default(),
-            save_time: 0.0,
         }
     }
 }
@@ -217,7 +215,6 @@ pub struct Sign {
     pub text: String,
     pub connection_type: SignConnectionType,
     pub offset_type: u64,
-    pub save_time: f64,
 }
 inherit!(Sign -> InteractionObject, obj);
 
@@ -231,7 +228,6 @@ impl Default for Sign {
             text: String::default(),
             connection_type: SignConnectionType::default(),
             offset_type: 0,
-            save_time: 0.0,
         }
     }
 }
@@ -243,7 +239,6 @@ pub struct TradingPost {
     obj: InteractionObject,
     pub coin_count: u32,
     pub price_tier: u32,
-    pub save_time: f64,
     pub sell_slot: plist::Value,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub seller_client_name: Option<String>,
@@ -256,11 +251,21 @@ pub struct TradePortal {
     #[serde(flatten)]
     obj: InteractionObject,
     pub level: u32,
-    pub save_time: f64,
     pub local_price_offsets: plist::Dictionary,
-    pub light_dict: super::ArtificialLight,
+    pub light_dict: ArtificialLight,
 }
 inherit!(TradePortal -> InteractionObject, obj);
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Painting {
+    #[serde(flatten)]
+    obj: DynamicObject,
+    pub has_verified_image_data: bool,
+    pub output_image_data: plist::Data,
+    pub item_type: ItemType,
+}
+inherit!(Painting -> DynamicObject, obj);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr)]
 #[repr(u8)]
@@ -329,3 +334,36 @@ pub struct ElevatorShaft {
     pub paint_color: u16,
 }
 inherit!(ElevatorShaft -> DynamicObject, obj);
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OwnershipSign {
+    #[serde(flatten)]
+    sign: Sign,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_some",
+        serialize_with = "serialize_some",
+        skip_serializing_if = "Option::is_none",
+        rename = "landOwnerID"
+    )]
+    pub land_owner_id: Option<String>,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_some",
+        serialize_with = "serialize_some",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub land_owner_name: Option<String>,
+    pub w: u8,
+    pub h: u8,
+}
+inherit!(OwnershipSign -> Sign, sign);
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Mirror {
+    #[serde(flatten)]
+    obj: InteractionObject,
+}
+inherit!(Mirror -> InteractionObject, obj);

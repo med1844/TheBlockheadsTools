@@ -223,7 +223,6 @@ impl ChestSlots {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Chest {
     obj: InteractionObject,
-    pub save_time: f64,
     pub slots: ChestSlots,
 }
 inherit!(Chest -> InteractionObject, obj);
@@ -235,19 +234,14 @@ impl Default for Chest {
                 interaction_object_type: InteractionObjectType::Chest,
                 ..Default::default()
             },
-            save_time: 0.0,
             slots: ChestSlots::default(),
         }
     }
 }
 
 impl Chest {
-    pub fn new(obj: InteractionObject, save_time: f64, slots: ChestSlots) -> Self {
-        Self {
-            obj,
-            save_time,
-            slots,
-        }
+    pub fn new(obj: InteractionObject, slots: ChestSlots) -> Self {
+        Self { obj, slots }
     }
 }
 
@@ -258,7 +252,6 @@ pub(crate) struct ChestItem {
     #[serde(flatten)]
     obj: InteractionObject,
     pub chest_type: ChestType,
-    pub save_time: f64,
     #[serde(
         default,
         deserialize_with = "deserialize_some",
@@ -270,13 +263,13 @@ pub(crate) struct ChestItem {
 inherit!(ChestItem -> InteractionObject, obj);
 
 // Contains metadata of a chest stored in dynamic world sub-db
-#[derive(Debug, Serialize, Deserialize)]
+// Doesn't have slots
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct ChestMeta {
+pub(crate) struct ChestXml {
     #[serde(flatten)]
     obj: InteractionObject,
     chest_type: ChestType,
-    save_time: f64,
 
     #[serde(
         rename = "shelfRenderItems_0",
@@ -344,7 +337,7 @@ pub(crate) struct ChestMeta {
     )]
     shelf_item_data_bs_3: Option<u16>,
 }
-inherit!(ChestMeta -> InteractionObject, obj);
+inherit!(ChestXml -> InteractionObject, obj);
 
 impl Chest {
     pub(crate) fn parse_slot_bytes(bytes: &[u8]) -> Result<Vec<plist::Value>> {
@@ -352,39 +345,38 @@ impl Chest {
         plist::from_bytes(&decompressed).context(DeserializeSlotsSnafu)
     }
 
-    pub(crate) fn from_meta_and_slots(meta: ChestMeta, slot_bytes: Option<&[u8]>) -> Result<Self> {
+    pub(crate) fn from_xml_and_slots(xml: ChestXml, slot_bytes: Option<&[u8]>) -> Result<Self> {
         let slot_values = slot_bytes
             .map(|bytes| -> Result<Vec<plist::Value>> { Self::parse_slot_bytes(bytes) })
             .transpose()?;
         let shelf_render_items = [
-            meta.shelf_render_items_0,
-            meta.shelf_render_items_1,
-            meta.shelf_render_items_2,
-            meta.shelf_render_items_3,
+            xml.shelf_render_items_0,
+            xml.shelf_render_items_1,
+            xml.shelf_render_items_2,
+            xml.shelf_render_items_3,
         ];
 
         let shelf_item_data_bs = [
-            meta.shelf_item_data_bs_0,
-            meta.shelf_item_data_bs_1,
-            meta.shelf_item_data_bs_2,
-            meta.shelf_item_data_bs_3,
+            xml.shelf_item_data_bs_0,
+            xml.shelf_item_data_bs_1,
+            xml.shelf_item_data_bs_2,
+            xml.shelf_item_data_bs_3,
         ];
 
         let slots = ChestSlots::from_chest_type_and_slots(
-            meta.chest_type,
+            xml.chest_type,
             slot_values,
             Some(shelf_render_items),
             Some(shelf_item_data_bs),
         )?;
 
         Ok(Self {
-            obj: meta.obj,
-            save_time: meta.save_time,
+            obj: xml.obj,
             slots,
         })
     }
 
-    pub(crate) fn to_meta_and_slots(&self) -> Result<(ChestMeta, Option<Vec<u8>>)> {
+    pub(crate) fn to_xml_and_slots(&self) -> Result<(ChestXml, Option<Vec<u8>>)> {
         let (chest_type, save_item_slots, shelf_render_items, shelf_item_data_bs) =
             self.slots.to_chest_type_and_slots()?;
         let [r0, r1, r2, r3] = shelf_render_items.unwrap_or_default();
@@ -401,10 +393,9 @@ impl Chest {
             None => None,
         };
         Ok((
-            ChestMeta {
+            ChestXml {
                 obj: self.obj.clone(), // should be cheap if there's no owner id
                 chest_type,
-                save_time: self.save_time,
                 shelf_render_items_0: r0,
                 shelf_render_items_1: r1,
                 shelf_render_items_2: r2,
@@ -421,7 +412,6 @@ impl Chest {
     pub(crate) fn from_chest_item(chest_item: ChestItem) -> Result<Self> {
         Ok(Self {
             obj: chest_item.obj,
-            save_time: chest_item.save_time,
             slots: ChestSlots::from_chest_type_and_slots(
                 chest_item.chest_type,
                 chest_item.save_item_slots,
@@ -436,7 +426,6 @@ impl Chest {
         Ok(ChestItem {
             obj: self.obj.clone(),
             chest_type,
-            save_time: self.save_time,
             save_item_slots,
         })
     }

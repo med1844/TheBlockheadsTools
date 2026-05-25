@@ -68,7 +68,6 @@ pub struct TrainStation {
     #[serde(flatten)]
     obj: InteractionObject,
     pub text: String,
-    pub save_time: f64,
 }
 inherit!(TrainStation -> InteractionObject, obj);
 
@@ -80,7 +79,6 @@ impl Default for TrainStation {
                 ..Default::default()
             },
             text: String::default(),
-            save_time: 0.0,
         }
     }
 }

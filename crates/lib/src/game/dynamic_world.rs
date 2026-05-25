@@ -1,12 +1,13 @@
 use super::{
     coord::{ChunkCoord, CoordError},
     dynamic_object::{
-        AnyDynamicObject, AnyDynamicObjectRef, DynamicObjectList, DynamicObjectType,
+        AnyDynamicObject, AnyDynamicObjectRef, DynamicObjectList, DynamicObjectType, FireObject,
+        FireObjectXml, GatherBlock, GlowBlock,
         animal::{CaveTroll, ClownFish, Dodo, Donkey, DropBear, Egg, Scorpion, Shark, Yak},
-        chest::{Chest, ChestError, ChestMeta},
+        chest::{Chest, ChestError, ChestXml},
         craft::{
-            Bed, Boat, Column, Door, ElevatorMotor, ElevatorShaft, Ladder, Rail, Sign, Stairs,
-            Torch, TradePortal, TradingPost, Window, Wire,
+            Bed, Boat, Column, Door, ElevatorMotor, ElevatorShaft, Ladder, Mirror, OwnershipSign,
+            Painting, Rail, Sign, Stairs, Torch, TradePortal, TradingPost, Window, Wire,
         },
         dropped_item::{DroppedItem, DroppedItemXml},
         plant::{
@@ -86,15 +87,15 @@ pub struct ChunkDynamicObjects {
     pub corn_plant: DynamicObjectList<CornPlant>,
     pub dodo: DynamicObjectList<Dodo>,
     pub dropped_item: DynamicObjectList<DroppedItem>,
-    pub fire: Vec<u8>,
+    pub fire: DynamicObjectList<FireObject>,
     pub torch: DynamicObjectList<Torch>,
-    pub glow_block: Vec<u8>,
+    pub glow_block: DynamicObjectList<GlowBlock>,
     pub ladder: DynamicObjectList<Ladder>,
     pub door: DynamicObjectList<Door>,
     pub artificial_light: Vec<u8>,
     pub bed: DynamicObjectList<Bed>,
     pub dropbear: DynamicObjectList<DropBear>,
-    pub gather_block: Vec<u8>,
+    pub gather_block: DynamicObjectList<GatherBlock>,
     pub carrot_plant: DynamicObjectList<CarrotPlant>,
     pub donkey: DynamicObjectList<Donkey>,
     pub egg: DynamicObjectList<Egg>,
@@ -119,7 +120,7 @@ pub struct ChunkDynamicObjects {
     pub train_station: DynamicObjectList<TrainStation>,
     pub trade_portal: DynamicObjectList<TradePortal>,
     pub scorpion: DynamicObjectList<Scorpion>,
-    pub painting: Vec<u8>,
+    pub painting: DynamicObjectList<Painting>,
     pub column: DynamicObjectList<Column>,
     pub stairs: DynamicObjectList<Stairs>,
     pub elevator_motor: DynamicObjectList<ElevatorMotor>,
@@ -127,11 +128,11 @@ pub struct ChunkDynamicObjects {
     pub gem_tree: DynamicObjectList<GemTree>,
     pub vine_plant: DynamicObjectList<VinePlant>,
     pub tulip_plant: DynamicObjectList<TulipPlant>,
-    pub ownership_sign: Vec<u8>,
+    pub ownership_sign: DynamicObjectList<OwnershipSign>,
     pub wheat_plant: DynamicObjectList<WheatPlant>,
     pub tomato_plant: DynamicObjectList<TomatoPlant>,
     pub yak: DynamicObjectList<Yak>,
-    pub mirror: Vec<u8>,
+    pub mirror: DynamicObjectList<Mirror>,
 }
 
 impl ChunkDynamicObjects {
@@ -150,15 +151,15 @@ impl ChunkDynamicObjects {
             + self.corn_plant.num_obj()
             + self.dodo.num_obj()
             + self.dropped_item.num_obj()
-            // + self.fire.num_obj()
+            + self.fire.num_obj()
             + self.torch.num_obj()
-            // + self.glow_block.num_obj()
+            + self.glow_block.num_obj()
             + self.ladder.num_obj()
             + self.door.num_obj()
             // + self.artificial_light.num_obj()
             + self.bed.num_obj()
             + self.dropbear.num_obj()
-            // + self.gather_block.num_obj()
+            + self.gather_block.num_obj()
             + self.carrot_plant.num_obj()
             + self.donkey.num_obj()
             + self.egg.num_obj()
@@ -183,7 +184,7 @@ impl ChunkDynamicObjects {
             + self.train_station.num_obj()
             + self.trade_portal.num_obj()
             + self.scorpion.num_obj()
-            // + self.painting.num_obj()
+            + self.painting.num_obj()
             + self.column.num_obj()
             + self.stairs.num_obj()
             + self.elevator_motor.num_obj()
@@ -191,11 +192,11 @@ impl ChunkDynamicObjects {
             + self.gem_tree.num_obj()
             + self.vine_plant.num_obj()
             + self.tulip_plant.num_obj()
-            // + self.ownership_sign.num_obj()
+            + self.ownership_sign.num_obj()
             + self.wheat_plant.num_obj()
             + self.tomato_plant.num_obj()
             + self.yak.num_obj()
-        // + self.mirror.num_obj()
+            + self.mirror.num_obj()
     }
 
     fn move_element(
@@ -609,15 +610,18 @@ impl DynamicWorld {
                         })
                         .collect::<Result<DynamicObjectList<DroppedItem>>>()?;
                 }
-                DynamicObjectType::Fire => entry.fire = v.to_vec(),
+                DynamicObjectType::Fire => {
+                    let fire_obj_xml: DynamicObjectList<FireObjectXml> = load(v, obj_ty, coord)?;
+                    entry.fire = fire_obj_xml.into_iter().map(Into::into).collect();
+                }
                 DynamicObjectType::Torch => entry.torch = load(v, obj_ty, coord)?,
-                DynamicObjectType::GlowBlock => entry.glow_block = v.to_vec(),
+                DynamicObjectType::GlowBlock => entry.glow_block = load(v, obj_ty, coord)?,
                 DynamicObjectType::Ladder => entry.ladder = load(v, obj_ty, coord)?,
                 DynamicObjectType::Door => entry.door = load(v, obj_ty, coord)?,
                 DynamicObjectType::ArtificialLight => entry.artificial_light = v.to_vec(),
                 DynamicObjectType::Bed => entry.bed = load(v, obj_ty, coord)?,
                 DynamicObjectType::DropBear => entry.dropbear = load(v, obj_ty, coord)?,
-                DynamicObjectType::GatherBlock => entry.gather_block = v.to_vec(),
+                DynamicObjectType::GatherBlock => entry.gather_block = load(v, obj_ty, coord)?,
                 DynamicObjectType::CarrotPlant => entry.carrot_plant = load(v, obj_ty, coord)?,
                 DynamicObjectType::Donkey => entry.donkey = load(v, obj_ty, coord)?,
                 DynamicObjectType::Egg => entry.egg = load(v, obj_ty, coord)?,
@@ -639,7 +643,7 @@ impl DynamicWorld {
                 DynamicObjectType::PassengerCar => entry.passenger_car = load(v, obj_ty, coord)?,
                 DynamicObjectType::Workbench => entry.workbench = load(v, obj_ty, coord)?,
                 DynamicObjectType::Chest => {
-                    let chest_metas: DynamicObjectList<ChestMeta> =
+                    let chest_metas: DynamicObjectList<ChestXml> =
                         plist::from_bytes(v).context(DeserializeObjectSnafu {
                             object_type: obj_ty,
                             coord,
@@ -650,7 +654,7 @@ impl DynamicWorld {
                             let id = *chest_meta.unique_id.inner();
                             let key = format!("{}/chest_{}", coord_str, id);
                             let slot_bytes = db.get(rtxn, &key).context(GetEntrySnafu { key })?;
-                            Chest::from_meta_and_slots(chest_meta, slot_bytes)
+                            Chest::from_xml_and_slots(chest_meta, slot_bytes)
                                 .context(LoadChestSnafu { coord, id })
                         })
                         .collect::<Result<DynamicObjectList<Chest>>>()?
@@ -660,7 +664,7 @@ impl DynamicWorld {
                 DynamicObjectType::TrainStation => entry.train_station = load(v, obj_ty, coord)?,
                 DynamicObjectType::TradePortal => entry.trade_portal = load(v, obj_ty, coord)?,
                 DynamicObjectType::Scorpion => entry.scorpion = load(v, obj_ty, coord)?,
-                DynamicObjectType::Painting => entry.painting = v.to_vec(),
+                DynamicObjectType::Painting => entry.painting = load(v, obj_ty, coord)?,
                 DynamicObjectType::Column => entry.column = load(v, obj_ty, coord)?,
                 DynamicObjectType::Stairs => entry.stairs = load(v, obj_ty, coord)?,
                 DynamicObjectType::ElevatorMotor => entry.elevator_motor = load(v, obj_ty, coord)?,
@@ -668,11 +672,11 @@ impl DynamicWorld {
                 DynamicObjectType::GemTree => entry.gem_tree = load(v, obj_ty, coord)?,
                 DynamicObjectType::VinePlant => entry.vine_plant = load(v, obj_ty, coord)?,
                 DynamicObjectType::TulipPlant => entry.tulip_plant = load(v, obj_ty, coord)?,
-                DynamicObjectType::OwnershipSign => entry.ownership_sign = v.to_vec(),
+                DynamicObjectType::OwnershipSign => entry.ownership_sign = load(v, obj_ty, coord)?,
                 DynamicObjectType::WheatPlant => entry.wheat_plant = load(v, obj_ty, coord)?,
                 DynamicObjectType::TomatoPlant => entry.tomato_plant = load(v, obj_ty, coord)?,
                 DynamicObjectType::Yak => entry.yak = load(v, obj_ty, coord)?,
-                DynamicObjectType::Mirror => entry.mirror = v.to_vec(),
+                DynamicObjectType::Mirror => entry.mirror = load(v, obj_ty, coord)?,
             };
         }
         Ok(Self(map))
@@ -728,7 +732,13 @@ impl DynamicWorld {
                 })
                 .collect::<Result<DynamicObjectList<DroppedItemXml>>>()?;
             put(db, wtxn, &coord_str, DroppedItem, &dropped_item_xml)?;
-            put(db, wtxn, &coord_str, Fire, &obj.fire)?;
+            let fire_xml = obj
+                .fire
+                .iter()
+                .cloned()
+                .map(Into::into)
+                .collect::<DynamicObjectList<FireObjectXml>>();
+            put(db, wtxn, &coord_str, Fire, &fire_xml)?;
             put(db, wtxn, &coord_str, Torch, &obj.torch)?;
             put(db, wtxn, &coord_str, GlowBlock, &obj.glow_block)?;
             put(db, wtxn, &coord_str, Ladder, &obj.ladder)?;
@@ -758,10 +768,10 @@ impl DynamicWorld {
             let chest_metas = obj
                 .chest
                 .iter()
-                .map(|c| -> Result<ChestMeta> {
+                .map(|c| -> Result<ChestXml> {
                     let id = *c.unique_id.inner();
                     let (chest_meta, slot_bytes) =
-                        c.to_meta_and_slots().context(SaveChestSnafu {
+                        c.to_xml_and_slots().context(SaveChestSnafu {
                             id,
                             coord: coord.to_owned(),
                         })?;
@@ -772,7 +782,7 @@ impl DynamicWorld {
                     }
                     Ok(chest_meta)
                 })
-                .collect::<Result<DynamicObjectList<ChestMeta>>>()?;
+                .collect::<Result<DynamicObjectList<ChestXml>>>()?;
             put(db, wtxn, &coord_str, Chest, &chest_metas)?;
             put(db, wtxn, &coord_str, Sign, &obj.sign)?;
             put(db, wtxn, &coord_str, TradingPost, &obj.trading_post)?;
@@ -803,8 +813,8 @@ mod tests {
         super::{
             coord::ChunkCoord,
             dynamic_object::{
-                DynamicObjectList,
-                chest::{Chest, ChestMeta},
+                DynamicObjectList, FireObjectXml,
+                chest::{Chest, ChestXml},
                 dropped_item::{DroppedItem, DroppedItemXml},
             },
         },
@@ -876,15 +886,16 @@ mod tests {
             .map(DroppedItem::try_from_xml)
             .collect::<Result<DynamicObjectList<_>, _>>()
             .unwrap();
-        monster.fire = vec![16, 0xAA, 0xBB];
+        let fire_xml: DynamicObjectList<FireObjectXml> = read_test_xml(DynamicObjectType::Fire);
+        monster.fire = fire_xml.into_iter().map(Into::into).collect();
         monster.torch = read_test_xml(DynamicObjectType::Torch);
-        monster.glow_block = vec![18, 0xAA, 0xBB];
+        monster.glow_block = read_test_xml(DynamicObjectType::GlowBlock);
         monster.ladder = read_test_xml(DynamicObjectType::Ladder);
         monster.door = read_test_xml(DynamicObjectType::Door);
         monster.artificial_light = vec![21, 0xAA, 0xBB];
         monster.bed = read_test_xml(DynamicObjectType::Bed);
         monster.dropbear = read_test_xml(DynamicObjectType::DropBear);
-        monster.gather_block = vec![26, 0xAA, 0xBB];
+        monster.gather_block = read_test_xml(DynamicObjectType::GatherBlock);
         monster.carrot_plant = read_test_xml(DynamicObjectType::CarrotPlant);
         monster.donkey = read_test_xml(DynamicObjectType::Donkey);
         monster.egg = read_test_xml(DynamicObjectType::Egg);
@@ -903,7 +914,7 @@ mod tests {
         monster.freight_car = read_test_xml(DynamicObjectType::FreightCar);
         monster.passenger_car = read_test_xml(DynamicObjectType::PassengerCar);
         monster.workbench = read_test_xml(DynamicObjectType::Workbench);
-        let chest_metas: DynamicObjectList<ChestMeta> = read_test_xml(DynamicObjectType::Chest);
+        let chest_metas: DynamicObjectList<ChestXml> = read_test_xml(DynamicObjectType::Chest);
         monster.chest = chest_metas
             .into_inner()
             .into_iter()
@@ -911,7 +922,7 @@ mod tests {
                 let id = *meta.unique_id.inner();
                 let slot_path = format!("resources/chest_{}.xml.gz", id);
                 let slot_bytes = std::fs::read(&slot_path).ok();
-                Chest::from_meta_and_slots(meta, slot_bytes.as_deref())
+                Chest::from_xml_and_slots(meta, slot_bytes.as_deref())
                     .unwrap_or_else(|e| panic!("Failed to construct test chest {}: {:?}", id, e))
             })
             .collect();
@@ -925,7 +936,7 @@ mod tests {
         monster.train_station = read_test_xml(DynamicObjectType::TrainStation);
         monster.trade_portal = read_test_xml(DynamicObjectType::TradePortal);
         monster.scorpion = read_test_xml(DynamicObjectType::Scorpion);
-        monster.painting = vec![52, 0xAA, 0xBB];
+        monster.painting = read_test_xml(DynamicObjectType::Painting);
         monster.column = read_test_xml(DynamicObjectType::Column);
         monster.stairs = read_test_xml(DynamicObjectType::Stairs);
         monster.elevator_motor = read_test_xml(DynamicObjectType::ElevatorMotor);
@@ -933,11 +944,11 @@ mod tests {
         monster.gem_tree = read_test_xml(DynamicObjectType::GemTree);
         monster.vine_plant = read_test_xml(DynamicObjectType::VinePlant);
         monster.tulip_plant = read_test_xml(DynamicObjectType::TulipPlant);
-        monster.ownership_sign = vec![60, 0xAA, 0xBB];
+        monster.ownership_sign = read_test_xml(DynamicObjectType::OwnershipSign);
         monster.wheat_plant = read_test_xml(DynamicObjectType::WheatPlant);
         monster.tomato_plant = read_test_xml(DynamicObjectType::TomatoPlant);
         monster.yak = read_test_xml(DynamicObjectType::Yak);
-        monster.mirror = vec![64, 0xAA, 0xBB];
+        monster.mirror = read_test_xml(DynamicObjectType::Mirror);
 
         let coord = ChunkCoord::new(10, 20).unwrap();
         let mut map = HashMap::new();
