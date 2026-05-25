@@ -759,6 +759,10 @@ impl EditorApp {
                 .text("Specular Intensity"),
         );
         ui.add(
+            egui::Slider::new(&mut self.render_settings.ambient_reflect, 0.0..=1.0)
+                .text("Ambient Reflection"),
+        );
+        ui.add(
             egui::Slider::new(&mut self.render_settings.min_depth_factor, 0.0..=1.0)
                 .text("Min Depth Factor"),
         );

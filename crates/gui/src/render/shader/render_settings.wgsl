@@ -8,5 +8,5 @@ struct RenderSettings {
     shininess: f32,
     specular_intensity: f32,
     min_depth_factor: f32,
-    _padding0: u32,
+    ambient_reflect: f32,
 };

@@ -22,7 +22,8 @@ fn calculate_lighting(
     var specular = vec3<f32>(0.0);
     if (render_settings.enable_reflect != 0u) {
         let spec_strength = pow(max(dot(p_normal, half_dir), 0.0), render_settings.shininess);
-        specular = vec3<f32>(spec_strength * render_settings.specular_intensity * p_specular_val);
+        let ambient_spec = (render_settings.ambient_light + diffuse_strength) * render_settings.ambient_reflect;
+        specular = vec3<f32>((spec_strength + ambient_spec) * render_settings.specular_intensity * p_specular_val);
     }
 
     // Depth falloff

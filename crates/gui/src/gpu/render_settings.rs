@@ -15,6 +15,7 @@ pub struct RenderSettings {
     pub shininess: f32,
     pub specular_intensity: f32,
     pub min_depth_factor: f32,
+    pub ambient_reflect: f32,
 }
 
 impl Default for RenderSettings {
@@ -29,9 +30,10 @@ impl Default for RenderSettings {
             render_dw_mesh: true,
             render_dw_item: true,
             ambient_light: 0.1,
-            shininess: 256.0,
-            specular_intensity: 1.5,
+            shininess: 64.0,
+            specular_intensity: 1.0,
             min_depth_factor: 0.6,
+            ambient_reflect: 0.05,
         }
     }
 }
@@ -48,7 +50,7 @@ pub struct RenderSettingsUniform {
     pub shininess: f32,          // 4 bytes (offset 32)
     pub specular_intensity: f32, // 4 bytes (offset 36)
     pub min_depth_factor: f32,   // 4 bytes (offset 40)
-    pub _padding: u32,           // 4 bytes (pad to 48)
+    pub ambient_reflect: f32,    // 4 bytes (offset 44)
 }
 
 impl RenderSettings {
@@ -63,7 +65,7 @@ impl RenderSettings {
             shininess: self.shininess,
             specular_intensity: self.specular_intensity,
             min_depth_factor: self.min_depth_factor,
-            _padding: 0,
+            ambient_reflect: self.ambient_reflect,
         }
     }
 

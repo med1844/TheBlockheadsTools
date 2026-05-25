@@ -249,9 +249,11 @@ fn calculate_translucent_lighting(material: MaterialData, face_normal_f32: vec3<
     // NOTE: The original game FAKED specular physically disconnected from the camera view angle,
     // using purely the diffuse dot product to drive the shine based on the destruct mask:
     // specular = reflect * 2.0 * (pow(diffuse, 8.0 * reflect) * 0.15 + diffuse * 0.2);
-    // We are deliberately preserving a physically-accurate Blinn-Phong specular view angle here.
+    // We are deliberately preserving a physically-accurate Blinn-Phong specular view angle here,
+    // but we add a universal ambient reflection term.
     let specular_factor = pow(spec_angle, shininess);
-    let spec_scalar = specular_factor * material.reflect_intensity * render_settings.specular_intensity;
+    let ambient_spec = final_light_factor * render_settings.ambient_reflect;
+    let spec_scalar = (specular_factor + ambient_spec) * material.reflect_intensity * render_settings.specular_intensity;
 
     let lit_rgb = material.base_color.rgb * final_light_factor;
 
