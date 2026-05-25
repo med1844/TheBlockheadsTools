@@ -17,7 +17,7 @@ use std::path::PathBuf;
 #[cfg(target_arch = "wasm32")]
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     sync::{Arc, Mutex},
 };
 use the_blockheads_tools_lib::{
@@ -25,7 +25,7 @@ use the_blockheads_tools_lib::{
     game::{
         block::{Block, BlockContentType, BlockMut, BlockType, BlockViewMut, NUM_BYTES_PER_BLOCK},
         chunk::{Chunk, Chunks},
-        coord::{BlockCoord, ChunkCoord},
+        coord::{BlockCoord, ChunkBlockCoord, ChunkCoord},
         db::world_db::{WorldDb, WorldDbError},
         dynamic_object::{AnyDynamicObject, DynamicObjectType},
         dynamic_world::{ChunkDynamicObjects, DynamicWorld},
@@ -174,14 +174,19 @@ impl InteractionState {
 }
 
 #[derive(Default)]
-struct DirtyChunkManager {
+struct ChunkCache {
     // We can easily add eviction support here if memory usage becomes a concern.
-    dirty_chunks: HashMap<ChunkCoord, Chunk>,
+    decompressed_chunks: HashMap<ChunkCoord, Chunk>,
+    voxel_outdated: HashSet<ChunkCoord>,
 }
 
-impl DirtyChunkManager {
+impl ChunkCache {
     fn new() -> Self {
         Self::default()
+    }
+
+    fn mark_voxel_outdated<I: Into<ChunkCoord>>(&mut self, chunk_coord: I) {
+        self.voxel_outdated.insert(chunk_coord.into());
     }
 
     fn get_chunk_mut<'a>(
@@ -189,33 +194,42 @@ impl DirtyChunkManager {
         chunk_coord: ChunkCoord,
         world_db: &WorldDb,
     ) -> Option<&'a mut Chunk> {
-        if !self.dirty_chunks.contains_key(&chunk_coord) {
+        if !self.decompressed_chunks.contains_key(&chunk_coord) {
             let compressed_chunk = world_db.chunks.chunk_at(chunk_coord)?;
             let chunk = compressed_chunk.decompress().ok()?;
-            self.dirty_chunks.insert(chunk_coord, chunk);
+            self.decompressed_chunks.insert(chunk_coord, chunk);
         }
-        self.dirty_chunks.get_mut(&chunk_coord)
+        self.decompressed_chunks.get_mut(&chunk_coord)
     }
 
-    #[allow(unused)]
     fn get_or_create_chunk_mut<'a>(
         &'a mut self,
         chunk_coord: ChunkCoord,
         world_db: &WorldDb,
     ) -> &'a mut Chunk {
-        self.dirty_chunks.entry(chunk_coord).or_insert_with(|| {
-            world_db
-                .chunks
-                .chunk_at(chunk_coord)
-                .and_then(|c| c.decompress().ok())
-                .unwrap_or_else(Chunk::new_empty)
-        })
+        self.decompressed_chunks
+            .entry(chunk_coord)
+            .or_insert_with(|| {
+                world_db
+                    .chunks
+                    .chunk_at(chunk_coord)
+                    .and_then(|c| c.decompress().ok())
+                    .unwrap_or_else(Chunk::new_empty)
+            })
     }
 
     fn flush(&mut self, world_db: &mut WorldDb) {
-        for (coord, chunk) in self.dirty_chunks.drain() {
+        for (coord, chunk) in self.decompressed_chunks.drain() {
             if let Ok(compressed) = chunk.compress() {
                 world_db.chunks.set_chunk_at(coord, compressed);
+            }
+        }
+    }
+
+    fn update_voxels(&mut self, queue: &wgpu::Queue, voxel_buf: &wgpu::Buffer) {
+        for coord in self.voxel_outdated.drain() {
+            if let Some(chunk) = self.decompressed_chunks.get(&coord) {
+                voxel_util::set_chunk(queue, voxel_buf, coord, chunk);
             }
         }
     }
@@ -275,6 +289,14 @@ impl BlockData {
         view_mut.set_content(content);
         data
     }
+
+    fn from_bytes(bytes: [u8; NUM_BYTES_PER_BLOCK]) -> Self {
+        Self(bytes)
+    }
+
+    fn as_bytes(&self) -> &[u8; NUM_BYTES_PER_BLOCK] {
+        &self.0
+    }
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
@@ -312,7 +334,7 @@ impl Default for PenModeSettings {
 
 pub struct EditorApp {
     world_db: Option<WorldDb>,
-    dirty_chunk_manager: DirtyChunkManager,
+    chunk_cache: ChunkCache,
     dw_buf: DwBuf,
     camera: Camera,
 
@@ -364,7 +386,7 @@ impl EditorApp {
 
         Self {
             world_db: None,
-            dirty_chunk_manager: DirtyChunkManager::new(),
+            chunk_cache: ChunkCache::new(),
             dw_buf: DwBuf::new(),
             camera,
 
@@ -462,7 +484,7 @@ impl EditorApp {
                         if let Some(world_db) = self.world_db.as_mut()
                             && let Some(save_path) = rfd::FileDialog::new().pick_folder()
                         {
-                            self.dirty_chunk_manager.flush(world_db);
+                            self.chunk_cache.flush(world_db);
                             if let Err(e) = world_db
                                 .to_path(save_path, DynArch::Arch64)
                                 .context(SaveWorldDbSnafu)
@@ -714,8 +736,8 @@ impl EditorApp {
             self.world_viewport_rect.height(),
         );
 
-        if matches!(self.mode, Mode::View)
-            && response.dragged_by(egui::PointerButton::Primary)
+        if ((matches!(self.mode, Mode::View) && response.dragged_by(egui::PointerButton::Primary))
+            || (matches!(self.mode, Mode::Pen) && response.dragged_by(egui::PointerButton::Middle)))
             && let Some(cur_pos) = response.interact_pointer_pos()
         {
             let delta = response.drag_delta();
@@ -793,81 +815,119 @@ impl EditorApp {
         });
     }
 
-    fn is_drawing_block(&self) -> bool {
-        matches!(self.mode, Mode::Pen)
-            && matches!(self.pen_mode_settings.target, PenDrawTarget::Block)
-    }
-
-    fn is_drawing_dyn_obj(&self) -> bool {
-        matches!(self.mode, Mode::Pen)
-            && matches!(self.pen_mode_settings.target, PenDrawTarget::DwObj)
-    }
-
-    fn handle_draw(&mut self, response: &egui::Response) {
-        if self.is_drawing_block()
-            && let Some(InteractionTarget::Block(block_coord)) = self.interaction_state.hover
+    fn handle_pen_mode_input(&mut self, response: &egui::Response) {
+        if matches!(self.mode, Mode::Pen)
+            && let Some(world_db) = self.world_db.as_mut()
         {
-            if response.clicked_by(egui::PointerButton::Primary)
-                || response.dragged_by(egui::PointerButton::Primary)
-            {
-                dbg!("draw block at {} with block A", block_coord);
-            }
-            if response.clicked_by(egui::PointerButton::Middle) {
-                dbg!("sample block at {}", block_coord);
-            }
-            if response.clicked_by(egui::PointerButton::Secondary)
-                || response.dragged_by(egui::PointerButton::Secondary)
-            {
-                dbg!("draw block at {} with block B", block_coord);
-            }
-        }
-        if self.is_drawing_dyn_obj() {
-            if response.clicked_by(egui::PointerButton::Primary) {
-                if let Some(InteractionTarget::DynamicObject { chunk_coord, id }) =
-                    self.interaction_state.hover
-                {
-                    dbg!(
-                        "select obj {}-th {:?} at {}",
-                        id.index,
-                        id.obj_type,
-                        chunk_coord
-                    );
-                } else if let Some(pos) = response.hover_pos() {
-                    let [x, y] = self
-                        .camera
-                        .mouse_at(
-                            (pos - self.world_viewport_rect.min).into(),
-                            self.world_viewport_rect.size().into(),
-                        )
-                        .to_array();
+            match self.pen_mode_settings.target {
+                PenDrawTarget::Block => {
+                    let (primary_block_data, secondary_block_data) =
+                        match self.pen_mode_settings.primary_block {
+                            PrimaryTarget::A => (
+                                &mut self.pen_mode_settings.block_a,
+                                &self.pen_mode_settings.block_b,
+                            ),
+                            PrimaryTarget::B => (
+                                &mut self.pen_mode_settings.block_b,
+                                &self.pen_mode_settings.block_a,
+                            ),
+                        };
 
-                    dbg!("draw obj at {}", (x, y));
+                    if let Some(InteractionTarget::Block(block_coord)) =
+                        self.interaction_state.hover
+                    {
+                        if response.clicked_by(egui::PointerButton::Primary)
+                            || response.drag_started_by(egui::PointerButton::Primary)
+                            || response.dragged_by(egui::PointerButton::Primary)
+                        {
+                            let chunk = self
+                                .chunk_cache
+                                .get_or_create_chunk_mut(block_coord.into(), world_db);
+                            let chunk_block_coord: ChunkBlockCoord = block_coord.into();
+                            let mut chunk_view_mut = chunk.view_mut();
+                            let mut block = chunk_view_mut.block_at_mut(chunk_block_coord);
+                            *block.as_mut_bytes() = *primary_block_data.as_bytes();
+                            self.chunk_cache.mark_voxel_outdated(block_coord);
+                        }
+                        if response.clicked_by(egui::PointerButton::Middle)
+                            && let Some(chunk) =
+                                self.chunk_cache.get_chunk_mut(block_coord.into(), world_db)
+                        {
+                            let chunk_view = chunk.view();
+                            let chunk_block_coord: ChunkBlockCoord = block_coord.into();
+                            let block_view = chunk_view.block_at(chunk_block_coord);
+                            *primary_block_data = BlockData::from_bytes(*block_view.as_bytes());
+                        }
+                        if response.clicked_by(egui::PointerButton::Secondary)
+                            || response.drag_started_by(egui::PointerButton::Secondary)
+                            || response.dragged_by(egui::PointerButton::Secondary)
+                        {
+                            let chunk = self
+                                .chunk_cache
+                                .get_or_create_chunk_mut(block_coord.into(), world_db);
+                            let chunk_block_coord: ChunkBlockCoord = block_coord.into();
+                            let mut chunk_view_mut = chunk.view_mut();
+                            let mut block = chunk_view_mut.block_at_mut(chunk_block_coord);
+                            *block.as_mut_bytes() = *secondary_block_data.as_bytes();
+                            self.chunk_cache.mark_voxel_outdated(block_coord);
+                        }
+                    }
                 }
-            }
-            if let Some(InteractionTarget::DynamicObject { chunk_coord, id }) =
-                self.interaction_state.hover
-            {
-                if response.clicked_by(egui::PointerButton::Middle) {
-                    dbg!(
-                        "sample obj {}-th {:?} at {}",
-                        id.index,
-                        id.obj_type,
-                        chunk_coord
-                    );
-                }
-                if response.clicked_by(egui::PointerButton::Secondary) {
-                    dbg!(
-                        "delete obj {}-th {:?} at {}",
-                        id.index,
-                        id.obj_type,
-                        chunk_coord
-                    );
+                PenDrawTarget::DwObj => {
+                    if response.clicked_by(egui::PointerButton::Primary) {
+                        if let Some(InteractionTarget::DynamicObject { .. }) =
+                            self.interaction_state.hover
+                        {
+                            self.interaction_state.copy_hover_to_select();
+                        } else if let Some(pos) = response.hover_pos() {
+                            let [x, y] = self
+                                .camera
+                                .mouse_at(
+                                    (pos - self.world_viewport_rect.min).into(),
+                                    self.world_viewport_rect.size().into(),
+                                )
+                                .to_array();
+
+                            dbg!("draw obj at {}", (x, y));
+                        }
+                    }
+                    if let Some(InteractionTarget::DynamicObject { chunk_coord, id }) =
+                        self.interaction_state.hover
+                    {
+                        if response.clicked_by(egui::PointerButton::Middle) {
+                            dbg!(
+                                "sample obj {}-th {:?} at {}",
+                                id.index,
+                                id.obj_type,
+                                chunk_coord
+                            );
+                        }
+                        if response.clicked_by(egui::PointerButton::Secondary) {
+                            dbg!(
+                                "delete obj {}-th {:?} at {}",
+                                id.index,
+                                id.obj_type,
+                                chunk_coord
+                            );
+                        }
+                    }
                 }
             }
         }
     }
 
-    fn render_3d_viewport(&mut self, ui: &mut egui::Ui) {
+    fn update_voxels(&mut self, frame: &eframe::Frame) {
+        if let Some(state) = frame.wgpu_render_state() {
+            let read_renderer = state.renderer.read();
+            let r = read_renderer
+                .callback_resources
+                .get::<RenderResources>()
+                .expect("should have render resources");
+            self.chunk_cache.update_voxels(&state.queue, r.voxel_buf());
+        }
+    }
+
+    fn render_3d_viewport(&mut self, ui: &mut egui::Ui, frame: &eframe::Frame) {
         let available_size = ui.available_size();
         let (rect, response) =
             ui.allocate_exact_size(available_size, egui::Sense::click_and_drag());
@@ -878,7 +938,9 @@ impl EditorApp {
         self.update_mouse_pos(&response);
         self.update_interaction_state(&response);
         self.update_camera_pos(ui, &response);
-        self.handle_draw(&response);
+        self.handle_pen_mode_input(&response);
+
+        self.update_voxels(frame);
 
         let [min_coords, max_coords] = self.camera.visible_world_region_2d(rect.size().into());
         let center = self.camera.world_offset().xy();
@@ -1032,18 +1094,12 @@ impl EditorApp {
         }
     }
 
-    fn render_selected_block_info_window(
-        &mut self,
-        egui_ctx: &egui::Context,
-        frame: &mut eframe::Frame,
-    ) {
+    fn render_selected_block_info_window(&mut self, egui_ctx: &egui::Context) {
         let mut open = true;
         if let Some(InteractionTarget::Block(selected_block_coord)) = self.interaction_state.select
             && let Some(world_db) = self.world_db.as_ref()
             && let chunk_coord = selected_block_coord.into()
-            && let Some(selected_chunk) = self
-                .dirty_chunk_manager
-                .get_chunk_mut(chunk_coord, world_db)
+            && let Some(selected_chunk) = self.chunk_cache.get_chunk_mut(chunk_coord, world_db)
         {
             let mut update_voxel = false;
             egui::Window::new(format!("Selected Block in Chunk {}", chunk_coord))
@@ -1060,13 +1116,8 @@ impl EditorApp {
                     ));
                     update_voxel = Self::render_block_info(ui, block_view_mut);
                 });
-            if update_voxel && let Some(state) = frame.wgpu_render_state() {
-                let read_renderer = state.renderer.read();
-                let r = read_renderer
-                    .callback_resources
-                    .get::<RenderResources>()
-                    .expect("should have render resources");
-                voxel_util::set_chunk(&state.queue, r.voxel_buf(), chunk_coord, selected_chunk);
+            if update_voxel {
+                self.chunk_cache.mark_voxel_outdated(chunk_coord);
             }
         }
         if !open {
@@ -1366,17 +1417,17 @@ impl eframe::App for EditorApp {
             });
         self.show_settings = show_settings;
 
-        egui::CentralPanel::default()
-            .frame(egui::Frame::default().inner_margin(0.0))
-            .show(ctx, |ui| {
-                self.render_3d_viewport(ui);
-            });
-
         self.render_error_windows(ctx);
-        self.render_selected_block_info_window(ctx, frame);
+        self.render_selected_block_info_window(ctx);
         self.render_selected_dyn_obj_info_window(ctx, frame);
         if self.mode == Mode::Pen {
             self.render_pen_mode_window(ctx);
         }
+
+        egui::CentralPanel::default()
+            .frame(egui::Frame::default().inner_margin(0.0))
+            .show(ctx, |ui| {
+                self.render_3d_viewport(ui, frame);
+            });
     }
 }
