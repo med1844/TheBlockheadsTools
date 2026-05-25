@@ -142,11 +142,11 @@ fn fs_composite(in: VertexOutput) -> @location(0) vec4<f32> {
             if (!is_m_opaque && m_depth < surf.depth) { composed = blend_premultiplied(composed, m_translucent); }
         }
     } else if (is_m_trans) {
-        if (!is_m_opaque && m_depth < surf.depth + 1e-3) {
+        if (!is_m_opaque && m_depth - 1e-3 < surf.depth) {
             composed = blend_premultiplied(composed, m_translucent);
         }
     } else if (is_v_trans) {
-        if (v_trans_d < surf.depth) {
+        if (v_trans_d < min(surf.depth, m_depth - 1e-3)) {
             composed = blend_premultiplied(composed, v_translucent);
         }
     }
