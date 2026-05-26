@@ -1001,6 +1001,9 @@ pub struct DwCapacity {
 }
 
 impl DwCapacity {
+    pub const ITEM: Self = Self { items: 1, quads: 0 };
+    pub const QUAD: Self = Self { items: 0, quads: 1 };
+
     fn is_empty(&self) -> bool {
         self.items == 0 && self.quads == 0
     }
@@ -1424,7 +1427,7 @@ impl DwChunkBuf {
         add(chunk.flax_plant.iter(), FlaxPlant, &mut builder);
         add(chunk.sunflower_plant.iter(), SunflowerPlant, &mut builder);
         add(chunk.corn_plant.iter(), CornPlant, &mut builder);
-        // add(chunk.dodo.iter(), Dodo, &mut builder);
+        add(chunk.dodo.iter(), Dodo, &mut builder);
         // add(chunk.dropped_item.iter(), DroppedItem, &mut builder);
         // add(chunk.fire.iter(), u8, &mut builder);
         add(chunk.torch.iter(), Torch, &mut builder);
@@ -1433,20 +1436,20 @@ impl DwChunkBuf {
         add(chunk.door.iter(), Door, &mut builder);
         // add(chunk.artificial_light.iter(), u8, &mut builder);
         // add(chunk.bed.iter(), Bed, &mut builder);
-        // add(chunk.dropbear.iter(), DropBear, &mut builder);
+        add(chunk.dropbear.iter(), DropBear, &mut builder);
         // add(chunk.gather_block.iter(), u8, &mut builder);
         add(chunk.carrot_plant.iter(), CarrotPlant, &mut builder);
-        // add(chunk.donkey.iter(), Donkey, &mut builder);
+        add(chunk.donkey.iter(), Donkey, &mut builder);
         add(chunk.egg.iter(), Egg, &mut builder);
         add(chunk.window.iter(), Window, &mut builder);
         // add(chunk.boat.iter(), Boat, &mut builder);
         add(chunk.chilli_plant.iter(), ChilliPlant, &mut builder);
         add(chunk.kelp_plant.iter(), KelpPlant, &mut builder);
-        // add(chunk.clown_fish.iter(), ClownFish, &mut builder);
-        // add(chunk.shark.iter(), Shark, &mut builder);
+        add(chunk.clown_fish.iter(), ClownFish, &mut builder);
+        add(chunk.shark.iter(), Shark, &mut builder);
         add(chunk.lime_tree.iter(), LimeTree, &mut builder);
         add(chunk.wire.iter(), Wire, &mut builder);
-        // add(chunk.cave_troll.iter(), CaveTroll, &mut builder);
+        add(chunk.cave_troll.iter(), CaveTroll, &mut builder);
         // add(chunk.rail.iter(), Rail, &mut builder);
         // add(chunk.hand_car.iter(), HandCar, &mut builder);
         // add(chunk.steam_locomotive.iter(), SteamLocomotive, &mut builder);
@@ -1458,7 +1461,7 @@ impl DwChunkBuf {
         // add(chunk.trading_post.iter(), TradingPost, &mut builder);
         add(chunk.train_station.iter(), TrainStation, &mut builder);
         // add(chunk.trade_portal.iter(), TradePortal, &mut builder);
-        // add(chunk.scorpion.iter(), Scorpion, &mut builder);
+        add(chunk.scorpion.iter(), Scorpion, &mut builder);
         // add(chunk.painting.iter(), u8, &mut builder);
         // add(chunk.column.iter(), Column, &mut builder);
         // add(chunk.stairs.iter(), Stairs, &mut builder);
@@ -1470,7 +1473,7 @@ impl DwChunkBuf {
         // add(chunk.ownership_sign.iter(), u8, &mut builder);
         add(chunk.wheat_plant.iter(), WheatPlant, &mut builder);
         add(chunk.tomato_plant.iter(), TomatoPlant, &mut builder);
-        // add(chunk.yak.iter(), Yak, &mut builder);
+        add(chunk.yak.iter(), Yak, &mut builder);
         // add(chunk.mirror.iter(), u8, &mut builder);
 
         let DwChunkBufBuilder {

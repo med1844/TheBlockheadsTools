@@ -28,7 +28,10 @@ use the_blockheads_tools_lib::game::{
     dynamic_object::{
         AnyDynamicObject, ArtificialLight, DynamicObject, InteractionObject, InteractionObjectType,
         LightDirection, UniqueID,
-        animal::{DodoBreed, Egg},
+        animal::{
+            Animal, CaveTroll, ClownFish, Dodo, DodoBreed, Donkey, DropBear, Egg, Scorpion, Shark,
+            Yak,
+        },
         blockhead::Blockhead,
         chest::{Chest, ChestSlots, ChestType},
         craft::{
@@ -49,7 +52,7 @@ use the_blockheads_tools_lib::game::{
     item::{Item, ItemType, Slot},
 };
 
-const CUBE_NUM_FACES: usize = 6;
+const CUBE_NUM_FACES: usize = 5; // back face never get rendered
 
 #[derive(Debug, Default, PartialEq)]
 pub struct ObjFlags {
@@ -380,7 +383,7 @@ impl InfoUi for Tree {
 }
 
 impl BuildDwMesh for AppleTree {
-    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 1, quads: 0 });
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::ITEM);
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         builder.add_item(DwItem::from_item_type(self.float_pos, ItemType::Apple));
@@ -408,7 +411,7 @@ impl InfoUi for AppleTree {
 }
 
 impl BuildDwMesh for MapleTree {
-    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 1, quads: 0 });
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::ITEM);
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         builder.add_item(DwItem::from_item_type(self.float_pos, ItemType::MapleSeed));
@@ -424,6 +427,8 @@ impl InfoUi for MapleTree {
 }
 
 impl BuildDwMesh for MangoTree {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::ITEM);
+
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         builder.add_item(DwItem::from_item_type(self.float_pos, ItemType::Mango));
         Ok(())
@@ -457,7 +462,7 @@ impl InfoUi for PineTree {
 }
 
 impl BuildDwMesh for PineTree {
-    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 1, quads: 0 });
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::ITEM);
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         builder.add_item(DwItem::from_item_type(self.float_pos, ItemType::Pinecone));
@@ -488,7 +493,7 @@ impl InfoUi for CactusTree {
 }
 
 impl BuildDwMesh for CactusTree {
-    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 1, quads: 0 });
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::ITEM);
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         builder.add_item(DwItem::from_item_type(
@@ -507,7 +512,7 @@ impl InfoUi for CoconutTree {
 }
 
 impl BuildDwMesh for CoconutTree {
-    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 1, quads: 0 });
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::ITEM);
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         builder.add_item(DwItem::from_item_type(self.float_pos, ItemType::Coconut));
@@ -522,7 +527,7 @@ impl InfoUi for OrangeTree {
     }
 }
 impl BuildDwMesh for OrangeTree {
-    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 1, quads: 0 });
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::ITEM);
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         builder.add_item(DwItem::from_item_type(self.float_pos, ItemType::Orange));
@@ -538,7 +543,7 @@ impl InfoUi for CherryTree {
 }
 
 impl BuildDwMesh for CherryTree {
-    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 1, quads: 0 });
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::ITEM);
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         builder.add_item(DwItem::from_item_type(self.float_pos, ItemType::Cherry));
@@ -554,7 +559,7 @@ impl InfoUi for CoffeeTree {
 }
 
 impl BuildDwMesh for CoffeeTree {
-    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 1, quads: 0 });
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::ITEM);
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         builder.add_item(DwItem::from_item_type(
@@ -670,7 +675,7 @@ impl InfoUi for FlaxPlant {
 }
 
 impl BuildDwMesh for FlaxPlant {
-    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 0, quads: 1 });
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::QUAD);
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         builder.add_face(DwFace::new_sprite(
@@ -696,7 +701,7 @@ impl InfoUi for SunflowerPlant {
 }
 
 impl BuildDwMesh for SunflowerPlant {
-    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 0, quads: 1 });
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::QUAD);
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         builder.add_face(DwFace::new_sprite(
@@ -722,7 +727,7 @@ impl InfoUi for CornPlant {
 }
 
 impl BuildDwMesh for CornPlant {
-    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 0, quads: 1 });
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::QUAD);
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         builder.add_face(DwFace::new_sprite(
@@ -735,6 +740,56 @@ impl BuildDwMesh for CornPlant {
             self.float_pos,
             [1, 2],
             2.0,
+        ));
+        Ok(())
+    }
+}
+
+impl ToGrid for Animal {
+    fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut DwUiContext) {
+        self.save_time.add_row("saveTime", ui);
+        self.age.add_row("age", ui);
+        self.breed.add_row("breed", ui);
+        self.damage.add_row("damage", ui);
+        self.fullness.add_row("fullness", ui);
+        self.has_been_fed_by_blockhead_or_chest
+            .add_row("hasBeenFedByBlockheadOrChest", ui);
+        self.has_bred.add_row("hasBred", ui);
+        self.lay_cooldown_timer.add_row("layCooldownTimer", ui);
+        self.lay_timer.add_row("layTimer", ui);
+        self.mate_breed.add_row("mateBreed", ui);
+        self.mate_cooldown_timer.add_row("mateCooldownTimer", ui);
+        self.tame_cooldown_timer.add_row("tameCooldownTimer", ui);
+    }
+}
+
+impl InfoUi for Animal {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        let obj = self.deref_mut();
+        obj.info(ui, context);
+
+        ui.vertical(|ui| {
+            ui.heading("Animal");
+            ui.separator();
+            self.add_grid("animal_grid", ui, context);
+        });
+    }
+}
+
+impl InfoUi for Dodo {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        let animal = self.deref_mut();
+        animal.info(ui, context);
+    }
+}
+
+impl BuildDwMesh for Dodo {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::ITEM);
+
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        builder.add_item(DwItem::from_item_type(
+            self.float_pos,
+            ItemType::DodoFeather,
         ));
         Ok(())
     }
@@ -1004,7 +1059,7 @@ impl DwQuad for RotatedTorchFace {
 }
 
 impl BuildDwMesh for Torch {
-    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 0, quads: 1 });
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::QUAD);
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         let image_type = match self.item_type {
@@ -1091,7 +1146,7 @@ impl InfoUi for Ladder {
 }
 
 impl BuildDwMesh for Ladder {
-    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 0, quads: 1 });
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::QUAD);
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         builder.add_face(DwFace::new_sprite(
@@ -1179,6 +1234,41 @@ impl BuildDwMesh for Door {
     }
 }
 
+impl ToGrid for DropBear {
+    fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut DwUiContext) {
+        self.courage_meter.add_row("courageMeter", ui);
+        self.drop_pos_x.add_row("dropPos.X", ui);
+        self.drop_pos_y.add_row("dropPos.Y", ui);
+        self.drop_speed.add_row("dropSpeed", ui);
+        self.dropping.add_row("dropping", ui);
+        self.goal_tree_direction.add_row("goalTreeDirection", ui);
+        self.on_ground.add_row("onGround", ui);
+        self.provoke_meter.add_row("provokeMeter", ui);
+    }
+}
+
+impl InfoUi for DropBear {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        let animal = self.deref_mut();
+        animal.info(ui, context);
+
+        ui.vertical(|ui| {
+            ui.heading("DropBear");
+            ui.separator();
+            self.add_grid("drop_bear_grid", ui, context);
+        });
+    }
+}
+
+impl BuildDwMesh for DropBear {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::ITEM);
+
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        builder.add_item(DwItem::from_item_type(self.float_pos, ItemType::Fur));
+        Ok(())
+    }
+}
+
 impl InfoUi for CarrotPlant {
     fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         let normal_plant = self.deref_mut();
@@ -1187,7 +1277,7 @@ impl InfoUi for CarrotPlant {
 }
 
 impl BuildDwMesh for CarrotPlant {
-    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 0, quads: 1 });
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::QUAD);
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         builder.add_face(DwFace::new_sprite(
@@ -1200,6 +1290,25 @@ impl BuildDwMesh for CarrotPlant {
             self.float_pos,
             [1, 2],
             2.0,
+        ));
+        Ok(())
+    }
+}
+
+impl InfoUi for Donkey {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        let animal = self.deref_mut();
+        animal.info(ui, context);
+    }
+}
+
+impl BuildDwMesh for Donkey {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::ITEM);
+
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        builder.add_item(DwItem::from_item_type(
+            self.float_pos,
+            ItemType::CarrotOnAStick,
         ));
         Ok(())
     }
@@ -1271,7 +1380,7 @@ impl InfoUi for Egg {
 }
 
 impl BuildDwMesh for Egg {
-    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 1, quads: 0 });
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::ITEM);
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         // TODO add render egg with real breed textures
@@ -1300,7 +1409,8 @@ impl InfoUi for Window {
 }
 
 impl BuildDwMesh for Window {
-    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 0, quads: 1 });
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::QUAD);
+
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         builder.add_face(DwFace::new_sprite(
             match self.item_type {
@@ -1329,7 +1439,7 @@ impl InfoUi for ChilliPlant {
 }
 
 impl BuildDwMesh for ChilliPlant {
-    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 0, quads: 1 });
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::QUAD);
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         builder.add_face(DwFace::new_sprite(
@@ -1425,6 +1535,41 @@ impl BuildDwMesh for KelpPlant {
     }
 }
 
+impl InfoUi for ClownFish {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        let animal = self.deref_mut();
+        animal.info(ui, context);
+    }
+}
+
+impl BuildDwMesh for ClownFish {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::ITEM);
+
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        builder.add_item(DwItem::from_item_type(self.float_pos, ItemType::FishBucket));
+        Ok(())
+    }
+}
+
+impl InfoUi for Shark {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        let animal = self.deref_mut();
+        animal.info(ui, context);
+    }
+}
+
+impl BuildDwMesh for Shark {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::ITEM);
+
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        builder.add_item(DwItem::from_item_type(
+            self.float_pos,
+            ItemType::SharkBucket,
+        ));
+        Ok(())
+    }
+}
+
 impl InfoUi for LimeTree {
     fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         let tree = self.deref_mut();
@@ -1433,7 +1578,7 @@ impl InfoUi for LimeTree {
 }
 
 impl BuildDwMesh for LimeTree {
-    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 1, quads: 0 });
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::ITEM);
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         builder.add_item(DwItem::from_item_type(self.float_pos, ItemType::Lime));
@@ -1516,10 +1661,46 @@ impl InfoUi for Wire {
 }
 
 impl BuildDwMesh for Wire {
-    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 1, quads: 0 });
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::ITEM);
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         builder.add_item(DwItem::from_item_type(self.float_pos, ItemType::CopperWire));
+        Ok(())
+    }
+}
+
+impl ToGrid for CaveTroll {
+    fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut DwUiContext) {
+        self.dead.add_row("dead", ui);
+        self.defend_square_x.add_row("defendSquare.x", ui);
+        self.defend_square_y.add_row("defendSquare.y", ui);
+        let state = self.state.as_ref();
+        let state_str = format!("{:?}", state);
+        state_str.as_str().add_row("state", ui);
+    }
+}
+
+impl InfoUi for CaveTroll {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        let animal = self.deref_mut();
+        animal.info(ui, context);
+
+        ui.vertical(|ui| {
+            ui.heading("CaveTroll");
+            ui.separator();
+            self.add_grid("cave_troll_grid", ui, context);
+        });
+    }
+}
+
+impl BuildDwMesh for CaveTroll {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::ITEM);
+
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        builder.add_item(DwItem::from_item_type(
+            self.float_pos,
+            ItemType::IceChestPlate,
+        ));
         Ok(())
     }
 }
@@ -2439,7 +2620,7 @@ impl InfoUi for Sign {
 }
 
 impl BuildDwMesh for Sign {
-    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 0, quads: 1 });
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::QUAD);
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         let z = 3.0;
@@ -2523,11 +2704,29 @@ impl InfoUi for TrainStation {
 }
 
 impl BuildDwMesh for TrainStation {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::ITEM);
+
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         builder.add_item(DwItem::from_item_type(
             self.float_pos,
             ItemType::TrainStation,
         ));
+        Ok(())
+    }
+}
+
+impl InfoUi for Scorpion {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        let animal = self.deref_mut();
+        animal.info(ui, context);
+    }
+}
+
+impl BuildDwMesh for Scorpion {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::ITEM);
+
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        builder.add_item(DwItem::from_item_type(self.float_pos, ItemType::Poison));
         Ok(())
     }
 }
@@ -2580,7 +2779,7 @@ impl InfoUi for GemTree {
 }
 
 impl BuildDwMesh for GemTree {
-    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 1, quads: 0 });
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::ITEM);
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         let item_type = match self.gem_tree_type {
@@ -2709,7 +2908,7 @@ impl InfoUi for TulipPlant {
 }
 
 impl BuildDwMesh for TulipPlant {
-    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 0, quads: 1 });
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::QUAD);
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         builder.add_face(DwFace::new_sprite(
@@ -2735,7 +2934,7 @@ impl InfoUi for WheatPlant {
 }
 
 impl BuildDwMesh for WheatPlant {
-    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 0, quads: 1 });
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::QUAD);
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         builder.add_face(DwFace::new_sprite(
@@ -2761,7 +2960,7 @@ impl InfoUi for TomatoPlant {
 }
 
 impl BuildDwMesh for TomatoPlant {
-    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 0, quads: 1 });
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::QUAD);
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         builder.add_face(DwFace::new_sprite(
@@ -2775,6 +2974,35 @@ impl BuildDwMesh for TomatoPlant {
             [1, 2],
             2.0,
         ));
+        Ok(())
+    }
+}
+
+impl ToGrid for Yak {
+    fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut DwUiContext) {
+        self.hair.add_row("hair", ui);
+        self.milk.add_row("milk", ui);
+    }
+}
+
+impl InfoUi for Yak {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        let animal = self.deref_mut();
+        animal.info(ui, context);
+
+        ui.vertical(|ui| {
+            ui.heading("Yak");
+            ui.separator();
+            self.add_grid("yak_grid", ui, context);
+        });
+    }
+}
+
+impl BuildDwMesh for Yak {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::ITEM);
+
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        builder.add_item(DwItem::from_item_type(self.float_pos, ItemType::YakHorn));
         Ok(())
     }
 }

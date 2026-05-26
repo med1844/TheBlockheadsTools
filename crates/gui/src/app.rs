@@ -1275,7 +1275,7 @@ impl EditorApp {
                         draw_window(title, dw_chunk.sunflower_plant.get_mut(index), ctx)
                     }
                     CornPlant => draw_window(title, dw_chunk.corn_plant.get_mut(index), ctx),
-                    // Dodo => {}
+                    Dodo => draw_window(title, dw_chunk.dodo.get_mut(index), ctx),
                     // DroppedItem => {}
                     // Fire => {}
                     Torch => draw_window(title, dw_chunk.torch.get_mut(index), ctx),
@@ -1284,20 +1284,20 @@ impl EditorApp {
                     Door => draw_window(title, dw_chunk.door.get_mut(index), ctx),
                     // ArtificialLight => {}
                     // Bed => {}
-                    // DropBear => {}
+                    DropBear => draw_window(title, dw_chunk.dropbear.get_mut(index), ctx),
                     // GatherBlock => {}
                     CarrotPlant => draw_window(title, dw_chunk.carrot_plant.get_mut(index), ctx),
-                    // Donkey => {}
+                    Donkey => draw_window(title, dw_chunk.donkey.get_mut(index), ctx),
                     Egg => draw_window(title, dw_chunk.egg.get_mut(index), ctx),
                     Window => draw_window(title, dw_chunk.window.get_mut(index), ctx),
                     // Boat => {}
                     ChilliPlant => draw_window(title, dw_chunk.chilli_plant.get_mut(index), ctx),
                     KelpPlant => draw_window(title, dw_chunk.kelp_plant.get_mut(index), ctx),
-                    // ClownFish => {}
-                    // Shark => {}
+                    ClownFish => draw_window(title, dw_chunk.clown_fish.get_mut(index), ctx),
+                    Shark => draw_window(title, dw_chunk.shark.get_mut(index), ctx),
                     LimeTree => draw_window(title, dw_chunk.lime_tree.get_mut(index), ctx),
                     Wire => draw_window(title, dw_chunk.wire.get_mut(index), ctx),
-                    // CaveTroll => {}
+                    CaveTroll => draw_window(title, dw_chunk.cave_troll.get_mut(index), ctx),
                     // Rail => {}
                     // HandCar => {}
                     // SteamLocomotive => {}
@@ -1309,7 +1309,7 @@ impl EditorApp {
                     // TradingPost => {}
                     TrainStation => draw_window(title, dw_chunk.train_station.get_mut(index), ctx),
                     // TradePortal => {}
-                    // Scorpion => {}
+                    Scorpion => draw_window(title, dw_chunk.scorpion.get_mut(index), ctx),
                     // Painting => {}
                     // Column => {}
                     // Stairs => {}
@@ -1321,7 +1321,7 @@ impl EditorApp {
                     // OwnershipSign => {}
                     WheatPlant => draw_window(title, dw_chunk.wheat_plant.get_mut(index), ctx),
                     TomatoPlant => draw_window(title, dw_chunk.tomato_plant.get_mut(index), ctx),
-                    // Yak => {}
+                    Yak => draw_window(title, dw_chunk.yak.get_mut(index), ctx),
                     // Mirror => {}
                     _ => (ObjFlags::default(), true),
                 }
