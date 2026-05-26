@@ -12,7 +12,7 @@ use the_blockheads_tools_lib::game::{
         AnyDynamicObject, DynamicObjectType,
         blockhead::Blockhead,
         chest::ChestType,
-        craft::{Door, Torch, Window},
+        craft::{Torch, Window},
         workbench::WorkbenchType,
     },
     dynamic_world::ChunkDynamicObjects,
@@ -977,11 +977,6 @@ pub enum BuildDwMeshError {
         maximum: u8,
     },
     // TODO these should be checked when loading the dw xmls
-    #[snafu(display("Item type {item_type:?} is not door: {door:?}"))]
-    InvalidItemTypeForDoor {
-        item_type: ItemType,
-        door: Box<Door>,
-    },
     #[snafu(display("Item type {item_type:?} is not torch: {torch:?}"))]
     InvalidItemTypeForTorch {
         item_type: ItemType,
@@ -1435,14 +1430,14 @@ impl DwChunkBuf {
         add(chunk.ladder.iter(), Ladder, &mut builder);
         add(chunk.door.iter(), Door, &mut builder);
         // add(chunk.artificial_light.iter(), u8, &mut builder);
-        // add(chunk.bed.iter(), Bed, &mut builder);
+        add(chunk.bed.iter(), Bed, &mut builder);
         add(chunk.dropbear.iter(), DropBear, &mut builder);
         // add(chunk.gather_block.iter(), u8, &mut builder);
         add(chunk.carrot_plant.iter(), CarrotPlant, &mut builder);
         add(chunk.donkey.iter(), Donkey, &mut builder);
         add(chunk.egg.iter(), Egg, &mut builder);
         add(chunk.window.iter(), Window, &mut builder);
-        // add(chunk.boat.iter(), Boat, &mut builder);
+        add(chunk.boat.iter(), Boat, &mut builder);
         add(chunk.chilli_plant.iter(), ChilliPlant, &mut builder);
         add(chunk.kelp_plant.iter(), KelpPlant, &mut builder);
         add(chunk.clown_fish.iter(), ClownFish, &mut builder);
@@ -1458,23 +1453,23 @@ impl DwChunkBuf {
         add(chunk.workbench.iter(), Workbench, &mut builder);
         add(chunk.chest.iter(), Chest, &mut builder);
         add(chunk.sign.iter(), Sign, &mut builder);
-        // add(chunk.trading_post.iter(), TradingPost, &mut builder);
+        add(chunk.trading_post.iter(), TradingPost, &mut builder);
         add(chunk.train_station.iter(), TrainStation, &mut builder);
-        // add(chunk.trade_portal.iter(), TradePortal, &mut builder);
+        add(chunk.trade_portal.iter(), TradePortal, &mut builder);
         add(chunk.scorpion.iter(), Scorpion, &mut builder);
-        // add(chunk.painting.iter(), u8, &mut builder);
-        // add(chunk.column.iter(), Column, &mut builder);
-        // add(chunk.stairs.iter(), Stairs, &mut builder);
-        // add(chunk.elevator_motor.iter(), ElevatorMotor, &mut builder);
-        // add(chunk.elevator_shaft.iter(), ElevatorShaft, &mut builder);
+        add(chunk.painting.iter(), Painting, &mut builder);
+        add(chunk.column.iter(), Column, &mut builder);
+        add(chunk.stairs.iter(), Stairs, &mut builder);
+        add(chunk.elevator_motor.iter(), ElevatorMotor, &mut builder);
+        add(chunk.elevator_shaft.iter(), ElevatorShaft, &mut builder);
         add(chunk.gem_tree.iter(), GemTree, &mut builder);
         add(chunk.vine_plant.iter(), VinePlant, &mut builder);
         add(chunk.tulip_plant.iter(), TulipPlant, &mut builder);
-        // add(chunk.ownership_sign.iter(), u8, &mut builder);
+        add(chunk.ownership_sign.iter(), OwnershipSign, &mut builder);
         add(chunk.wheat_plant.iter(), WheatPlant, &mut builder);
         add(chunk.tomato_plant.iter(), TomatoPlant, &mut builder);
         add(chunk.yak.iter(), Yak, &mut builder);
-        // add(chunk.mirror.iter(), u8, &mut builder);
+        add(chunk.mirror.iter(), Mirror, &mut builder);
 
         let DwChunkBufBuilder {
             item_instances,

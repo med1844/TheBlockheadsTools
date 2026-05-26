@@ -435,7 +435,11 @@ impl VoxelType {
             | (block_type, BlockContentType::Workbench)
             | (block_type, BlockContentType::WorkbenchSprite)
             | (block_type, BlockContentType::Sprite)
-            | (block_type, BlockContentType::Wire) => block_type.into(),
+            | (block_type, BlockContentType::Wire)
+            | (block_type, BlockContentType::Stairs)
+            | (block_type, BlockContentType::ElevatorShaft)
+            | (block_type, BlockContentType::ElevatorMotor)
+            | (block_type, BlockContentType::Gate) => block_type.into(),
             (BlockType::Dirt, BlockContentType::Clay) => Self::DirtClay,
             (BlockType::Dirt, BlockContentType::Flint) => Self::DirtFlint,
             (BlockType::GrassDirt, BlockContentType::Clay) => Self::GrassDirtClay,
@@ -474,7 +478,11 @@ impl VoxelType {
             BlockContentType::Workbench
             | BlockContentType::WorkbenchSprite
             | BlockContentType::Sprite
-            | BlockContentType::Wire => Self::Air,
+            | BlockContentType::Wire
+            | BlockContentType::Stairs
+            | BlockContentType::ElevatorShaft
+            | BlockContentType::ElevatorMotor
+            | BlockContentType::Gate => Self::Air,
             BlockContentType::AppleTreeLeaf => Self::AppleTreeLeaf,
             BlockContentType::AppleTreeTrunk => Self::AppleTreeTrunk,
             BlockContentType::AppleTreeTrunkLeaf => Self::AppleTreeTrunkLeaf,

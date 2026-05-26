@@ -5,8 +5,8 @@ use super::{
         dw::{
             BuildDwMesh, BuildDwMeshError, CoordOutOfBoundSnafu, DwBlock, DwCapacity,
             DwChunkBufBuilder, DwFace, DwItem, DwItemInstanceRaw, DwQuad, FaceDirection,
-            InvalidItemTypeForDoorSnafu, InvalidItemTypeForTorchSnafu,
-            InvalidItemTypeForWindowSnafu, InvalidWorkbenchLevelSnafu,
+            InvalidItemTypeForTorchSnafu, InvalidItemTypeForWindowSnafu,
+            InvalidWorkbenchLevelSnafu,
         },
     },
     image_type::ImageType,
@@ -35,8 +35,10 @@ use the_blockheads_tools_lib::game::{
         blockhead::Blockhead,
         chest::{Chest, ChestSlots, ChestType},
         craft::{
-            Door, Ladder, Sign, SignConnectionType, Torch, TorchConnectionType, Window, Wire,
-            WireConfiguration, WireSolidConfiguration,
+            Bed, Boat, Column, ColumnConfiguration, Door, ElevatorMotor, ElevatorShaft, Ladder,
+            Mirror, OwnershipSign, Painting, Sign, SignConnectionType, Stairs, StairsConfiguration,
+            Torch, TorchConnectionType, TradePortal, TradingPost, Window, Wire, WireConfiguration,
+            WireSolidConfiguration,
         },
         plant::{
             CarrotPlant, ChilliPlant, CornPlant, FlaxPlant, KelpPlant, NormalPlant, Plant,
@@ -1192,11 +1194,11 @@ impl BuildDwMesh for Door {
             ItemType::IronDoor => ImageType::IronDoor,
             ItemType::Trapdoor => ImageType::DoorTop,
             ItemType::IronTrapdoor => ImageType::IronDoorTop,
-            _ => InvalidItemTypeForDoorSnafu {
-                item_type: self.item_type,
-                door: self.clone(),
+            ItemType::WoodenGate => ImageType::Gate,
+            _ => {
+                builder.add_item(DwItem::from_item_type(self.float_pos, self.item_type));
+                return Ok(());
             }
-            .fail()?,
         };
         match self.item_type {
             ItemType::Door | ItemType::IronDoor => {
@@ -1227,8 +1229,130 @@ impl BuildDwMesh for Door {
                     [1, 1],
                 ));
             }
+            ItemType::WoodenGate => {
+                builder.add_face(DwFace::from_tile_map(
+                    ImageType::Gate,
+                    FaceDirection::Left,
+                    [x, y, 2.0],
+                    [1, 1],
+                ));
+            }
             // SAFETY: previous match have failed this arm
             _ => unreachable!(),
+        }
+        Ok(())
+    }
+}
+
+impl ToGrid for Bed {
+    fn to_grid(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        context.flags.rebuild_mesh |= self.item_type.add_row("itemType", ui).changed();
+        self.bedding_color.add_row("beddingColor", ui);
+    }
+}
+
+impl InfoUi for Bed {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        let obj = self.deref_mut();
+        obj.info(ui, context);
+
+        ui.vertical(|ui| {
+            ui.heading("Bed");
+            ui.separator();
+            self.add_grid("bed_grid", ui, context);
+        });
+    }
+}
+
+// TODO render comforter & pillow
+fn draw_bed(
+    float_pos: [f32; 2],
+    flipped: bool,
+    frame: ImageType,
+    top: ImageType,
+    head: ImageType,
+    builder: &mut DwChunkBufBuilder,
+) {
+    let [x, y] = float_pos;
+    let mut face = DwFace::from_tile_map(
+        frame,
+        FaceDirection::Front,
+        [x - if flipped { 1.5 } else { 0.5 }, y, 2.0],
+        [2, 1],
+    );
+    if flipped {
+        face.mirror_uv_h();
+    }
+    builder.add_face(face);
+
+    let mut face = DwFace::from_tile_map(
+        frame,
+        FaceDirection::Front,
+        [x - if flipped { 1.5 } else { 0.5 }, y, 1.0],
+        [2, 1],
+    );
+    if flipped {
+        face.mirror_uv_h();
+    }
+    builder.add_face(face);
+
+    let top_height = 6.0 / 16.0;
+    let mut face = DwFace::from_tile_map(
+        top,
+        FaceDirection::Up,
+        [x - if flipped { 1.5 } else { 0.5 }, y + top_height, 2.0],
+        [2, 1],
+    );
+    if flipped {
+        face.mirror_uv_h();
+    }
+    builder.add_face(face);
+
+    let offset = 1.0 / 32.0; // middle of a pixel
+    let mut face = DwFace::from_tile_map(
+        head,
+        FaceDirection::Left,
+        [
+            x + if flipped { 0.5 - offset } else { -0.5 + offset },
+            y,
+            1.0,
+        ],
+        [1, 1],
+    );
+    if flipped {
+        face.mirror_uv_h();
+    }
+    builder.add_face(face);
+}
+
+impl BuildDwMesh for Bed {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 1, quads: 5 });
+
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        match self.item_type {
+            ItemType::Bed | ItemType::SoftBed | ItemType::RainbowSoftBed => {
+                draw_bed(
+                    self.float_pos,
+                    self.flipped,
+                    ImageType::WoodBed,
+                    ImageType::WoodBedTop,
+                    ImageType::WoodBedHead,
+                    builder,
+                );
+            }
+            ItemType::GoldenBed | ItemType::RainbowGoldenBed => {
+                draw_bed(
+                    self.float_pos,
+                    self.flipped,
+                    ImageType::GoldBed,
+                    ImageType::GoldBedTop,
+                    ImageType::GoldBedHead,
+                    builder,
+                );
+            }
+            _ => {
+                builder.add_item(DwItem::from_item_type(self.float_pos, self.item_type));
+            }
         }
         Ok(())
     }
@@ -1427,6 +1551,22 @@ impl BuildDwMesh for Window {
             [1, 1],
             1.0,
         ));
+        Ok(())
+    }
+}
+
+impl InfoUi for Boat {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        let obj = self.deref_mut();
+        obj.info(ui, context);
+    }
+}
+
+impl BuildDwMesh for Boat {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::ITEM);
+
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        builder.add_item(DwItem::from_item_type(self.float_pos, ItemType::Boat));
         Ok(())
     }
 }
@@ -2619,67 +2759,114 @@ impl InfoUi for Sign {
     }
 }
 
+fn draw_sign(
+    float_pos: [f32; 2],
+    flipped: bool,
+    ground_double: ImageType,
+    ground_single: ImageType,
+    sign: ImageType,
+    sign_hang: ImageType,
+    connection_type: SignConnectionType,
+    builder: &mut DwChunkBufBuilder,
+) {
+    let z = 3.0;
+    match connection_type {
+        SignConnectionType::None => {}
+        SignConnectionType::GroundDouble => {
+            builder.add_face(DwFace::new_sprite(
+                ground_double,
+                [1.0, 0.0],
+                float_pos,
+                [2, 1],
+                z,
+            ));
+        }
+        SignConnectionType::GroundSingle => {
+            builder.add_face(DwFace::new_sprite(
+                ground_single,
+                [1.0, 0.0],
+                float_pos,
+                [2, 1],
+                z,
+            ));
+        }
+        SignConnectionType::Front => {
+            builder.add_face(DwFace::new_sprite(sign, [1.0, 0.0], float_pos, [2, 1], z));
+        }
+        SignConnectionType::Side => {
+            let mut face = DwFace::new_sprite(
+                sign_hang,
+                [if flipped { 1.5 } else { 0.5 }, 0.0],
+                float_pos,
+                [2, 2],
+                z,
+            );
+            if !flipped {
+                face.mirror_uv_h();
+            }
+            builder.add_face(face);
+        }
+        SignConnectionType::Up => {
+            let mut face = DwFace::new_sprite(
+                sign_hang,
+                [if flipped { 1.5 } else { 0.5 }, 0.0],
+                float_pos,
+                [2, 1],
+                z,
+            );
+            if !flipped {
+                face.mirror_uv_h();
+            }
+            builder.add_face(face);
+        }
+    }
+}
+
 impl BuildDwMesh for Sign {
     const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::QUAD);
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
-        let z = 3.0;
-        match self.connection_type {
-            SignConnectionType::None => {}
-            SignConnectionType::GroundDouble => {
-                builder.add_face(DwFace::new_sprite(
-                    ImageType::SignGroundDouble,
-                    [1.0, 0.0],
-                    self.float_pos,
-                    [2, 1],
-                    z,
-                ));
-            }
-            SignConnectionType::GroundSingle => {
-                builder.add_face(DwFace::new_sprite(
-                    ImageType::SignGroundSingle,
-                    [1.0, 0.0],
-                    self.float_pos,
-                    [2, 1],
-                    z,
-                ));
-            }
-            SignConnectionType::Front => {
-                builder.add_face(DwFace::new_sprite(
-                    ImageType::Sign,
-                    [1.0, 0.0],
-                    self.float_pos,
-                    [2, 1],
-                    z,
-                ));
-            }
-            SignConnectionType::Side => {
-                let mut face = DwFace::new_sprite(
-                    ImageType::SignHang,
-                    [if self.flipped { 1.5 } else { 0.5 }, 0.0],
-                    self.float_pos,
-                    [2, 2],
-                    z,
-                );
-                if !self.flipped {
-                    face.mirror_uv_h();
-                }
-                builder.add_face(face);
-            }
-            SignConnectionType::Up => {
-                let mut face = DwFace::new_sprite(
-                    ImageType::SignHang,
-                    [if self.flipped { 1.5 } else { 0.5 }, 0.0],
-                    self.float_pos,
-                    [2, 1],
-                    z,
-                );
-                if !self.flipped {
-                    face.mirror_uv_h();
-                }
-                builder.add_face(face);
-            }
-        }
+        draw_sign(
+            self.float_pos,
+            self.flipped,
+            ImageType::SignGroundDouble,
+            ImageType::SignGroundSingle,
+            ImageType::Sign,
+            ImageType::SignHang,
+            self.connection_type,
+            builder,
+        );
+        Ok(())
+    }
+}
+
+impl ToGrid for TradingPost {
+    fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut DwUiContext) {
+        self.coin_count.add_row("coinCount", ui);
+        self.price_tier.add_row("priceTier", ui);
+        let sell_slot_str = format!("{:?}", self.sell_slot);
+        sell_slot_str.as_str().add_row("sellSlot", ui);
+        self.seller_client_name.add_row("sellerClientName", ui);
+    }
+}
+
+impl InfoUi for TradingPost {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        let obj = self.deref_mut();
+        obj.info(ui, context);
+
+        ui.vertical(|ui| {
+            ui.heading("TradingPost");
+            ui.separator();
+            self.add_grid("trading_post_grid", ui, context);
+        });
+    }
+}
+
+impl BuildDwMesh for TradingPost {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::ITEM);
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        builder.add_item(DwItem::from_item_type(self.float_pos, ItemType::Shop));
         Ok(())
     }
 }
@@ -2715,6 +2902,51 @@ impl BuildDwMesh for TrainStation {
     }
 }
 
+impl ToGrid for TradePortal {
+    fn to_grid(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        self.level.add_row("level", ui);
+        let local_price_offsets_str = format!("{:?}", self.local_price_offsets);
+        local_price_offsets_str
+            .as_str()
+            .add_row("localPriceOffsets", ui);
+        grid_as_row(
+            &mut self.light_dict,
+            "lightDict",
+            "light_dict_grid",
+            ui,
+            context,
+        );
+    }
+}
+
+impl InfoUi for TradePortal {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        let obj = self.deref_mut();
+        obj.info(ui, context);
+
+        ui.vertical(|ui| {
+            ui.heading("TradePortal");
+            ui.separator();
+            self.add_grid("trade_portal_grid", ui, context);
+        });
+    }
+}
+
+impl BuildDwMesh for TradePortal {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::QUAD);
+
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        builder.add_face(DwFace::new_sprite(
+            ImageType::TradePortal0,
+            [0.5, 0.0],
+            self.float_pos,
+            [1, 2],
+            2.0,
+        ));
+        Ok(())
+    }
+}
+
 impl InfoUi for Scorpion {
     fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         let animal = self.deref_mut();
@@ -2727,6 +2959,228 @@ impl BuildDwMesh for Scorpion {
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         builder.add_item(DwItem::from_item_type(self.float_pos, ItemType::Poison));
+        Ok(())
+    }
+}
+
+impl ToGrid for Painting {
+    fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut DwUiContext) {
+        self.has_verified_image_data
+            .add_row("hasVerifiedImageData", ui);
+        let data_str = format!("{:?}", self.output_image_data);
+        data_str.as_str().add_row("outputImageData", ui);
+        self.item_type.add_row("itemType", ui);
+    }
+}
+
+impl InfoUi for Painting {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        let obj = self.deref_mut();
+        obj.info(ui, context);
+
+        ui.vertical(|ui| {
+            ui.heading("painting");
+            ui.separator();
+            self.add_grid("painting_grid", ui, context);
+        });
+    }
+}
+
+impl BuildDwMesh for Painting {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::ITEM);
+
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        builder.add_item(DwItem::from_item_type(self.float_pos, self.item_type));
+        Ok(())
+    }
+}
+
+impl ToRow for ColumnConfiguration {
+    fn to_row(&mut self, ui: &mut egui::Ui) -> egui::Response {
+        wrap_combo_box_resp(
+            egui::ComboBox::from_id_salt("sign_connection_type_combo_box")
+                .selected_text(format!("{:?}", self))
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(self, Self::Undefined, "Undefined")
+                        | ui.selectable_value(self, Self::NoPlinth, "NoPlinth")
+                        | ui.selectable_value(self, Self::PlinthBelow, "PlinthBelow")
+                        | ui.selectable_value(self, Self::PlinthAbove, "PlinthAbove")
+                        | ui.selectable_value(
+                            self,
+                            Self::PlinthAboveAndBelow,
+                            "PlinthAboveAndBelow",
+                        )
+                }),
+        )
+    }
+}
+
+impl ToGrid for Column {
+    fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut DwUiContext) {
+        self.item_type.add_row("itemType", ui);
+        self.paint_color.add_row("paintColor", ui);
+        self.configuration.add_row("configuration", ui);
+    }
+}
+
+impl InfoUi for Column {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        let obj = self.deref_mut();
+        obj.info(ui, context);
+
+        ui.vertical(|ui| {
+            ui.heading("Column");
+            ui.separator();
+            self.add_grid("column_grid", ui, context);
+        });
+    }
+}
+
+impl BuildDwMesh for Column {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::ITEM);
+
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        builder.add_item(DwItem::from_item_type(self.float_pos, self.item_type));
+        Ok(())
+    }
+}
+
+impl ToRow for StairsConfiguration {
+    fn to_row(&mut self, ui: &mut egui::Ui) -> egui::Response {
+        wrap_combo_box_resp(
+            egui::ComboBox::from_id_salt("sign_connection_type_combo_box")
+                .selected_text(format!("{:?}", self))
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(self, Self::Undefined, "Undefined")
+                        | ui.selectable_value(self, Self::HighRightSolid, "HighRightSolid")
+                        | ui.selectable_value(self, Self::HighLeftSolid, "HighLeftSolid")
+                        | ui.selectable_value(self, Self::HighRightFloating, "HighRightFloating")
+                        | ui.selectable_value(self, Self::HighLeftFloating, "HighLeftFloating")
+                }),
+        )
+    }
+}
+
+impl ToGrid for Stairs {
+    fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut DwUiContext) {
+        self.item_type.add_row("itemType", ui);
+        self.paint_color.add_row("paintColor", ui);
+        self.configuration.add_row("configuration", ui);
+    }
+}
+
+impl InfoUi for Stairs {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        let obj = self.deref_mut();
+        obj.info(ui, context);
+
+        ui.vertical(|ui| {
+            ui.heading("Stairs");
+            ui.separator();
+            self.add_grid("stairs_grid", ui, context);
+        });
+    }
+}
+
+impl BuildDwMesh for Stairs {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::ITEM);
+
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        builder.add_item(DwItem::from_item_type(self.float_pos, self.item_type));
+        Ok(())
+    }
+}
+
+impl ToGrid for ElevatorMotor {
+    fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut DwUiContext) {
+        self.item_type.add_row("itemType", ui);
+        self.available_electricity
+            .add_row("availableElectricity", ui);
+        self.min_y.add_row("minY", ui);
+        self.max_y.add_row("maxY", ui);
+    }
+}
+
+impl InfoUi for ElevatorMotor {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        let obj = self.deref_mut();
+        obj.info(ui, context);
+
+        ui.vertical(|ui| {
+            ui.heading("ElevatorMotor");
+            ui.separator();
+            self.add_grid("elevator_motor_grid", ui, context);
+        });
+    }
+}
+
+impl BuildDwMesh for ElevatorMotor {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity {
+        quads: CUBE_NUM_FACES,
+        items: 0,
+    });
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        builder.add_block(DwBlock::new(
+            BlockCoord::new(self.pos_x, self.pos_y).context(CoordOutOfBoundSnafu)?,
+            BlockUv::All(ImageType::ElevatorMotor),
+        ));
+        Ok(())
+    }
+}
+
+impl ToGrid for ElevatorShaft {
+    fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut DwUiContext) {
+        self.item_type.add_row("itemType", ui);
+        self.last_known_motor_pos_x
+            .add_row("lastKnownMotorPos.x", ui);
+        self.last_known_motor_pos_y
+            .add_row("lastKnownMotorPos.y", ui);
+        self.paint_color.add_row("paintColor", ui);
+    }
+}
+
+impl InfoUi for ElevatorShaft {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        let obj = self.deref_mut();
+        obj.info(ui, context);
+
+        ui.vertical(|ui| {
+            ui.heading("ElevatorShaft");
+            ui.separator();
+            self.add_grid("elevator_shaft_grid", ui, context);
+        });
+    }
+}
+
+impl BuildDwMesh for ElevatorShaft {
+    // no up and down face
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 0, quads: 4 });
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        let [x, y] = self.float_pos;
+        builder.add_face(DwFace::from_tile_map(
+            ImageType::ElevatorShaft,
+            FaceDirection::Left,
+            [x - 0.5, y, 1.0],
+            [1, 1],
+        ));
+        builder.add_face(DwFace::from_tile_map(
+            ImageType::ElevatorShaft,
+            FaceDirection::Right,
+            [x + 0.5, y, 1.0],
+            [1, 1],
+        ));
+        builder.add_face(DwFace::from_tile_map(
+            ImageType::SteelBlock,
+            FaceDirection::Front,
+            [x - 0.5, y, 1.0],
+            [1, 1],
+        ));
+        builder.add_face(DwFace::from_tile_map(
+            ImageType::ElevatorShaft,
+            FaceDirection::Front,
+            [x - 0.5, y, 2.0],
+            [1, 1],
+        ));
         Ok(())
     }
 }
@@ -2926,6 +3380,46 @@ impl BuildDwMesh for TulipPlant {
     }
 }
 
+impl ToGrid for OwnershipSign {
+    fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut DwUiContext) {
+        self.land_owner_id.add_row("landOwnerId", ui);
+        self.land_owner_name.add_row("landOwnerName", ui);
+        self.w.add_row("width", ui);
+        self.h.add_row("height", ui);
+    }
+}
+
+impl InfoUi for OwnershipSign {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        let sign = self.deref_mut();
+        sign.info(ui, context);
+
+        ui.vertical(|ui| {
+            ui.heading("OwnershipSign");
+            ui.separator();
+            self.add_grid("ownership_sign_grid", ui, context);
+        });
+    }
+}
+
+impl BuildDwMesh for OwnershipSign {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::QUAD);
+
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        draw_sign(
+            self.float_pos,
+            self.flipped,
+            ImageType::OwnershipSignGroundDouble,
+            ImageType::OwnershipSignGroundSingle,
+            ImageType::OwnershipSign,
+            ImageType::OwnershipSignHang,
+            self.connection_type,
+            builder,
+        );
+        Ok(())
+    }
+}
+
 impl InfoUi for WheatPlant {
     fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         let normal_plant = self.deref_mut();
@@ -3003,6 +3497,28 @@ impl BuildDwMesh for Yak {
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         builder.add_item(DwItem::from_item_type(self.float_pos, ItemType::YakHorn));
+        Ok(())
+    }
+}
+
+impl InfoUi for Mirror {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        let obj = self.deref_mut();
+        obj.info(ui, context);
+    }
+}
+
+impl BuildDwMesh for Mirror {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::QUAD);
+
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        builder.add_face(DwFace::new_sprite(
+            ImageType::Mirror,
+            [0.5, 0.0],
+            self.float_pos,
+            [1, 2],
+            2.0,
+        ));
         Ok(())
     }
 }

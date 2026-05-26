@@ -188,6 +188,9 @@ pub enum BlockContentType {
     DeadLimeTreeTrunk = 93,
     GoldChest = 94,
     Wire = 96,
+    Stairs = 101,
+    ElevatorShaft = 103,
+    ElevatorMotor = 104,
     PlatinumOre = 106,
     TitaniumOre = 107,
     AmethystTreeTrunk = 109,
@@ -205,6 +208,7 @@ pub enum BlockContentType {
     DiamondTreeTrunk = 121,
     DiamondTreeLeaf = 122,
     DiamondTreeTrunkLeaf = 123,
+    Gate = 146,
 }
 
 impl From<BlockContentType> for u8 {

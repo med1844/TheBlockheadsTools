@@ -1283,14 +1283,14 @@ impl EditorApp {
                     Ladder => draw_window(title, dw_chunk.ladder.get_mut(index), ctx),
                     Door => draw_window(title, dw_chunk.door.get_mut(index), ctx),
                     // ArtificialLight => {}
-                    // Bed => {}
+                    Bed => draw_window(title, dw_chunk.bed.get_mut(index), ctx),
                     DropBear => draw_window(title, dw_chunk.dropbear.get_mut(index), ctx),
                     // GatherBlock => {}
                     CarrotPlant => draw_window(title, dw_chunk.carrot_plant.get_mut(index), ctx),
                     Donkey => draw_window(title, dw_chunk.donkey.get_mut(index), ctx),
                     Egg => draw_window(title, dw_chunk.egg.get_mut(index), ctx),
                     Window => draw_window(title, dw_chunk.window.get_mut(index), ctx),
-                    // Boat => {}
+                    Boat => draw_window(title, dw_chunk.boat.get_mut(index), ctx),
                     ChilliPlant => draw_window(title, dw_chunk.chilli_plant.get_mut(index), ctx),
                     KelpPlant => draw_window(title, dw_chunk.kelp_plant.get_mut(index), ctx),
                     ClownFish => draw_window(title, dw_chunk.clown_fish.get_mut(index), ctx),
@@ -1306,23 +1306,29 @@ impl EditorApp {
                     Workbench => draw_window(title, dw_chunk.workbench.get_mut(index), ctx),
                     Chest => draw_window(title, dw_chunk.chest.get_mut(index), ctx),
                     Sign => draw_window(title, dw_chunk.sign.get_mut(index), ctx),
-                    // TradingPost => {}
+                    TradingPost => draw_window(title, dw_chunk.trading_post.get_mut(index), ctx),
                     TrainStation => draw_window(title, dw_chunk.train_station.get_mut(index), ctx),
-                    // TradePortal => {}
+                    TradePortal => draw_window(title, dw_chunk.trade_portal.get_mut(index), ctx),
                     Scorpion => draw_window(title, dw_chunk.scorpion.get_mut(index), ctx),
-                    // Painting => {}
-                    // Column => {}
-                    // Stairs => {}
-                    // ElevatorMotor => {}
-                    // ElevatorShaft => {}
+                    Painting => draw_window(title, dw_chunk.painting.get_mut(index), ctx),
+                    Column => draw_window(title, dw_chunk.column.get_mut(index), ctx),
+                    Stairs => draw_window(title, dw_chunk.stairs.get_mut(index), ctx),
+                    ElevatorMotor => {
+                        draw_window(title, dw_chunk.elevator_motor.get_mut(index), ctx)
+                    }
+                    ElevatorShaft => {
+                        draw_window(title, dw_chunk.elevator_shaft.get_mut(index), ctx)
+                    }
                     GemTree => draw_window(title, dw_chunk.gem_tree.get_mut(index), ctx),
                     VinePlant => draw_window(title, dw_chunk.vine_plant.get_mut(index), ctx),
                     TulipPlant => draw_window(title, dw_chunk.tulip_plant.get_mut(index), ctx),
-                    // OwnershipSign => {}
+                    OwnershipSign => {
+                        draw_window(title, dw_chunk.ownership_sign.get_mut(index), ctx)
+                    }
                     WheatPlant => draw_window(title, dw_chunk.wheat_plant.get_mut(index), ctx),
                     TomatoPlant => draw_window(title, dw_chunk.tomato_plant.get_mut(index), ctx),
                     Yak => draw_window(title, dw_chunk.yak.get_mut(index), ctx),
-                    // Mirror => {}
+                    Mirror => draw_window(title, dw_chunk.mirror.get_mut(index), ctx),
                     _ => (ObjFlags::default(), true),
                 }
             }

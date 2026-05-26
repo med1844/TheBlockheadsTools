@@ -31,9 +31,9 @@ impl Default for RenderSettings {
             render_dw_item: true,
             ambient_light: 0.1,
             shininess: 64.0,
-            specular_intensity: 1.0,
+            specular_intensity: 2.2,
             min_depth_factor: 0.6,
-            ambient_reflect: 0.05,
+            ambient_reflect: 0.02,
         }
     }
 }

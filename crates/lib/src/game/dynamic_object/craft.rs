@@ -328,7 +328,7 @@ pub struct ElevatorShaft {
     obj: DynamicObject,
     pub item_type: ItemType,
     #[serde(rename = "lastKnownMotorPos.x")]
-    pub last_known_motor_pos_x: i32,
+    pub last_known_motor_pos_x: u32,
     #[serde(rename = "lastKnownMotorPos.y")]
     pub last_known_motor_pos_y: u16,
     pub paint_color: u16,
