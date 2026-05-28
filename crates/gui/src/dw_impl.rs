@@ -243,7 +243,15 @@ impl ToGrid for DynamicObject {
                 self.float_pos[0] = self.float_pos[0].max(0.0).min(world_width - 1e-3);
             }
         }
-        float_pos_changed |= self.float_pos[1].add_row("floatPos[1]", ui).changed();
+        ui.label("pos_x");
+        float_pos_changed |= ui
+            .add(
+                egui::DragValue::new(&mut self.float_pos[1])
+                    .speed(FLOAT_SPEED)
+                    .range(0.0..=1024.0),
+            )
+            .changed();
+        ui.end_row();
 
         let mut int_pos_changed = false;
         int_pos_changed |= self.pos_x.add_row("pos_x", ui).changed();
@@ -254,7 +262,11 @@ impl ToGrid for DynamicObject {
                 self.pos_x = self.pos_x.min(context.world_width() - 1);
             }
         }
-        int_pos_changed |= self.pos_y.add_row("pos_y", ui).changed();
+        ui.label("pos_y");
+        int_pos_changed |= ui
+            .add(egui::DragValue::new(&mut self.pos_y).range(0..=1023))
+            .changed();
+        ui.end_row();
 
         match (float_pos_changed, int_pos_changed) {
             // float takes precedence
