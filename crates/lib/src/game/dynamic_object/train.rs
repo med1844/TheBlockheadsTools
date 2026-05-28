@@ -1,6 +1,7 @@
 use super::{
-    DynamicObject, InteractionObject, InteractionObjectType, UniqueID, deserialize_some,
-    serialize_some,
+    DynamicObject, InteractionObject, InteractionObjectType, UniqueID,
+    chest::{Chest, ChestError, ChestSaveDictXml},
+    deserialize_some, serialize_some,
 };
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
@@ -55,8 +56,40 @@ pub struct SteamLocomotive {
 inherit!(SteamLocomotive -> TrainCar, train_car);
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct FreightCar(TrainCar);
-inherit!(FreightCar -> TrainCar);
+pub struct FreightCarXml(TrainCar);
+inherit!(FreightCarXml -> TrainCar);
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct FreightCar {
+    train_car: TrainCar,
+    pub chest: Option<Chest>,
+}
+inherit!(FreightCar -> TrainCar, train_car);
+
+impl FreightCar {
+    pub(crate) fn from_xml_and_chest(
+        xml: FreightCarXml,
+        chest_xml: Option<ChestSaveDictXml>,
+    ) -> Result<Self, ChestError> {
+        let chest = chest_xml.map(Chest::from_chest_save_dict_xml).transpose()?;
+        Ok(Self {
+            train_car: xml.0,
+            chest,
+        })
+    }
+
+    pub(crate) fn to_xml_and_chest(
+        &self,
+    ) -> Result<(FreightCarXml, Option<ChestSaveDictXml>), ChestError> {
+        Ok((
+            FreightCarXml(self.train_car.clone()),
+            self.chest
+                .as_ref()
+                .map(|chest| chest.to_chest_save_dict_xml())
+                .transpose()?,
+        ))
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PassengerCar(TrainCar);

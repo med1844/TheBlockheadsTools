@@ -515,7 +515,7 @@ impl AnyDynamicObject {
                     dict: value,
                 })?;
                 Ok(Self::Chest(Box::new(
-                    chest::Chest::from_chest_item(chest_item).context(LoadChestSnafu)?,
+                    chest::Chest::from_chest_save_dict_xml(chest_item).context(LoadChestSnafu)?,
                 )))
             }
             ItemType::Portal
@@ -634,7 +634,7 @@ impl AnyDynamicObject {
                 })?
             }
             Self::Chest(chest) => {
-                let chest_item = chest.to_chest_item().context(SaveChestSnafu)?;
+                let chest_item = chest.to_chest_save_dict_xml().context(SaveChestSnafu)?;
 
                 plist::to_value(&chest_item).context(SerializeDictionarySnafu {
                     source_type: "ChestItem",
@@ -686,7 +686,7 @@ mod tests {
     use super::{
         DynamicObjectList, DynamicObjectType, FireObjectXml, GatherBlock, GlowBlock,
         animal::{CaveTroll, ClownFish, Dodo, Donkey, DropBear, Egg, Scorpion, Shark, Yak},
-        chest::ChestXml,
+        chest::ChestDwXml,
         craft::{
             Bed, Boat, Column, Door, ElevatorMotor, ElevatorShaft, Ladder, Mirror, OwnershipSign,
             Painting, Rail, Sign, Stairs, Torch, TradePortal, TradingPost, Window, Wire,
@@ -696,7 +696,7 @@ mod tests {
             CarrotPlant, ChilliPlant, CornPlant, FlaxPlant, KelpPlant, SunflowerPlant, TomatoPlant,
             TulipPlant, VinePlant, WheatPlant,
         },
-        train::{FreightCar, HandCar, PassengerCar, SteamLocomotive, TrainStation},
+        train::{FreightCarXml, HandCar, PassengerCar, SteamLocomotive, TrainStation},
         tree::{
             AppleTree, CactusTree, CherryTree, CoconutTree, CoffeeTree, GemTree, LimeTree,
             MangoTree, MapleTree, OrangeTree, PineTree,
@@ -772,10 +772,10 @@ mod tests {
         check_round_trip::<Rail>(DynamicObjectType::Rail).unwrap();
         check_round_trip::<HandCar>(DynamicObjectType::HandCar).unwrap();
         check_round_trip::<SteamLocomotive>(DynamicObjectType::SteamLocomotive).unwrap();
-        check_round_trip::<FreightCar>(DynamicObjectType::FreightCar).unwrap();
+        check_round_trip::<FreightCarXml>(DynamicObjectType::FreightCar).unwrap();
         check_round_trip::<PassengerCar>(DynamicObjectType::PassengerCar).unwrap();
         check_round_trip::<Workbench>(DynamicObjectType::Workbench).unwrap();
-        check_round_trip::<ChestXml>(DynamicObjectType::Chest).unwrap();
+        check_round_trip::<ChestDwXml>(DynamicObjectType::Chest).unwrap();
         check_round_trip::<Sign>(DynamicObjectType::Sign).unwrap();
         check_round_trip::<TradingPost>(DynamicObjectType::TradingPost).unwrap();
         check_round_trip::<TrainStation>(DynamicObjectType::TrainStation).unwrap();

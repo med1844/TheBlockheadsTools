@@ -245,10 +245,10 @@ impl Chest {
     }
 }
 
-// Chest data from binary item
+// Chest data from binary item or freight car chest
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct ChestItem {
+pub(crate) struct ChestSaveDictXml {
     #[serde(flatten)]
     obj: InteractionObject,
     pub chest_type: ChestType,
@@ -260,13 +260,13 @@ pub(crate) struct ChestItem {
     )]
     pub save_item_slots: Option<Vec<plist::Value>>,
 }
-inherit!(ChestItem -> InteractionObject, obj);
+inherit!(ChestSaveDictXml -> InteractionObject, obj);
 
 // Contains metadata of a chest stored in dynamic world sub-db
 // Doesn't have slots
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct ChestXml {
+pub(crate) struct ChestDwXml {
     #[serde(flatten)]
     obj: InteractionObject,
     chest_type: ChestType,
@@ -337,7 +337,7 @@ pub(crate) struct ChestXml {
     )]
     shelf_item_data_bs_3: Option<u16>,
 }
-inherit!(ChestXml -> InteractionObject, obj);
+inherit!(ChestDwXml -> InteractionObject, obj);
 
 impl Chest {
     pub(crate) fn parse_slot_bytes(bytes: &[u8]) -> Result<Vec<plist::Value>> {
@@ -345,7 +345,10 @@ impl Chest {
         plist::from_bytes(&decompressed).context(DeserializeSlotsSnafu)
     }
 
-    pub(crate) fn from_xml_and_slots(xml: ChestXml, slot_bytes: Option<&[u8]>) -> Result<Self> {
+    pub(crate) fn from_dw_xml_and_slots(
+        xml: ChestDwXml,
+        slot_bytes: Option<&[u8]>,
+    ) -> Result<Self> {
         let slot_values = slot_bytes
             .map(|bytes| -> Result<Vec<plist::Value>> { Self::parse_slot_bytes(bytes) })
             .transpose()?;
@@ -376,7 +379,7 @@ impl Chest {
         })
     }
 
-    pub(crate) fn to_xml_and_slots(&self) -> Result<(ChestXml, Option<Vec<u8>>)> {
+    pub(crate) fn to_dw_xml_and_slots(&self) -> Result<(ChestDwXml, Option<Vec<u8>>)> {
         let (chest_type, save_item_slots, shelf_render_items, shelf_item_data_bs) =
             self.slots.to_chest_type_and_slots()?;
         let [r0, r1, r2, r3] = shelf_render_items.unwrap_or_default();
@@ -393,7 +396,7 @@ impl Chest {
             None => None,
         };
         Ok((
-            ChestXml {
+            ChestDwXml {
                 obj: self.obj.clone(), // should be cheap if there's no owner id
                 chest_type,
                 shelf_render_items_0: r0,
@@ -409,7 +412,7 @@ impl Chest {
         ))
     }
 
-    pub(crate) fn from_chest_item(chest_item: ChestItem) -> Result<Self> {
+    pub(crate) fn from_chest_save_dict_xml(chest_item: ChestSaveDictXml) -> Result<Self> {
         Ok(Self {
             obj: chest_item.obj,
             slots: ChestSlots::from_chest_type_and_slots(
@@ -421,9 +424,9 @@ impl Chest {
         })
     }
 
-    pub(crate) fn to_chest_item(&self) -> Result<ChestItem> {
+    pub(crate) fn to_chest_save_dict_xml(&self) -> Result<ChestSaveDictXml> {
         let (chest_type, save_item_slots, _, _) = self.slots.to_chest_type_and_slots()?;
-        Ok(ChestItem {
+        Ok(ChestSaveDictXml {
             obj: self.obj.clone(),
             chest_type,
             save_item_slots,

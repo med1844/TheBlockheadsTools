@@ -1994,10 +1994,28 @@ impl BuildDwMesh for SteamLocomotive {
     }
 }
 
+impl ToGrid for FreightCar {
+    fn to_grid(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        grid_as_row(
+            &mut self.chest,
+            "chest",
+            "freight_car_chest_grid",
+            ui,
+            context,
+        );
+    }
+}
+
 impl InfoUi for FreightCar {
     fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         let train_car = self.deref_mut();
         train_car.info(ui, context);
+
+        ui.vertical(|ui| {
+            ui.heading("FreightCar");
+            ui.separator();
+            self.add_grid("freight_car_grid", ui, context);
+        });
     }
 }
 

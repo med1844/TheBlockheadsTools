@@ -4,7 +4,7 @@ use super::{
         AnyDynamicObject, AnyDynamicObjectRef, DynamicObjectList, DynamicObjectType, FireObject,
         FireObjectXml, GatherBlock, GlowBlock,
         animal::{CaveTroll, ClownFish, Dodo, Donkey, DropBear, Egg, Scorpion, Shark, Yak},
-        chest::{Chest, ChestError, ChestXml},
+        chest::{Chest, ChestDwXml, ChestError},
         craft::{
             Bed, Boat, Column, Door, ElevatorMotor, ElevatorShaft, Ladder, Mirror, OwnershipSign,
             Painting, Rail, Sign, Stairs, Torch, TradePortal, TradingPost, Window, Wire,
@@ -14,7 +14,7 @@ use super::{
             CarrotPlant, ChilliPlant, CornPlant, FlaxPlant, KelpPlant, SunflowerPlant, TomatoPlant,
             TulipPlant, VinePlant, WheatPlant,
         },
-        train::{FreightCar, HandCar, PassengerCar, SteamLocomotive, TrainStation},
+        train::{FreightCar, FreightCarXml, HandCar, PassengerCar, SteamLocomotive, TrainStation},
         tree::{
             AppleTree, CactusTree, CherryTree, CoconutTree, CoffeeTree, GemTree, LimeTree,
             MangoTree, MapleTree, OrangeTree, PineTree,
@@ -23,6 +23,7 @@ use super::{
     },
     item::ItemError,
 };
+use crate::util::plist::to_xml_plist;
 use lmdb_rs::{
     codec::types::{Bytes, Str},
     database::Database,
@@ -473,6 +474,10 @@ pub enum DynamicWorldError {
         coord: ChunkCoord,
         source: ChestError,
     },
+    #[snafu(display("Failed to load train chest {id}"))]
+    LoadTrainChest { id: u64, source: ChestError },
+    #[snafu(display("Failed to save train chest {id}"))]
+    SaveTrainChest { id: u64, source: ChestError },
     #[snafu(display("Failed to parse chunk coord {coord}"))]
     ParseChunkCoordFromStr { coord: String, source: CoordError },
     #[snafu(display("Failed to load dropped item in chunk {coord}: {xml}"))]
@@ -545,7 +550,9 @@ impl DynamicWorld {
             .filter_map(|v| v.ok())
         {
             let Some((coord_str, type_id_str)) = k.split_once("/") else {
-                println!("Found key {} we don't understand in dynamic world", k);
+                if !k.starts_with("trainchest_") {
+                    println!("Found key {} we don't understand in dynamic world", k);
+                }
                 continue;
             };
             let coord = ChunkCoord::try_from_str(coord_str).with_context(|_| {
@@ -639,22 +646,47 @@ impl DynamicWorld {
                 DynamicObjectType::SteamLocomotive => {
                     entry.steam_locomotive = load(v, obj_ty, coord)?
                 }
-                DynamicObjectType::FreightCar => entry.freight_car = load(v, obj_ty, coord)?,
-                DynamicObjectType::PassengerCar => entry.passenger_car = load(v, obj_ty, coord)?,
-                DynamicObjectType::Workbench => entry.workbench = load(v, obj_ty, coord)?,
-                DynamicObjectType::Chest => {
-                    let chest_metas: DynamicObjectList<ChestXml> =
+                DynamicObjectType::FreightCar => {
+                    let freight_car_xmls: DynamicObjectList<FreightCarXml> =
                         plist::from_bytes(v).context(DeserializeObjectSnafu {
                             object_type: obj_ty,
                             coord,
                         })?;
-                    entry.chest = chest_metas
+                    entry.freight_car = freight_car_xmls
                         .into_iter()
-                        .map(|chest_meta| {
-                            let id = *chest_meta.unique_id.inner();
+                        .map(|freight_car_xml| {
+                            let id = *freight_car_xml.unique_id.inner();
+                            let key = format!("trainchest_{}", id);
+                            let chest_xml_bytes =
+                                db.get(rtxn, &key).context(GetEntrySnafu { key })?;
+                            let chest_xml = chest_xml_bytes
+                                .map(|bytes| {
+                                    plist::from_bytes(bytes).context(DeserializeObjectSnafu {
+                                        object_type: DynamicObjectType::Chest,
+                                        coord,
+                                    })
+                                })
+                                .transpose()?;
+                            FreightCar::from_xml_and_chest(freight_car_xml, chest_xml)
+                                .context(LoadTrainChestSnafu { id })
+                        })
+                        .collect::<Result<DynamicObjectList<FreightCar>>>()?
+                }
+                DynamicObjectType::PassengerCar => entry.passenger_car = load(v, obj_ty, coord)?,
+                DynamicObjectType::Workbench => entry.workbench = load(v, obj_ty, coord)?,
+                DynamicObjectType::Chest => {
+                    let chest_dw_xmls: DynamicObjectList<ChestDwXml> = plist::from_bytes(v)
+                        .context(DeserializeObjectSnafu {
+                            object_type: obj_ty,
+                            coord,
+                        })?;
+                    entry.chest = chest_dw_xmls
+                        .into_iter()
+                        .map(|dw_xml| {
+                            let id = *dw_xml.unique_id.inner();
                             let key = format!("{}/chest_{}", coord_str, id);
                             let slot_bytes = db.get(rtxn, &key).context(GetEntrySnafu { key })?;
-                            Chest::from_xml_and_slots(chest_meta, slot_bytes)
+                            Chest::from_dw_xml_and_slots(dw_xml, slot_bytes)
                                 .context(LoadChestSnafu { coord, id })
                         })
                         .collect::<Result<DynamicObjectList<Chest>>>()?
@@ -762,16 +794,37 @@ impl DynamicWorld {
             put(db, wtxn, &coord_str, Rail, &obj.rail)?;
             put(db, wtxn, &coord_str, HandCar, &obj.hand_car)?;
             put(db, wtxn, &coord_str, SteamLocomotive, &obj.steam_locomotive)?;
-            put(db, wtxn, &coord_str, FreightCar, &obj.freight_car)?;
+            let freight_car_xmls = obj
+                .freight_car
+                .iter()
+                .map(|f| {
+                    let id = *f.unique_id.inner();
+                    let (freight_car_xml, chest_save_dict_xml) =
+                        f.to_xml_and_chest().context(SaveChestSnafu {
+                            id,
+                            coord: coord.to_owned(),
+                        })?;
+                    let key = format!("trainchest_{}", id);
+                    let chest_bytes =
+                        to_xml_plist(&chest_save_dict_xml).context(SerializeObjectSnafu {
+                            object_type: DynamicObjectType::Chest,
+                            coord: coord_str.to_owned(),
+                        })?;
+                    db.put(wtxn, &key, &chest_bytes)
+                        .context(PutEntrySnafu { key })?;
+                    Ok(freight_car_xml)
+                })
+                .collect::<Result<DynamicObjectList<FreightCarXml>>>()?;
+            put(db, wtxn, &coord_str, FreightCar, &freight_car_xmls)?;
             put(db, wtxn, &coord_str, PassengerCar, &obj.passenger_car)?;
             put(db, wtxn, &coord_str, Workbench, &obj.workbench)?;
-            let chest_metas = obj
+            let chest_dw_xmls = obj
                 .chest
                 .iter()
-                .map(|c| -> Result<ChestXml> {
+                .map(|c| -> Result<ChestDwXml> {
                     let id = *c.unique_id.inner();
-                    let (chest_meta, slot_bytes) =
-                        c.to_xml_and_slots().context(SaveChestSnafu {
+                    let (chest_dw_xml, slot_bytes) =
+                        c.to_dw_xml_and_slots().context(SaveChestSnafu {
                             id,
                             coord: coord.to_owned(),
                         })?;
@@ -780,10 +833,10 @@ impl DynamicWorld {
                         db.put(wtxn, &key, &slot_bytes)
                             .context(PutEntrySnafu { key })?;
                     }
-                    Ok(chest_meta)
+                    Ok(chest_dw_xml)
                 })
-                .collect::<Result<DynamicObjectList<ChestXml>>>()?;
-            put(db, wtxn, &coord_str, Chest, &chest_metas)?;
+                .collect::<Result<DynamicObjectList<ChestDwXml>>>()?;
+            put(db, wtxn, &coord_str, Chest, &chest_dw_xmls)?;
             put(db, wtxn, &coord_str, Sign, &obj.sign)?;
             put(db, wtxn, &coord_str, TradingPost, &obj.trading_post)?;
             put(db, wtxn, &coord_str, TrainStation, &obj.train_station)?;
@@ -814,8 +867,9 @@ mod tests {
             coord::ChunkCoord,
             dynamic_object::{
                 DynamicObjectList, FireObjectXml,
-                chest::{Chest, ChestXml},
+                chest::{Chest, ChestDwXml, ChestSaveDictXml},
                 dropped_item::{DroppedItem, DroppedItemXml},
+                train::{FreightCar, FreightCarXml},
             },
         },
         ChunkDynamicObjects, DynamicObjectType, DynamicWorld,
@@ -911,18 +965,37 @@ mod tests {
         monster.rail = read_test_xml(DynamicObjectType::Rail);
         monster.hand_car = read_test_xml(DynamicObjectType::HandCar);
         monster.steam_locomotive = read_test_xml(DynamicObjectType::SteamLocomotive);
-        monster.freight_car = read_test_xml(DynamicObjectType::FreightCar);
+        let freight_car_xmls: DynamicObjectList<FreightCarXml> =
+            read_test_xml(DynamicObjectType::FreightCar);
+        monster.freight_car = freight_car_xmls
+            .into_iter()
+            .map(|xml| {
+                let id = *xml.unique_id.inner();
+                let chest_path = format!("resources/trainchest_{}.xml", id);
+                let slot_bytes = std::fs::read(&chest_path)
+                    .ok()
+                    .expect("should read test xml");
+                let chest_xml: ChestSaveDictXml = plist::from_bytes(slot_bytes.as_slice())
+                    .expect("should parse as chest save dict");
+                FreightCar::from_xml_and_chest(xml, Some(chest_xml)).unwrap()
+            })
+            .collect();
+        let freight_car_chest_ids: Vec<_> = monster
+            .freight_car
+            .iter()
+            .map(|freight_car| freight_car.unique_id)
+            .collect();
         monster.passenger_car = read_test_xml(DynamicObjectType::PassengerCar);
         monster.workbench = read_test_xml(DynamicObjectType::Workbench);
-        let chest_metas: DynamicObjectList<ChestXml> = read_test_xml(DynamicObjectType::Chest);
-        monster.chest = chest_metas
+        let chest_dw_xmls: DynamicObjectList<ChestDwXml> = read_test_xml(DynamicObjectType::Chest);
+        monster.chest = chest_dw_xmls
             .into_inner()
             .into_iter()
-            .map(|meta| {
-                let id = *meta.unique_id.inner();
+            .map(|dw_xml| {
+                let id = *dw_xml.unique_id.inner();
                 let slot_path = format!("resources/chest_{}.xml.gz", id);
                 let slot_bytes = std::fs::read(&slot_path).ok();
-                Chest::from_xml_and_slots(meta, slot_bytes.as_deref())
+                Chest::from_dw_xml_and_slots(dw_xml, slot_bytes.as_deref())
                     .unwrap_or_else(|e| panic!("Failed to construct test chest {}: {:?}", id, e))
             })
             .collect();
@@ -1046,6 +1119,14 @@ mod tests {
             check_key(DynamicObjectType::Mirror);
             for chest_id in chest_ids {
                 let key = format!("{}/chest_{}", coord_str, chest_id.inner());
+                assert!(
+                    db.get(&rtxn, &key).unwrap().is_some(),
+                    "Key {} missing",
+                    key
+                );
+            }
+            for id in freight_car_chest_ids {
+                let key = format!("trainchest_{}", id.inner());
                 assert!(
                     db.get(&rtxn, &key).unwrap().is_some(),
                     "Key {} missing",
