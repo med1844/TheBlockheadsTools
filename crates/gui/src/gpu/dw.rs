@@ -9,10 +9,7 @@ use the_blockheads_tools_lib::game::{
     chunk::Chunk,
     coord::{BlockCoord, ChunkBlockCoord, ChunkCoord, CoordError},
     dynamic_object::{
-        AnyDynamicObject, DynamicObjectType,
-        blockhead::Blockhead,
-        chest::ChestType,
-        craft::{Torch, Window},
+        AnyDynamicObject, DynamicObjectType, blockhead::Blockhead, chest::ChestType,
         workbench::WorkbenchType,
     },
     dynamic_world::ChunkDynamicObjects,
@@ -968,25 +965,6 @@ impl ChunkDwBlock {
 pub enum BuildDwMeshError {
     #[snafu(display("Object coordinate out of world bound: {source}"))]
     CoordOutOfBound { source: CoordError },
-    #[snafu(display(
-        "Workbench with type {workbench_type:?} has level {level} that exceeds maximum {maximum}"
-    ))]
-    InvalidWorkbenchLevel {
-        workbench_type: WorkbenchType,
-        level: u8,
-        maximum: u8,
-    },
-    // TODO these should be checked when loading the dw xmls
-    #[snafu(display("Item type {item_type:?} is not torch: {torch:?}"))]
-    InvalidItemTypeForTorch {
-        item_type: ItemType,
-        torch: Box<Torch>,
-    },
-    #[snafu(display("Item type {item_type:?} is not window: {window:?}"))]
-    InvalidItemTypeForWindow {
-        item_type: ItemType,
-        window: Box<Window>,
-    },
 }
 
 #[derive(Default, Clone, Copy)]

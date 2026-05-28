@@ -5,8 +5,6 @@ use super::{
         dw::{
             BuildDwMesh, BuildDwMeshError, CoordOutOfBoundSnafu, DwBlock, DwCapacity,
             DwChunkBufBuilder, DwFace, DwItem, DwItemInstanceRaw, DwQuad, FaceDirection,
-            InvalidItemTypeForTorchSnafu, InvalidItemTypeForWindowSnafu,
-            InvalidWorkbenchLevelSnafu,
         },
     },
     image_type::ImageType,
@@ -1071,11 +1069,10 @@ impl BuildDwMesh for Torch {
             ItemType::SteelLantern => ImageType::SteelLantern0,
             ItemType::SteelDownlight => ImageType::SteelDownlight,
             ItemType::SteelUplight => ImageType::SteelUplight,
-            _ => InvalidItemTypeForTorchSnafu {
-                item_type: self.item_type,
-                torch: self.clone(),
+            _ => {
+                builder.add_item(DwItem::from_item_type(self.float_pos, self.item_type));
+                return Ok(());
             }
-            .fail()?,
         };
         let [x, y] = self.float_pos;
         match self.connection_type {
@@ -1540,11 +1537,10 @@ impl BuildDwMesh for Window {
             match self.item_type {
                 ItemType::Window => ImageType::Window,
                 ItemType::BlackWindow => ImageType::BlackWindow,
-                _ => InvalidItemTypeForWindowSnafu {
-                    item_type: self.item_type,
-                    window: self.clone(),
+                _ => {
+                    builder.add_item(DwItem::from_item_type(self.float_pos, self.item_type));
+                    return Ok(());
                 }
-                .fail()?,
             },
             [0.5, 0.0],
             self.float_pos,
@@ -1978,6 +1974,384 @@ impl InfoUi for Workbench {
     }
 }
 
+#[allow(unused)]
+struct WorkbenchMeshError {
+    workbench_type: WorkbenchType,
+    level: u8,
+    maximum: u8,
+}
+
+fn build_workbench_mesh(
+    block_coord: BlockCoord,
+    wb: &Workbench,
+    builder: &mut DwChunkBufBuilder,
+) -> Result<(), WorkbenchMeshError> {
+    use BlockUv::*;
+    use ImageType::*;
+    match wb.workbench_type {
+        WorkbenchType::Undefined => {
+            builder.add_item(DwItem::from_item_type(wb.float_pos, ItemType::Unknown))
+        }
+        WorkbenchType::BasicPortal | WorkbenchType::PlacedPortal => {
+            builder.add_face(DwFace::new_sprite(
+                match wb.level {
+                    0 => ImageType::Portal0,
+                    1 => ImageType::PortalAmethyst0,
+                    2 => ImageType::PortalSapphire0,
+                    3 => ImageType::PortalEmerald0,
+                    4 => ImageType::PortalRuby0,
+                    5 => ImageType::PortalDiamond0,
+                    _ => Err(WorkbenchMeshError {
+                        workbench_type: wb.workbench_type,
+                        level: wb.level,
+                        maximum: 6,
+                    })?,
+                },
+                [0.5, 0.0],
+                wb.float_pos,
+                [1, 2],
+                2.0,
+            ))
+        }
+        WorkbenchType::Workbench => builder.add_block(DwBlock::new(
+            block_coord,
+            match wb.level {
+                0 => TopSide {
+                    top: WorkbenchLevel1Top,
+                    side: WorkbenchLevel1,
+                },
+                1 => TopSide {
+                    top: WorkbenchLevel2Top,
+                    side: WorkbenchLevel2,
+                },
+                2 => TopSide {
+                    top: WorkbenchLevel3Top,
+                    side: WorkbenchLevel3,
+                },
+                3 => TopSide {
+                    top: WorkbenchLevel4Top,
+                    side: WorkbenchLevel4,
+                },
+                _ => Err(WorkbenchMeshError {
+                    workbench_type: wb.workbench_type,
+                    level: wb.level,
+                    maximum: 4,
+                })?,
+            },
+        )),
+        WorkbenchType::Campfire => builder.add_face(DwFace::new_sprite(
+            ImageType::Campfire0,
+            [0.5, 0.0],
+            wb.float_pos,
+            [1, 1],
+            2.0,
+        )),
+        WorkbenchType::Weave => builder.add_block(DwBlock::new(
+            block_coord,
+            match wb.level {
+                0 => TopSide {
+                    top: WorkbenchWeave1Top,
+                    side: WorkbenchWeave1,
+                },
+                1 => TopSide {
+                    top: WorkbenchWeave2Top,
+                    side: WorkbenchWeave2,
+                },
+                _ => Err(WorkbenchMeshError {
+                    workbench_type: wb.workbench_type,
+                    level: wb.level,
+                    maximum: 2,
+                })?,
+            },
+        )),
+        WorkbenchType::Wood => builder.add_block(DwBlock::new(
+            block_coord,
+            TopSide {
+                top: WorkbenchWood1Top,
+                side: WorkbenchWood1,
+            },
+        )),
+        WorkbenchType::Tool => builder.add_block(DwBlock::new(
+            block_coord,
+            match wb.level {
+                0 => TopSide {
+                    top: WorkbenchTool1Top,
+                    side: WorkbenchTool1,
+                },
+                1 => TopSide {
+                    top: WorkbenchTool2Top,
+                    side: WorkbenchTool2,
+                },
+                2 => TopSide {
+                    top: WorkbenchTool3Top,
+                    side: WorkbenchTool3,
+                },
+                3 => TopSide {
+                    top: WorkbenchTool4Top,
+                    side: WorkbenchTool4,
+                },
+                4 => TopSide {
+                    top: WorkbenchTool5Top,
+                    side: WorkbenchTool5,
+                },
+                5 => TopSide {
+                    top: WorkbenchTool6Top,
+                    side: WorkbenchTool6,
+                },
+                6 => TopSide {
+                    top: WorkbenchTool7Top,
+                    side: WorkbenchTool7,
+                },
+                _ => Err(WorkbenchMeshError {
+                    workbench_type: wb.workbench_type,
+                    level: wb.level,
+                    maximum: 7,
+                })?,
+            },
+        )),
+        WorkbenchType::Press => builder.add_block(DwBlock::new(
+            block_coord,
+            match wb.level {
+                0 => TopSide {
+                    top: WorkbenchPress1Top,
+                    side: WorkbenchPress1,
+                },
+                1 => TopSide {
+                    top: WorkbenchPress2Top,
+                    side: WorkbenchPress2,
+                },
+                _ => Err(WorkbenchMeshError {
+                    workbench_type: wb.workbench_type,
+                    level: wb.level,
+                    maximum: 2,
+                })?,
+            },
+        )),
+        WorkbenchType::Kiln => builder.add_block(DwBlock::new(
+            block_coord,
+            TopSide {
+                top: KilnTop,
+                side: Kiln,
+            },
+        )),
+        WorkbenchType::Furnace => builder.add_block(DwBlock::new(
+            block_coord,
+            match wb.level {
+                0 => TopSide {
+                    top: Furnace1Top,
+                    side: Furnace1,
+                },
+                1 => TopSide {
+                    top: Furnace2Top,
+                    side: Furnace2,
+                },
+                2 => TopSide {
+                    top: Furnace3Top,
+                    side: Furnace3,
+                },
+                _ => Err(WorkbenchMeshError {
+                    workbench_type: wb.workbench_type,
+                    level: wb.level,
+                    maximum: 3,
+                })?,
+            },
+        )),
+        WorkbenchType::Craft => builder.add_block(DwBlock::new(
+            block_coord,
+            match wb.level {
+                0 => TopSide {
+                    top: CraftBenchLevel1Top,
+                    side: CraftBenchLevel1,
+                },
+                1 => TopSide {
+                    top: CraftBenchLevel2Top,
+                    side: CraftBenchLevel2,
+                },
+                2 => TopSide {
+                    top: CraftBenchLevel3Top,
+                    side: CraftBenchLevel3,
+                },
+                3 => TopSide {
+                    top: CraftBenchLevel4Top,
+                    side: CraftBenchLevel4,
+                },
+                _ => Err(WorkbenchMeshError {
+                    workbench_type: wb.workbench_type,
+                    level: wb.level,
+                    maximum: 4,
+                })?,
+            },
+        )),
+        WorkbenchType::Mix => builder.add_block(DwBlock::new(
+            block_coord,
+            TopSide {
+                top: MixBenchLevel1Top,
+                side: MixBenchLevel1,
+            },
+        )),
+        WorkbenchType::Dye => builder.add_block(DwBlock::new(
+            block_coord,
+            TopSide {
+                top: DyeBenchLevel1Top,
+                side: DyeBenchLevel1,
+            },
+        )),
+        WorkbenchType::Metalwork => builder.add_block(DwBlock::new(
+            block_coord,
+            match wb.level {
+                0 => TopSide {
+                    top: MetalworkBenchLevel1Top,
+                    side: MetalworkBenchLevel1,
+                },
+                1 => TopSide {
+                    top: MetalworkBenchLevel2Top,
+                    side: MetalworkBenchLevel2,
+                },
+                _ => Err(WorkbenchMeshError {
+                    workbench_type: wb.workbench_type,
+                    level: wb.level,
+                    maximum: 2,
+                })?,
+            },
+        )),
+        WorkbenchType::SteamGenerator => builder.add_block(DwBlock::new(
+            block_coord,
+            TopSide {
+                top: SteamGeneratorTop,
+                side: SteamGenerator,
+            },
+        )),
+        WorkbenchType::ElectricKiln => builder.add_block(DwBlock::new(
+            block_coord,
+            TopSide {
+                top: ElectricKilnTop,
+                side: ElectricKiln,
+            },
+        )),
+        WorkbenchType::ElectricFurnace => builder.add_block(DwBlock::new(
+            block_coord,
+            TopSide {
+                top: ElectricFurnaceTop,
+                side: ElectricFurnace,
+            },
+        )),
+        WorkbenchType::ElectricMetalworkBench => builder.add_block(DwBlock::new(
+            block_coord,
+            TopSide {
+                top: ElectricMetalworkBenchTop,
+                side: ElectricMetalworkBench,
+            },
+        )),
+        WorkbenchType::ElectricStove => builder.add_block(DwBlock::new(
+            block_coord,
+            TopSide {
+                top: ElectricStoveTop,
+                side: ElectricStove,
+            },
+        )),
+        WorkbenchType::SolarPanel => builder.add_block(DwBlock::new(
+            block_coord,
+            TopSide {
+                top: SolarPanelTop,
+                side: SolarPanel,
+            },
+        )),
+        WorkbenchType::Flywheel => builder.add_block(DwBlock::new(
+            block_coord,
+            TopSide {
+                top: FlywheelTop,
+                side: Flywheel,
+            },
+        )),
+        WorkbenchType::ArmorBench => builder.add_block(DwBlock::new(
+            block_coord,
+            match wb.level {
+                0 => TopSide {
+                    top: ArmorBenchLevel1Top,
+                    side: ArmorBenchLevel1,
+                },
+                1 => TopSide {
+                    top: ArmorBenchLevel2Top,
+                    side: ArmorBenchLevel2,
+                },
+                2 => TopSide {
+                    top: ArmorBenchLevel3Top,
+                    side: ArmorBenchLevel3,
+                },
+                _ => Err(WorkbenchMeshError {
+                    workbench_type: wb.workbench_type,
+                    level: wb.level,
+                    maximum: 3,
+                })?,
+            },
+        )),
+        WorkbenchType::TrainYard => builder.add_block(DwBlock::new(
+            block_coord,
+            TopSide {
+                top: TrainYardTop,
+                side: TrainYard,
+            },
+        )),
+        WorkbenchType::Easel => {
+            builder.add_item(DwItem::from_item_type(wb.float_pos, ItemType::Easel))
+        }
+        WorkbenchType::Build => builder.add_block(DwBlock::new(
+            block_coord,
+            match wb.level {
+                0 => TopSide {
+                    top: BuildersBenchLevel1Top,
+                    side: BuildersBenchLevel1,
+                },
+                1 => TopSide {
+                    top: BuildersBenchLevel2Top,
+                    side: BuildersBenchLevel2,
+                },
+                _ => Err(WorkbenchMeshError {
+                    workbench_type: wb.workbench_type,
+                    level: wb.level,
+                    maximum: 2,
+                })?,
+            },
+        )),
+        WorkbenchType::Refinery => {
+            builder.add_item(DwItem::from_item_type(wb.float_pos, ItemType::Refinery))
+        }
+        WorkbenchType::ElectricPress => builder.add_block(DwBlock::new(
+            block_coord,
+            TopSide {
+                top: ElectricPressTop,
+                side: ElectricPress,
+            },
+        )),
+        WorkbenchType::CompostBin => builder.add_block(DwBlock::new(
+            block_coord,
+            TopSide {
+                top: CompostBinTop,
+                side: CompostBin,
+            },
+        )),
+        WorkbenchType::Sluice => builder.add_item(DwItem::from_item_type(
+            wb.float_pos,
+            ItemType::ElectricSluice,
+        )),
+        WorkbenchType::EggExtractor => builder.add_block(DwBlock::new(
+            block_coord,
+            TopSide {
+                top: EggExtractorTop,
+                side: EggExtractor,
+            },
+        )),
+        WorkbenchType::PizzaOven => builder.add_block(DwBlock::new(
+            block_coord,
+            TopSide {
+                top: PizzaOvenTop,
+                side: PizzaOven,
+            },
+        )),
+    };
+    Ok(())
+}
+
 impl BuildDwMesh for Workbench {
     const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity {
         items: 0,
@@ -1985,379 +2359,15 @@ impl BuildDwMesh for Workbench {
     });
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
-        use BlockUv::*;
-        use ImageType::*;
         let block_coord = BlockCoord::new(self.pos_x, self.pos_y).context(CoordOutOfBoundSnafu)?;
-        match self.workbench_type {
-            WorkbenchType::Undefined => {
-                builder.add_item(DwItem::from_item_type(self.float_pos, ItemType::Unknown))
-            }
-            WorkbenchType::BasicPortal | WorkbenchType::PlacedPortal => {
-                builder.add_face(DwFace::new_sprite(
-                    match self.level {
-                        0 => ImageType::Portal0,
-                        1 => ImageType::PortalAmethyst0,
-                        2 => ImageType::PortalSapphire0,
-                        3 => ImageType::PortalEmerald0,
-                        4 => ImageType::PortalRuby0,
-                        5 => ImageType::PortalDiamond0,
-                        _ => InvalidWorkbenchLevelSnafu {
-                            workbench_type: self.workbench_type,
-                            level: self.level,
-                            maximum: 6,
-                        }
-                        .fail()?,
-                    },
-                    [0.5, 0.0],
-                    self.float_pos,
-                    [1, 2],
-                    2.0,
-                ))
-            }
-            WorkbenchType::Workbench => builder.add_block(DwBlock::new(
+        if build_workbench_mesh(block_coord, self, builder).is_err() {
+            builder.add_block(DwBlock::new(
                 block_coord,
-                match self.level {
-                    0 => TopSide {
-                        top: WorkbenchLevel1Top,
-                        side: WorkbenchLevel1,
-                    },
-                    1 => TopSide {
-                        top: WorkbenchLevel2Top,
-                        side: WorkbenchLevel2,
-                    },
-                    2 => TopSide {
-                        top: WorkbenchLevel3Top,
-                        side: WorkbenchLevel3,
-                    },
-                    3 => TopSide {
-                        top: WorkbenchLevel4Top,
-                        side: WorkbenchLevel4,
-                    },
-                    _ => InvalidWorkbenchLevelSnafu {
-                        workbench_type: self.workbench_type,
-                        level: self.level,
-                        maximum: 4,
-                    }
-                    .fail()?,
+                BlockUv::TopSide {
+                    top: ImageType::WorkbenchLevel1Top,
+                    side: ImageType::WorkbenchLevel1,
                 },
-            )),
-            WorkbenchType::Campfire => builder.add_face(DwFace::new_sprite(
-                ImageType::Campfire0,
-                [0.5, 0.0],
-                self.float_pos,
-                [1, 1],
-                2.0,
-            )),
-            WorkbenchType::Weave => builder.add_block(DwBlock::new(
-                block_coord,
-                match self.level {
-                    0 => TopSide {
-                        top: WorkbenchWeave1Top,
-                        side: WorkbenchWeave1,
-                    },
-                    1 => TopSide {
-                        top: WorkbenchWeave2Top,
-                        side: WorkbenchWeave2,
-                    },
-                    _ => InvalidWorkbenchLevelSnafu {
-                        workbench_type: self.workbench_type,
-                        level: self.level,
-                        maximum: 2,
-                    }
-                    .fail()?,
-                },
-            )),
-            WorkbenchType::Wood => builder.add_block(DwBlock::new(
-                block_coord,
-                TopSide {
-                    top: WorkbenchWood1Top,
-                    side: WorkbenchWood1,
-                },
-            )),
-            WorkbenchType::Tool => builder.add_block(DwBlock::new(
-                block_coord,
-                match self.level {
-                    0 => TopSide {
-                        top: WorkbenchTool1Top,
-                        side: WorkbenchTool1,
-                    },
-                    1 => TopSide {
-                        top: WorkbenchTool2Top,
-                        side: WorkbenchTool2,
-                    },
-                    2 => TopSide {
-                        top: WorkbenchTool3Top,
-                        side: WorkbenchTool3,
-                    },
-                    3 => TopSide {
-                        top: WorkbenchTool4Top,
-                        side: WorkbenchTool4,
-                    },
-                    4 => TopSide {
-                        top: WorkbenchTool5Top,
-                        side: WorkbenchTool5,
-                    },
-                    5 => TopSide {
-                        top: WorkbenchTool6Top,
-                        side: WorkbenchTool6,
-                    },
-                    6 => TopSide {
-                        top: WorkbenchTool7Top,
-                        side: WorkbenchTool7,
-                    },
-                    _ => InvalidWorkbenchLevelSnafu {
-                        workbench_type: self.workbench_type,
-                        level: self.level,
-                        maximum: 7,
-                    }
-                    .fail()?,
-                },
-            )),
-            WorkbenchType::Press => builder.add_block(DwBlock::new(
-                block_coord,
-                match self.level {
-                    0 => TopSide {
-                        top: WorkbenchPress1Top,
-                        side: WorkbenchPress1,
-                    },
-                    1 => TopSide {
-                        top: WorkbenchPress2Top,
-                        side: WorkbenchPress2,
-                    },
-                    _ => InvalidWorkbenchLevelSnafu {
-                        workbench_type: self.workbench_type,
-                        level: self.level,
-                        maximum: 2,
-                    }
-                    .fail()?,
-                },
-            )),
-            WorkbenchType::Kiln => builder.add_block(DwBlock::new(
-                block_coord,
-                TopSide {
-                    top: KilnTop,
-                    side: Kiln,
-                },
-            )),
-            WorkbenchType::Furnace => builder.add_block(DwBlock::new(
-                block_coord,
-                match self.level {
-                    0 => TopSide {
-                        top: Furnace1Top,
-                        side: Furnace1,
-                    },
-                    1 => TopSide {
-                        top: Furnace2Top,
-                        side: Furnace2,
-                    },
-                    2 => TopSide {
-                        top: Furnace3Top,
-                        side: Furnace3,
-                    },
-                    _ => InvalidWorkbenchLevelSnafu {
-                        workbench_type: self.workbench_type,
-                        level: self.level,
-                        maximum: 3,
-                    }
-                    .fail()?,
-                },
-            )),
-            WorkbenchType::Craft => builder.add_block(DwBlock::new(
-                block_coord,
-                match self.level {
-                    0 => TopSide {
-                        top: CraftBenchLevel1Top,
-                        side: CraftBenchLevel1,
-                    },
-                    1 => TopSide {
-                        top: CraftBenchLevel2Top,
-                        side: CraftBenchLevel2,
-                    },
-                    2 => TopSide {
-                        top: CraftBenchLevel3Top,
-                        side: CraftBenchLevel3,
-                    },
-                    3 => TopSide {
-                        top: CraftBenchLevel4Top,
-                        side: CraftBenchLevel4,
-                    },
-                    _ => InvalidWorkbenchLevelSnafu {
-                        workbench_type: self.workbench_type,
-                        level: self.level,
-                        maximum: 4,
-                    }
-                    .fail()?,
-                },
-            )),
-            WorkbenchType::Mix => builder.add_block(DwBlock::new(
-                block_coord,
-                TopSide {
-                    top: MixBenchLevel1Top,
-                    side: MixBenchLevel1,
-                },
-            )),
-            WorkbenchType::Dye => builder.add_block(DwBlock::new(
-                block_coord,
-                TopSide {
-                    top: DyeBenchLevel1Top,
-                    side: DyeBenchLevel1,
-                },
-            )),
-            WorkbenchType::Metalwork => builder.add_block(DwBlock::new(
-                block_coord,
-                match self.level {
-                    0 => TopSide {
-                        top: MetalworkBenchLevel1Top,
-                        side: MetalworkBenchLevel1,
-                    },
-                    1 => TopSide {
-                        top: MetalworkBenchLevel2Top,
-                        side: MetalworkBenchLevel2,
-                    },
-                    _ => InvalidWorkbenchLevelSnafu {
-                        workbench_type: self.workbench_type,
-                        level: self.level,
-                        maximum: 2,
-                    }
-                    .fail()?,
-                },
-            )),
-            WorkbenchType::SteamGenerator => builder.add_block(DwBlock::new(
-                block_coord,
-                TopSide {
-                    top: SteamGeneratorTop,
-                    side: SteamGenerator,
-                },
-            )),
-            WorkbenchType::ElectricKiln => builder.add_block(DwBlock::new(
-                block_coord,
-                TopSide {
-                    top: ElectricKilnTop,
-                    side: ElectricKiln,
-                },
-            )),
-            WorkbenchType::ElectricFurnace => builder.add_block(DwBlock::new(
-                block_coord,
-                TopSide {
-                    top: ElectricFurnaceTop,
-                    side: ElectricFurnace,
-                },
-            )),
-            WorkbenchType::ElectricMetalworkBench => builder.add_block(DwBlock::new(
-                block_coord,
-                TopSide {
-                    top: ElectricMetalworkBenchTop,
-                    side: ElectricMetalworkBench,
-                },
-            )),
-            WorkbenchType::ElectricStove => builder.add_block(DwBlock::new(
-                block_coord,
-                TopSide {
-                    top: ElectricStoveTop,
-                    side: ElectricStove,
-                },
-            )),
-            WorkbenchType::SolarPanel => builder.add_block(DwBlock::new(
-                block_coord,
-                TopSide {
-                    top: SolarPanelTop,
-                    side: SolarPanel,
-                },
-            )),
-            WorkbenchType::Flywheel => builder.add_block(DwBlock::new(
-                block_coord,
-                TopSide {
-                    top: FlywheelTop,
-                    side: Flywheel,
-                },
-            )),
-            WorkbenchType::ArmorBench => builder.add_block(DwBlock::new(
-                block_coord,
-                match self.level {
-                    0 => TopSide {
-                        top: ArmorBenchLevel1Top,
-                        side: ArmorBenchLevel1,
-                    },
-                    1 => TopSide {
-                        top: ArmorBenchLevel2Top,
-                        side: ArmorBenchLevel2,
-                    },
-                    2 => TopSide {
-                        top: ArmorBenchLevel3Top,
-                        side: ArmorBenchLevel3,
-                    },
-                    _ => InvalidWorkbenchLevelSnafu {
-                        workbench_type: self.workbench_type,
-                        level: self.level,
-                        maximum: 3,
-                    }
-                    .fail()?,
-                },
-            )),
-            WorkbenchType::TrainYard => builder.add_block(DwBlock::new(
-                block_coord,
-                TopSide {
-                    top: TrainYardTop,
-                    side: TrainYard,
-                },
-            )),
-            WorkbenchType::Easel => {
-                builder.add_item(DwItem::from_item_type(self.float_pos, ItemType::Easel))
-            }
-            WorkbenchType::Build => builder.add_block(DwBlock::new(
-                block_coord,
-                match self.level {
-                    0 => TopSide {
-                        top: BuildersBenchLevel1Top,
-                        side: BuildersBenchLevel1,
-                    },
-                    1 => TopSide {
-                        top: BuildersBenchLevel2Top,
-                        side: BuildersBenchLevel2,
-                    },
-                    _ => InvalidWorkbenchLevelSnafu {
-                        workbench_type: self.workbench_type,
-                        level: self.level,
-                        maximum: 2,
-                    }
-                    .fail()?,
-                },
-            )),
-            WorkbenchType::Refinery => {
-                builder.add_item(DwItem::from_item_type(self.float_pos, ItemType::Refinery))
-            }
-            WorkbenchType::ElectricPress => builder.add_block(DwBlock::new(
-                block_coord,
-                TopSide {
-                    top: ElectricPressTop,
-                    side: ElectricPress,
-                },
-            )),
-            WorkbenchType::CompostBin => builder.add_block(DwBlock::new(
-                block_coord,
-                TopSide {
-                    top: CompostBinTop,
-                    side: CompostBin,
-                },
-            )),
-            WorkbenchType::Sluice => builder.add_item(DwItem::from_item_type(
-                self.float_pos,
-                ItemType::ElectricSluice,
-            )),
-            WorkbenchType::EggExtractor => builder.add_block(DwBlock::new(
-                block_coord,
-                TopSide {
-                    top: EggExtractorTop,
-                    side: EggExtractor,
-                },
-            )),
-            WorkbenchType::PizzaOven => builder.add_block(DwBlock::new(
-                block_coord,
-                TopSide {
-                    top: PizzaOvenTop,
-                    side: PizzaOven,
-                },
-            )),
+            ));
         }
         Ok(())
     }
@@ -2759,6 +2769,7 @@ impl InfoUi for Sign {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn draw_sign(
     float_pos: [f32; 2],
     flipped: bool,
