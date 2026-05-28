@@ -232,6 +232,14 @@ impl UniqueID {
     pub fn inner(&self) -> &u64 {
         &self.0
     }
+
+    pub fn inner_mut(&mut self) -> &mut u64 {
+        &mut self.0
+    }
+
+    pub fn into_inner(self) -> u64 {
+        self.0
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]

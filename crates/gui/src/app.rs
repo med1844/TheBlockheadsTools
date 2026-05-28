@@ -1242,7 +1242,7 @@ impl EditorApp {
                 title: &str,
                 t: Option<&mut T>,
                 ctx: (&egui::Context, DwUiContext),
-            ) -> (ObjFlags, bool) {
+            ) -> Option<(DwUiContext, bool)> {
                 let (egui_ctx, mut context) = ctx;
                 let mut open = true;
                 if let Some(t) = t {
@@ -1255,7 +1255,7 @@ impl EditorApp {
                             });
                         });
                 }
-                (context.flags, open)
+                Some((context, open))
             }
 
             fn draw_dyn_obj_window(
@@ -1263,7 +1263,7 @@ impl EditorApp {
                 index: usize,
                 dw_chunk: &mut ChunkDynamicObjects,
                 ctx: (&egui::Context, DwUiContext),
-            ) -> (ObjFlags, bool) {
+            ) -> Option<(DwUiContext, bool)> {
                 use DynamicObjectType::*;
                 let title: &'static str = dyn_obj_type.into();
                 match dyn_obj_type {
@@ -1337,7 +1337,7 @@ impl EditorApp {
                     TomatoPlant => draw_window(title, dw_chunk.tomato_plant.get_mut(index), ctx),
                     Yak => draw_window(title, dw_chunk.yak.get_mut(index), ctx),
                     Mirror => draw_window(title, dw_chunk.mirror.get_mut(index), ctx),
-                    _ => (ObjFlags::default(), true),
+                    _ => None,
                 }
             }
 
@@ -1345,19 +1345,20 @@ impl EditorApp {
                 world_db.main.world_v2.world_width_macro * Chunk::NUM_BLOCK_PER_ROW as u32,
                 self.render_settings.enable_cyclic,
                 ObjFlags::default(),
+                world_db.main.dynamic_world_v2.dynamic_object_id_count,
             );
             let ctx = (egui_ctx, context);
             let draw_result = match id.obj_type {
-                ObjectType::DynamicObject(dyn_obj_type) => dw
-                    .chunk_at_mut(chunk_coord)
-                    .map(|dw_chunk| draw_dyn_obj_window(dyn_obj_type, id.index, dw_chunk, ctx)),
-                ObjectType::Blockhead => Some(draw_window(
-                    "Blockhead",
-                    world_db.main.blockheads.get_mut(id.index),
-                    ctx,
-                )),
+                ObjectType::DynamicObject(dyn_obj_type) => {
+                    dw.chunk_at_mut(chunk_coord).and_then(|dw_chunk| {
+                        draw_dyn_obj_window(dyn_obj_type, id.index, dw_chunk, ctx)
+                    })
+                }
+                ObjectType::Blockhead => {
+                    draw_window("Blockhead", world_db.main.blockheads.get_mut(id.index), ctx)
+                }
             };
-            if let Some((flags, open)) = draw_result {
+            if let Some((dw_ctx, open)) = draw_result {
                 if !open {
                     self.interaction_state.select = None;
                 }
@@ -1385,6 +1386,7 @@ impl EditorApp {
                             self.chunk_cache.mark_mesh_outdated(dst_chunk_coord);
                         }
                     };
+                let flags = dw_ctx.flags;
                 // handle obj move & dst chunk re-render
                 if let Some((x, y)) = flags.pos_changed_to {
                     match id.obj_type {
@@ -1405,6 +1407,8 @@ impl EditorApp {
                 if flags.rebuild_mesh {
                     self.chunk_cache.mark_mesh_outdated(chunk_coord);
                 }
+
+                world_db.main.dynamic_world_v2.dynamic_object_id_count = dw_ctx.num_dw_objs;
             }
         }
     }

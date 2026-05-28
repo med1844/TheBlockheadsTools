@@ -62,21 +62,25 @@ pub struct ObjFlags {
 
 // helper mod to keep read-only fields private
 mod context {
+    use the_blockheads_tools_lib::game::dynamic_object::UniqueID;
+
     use super::ObjFlags;
 
     #[derive(Debug, Default)]
     pub struct DwUiContext {
         world_width: u32,
         cyclic: bool,
+        pub num_dw_objs: u64,
         pub flags: ObjFlags,
     }
 
     impl DwUiContext {
-        pub fn new(world_width: u32, cyclic: bool, flags: ObjFlags) -> Self {
+        pub fn new(world_width: u32, cyclic: bool, flags: ObjFlags, next_unique_id: u64) -> Self {
             Self {
                 world_width,
                 cyclic,
                 flags,
+                num_dw_objs: next_unique_id,
             }
         }
 
@@ -86,6 +90,12 @@ mod context {
 
         pub fn cyclic(&self) -> bool {
             self.cyclic
+        }
+
+        pub fn next_unique_id(&mut self) -> UniqueID {
+            let unique_id = UniqueID::new(self.num_dw_objs);
+            self.num_dw_objs += 1;
+            unique_id
         }
     }
 }
@@ -129,12 +139,6 @@ impl ToRow for u8 {
 impl ToRow for i32 {
     fn to_row(&mut self, ui: &mut egui::Ui) -> egui::Response {
         ui.add(egui::DragValue::new(self))
-    }
-}
-
-impl ToRow for UniqueID {
-    fn to_row(&mut self, ui: &mut egui::Ui) -> egui::Response {
-        ui.label(format!("{:?}", self))
     }
 }
 
@@ -231,6 +235,28 @@ trait ToGrid {
     }
 }
 
+impl ToGrid for UniqueID {
+    fn to_grid(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        ui.add(egui::DragValue::new(self.inner_mut()));
+        if ui.button("Assign new ID").clicked() {
+            *self = context.next_unique_id();
+        }
+        ui.end_row();
+    }
+}
+
+fn grid_as_row<T: ToGrid, H: Hash>(
+    t: &mut T,
+    label: &str,
+    id: H,
+    ui: &mut egui::Ui,
+    context: &mut DwUiContext,
+) {
+    ui.label(label);
+    t.add_grid(id, ui, context);
+    ui.end_row();
+}
+
 impl ToGrid for DynamicObject {
     fn to_grid(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         let mut float_pos_changed = false;
@@ -285,7 +311,13 @@ impl ToGrid for DynamicObject {
             context.flags.rebuild_mesh = true;
         }
 
-        self.unique_id.add_row("uniqueID", ui);
+        grid_as_row(
+            &mut self.unique_id,
+            "uniqueID",
+            "unique_id_grid",
+            ui,
+            context,
+        );
         self.owner_id.add_row("ownerID", ui);
     }
 }
@@ -326,18 +358,6 @@ impl ToGrid for TreeFruit {
         self.pos_x.add_row("pos.x", ui);
         self.pos_y.add_row("pos.y", ui);
     }
-}
-
-fn grid_as_row<T: ToGrid, H: Hash>(
-    t: &mut T,
-    label: &str,
-    id: H,
-    ui: &mut egui::Ui,
-    context: &mut DwUiContext,
-) {
-    ui.label(label);
-    t.add_grid(id, ui, context);
-    ui.end_row();
 }
 
 impl ToGrid for Tree {
@@ -1920,11 +1940,29 @@ impl BuildDwMesh for Rail {
 }
 
 impl ToGrid for TrainCar {
-    fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut DwUiContext) {
+    fn to_grid(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         self.engine_is_right.add_row("engineIsRight", ui);
-        self.left_car_id.add_row("leftCarId", ui);
-        self.right_car_id.add_row("rightCarId", ui);
-        self.engine_car_id.add_row("engineCarId", ui);
+        grid_as_row(
+            &mut self.left_car_id,
+            "leftCarId",
+            "left_car_id_grid",
+            ui,
+            context,
+        );
+        grid_as_row(
+            &mut self.right_car_id,
+            "rightCarId",
+            "right_car_id_grid",
+            ui,
+            context,
+        );
+        grid_as_row(
+            &mut self.engine_car_id,
+            "engineCarId",
+            "engine_car_id_grid",
+            ui,
+            context,
+        );
     }
 }
 
