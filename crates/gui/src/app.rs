@@ -1298,11 +1298,13 @@ impl EditorApp {
                     LimeTree => draw_window(title, dw_chunk.lime_tree.get_mut(index), ctx),
                     Wire => draw_window(title, dw_chunk.wire.get_mut(index), ctx),
                     CaveTroll => draw_window(title, dw_chunk.cave_troll.get_mut(index), ctx),
-                    // Rail => {}
-                    // HandCar => {}
-                    // SteamLocomotive => {}
-                    // FreightCar => {}
-                    // PassengerCar => {}
+                    Rail => draw_window(title, dw_chunk.rail.get_mut(index), ctx),
+                    HandCar => draw_window(title, dw_chunk.hand_car.get_mut(index), ctx),
+                    SteamLocomotive => {
+                        draw_window(title, dw_chunk.steam_locomotive.get_mut(index), ctx)
+                    }
+                    FreightCar => draw_window(title, dw_chunk.freight_car.get_mut(index), ctx),
+                    PassengerCar => draw_window(title, dw_chunk.passenger_car.get_mut(index), ctx),
                     Workbench => draw_window(title, dw_chunk.workbench.get_mut(index), ctx),
                     Chest => draw_window(title, dw_chunk.chest.get_mut(index), ctx),
                     Sign => draw_window(title, dw_chunk.sign.get_mut(index), ctx),

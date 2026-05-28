@@ -46,13 +46,13 @@ inherit!(HandCar -> TrainCar);
 #[serde(rename_all = "camelCase")]
 pub struct SteamLocomotive {
     #[serde(flatten)]
-    obj: TrainCar,
+    train_car: TrainCar,
     pub fuel_fraction: f32,
     pub going_right: bool,
     pub has_fuel: bool,
     pub stopped: bool,
 }
-inherit!(SteamLocomotive -> TrainCar, obj);
+inherit!(SteamLocomotive -> TrainCar, train_car);
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FreightCar(TrainCar);

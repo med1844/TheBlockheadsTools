@@ -1423,11 +1423,11 @@ impl DwChunkBuf {
         add(chunk.lime_tree.iter(), LimeTree, &mut builder);
         add(chunk.wire.iter(), Wire, &mut builder);
         add(chunk.cave_troll.iter(), CaveTroll, &mut builder);
-        // add(chunk.rail.iter(), Rail, &mut builder);
-        // add(chunk.hand_car.iter(), HandCar, &mut builder);
-        // add(chunk.steam_locomotive.iter(), SteamLocomotive, &mut builder);
-        // add(chunk.freight_car.iter(), FreightCar, &mut builder);
-        // add(chunk.passenger_car.iter(), PassengerCar, &mut builder);
+        add(chunk.rail.iter(), Rail, &mut builder);
+        add(chunk.hand_car.iter(), HandCar, &mut builder);
+        add(chunk.steam_locomotive.iter(), SteamLocomotive, &mut builder);
+        add(chunk.freight_car.iter(), FreightCar, &mut builder);
+        add(chunk.passenger_car.iter(), PassengerCar, &mut builder);
         add(chunk.workbench.iter(), Workbench, &mut builder);
         add(chunk.chest.iter(), Chest, &mut builder);
         add(chunk.sign.iter(), Sign, &mut builder);

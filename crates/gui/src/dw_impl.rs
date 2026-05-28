@@ -1,4 +1,4 @@
-// Implements traits for dynamic object types defined in lib
+// Implements traits fo dynamic object types defined in lib
 use super::{
     gpu::{
         BlockUv,
@@ -34,15 +34,15 @@ use the_blockheads_tools_lib::game::{
         chest::{Chest, ChestSlots, ChestType},
         craft::{
             Bed, Boat, Column, ColumnConfiguration, Door, ElevatorMotor, ElevatorShaft, Ladder,
-            Mirror, OwnershipSign, Painting, Sign, SignConnectionType, Stairs, StairsConfiguration,
-            Torch, TorchConnectionType, TradePortal, TradingPost, Window, Wire, WireConfiguration,
-            WireSolidConfiguration,
+            Mirror, OwnershipSign, Painting, Rail, RailConfiguration, Sign, SignConnectionType,
+            Stairs, StairsConfiguration, Torch, TorchConnectionType, TradePortal, TradingPost,
+            Window, Wire, WireConfiguration, WireSolidConfiguration,
         },
         plant::{
             CarrotPlant, ChilliPlant, CornPlant, FlaxPlant, KelpPlant, NormalPlant, Plant,
             SunflowerPlant, TomatoPlant, TulipPlant, VinePlant, WheatPlant,
         },
-        train::TrainStation,
+        train::{FreightCar, HandCar, PassengerCar, SteamLocomotive, TrainCar, TrainStation},
         tree::{
             AppleTree, CactusTree, CherryTree, CoconutTree, CoffeeTree, GemTree, LimeTree,
             MangoTree, MapleTree, OrangeTree, PineTree, Tree, TreeFruit, TreeType,
@@ -1848,6 +1848,182 @@ impl BuildDwMesh for CaveTroll {
         builder.add_item(DwItem::from_item_type(
             self.float_pos,
             ItemType::IceChestPlate,
+        ));
+        Ok(())
+    }
+}
+
+impl ToRow for RailConfiguration {
+    fn to_row(&mut self, ui: &mut egui::Ui) -> egui::Response {
+        wrap_combo_box_resp(
+            egui::ComboBox::from_id_salt("wire_solid_configuration_combo_box")
+                .selected_text(format!("{:?}", self))
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(self, Self::Undefined, "Undefined")
+                        | ui.selectable_value(self, Self::Flat, "Flat")
+                        | ui.selectable_value(self, Self::DiagonalUpLeft, "DiagonalUpLeft")
+                        | ui.selectable_value(
+                            self,
+                            Self::DiagonalHalfUpLeftBot,
+                            "DiagonalHalfUpLeftBot",
+                        )
+                        | ui.selectable_value(
+                            self,
+                            Self::DiagonalHalfUpLeftTop,
+                            "DiagonalHalfUpLeftTop",
+                        )
+                        | ui.selectable_value(self, Self::DiagonalUpRight, "DiagonalUpRight")
+                        | ui.selectable_value(
+                            self,
+                            Self::DiagonalHalfUpRightBot,
+                            "DiagonalHalfUpRightBot",
+                        )
+                        | ui.selectable_value(
+                            self,
+                            Self::DiagonalHalfUpRightTop,
+                            "DiagonalHalfUpRightTop",
+                        )
+                        | ui.selectable_value(self, Self::DiagonalHalfFlat, "DiagonalHalfFlat")
+                }),
+        )
+    }
+}
+
+impl ToGrid for Rail {
+    fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut DwUiContext) {
+        self.item_type.add_row("itemType", ui);
+        self.configuration.add_row("configuration", ui);
+        self.owned_by_station.add_row("ownedByStation", ui);
+    }
+}
+
+impl InfoUi for Rail {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        let obj = self.deref_mut();
+        obj.info(ui, context);
+
+        ui.vertical(|ui| {
+            ui.heading("Rail");
+            ui.separator();
+            self.add_grid("rail_grid", ui, context);
+        });
+    }
+}
+
+impl BuildDwMesh for Rail {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::ITEM);
+
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        builder.add_item(DwItem::from_item_type(self.float_pos, self.item_type));
+        Ok(())
+    }
+}
+
+impl ToGrid for TrainCar {
+    fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut DwUiContext) {
+        self.engine_is_right.add_row("engineIsRight", ui);
+        self.left_car_id.add_row("leftCarId", ui);
+        self.right_car_id.add_row("rightCarId", ui);
+        self.engine_car_id.add_row("engineCarId", ui);
+    }
+}
+
+impl InfoUi for TrainCar {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        let obj = self.deref_mut();
+        obj.info(ui, context);
+
+        ui.vertical(|ui| {
+            ui.heading("TrainCar");
+            ui.separator();
+            self.add_grid("train_car_grid", ui, context);
+        });
+    }
+}
+
+impl InfoUi for HandCar {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        let train_car = self.deref_mut();
+        train_car.info(ui, context);
+    }
+}
+
+impl BuildDwMesh for HandCar {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::ITEM);
+
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        builder.add_item(DwItem::from_item_type(
+            self.float_pos,
+            ItemType::RailHandcar,
+        ));
+        Ok(())
+    }
+}
+
+impl ToGrid for SteamLocomotive {
+    fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut DwUiContext) {
+        self.fuel_fraction.add_row("fuelFraction", ui);
+        self.going_right.add_row("goingRight", ui);
+        self.has_fuel.add_row("hasFuel", ui);
+        self.stopped.add_row("stopped", ui);
+    }
+}
+
+impl InfoUi for SteamLocomotive {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        let train_car = self.deref_mut();
+        train_car.info(ui, context);
+
+        ui.vertical(|ui| {
+            ui.heading("SteamLocomotive");
+            ui.separator();
+            self.add_grid("steam_locomotive_grid", ui, context);
+        });
+    }
+}
+
+impl BuildDwMesh for SteamLocomotive {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::ITEM);
+
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        builder.add_item(DwItem::from_item_type(
+            self.float_pos,
+            ItemType::SteamLocomotive,
+        ));
+        Ok(())
+    }
+}
+
+impl InfoUi for FreightCar {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        let train_car = self.deref_mut();
+        train_car.info(ui, context);
+    }
+}
+
+impl BuildDwMesh for FreightCar {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::ITEM);
+
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        builder.add_item(DwItem::from_item_type(self.float_pos, ItemType::FreightCar));
+        Ok(())
+    }
+}
+
+impl InfoUi for PassengerCar {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        let train_car = self.deref_mut();
+        train_car.info(ui, context);
+    }
+}
+
+impl BuildDwMesh for PassengerCar {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::ITEM);
+
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        builder.add_item(DwItem::from_item_type(
+            self.float_pos,
+            ItemType::PassengerCar,
         ));
         Ok(())
     }
