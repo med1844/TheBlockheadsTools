@@ -23,6 +23,7 @@ use strum::IntoEnumIterator;
 use the_blockheads_tools_lib::game::{
     block::{BlockContentType, BlockType},
     coord::BlockCoord,
+    db::{dynamic_world_v2::DynamicWorldV2, world_v2::WorldV2},
     dynamic_object::{
         AnyDynamicObject, ArtificialLight, DynamicObject, InteractionObject, InteractionObjectType,
         LightDirection, UniqueID,
@@ -3469,8 +3470,8 @@ impl ToGrid for Painting {
     fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut DwUiContext) {
         self.has_verified_image_data
             .add_row("hasVerifiedImageData", ui);
-        let data_str = format!("{:?}", self.output_image_data);
-        data_str.as_str().add_row("outputImageData", ui);
+        let preview = format!("{} bytes", self.output_image_data.as_ref().len());
+        preview.as_str().add_row("previewImageData", ui);
         self.item_type.add_row("itemType", ui);
     }
 }
@@ -4233,6 +4234,111 @@ impl InfoUi for Blockhead {
             ui.heading("Blockhead");
             ui.separator();
             self.add_grid("blockhead_grid", ui, context);
+        });
+    }
+}
+
+impl ToGrid for WorldV2 {
+    fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut DwUiContext) {
+        let blockhead_datas = format!("{:?}", self.blockhead_datas_v2);
+        blockhead_datas.as_str().add_row("blockheadDatasv2", ui);
+
+        let circum_nav = format!("{:?}", self.circum_navigate_booleans_data);
+        circum_nav
+            .as_str()
+            .add_row("circumNavigateBooleansData", ui);
+
+        let creation_date = format!("{:?}", self.creation_date);
+        creation_date.as_str().add_row("creationDate", ui);
+
+        let distance_food = format!("{:?}", self.distance_ordered_food_types);
+        distance_food
+            .as_str()
+            .add_row("distanceOrderedFoodTypes", ui);
+
+        self.expert_mode.add_row("expertMode", ui);
+
+        let found_items = format!("{:?}", self.found_items);
+        found_items.as_str().add_row("foundItems", ui);
+
+        self.host_port.add_row("hostPort", ui);
+        self.max_players.add_row("maxPlayers", ui);
+        self.migration_complete_v1_7
+            .add_row("migrationComplete_1.7", ui);
+        self.no_rain_timer.add_row("noRainTimer", ui);
+        self.portal_level.add_row("portalLevel", ui);
+
+        let preview = match &self.preview_image_data {
+            Some(d) => format!("Some({} bytes)", d.as_ref().len()),
+            None => "None".to_owned(),
+        };
+        preview.as_str().add_row("previewImageData", ui);
+
+        self.random_seed.add_row("randomSeed", ui);
+        self.remote_game.add_row("remoteGame", ui);
+        self.run_at_launch.add_row("runAtLaunch", ui);
+
+        let save_date = format!("{:?}", self.save_date);
+        save_date.as_str().add_row("saveDate", ui);
+
+        self.save_id.add_row("saveID", ui);
+        self.save_version.add_row("saveVersion", ui);
+        self.start_portal_pos_x.add_row("startPortalPos.x", ui);
+        self.start_portal_pos_y.add_row("startPortalPos.y", ui);
+
+        ui.label("translation");
+        ui.horizontal(|ui| {
+            ui.add(
+                egui::DragValue::new(&mut self.translation.0)
+                    .speed(FLOAT_SPEED)
+                    .prefix("x: "),
+            );
+            ui.add(
+                egui::DragValue::new(&mut self.translation.1)
+                    .speed(FLOAT_SPEED)
+                    .prefix("y: "),
+            );
+        });
+        ui.end_row();
+
+        self.world_name.add_row("worldName", ui);
+        self.world_time.add_row("worldTime", ui);
+        self.world_width_macro.add_row("worldWidthMacro", ui);
+    }
+}
+
+impl InfoUi for WorldV2 {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        ui.vertical(|ui| {
+            ui.heading("WorldV2");
+            ui.separator();
+            self.add_grid("world_v2_grid", ui, context);
+        });
+    }
+}
+
+impl ToGrid for DynamicWorldV2 {
+    fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut DwUiContext) {
+        self.active_blockhead_index
+            .add_row("activeBlockheadIndex", ui);
+        self.dynamic_object_id_count
+            .add_row("dynamicObjectIDCount", ui);
+        self.save_version.add_row("saveVersion", ui);
+
+        let glow = format!("{:?}", self.saved_glow_indices);
+        glow.as_str().add_row("savedGlowIndices", ui);
+
+        self.workbench_has_been_crafted
+            .add_row("workbenchHasBeenCrafted", ui);
+    }
+}
+
+impl InfoUi for DynamicWorldV2 {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        ui.vertical(|ui| {
+            ui.heading("DynamicWorldV2");
+            ui.separator();
+            self.add_grid("dynamic_world_v2_grid", ui, context);
         });
     }
 }

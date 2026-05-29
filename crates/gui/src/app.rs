@@ -367,6 +367,7 @@ pub struct EditorApp {
     camera: Camera,
 
     show_settings: bool,
+    show_world_info: bool,
     fps_counter: FpsCounter,
     mode: Mode,
     pen_mode_settings: PenModeSettings,
@@ -419,6 +420,7 @@ impl EditorApp {
             camera,
 
             show_settings: false,
+            show_world_info: false,
             fps_counter: FpsCounter::new(2.0),
             mode: Mode::default(),
             pen_mode_settings: PenModeSettings::default(),
@@ -589,6 +591,7 @@ impl EditorApp {
             ui.separator();
             ui.toggle_value(&mut self.render_settings.show_grid, "Grid");
             ui.toggle_value(&mut self.show_settings, "Settings");
+            ui.toggle_value(&mut self.show_world_info, "Info");
 
             ui.separator();
             if ui
@@ -725,60 +728,65 @@ impl EditorApp {
         update_voxel
     }
 
-    fn render_settings_window(&mut self, ui: &mut egui::Ui) {
-        ui.label(format!("fps: {:.1}", self.fps_counter.fps()));
-        ui.separator();
-        ui.add(
-            egui::DragValue::new(&mut self.render_settings.light_dir.x)
-                .speed(0.1)
-                .prefix("Light Dir X: "),
-        );
-        ui.add(
-            egui::DragValue::new(&mut self.render_settings.light_dir.y)
-                .speed(0.1)
-                .prefix("Light Dir Y: "),
-        );
-        ui.add(
-            egui::DragValue::new(&mut self.render_settings.light_dir.z)
-                .speed(0.1)
-                .prefix("Light Dir Z: "),
-        );
-        ui.checkbox(&mut self.render_settings.enable_reflect, "Enable Reflect");
-        ui.checkbox(&mut self.render_settings.enable_destruct, "Enable Destruct");
-        ui.checkbox(&mut self.render_settings.enable_ssao, "Enable SSAO");
-        ui.checkbox(
-            &mut self.render_settings.render_dw_item,
-            "Render Dynamic Object Icons",
-        );
-        ui.checkbox(
-            &mut self.render_settings.render_dw_mesh,
-            "Render Dynamic Object Meshs",
-        );
-        ui.checkbox(
-            &mut self.render_settings.enable_cyclic,
-            "Enable Cyclic World",
-        );
+    fn render_settings_window(&mut self, ctx: &egui::Context) {
+        egui::Window::new("Settings")
+            .open(&mut self.show_settings)
+            .show(ctx, |ui| {
+                ui.label(format!("fps: {:.1}", self.fps_counter.fps()));
+                ui.separator();
+                ui.add(
+                    egui::DragValue::new(&mut self.render_settings.light_dir.x)
+                        .speed(0.1)
+                        .prefix("Light Dir X: "),
+                );
+                ui.add(
+                    egui::DragValue::new(&mut self.render_settings.light_dir.y)
+                        .speed(0.1)
+                        .prefix("Light Dir Y: "),
+                );
+                ui.add(
+                    egui::DragValue::new(&mut self.render_settings.light_dir.z)
+                        .speed(0.1)
+                        .prefix("Light Dir Z: "),
+                );
+                ui.checkbox(&mut self.render_settings.enable_reflect, "Enable Reflect");
+                ui.checkbox(&mut self.render_settings.enable_destruct, "Enable Destruct");
+                ui.checkbox(&mut self.render_settings.enable_ssao, "Enable SSAO");
+                ui.checkbox(
+                    &mut self.render_settings.render_dw_item,
+                    "Render Dynamic Object Icons",
+                );
+                ui.checkbox(
+                    &mut self.render_settings.render_dw_mesh,
+                    "Render Dynamic Object Meshs",
+                );
+                ui.checkbox(
+                    &mut self.render_settings.enable_cyclic,
+                    "Enable Cyclic World",
+                );
 
-        ui.separator();
-        ui.add(
-            egui::Slider::new(&mut self.render_settings.ambient_light, 0.0..=1.0)
-                .text("Ambient Light"),
-        );
-        ui.add(
-            egui::Slider::new(&mut self.render_settings.shininess, 1.0..=256.0).text("Shininess"),
-        );
-        ui.add(
-            egui::Slider::new(&mut self.render_settings.specular_intensity, 0.0..=5.0)
-                .text("Specular Intensity"),
-        );
-        ui.add(
-            egui::Slider::new(&mut self.render_settings.ambient_reflect, 0.0..=1.0)
-                .text("Ambient Reflection"),
-        );
-        ui.add(
-            egui::Slider::new(&mut self.render_settings.min_depth_factor, 0.0..=1.0)
-                .text("Min Depth Factor"),
-        );
+                ui.separator();
+                ui.add(
+                    egui::Slider::new(&mut self.render_settings.ambient_light, 0.0..=1.0)
+                        .text("Ambient Light"),
+                );
+                ui.add(
+                    egui::Slider::new(&mut self.render_settings.shininess, 1.0..=256.0)
+                        .text("Shininess"),
+                );
+                ui.add(
+                    egui::Slider::new(&mut self.render_settings.specular_intensity, 0.0..=5.0)
+                        .text("Specular Intensity"),
+                );
+                ui.add(
+                    egui::Slider::new(&mut self.render_settings.ambient_reflect, 0.0..=1.0)
+                        .text("Ambient Reflection"),
+                );
+                ui.add(
+                    egui::Slider::new(&mut self.render_settings.min_depth_factor, 0.0..=1.0)
+                        .text("Min Depth Factor"),
+                );
+            });
     }
 
     fn update_camera_pos(&mut self, ui: &mut egui::Ui, response: &egui::Response) {
@@ -1501,6 +1509,22 @@ impl EditorApp {
                 };
             });
     }
+
+    fn render_world_info_window(&mut self, ctx: &egui::Context) {
+        if let Some(world_db) = self.world_db.as_mut() {
+            let mut context = DwUiContext::default();
+            egui::Window::new("World Info")
+                .id("world_info_window".into())
+                .open(&mut self.show_world_info)
+                .show(ctx, |ui| {
+                    egui::ScrollArea::both().show(ui, |ui| {
+                        world_db.main.world_v2.info(ui, &mut context);
+                        ui.separator();
+                        world_db.main.dynamic_world_v2.info(ui, &mut context);
+                    });
+                });
+        }
+    }
 }
 
 impl eframe::App for EditorApp {
@@ -1512,14 +1536,8 @@ impl eframe::App for EditorApp {
             self.render_menu_bar(ui, frame);
         });
 
-        let mut show_settings = self.show_settings;
-        egui::Window::new("Settings")
-            .open(&mut show_settings)
-            .show(ctx, |ui| {
-                self.render_settings_window(ui);
-            });
-        self.show_settings = show_settings;
-
+        self.render_settings_window(ctx);
+        self.render_world_info_window(ctx);
         self.render_error_windows(ctx);
         self.render_selected_block_info_window(ctx);
         self.render_selected_dyn_obj_info_window(ctx, frame);
