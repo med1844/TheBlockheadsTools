@@ -1547,6 +1547,141 @@ mod tests {
         ));
     }
 
+    #[test]
+    fn test_caged_dropbear_deserialization() {
+        let xml = "
+<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
+<plist version=\"1.0\">
+    <data>
+		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
+		Bj7/1b99+gfrUG4lQhAAAA==
+    </data>
+</plist>";
+        let data: plist::Data = plist::from_reader_xml(xml.as_bytes()).unwrap();
+        let bytes: Vec<u8> = data.into();
+
+        let item = Item::try_from_bytes(bytes).expect("should parse");
+        assert!(matches!(item.item_type(), Ok(ItemType::Basket)));
+        assert!(matches!(
+            item.sub_items.unwrap()[1][0].dynamic_object,
+            Some(AnyDynamicObject::DropBear(_))
+        ));
+    }
+
+    #[test]
+    fn test_caged_scorpion_deserialization() {
+        let xml = "
+<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
+<plist version=\"1.0\">
+    <data>
+        DAAAAAAAAgwfiwgAAAAAAAAHdZNZj6M4FEafu35FJq9RldlDRqlqQYAsQMIa
+		IG8sgUAgZt9+fYd090jTmvGLP9v3XFuyzvp7n6Wz9lpWMXx8ztEPZD67PnwY
+		xI/oc24awjs9//71tv6LO20MR+FneRpX9UwxWWm/mc3fAWDyPL0CwBncTJH2
+		ujF79gCAP85n81td538D0HXdhztVffgwmworoJQwv5b1ID2bvT+Bj6AO5s9r
+		fnb/13Oeu0Hs119v39b36/BVrcE0PVduWbpT+JXAf8YpfVsHbu2+ktbxzM/R
+		hXEX/crMLrlogUdWnbB32wwFbMOAbOhXcrqF94krNLW28q1rN31BQ9GDbLn3
+		RD8HOJFF4RbVvGaoLmB8tCGB7VVlN97xicPzTLXODz8jyDTrnDLILFcI6yWN
+		2cvTJszUUZWUAQuFum0HHxL0vSsmbo9nh+OiERyfYBe7Pe1HHuOXFXKvcOpq
+		1ZBTWQtHRk7Z3FDAjMzCHrCJc3n00oxiq6p33dSoi3k8b2MaRaODVaBHLS8b
+		yJ1wiI62U2Q1JnjUIE4ccuPMCJDFuQBSIAM38WpVlmHCrVJss1kaQgvzLV8t
+		pU1lYqOsue4QTFydaSJN7GIu1M8pqqb5tY/ESF+NLHxID40eEF5t6mRU1G55
+		7hDGDrRx4jbtkrfBWXmwgTykAtkr7uGmYTbLXQbCTVSGNHuHNhN9IRdkYzdL
+		n4UTt4hVix0u55xS+NgR2OQUhePQplUZKq5nQp2kLBITPdIcZGDHDakf5YlT
+		jmAnwYNhjOXCw4URA/vbHqpRufcZNkgESMe+ePNAsKiLRe5pzZXWX/+nEh57
+		IXYRwi+llhdGuzmmSAnTnlkdFk1b9AxiDyglnSwloe45bq3aiaOKZlsMKU2F
+		mJOGeoAGy915LJkkQ1l3q8SGTNpusMCp2llVBrtp70d64uIt3tqd+FCrjLDa
+		jSxYxWrJGS66cpzLSVylFF/2PW0xnavUMqUaheVNnIkhqEYEtFgewsPKe2Cd
+		eqJDHaX0oKJxOyEdXx9tgtN1DVZXf5Lg82UG+K3GGvzh0x/mIOpvWbr/Jf9J
+		z8OXsmvwEvrr7Qe4ouQuZwQAAA==
+    </data>
+</plist>";
+        let data: plist::Data = plist::from_reader_xml(xml.as_bytes()).unwrap();
+        let bytes: Vec<u8> = data.into();
+
+        let item = Item::try_from_bytes(bytes).expect("should parse");
+        assert!(matches!(item.item_type(), Ok(ItemType::Basket)));
+        assert!(matches!(
+            item.sub_items.unwrap()[2][0].dynamic_object,
+            Some(AnyDynamicObject::Scorpion(_))
+        ));
+    }
+
+    #[test]
+    fn test_caged_unicorn_deserialization() {
+        let xml = "
+<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
+<plist version=\"1.0\">
+    <data>
+		DAAAAAAAAQwfiwgAAAAAAAAH7ZhJj5tIGIbP6V/h8RV1l/GCceTuCLAxNBiD
+		wRi4YfZ9Nduvj/EknZlRlh4pl9HAhQ++53kpQSGVav2picJRZeWFl8TPY/hp
+		Mh5ZsZGYXuw8j08S+YiOP708rP/YHAhJ5bejNPSKcsSfcJYmRuNHALA0DS0A
+		NtJmxLO0KI1uGQBsufFo7JZl+hGAuq6f9J56MpKoBwvA50lq5WXL3sIeb8KT
+		WZrj22P+TP/bcG53Tc8oXx4+rAOrfSnWoD/drvQ81/viL9WHtamX+r1SHezL
+		UT/fO+Braw1+borO9qtpe/VbDGVrHHuB6JqkFWUhm0FRmDwaEac0TbHeY9qd
+		y5is0OjNjopp9qRN5mpTJiCeSDRx2qZesYQhY8n7puK7S8uA4qL3hNdyT9rG
+		9Wgc4YT0Uo6ozitoyaJRoF4d0NB8MrW1eWG3qBXLr1HjZ2zvhVMBijr/uj3s
+		bU0M8DkUtojXRQW8YlNwwSB+FyNL56KjVbU7gJnVCnrvkXKWVvhWrzgiw3fT
+		3DpPpjm2O01Lscy7CFFQMc2m0bSoKIeNsw0TzP3emxEdDCMhwtIFXGLmLBBU
+		V4UWkhswtiGxbY0SLMpQOlKtMoc/7jX6TPYeZ3kqKngzCNZ1r+qISprE8OpV
+		ydSjyVD7M4HMSFUxmaMYcIyVBQdTXvUeFQviPACFzl7lwsF9y50hfMUda4z1
+		ApEIcg54x9TZJpRHcEwgZrJW9d6u2aTFYlHUnNcFK/lS49Z+WSGq3JLcAm4Z
+		PWNOEneGzjt1gZBzD4kPu95zfNKvuKXhkZJfLjFX0JqmCdgrLNaX00lLfbQl
+		XUuadrvlPpFJECo83XtXySRmqVt3jge6MMhQyF5B2WWDMotKX0lyaSf1JF+e
+		PXwy8ZQMP6bivvd4W7QFOTvaq4ATLCEqxGkh6tlrxxB1AQWa7oIDc6QSxbDa
+		CQSHVtw19++Qa+QqQlnFNHkWbxZ26YZnIKJUuljwvIMBnBNDatJP4n8582+v
+		9gf/zHehf8YP0AAN0AD9z6ANhTHBL5NwDKPfA23fA+3fAwm/J2nzO8f0vaRf
+		rsewt/XYj+O/QT8ZwwAN0AAN0AAN0AAN0H8T+rZeeqtuzfsW2RrcN9BeHj4D
+		pJmqx9cTAAA=
+    </data>
+</plist>";
+        let data: plist::Data = plist::from_reader_xml(xml.as_bytes()).unwrap();
+        let bytes: Vec<u8> = data.into();
+
+        let item = Item::try_from_bytes(bytes).expect("should parse");
+        assert!(matches!(item.item_type(), Ok(ItemType::Basket)));
+        assert!(matches!(
+            item.sub_items.unwrap()[1][0].dynamic_object,
+            Some(AnyDynamicObject::Donkey(_))
+        ));
+    }
+
     fn inventory_round_trip(inventory_data: &[u8]) {
         let inventory_value =
             plist::from_reader_xml(inventory_data).expect("should be able to deserialize");
@@ -1820,6 +1955,175 @@ mod tests {
                 </array>
         </array>
         </plist>";
+        inventory_round_trip(inventory_data);
+    }
+
+    #[test]
+    fn test_inventory_dyn_obj_round_trip_0() {
+        // Contains: GoldenBed, CagedYak, CagedDonkey, CagedDodo, SharkBucket, FishBucket
+        let inventory_data = b"
+<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
+<plist version=\"1.0\">
+<array>
+	<array>
+		<data>
+		AQAAAAAAAAwfiwgAAAAAAAAHjY9Pa4QwEMXP+imyuetsb6VEJVULLtIVVik9
+		BhNct/4JMWzqt290aWkPK80lL/Pm/TJDos++Q1ehpnYcAvzg7zESQz3ydmgC
+		XJUv3iOOQpfskmNcvhcpkl07aVRUz3kWI+wBUCk7AZCUCSry7FQiywBIXzHC
+		Z63lE4AxxmdLl1+P/dI4QaFGKZSecwvzbMDnmmP7zY3+Zxxb5W2tQ9chH2IO
+		JwLLZV9MKbaIX8ohnGm2qkOTNtRQe0ywOvBtEdhOZubfSbgLuTTxG6XbkB9l
+		zXVDAuv+ofsFGE6eVJYBAAA=
+		</data>
+	</array>
+	<array>
+		<data>
+		DAAAAAAAAgwfiwgAAAAAAAAH7ZhJc5swFIDPya9wfWViGZtg3HGSYTFLjDEY
+		eePGZnZMAFvgX1/jTJK206bTHnpCF5543/ekGb2LNHmqkrhzcvMiOKQPXbzX
+		73bc1D44Qeo9dFeQv6O6T4+3ky/cgoU7ddrJ4qAoO+qKkSW2070DgM6y2AWA
+		g1xHlSUddi41AJgq3U7XL8vsKwAIoZ7ZUD37kDRgAdT8kLl5WcuXYncXoeeU
+		TveyzGv1H7Zz+esEdvl4ezOJ3PqxmIDmc5mZeW42wXfRzcQxS/MaidpUoBF9
+		GejhmgFvqQn43JS9Kf06fjZ/CdH/Av1pDy/em4j2AXqfiKHx7EBijnjJPJU4
+		xgwljLVRpVSkbDUefN4VYbQcEMY2I4RqI5h4OaYEUFK05jz7BG6M4P2oGp8H
+		aYXJSzmk51Lj6euInPtDWfFwSaos6HBFvcb48HxWxb3v7KHhQord7ARY+ys/
+		ZchkWjVeWvkJR/Kjs6/QJpMtwg1d7RGh5DtRG82j/plzY4zB2QpTl1IYx8tN
+		vW08r5J4L51qs7g8FAZxLARpnYAXc3UaiKIxUEwTUpbnAG1hicJiI4fFyGi8
+		eT4QFrJN7bQI8o7IKPwGMa5oCfzWeklYuJoTfl5Giq7rXhVG4Sxh68ZjDp6W
+		KT5e0KyOSaPQnRE4mgUSmZ9zJZV2e8NeF3mkaPosHuDH47Dm9cbb2ZbfTznQ
+		D9k1NdRiYgW49Vw4bm1klCeohkEiYZaeZMtn0pOJ6cF21cbrw6Swp2QfqVha
+		38eUaq2IerXfwMTdOpwoDUkUMSjM8pJPsGVw3OHj6/mV6Sl0PcUxEOZU/im6
+		58g4HZYHJUaZC3DLGAcUO1Nrc7zOKX04HvnO6OrBei9r86bR/rLT4o9O+30j
+		f0CfdHsLtVALtVALtVALtVALtVALtdD/hj5uPO/RJXl9QpiA6wPD4+03hQT/
+		HfcQAAA=
+		</data>
+	</array>
+	<array>
+		<data>
+		DAAAAAAAAQwfiwgAAAAAAAAH7Zg9b4MwEIbn8Ctc73DpVlWGyHxURaItqGTo
+		iAClKAQQWKX59zWOmjRVSxiYops4fM+998r2cmarz11JPvK2K+rKpLfGkpK8
+		SuusqDYmXccP+h1dWRq7cV+c+C30SFMWnSDh2g58h1AdgDdNmQO4sUvCwH+N
+		idQA8J4poe9CNPcAfd8byUAZab0bwA7Ctm7yVuwDKabLAiMTGZVtDupnduRq
+		VqTC0hZsm++tjsHwkX9J2yZD8CNasCwRiYq2nNuce5zz3lQZOKbOIOcA8VHI
+		nhN6mkfJm9gumgL583hypih5Ez3NtOPuFE/u38fCYPyShZHqP37JTtCIB4QQ
+		QgghhBBCCCGEEEIIoSuHLg1YUf9d+HvAulT5uPlvNDtVHiOZVE8MDNQDhKV9
+		AWbLibMXEQAA
+		</data>
+	</array>
+	<array>
+		<data>
+		DAAAAAAAAQwfiwgAAAAAAAAHjZRtb4IwEMdf66fo+l6q25KZpWJu4EQpD4uQ
+		xb1jQpD4AAE25rdfwcTNhHC+4uj9ev3fXa98+nPYk+8oL5L0OKEjZUhJdNyk
+		YXKMJ9T3XgdjOlX7/E53NG/tzki2T4qSuP6LWGiEDhiDLNtHjOmeTlyxWHlE
+		xmBsZlNCt2WZPTNWVZUS1JSySQ81WDA3T7MoL09CBhvIDUpYhlQec45+JUeu
+		hsmmVPs9votOasFZ/ZF/QZ4HtfHP6vEwKIPGsmPdgOUYAKpJ42EX1xXkghlL
+		CLog7QHMYQvEWbeGeaVvwfG7NUgoOUMdGiQUg/2IQskNkPYE9gKF8vaUr497
+		BweHAnBnt0BvKPQBDl6C8JZIPpgVWoIUhIVCXyDWKHQPFtpgLQILFV5Hwhuc
+		gyhQaAcCufiyTgUs8QYbINqyw6bDjg3rXLzOCZ2PwEyxCTVWYLaljGn4bG4B
+		tGj423mxpLN5iDhrnim1/wtRtlDPPQUAAA==
+		</data>
+	</array>
+	<array>
+		<data>
+		DAAAAAAAAgwfiwgAAAAAAAAHtZXJsqNGEEXX7q94fluiGxAChON1O5hBYpQA
+		ATtmMc9i+HqDPIftcHhhNlwgT1ZSdbPq48e5LN6eUdendfX1Hf4Cvb9FVVCH
+		aZV8fTcN7vPp/cdvnz6+Z1TacDT2rSnSfnjTTEoS6bf3zyBINk0RgSBjMG+a
+		JN6Mty0HCLLK+9v7YxiaH0BwmqYv3h71JajLPbAHta5uom5YpC3Z5w34Eg7h
+		+zbMz9n/VM72NkyD4dun7z7yaPnWf4D7bXvyus7bxR/Udx+hN3gvddVZ8udr
+		itMp+UWTQmYpoY/2EyfAY5zYmXZNffxY3DLvZu2cmJsdNGZMlTpPhHTMBK0G
+		RT6AAkoubM5YVbmOWhROeMeGWrfYhtAzL04fIiR6OrJgKu0D0dKyATscyA1o
+		iONjcj+6MXxaOqI05la5jTnUXOydi6TB9eL6Vt8JeNXpR+h393xEyitWw3yS
+		EPEQwJoVtWDd6ZitL57YLzsXdnOfXMUiGYIEFio/pSE/afjG4AkggHmwDxWz
+		P1yqurfCSKTWQrzXO2e77TMD2sLQYl0BUJp0r9xBCJgJ5MJyTaPsmBt1iwcs
+		cpQSfkm4853eOc3JRIbjQdxlXekOmgB+JB7+cTEKm0Z1utQHaoTxJz1KJlxq
+		ZT2uHrBzcp0B0A1brienzQUREm1ePFplidr58SRm3cjrkAMdJdklLg5Tqnjc
+		RTunnu/B8kiTqBZ7rY9kfDqikDq7nXDRvYLCGnOix5Q/YyslxKavXU6ou3Nz
+		Tlj3Rp+GzmCb/CQfi5TCTExtI0ENzJURSE5qUwbAV2WAXAIPyrnfuXzzBhkI
+		Rim3tGB6ci1XFmPOsk+GmX90jQCsuvjejuNMGcmCYBprITsHH25ysU3lIeX4
+		LFslIln9c4wGXd3eq8mZmPjhcDag9lylZTyNwZj7ms9QKN2JaAmszGYOY4di
+		ePTUZtCXi8FfbfwB/ovLyX9wuasoPiZPrOhrq0ckYxDzVL2sdXGVdg7K22ud
+		IremDggrPE6GRSpueai8GCXEK+BTl/PBwH1hxdd1LVIVJ9AXh/kLpdT31i8O
+		tKZElNcKS1100ZiD62PhEBw9UyCPLOoZB9cRC+8Pn3+t5lAYajOqgh2JJwfA
+		ipqZXQad+6GCYGJuFIYGQCDH8L7zgOzJlyfoxaWuS9Pw/VDLvGtlVj2iEOz0
+		cklG5iFE+yUCTUmFIEianQMfrmyHU8rOnR7bzyEydtXCR+8Y2Wweej1I8m1Y
+		krwO3NYN8iMToqsDnoTpoFfr5bJzSy/eQlXiACkh8i6vpZMO6haQs5lroIku
+		dYE1hivF0bTJPm6aGsvdeedGr2cm9kLTvABcNJJWS/GkZpEKnqphwQ5FJ9OO
+		MSoMXiksJmarURfhL+vgcBcKS5g1bApxsIsgOeUBYdf8fMZYW9SRJF2uhNaC
+		6vNq+L0lvrrfQofWbm7JeERFlA3qbbfWTQ1o220TuLcX4UmiDp08mxgnwhtC
+		PCRef3X/UZyxlRyZtXv4A+eXgA/HHrjVadfDM0KM1dMO95sW1Zpt9tfbnF4k
+		feeIQ5ZTCK5lD7toJgSmcG9MO6IrWWwkVJpDMTR9aoTeIDbCuxpFzc985zy1
+		z/67q7mEY8lyijdXf/1vJPVrB/yF/Nsg8n8L+r3Q39T28XWOfYCvU+7bp58A
+		RN08h3wHAAA=
+		</data>
+	</array>
+	<array>
+		<data>
+		DAAAAAAAAwwfiwgAAAAAAAAH3ZVbj6JIFMefpz+F6yvpLkBA2Ng9KbmpXCwU
+		FX0DuQgiIBdBP/2As5PsJJumsw/7sPVSpyq//zknJ//kTL43l3hw8/IiTJP3
+		IfGGDwdeckzdMAnehxtTemWH3z9eJn8IS97cI3GQxWFRDtBmqs75wfAVAJhl
+		sQeAYAoDpM7X5qDNAYCoDwfDU1lmfwJQ1/Wb3VFvx/TSgQVAeZp5eXlX22Sv
+		reDNLd1hW+Zn9t/aaX/d8Fh+vHybnL37RzEB3dW+7Dy3u+Bv0beJa5f2M1Jr
+		Ef48tR/WwV8xnEVb3XXoopZmROUHVoTMvXyhsMUmJc+dLl4vJIVT05qmLipX
+		X65w/yDJi+0TbHA/qFBajhbcbUO3Z5w3OPAlk+90XuDFayLxydqgy8Ai1qdD
+		fHOYkQWUxN4FYLFA1B00dHwD2uxKyLGe7TsduakYS6sLj8qbktmvAiSyCXE7
+		HG9iVBKpHk0xQNI2p9kOHd6kqsSXbKczGHmbC9egyS5rYR0+rPEhxGkb8jHa
+		O4ergGU7V4+vG4XWtXE1H5G8K3W6SK1itCKj02Pq11gSqrEDV96cNvZBypn1
+		zjNk9bhi2dpi82C50BS5EDqdTfALEUMmlxqFN9vFvoEYJTRGF3eVaJKncOMq
+		WuDKfMaIqsZ6lMlenvUM/265meDysSwQKWKycpXc5d2JwdeV/FB5f+Ya9NzJ
+		JWWKBaHqZrhSdbpR5MCQPBIkBcnDWLLUyAwUWmHG2iiwbgJnitnqLpFu3OzS
+		dF35p+LUdLo5nvOhoKBKQ8sSNIBdPc7CHG51WsA4OmA4kfBPkiLPNDcRjXOI
+		mjvX6ULRuVoNiLZoJDbVmeFmTDu3I9XIOSZkZBzYCKa1GJ49TD57S0ReVlSn
+		c52ld3Qw0vXjhKduNDndxjFzCH0UUPTYAq6WnMWxZpG4pk5bAz5dCn7ZdAI+
+		d7ECJcGony5+/135jxD8DBJxHf5/oS+N4L+eE6Eb/xrqswaCggPV4+fWaCEL
+		qvPPe0CQx+AS74XucCn2QUILGb2QAxe9mfgzVPp7SqDCfgXq7Ymvodqf6QGV
+		ohcafWFOfAT1fS/kQa2/nAW1/sYdqFFfMRnoNuuvz5Z7bt4JeO7lj5cf3FPW
+		8i4IAAA=
+		</data>
+	</array>
+	<array>
+		<data>
+		DAAAAAAAAgwfiwgAAAAAAAAHjZXZsptGEIav7adQdEv5sC9KHTuFEPsiVglx
+		xw4SmxD700fIcRK74oq5oWf4v+4G/pl5/2Mqi80Qt4+8rj5v4Tdou4mrsI7y
+		Kv28dWzuE7X948vH998OR8a+6OymKfJHt9GdvSIym+0nEKSbpohB8GAfNroi
+		WvbmmQMEWW272WZd1/wOguM4vvmr6i2sy1X4APW2buK2m5Vnsk9P4C3qou2z
+		zNfs37XznI3ysPvy8cP7LZ6/PN7B9fYc+W3rr8G/og/vkd/5r6ga6b+uMcnH
+		9NtAuJ40LSDUkTuM6IAphVAuixcc8xM7WCtnNXyuRIplQFQboJnm0HAZ+FED
+		DjCjXy+SyXG69qAWCvHjMFnGs1G1K0fjRu+58MCOScB1hnL2bJjqcGD2QH4R
+		cNEceJRI1FtCQXHr+A5SXL1XveWe2NZEXjVGbzKehg5Wcu4Kapf36DlFWKEC
+		/aKF5mYojxDvL6GbCysXZv5M1LTvOTVSqxOC1nftjEl2qUo9AiwnBZgh2JfC
+		kjchjgQPWl7kKwczaAcTPKGAaiHQYH9JT6Ekzrjd58tNEoyJYIOJz1w9UwBZ
+		POQmU3x9P6gzmAtphm7Hcu1MOAq1T8yjVULLncXTdnJjMp17JvFCTOPNPSbG
+		6us/tDeCpsXwGBlXYdAi64omRyxhnw2EQwf7+f4OkblTCTXqEzKuWKzVr5x3
+		2k2VoTg2zNwQ2Ban5CHHOv+Q8sHA7zY81Q4fsZyFz3pbGT1QOWmzckxbNhQp
+		MrCtnhx1lyl0fdkFQrCgbuoCWrYHY5qzYyMZKuQ4GJ2LHNFXn6bLZ0pqMgHt
+		drF+3537GzhAOKmcyfnMg4cWiupUmydvKIXdHicGAF+5Qr8fhTFQJxPzXInM
+		4BCmR4zvCFAZ+DKw5elGcR23uIvgD0Rr91Vvrtwcp0mWQRY1p+zTl59f7gW/
+		2fcd/B93pz91dxTgj5ET4D5J3aseXCQB86WnSW6vbi2Jk3dKPeJYqZD4y91d
+		d3SShUpnT6K5C+SWQLcsVxR1rx0AMDm3cjsDlzlSJroJZgO6v3exyXVBibqg
+		XPnnFJQkHZsBCa8GUBXusM9pzWXlEKcnzg+si7F26sj6nOps7sJXzx9u1w6u
+		teseABHc32l+AOQDBwxQ/Fg5g+Bh5dCnU1NamnW1W+4++U5HowJD2q5mDKRi
+		m1U5aY/qplTEQerZaeXIJkDIKd1l2o230wh9GGLJNhEx6zEjyzLLdrEH2EKP
+		zQkfjC694PNrVagtvS88+lKRl0rik6JIRo2Qe2PhTauiOFWOguHaXsIJ5KiI
+		F0qeppiVi0vWAAk18oSIOckHuGYtAcgM00pVtGZxMZtOfelg+3uepL6nyr1L
+		Bq/V1Ou632JcEOJyC031yIW3KCovY1Cky2mSx/gMzPXDglXGEsazCNyw1/dc
+		nPSSeRipdu6sA6pp0gF9ywoRRDteSO7nlqha0drdB7xQLIch8kUQV+4EDTsC
+		OYZ3HHSPHCAEj6BO6ubQ8sEACTf/LEtHThZHpl10pDQvcXCMX7tMsENOCVft
+		qYFDONtxG005LSygS+iCXAHS00X3iFUPfYR+xcXgTw1tpweeVqjV0D8k+V5k
+		0fIq+rHS9yLzV0Q6rYr/Ifqn57+j58PXAfQOvo6nLx//BHhx38c1BwAA
+		</data>
+	</array>
+	<array>
+		<data>
+		DAAAAAAAAwwfiwgAAAAAAAAHlZJNa4NAEIbP8Vds965jDqUfrIaJH0WiVqk5
+		9CgqqcSo6NKt/76rgZBC0PS07+488+7LMGzzc6rId9H1ZVMbdK3plBR11uRl
+		fTDoPnHVZ7oxFfZgv1vJZ+SQtip7TqL91vcsQlUAbNuqALATm0S+95EQ6QHg
+		hJTQL87bVwAhhJaOlJY1pxHsIeqatuj44EszVTZoOc+p/Obs/ieOfM3LjJvK
+		ih2LwewZjIe8pV2XjuJKrVie8nRSu9i1Y4ExojCmClxK15CjhzhCuAht74Fw
+		AXLtQCxCdzk56zC+BTGYn4t7sJ4w0HF2LhJ6xOA4n0FCL2enf2cQ1oBefyPD
+		Uucb2jvcNbOdFyWL0+IwmNbKVH4BwoIVou0CAAA=
+		</data>
+	</array>
+</array>
+</plist>";
         inventory_round_trip(inventory_data);
     }
 

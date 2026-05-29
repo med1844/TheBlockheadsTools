@@ -1,7 +1,10 @@
-use super::DynamicObject;
+use super::{DynamicObject, deserialize_some, serialize_some};
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
-use std::ops::{Deref, DerefMut};
+use std::{
+    collections::HashMap,
+    ops::{Deref, DerefMut},
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr)]
 #[repr(u16)]
@@ -18,7 +21,7 @@ pub enum AnimalType {
 }
 
 // In blockheads source code this is called NPC
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Animal {
     #[serde(flatten)]
@@ -35,26 +38,42 @@ pub struct Animal {
     pub mate_breed: u16,
     pub mate_cooldown_timer: f32,
     pub tame_cooldown_timer: f32,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_some",
+        serialize_with = "serialize_some",
+        skip_serializing_if = "Option::is_none",
+        rename = "tameCountsByClientID"
+    )]
+    pub tame_counts_by_client_id: Option<HashMap<String, i32>>, // may be negative if you hit too many times
+    #[serde(
+        default,
+        deserialize_with = "deserialize_some",
+        serialize_with = "serialize_some",
+        skip_serializing_if = "Option::is_none",
+        rename = "tamedClientID"
+    )]
+    pub tamed_client_id: Option<String>,
 }
 inherit!(Animal -> DynamicObject, obj);
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Dodo(Animal);
 inherit!(Dodo -> Animal);
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Donkey(Animal);
 inherit!(Donkey -> Animal);
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct ClownFish(Animal);
 inherit!(ClownFish -> Animal);
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Shark(Animal);
 inherit!(Shark -> Animal);
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Scorpion(Animal);
 inherit!(Scorpion -> Animal);
 
@@ -72,7 +91,7 @@ pub struct CaveTroll {
 }
 inherit!(CaveTroll -> Animal, animal);
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Yak {
     #[serde(flatten)]
@@ -82,7 +101,7 @@ pub struct Yak {
 }
 inherit!(Yak -> Animal, animal);
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DropBear {
     #[serde(flatten)]

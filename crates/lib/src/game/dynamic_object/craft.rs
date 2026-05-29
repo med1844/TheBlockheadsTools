@@ -240,11 +240,31 @@ pub struct TradingPost {
     obj: InteractionObject,
     pub coin_count: u32,
     pub price_tier: u32,
-    pub sell_slot: plist::Value,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sell_slot: plist::Value, // likely Slot(Vec<Item>), unknown for now
+    #[serde(
+        default,
+        deserialize_with = "deserialize_some",
+        serialize_with = "serialize_some",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub seller_client_name: Option<String>,
 }
 inherit!(TradingPost -> InteractionObject, obj);
+
+impl Default for TradingPost {
+    fn default() -> Self {
+        Self {
+            obj: InteractionObject {
+                interaction_object_type: InteractionObjectType::TradingPost,
+                ..Default::default()
+            },
+            coin_count: u32::default(),
+            price_tier: u32::default(),
+            sell_slot: plist::Value::Array(Vec::default()),
+            seller_client_name: Option::default(),
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -257,6 +277,20 @@ pub struct TradePortal {
 }
 inherit!(TradePortal -> InteractionObject, obj);
 
+impl Default for TradePortal {
+    fn default() -> Self {
+        Self {
+            obj: InteractionObject {
+                interaction_object_type: InteractionObjectType::TradePortal,
+                ..Default::default()
+            },
+            level: u32::default(),
+            local_price_offsets: plist::Dictionary::default(),
+            light_dict: ArtificialLight::default(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Painting {
@@ -268,9 +302,21 @@ pub struct Painting {
 }
 inherit!(Painting -> DynamicObject, obj);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr)]
+impl Default for Painting {
+    fn default() -> Self {
+        Self {
+            obj: DynamicObject::default(),
+            has_verified_image_data: bool::default(),
+            output_image_data: plist::Data::new(Vec::new()),
+            item_type: ItemType::SmallSquarePainting,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize_repr, Deserialize_repr)]
 #[repr(u8)]
 pub enum ColumnConfiguration {
+    #[default]
     Undefined = 0,
     NoPlinth = 1,
     PlinthBelow = 2,
@@ -289,9 +335,21 @@ pub struct Column {
 }
 inherit!(Column -> DynamicObject, obj);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr)]
+impl Default for Column {
+    fn default() -> Self {
+        Self {
+            obj: DynamicObject::default(),
+            item_type: ItemType::StoneColumn,
+            paint_color: PigmentColors::default(),
+            configuration: ColumnConfiguration::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize_repr, Deserialize_repr)]
 #[repr(u8)]
 pub enum StairsConfiguration {
+    #[default]
     Undefined = 0,
     HighRightSolid = 1,
     HighLeftSolid = 2,
@@ -310,6 +368,17 @@ pub struct Stairs {
 }
 inherit!(Stairs -> DynamicObject, obj);
 
+impl Default for Stairs {
+    fn default() -> Self {
+        Self {
+            obj: DynamicObject::default(),
+            item_type: ItemType::StoneStairs,
+            paint_color: PigmentColors::default(),
+            configuration: StairsConfiguration::default(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ElevatorMotor {
@@ -321,6 +390,18 @@ pub struct ElevatorMotor {
     pub max_y: u16,
 }
 inherit!(ElevatorMotor -> DynamicObject, obj);
+
+impl Default for ElevatorMotor {
+    fn default() -> Self {
+        Self {
+            obj: DynamicObject::default(),
+            item_type: ItemType::ElectricElevatorMotor,
+            available_electricity: u16::default(),
+            min_y: u16::default(),
+            max_y: u16::default(),
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -335,6 +416,18 @@ pub struct ElevatorShaft {
     pub paint_color: PigmentColors,
 }
 inherit!(ElevatorShaft -> DynamicObject, obj);
+
+impl Default for ElevatorShaft {
+    fn default() -> Self {
+        Self {
+            obj: DynamicObject::default(),
+            item_type: ItemType::ElevatorShaft,
+            last_known_motor_pos_x: u32::default(),
+            last_known_motor_pos_y: u16::default(),
+            paint_color: PigmentColors::default(),
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -361,6 +454,25 @@ pub struct OwnershipSign {
 }
 inherit!(OwnershipSign -> Sign, sign);
 
+impl Default for OwnershipSign {
+    fn default() -> Self {
+        Self {
+            sign: Sign {
+                obj: InteractionObject {
+                    interaction_object_type: InteractionObjectType::OwnershipSign,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            land_owner_id: Option::default(),
+            land_owner_name: Option::default(),
+            // by default, game uses 31x31 size
+            w: 31,
+            h: 31,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Mirror {
@@ -368,3 +480,14 @@ pub struct Mirror {
     obj: InteractionObject,
 }
 inherit!(Mirror -> InteractionObject, obj);
+
+impl Default for Mirror {
+    fn default() -> Self {
+        Self {
+            obj: InteractionObject {
+                interaction_object_type: InteractionObjectType::Mirror,
+                ..Default::default()
+            },
+        }
+    }
+}

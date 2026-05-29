@@ -793,6 +793,9 @@ impl ToGrid for Animal {
         self.mate_breed.add_row("mateBreed", ui);
         self.mate_cooldown_timer.add_row("mateCooldownTimer", ui);
         self.tame_cooldown_timer.add_row("tameCooldownTimer", ui);
+        let tame_counts_str = format!("{:#?}", self.tame_counts_by_client_id);
+        tame_counts_str.as_str().add_row("tameCountsByClientID", ui);
+        self.tamed_client_id.add_row("tamedClientID", ui);
     }
 }
 
@@ -2771,6 +2774,13 @@ impl ToGrid for AnyDynamicObject {
 
                     selectable_variant(
                         ui,
+                        "Dodo",
+                        matches!(self, AnyDynamicObject::Dodo(_)),
+                        || AnyDynamicObject::Dodo(Box::default()),
+                        self,
+                    );
+                    selectable_variant(
+                        ui,
                         "Ladder",
                         matches!(self, AnyDynamicObject::Ladder(_)),
                         || AnyDynamicObject::Ladder(Box::default()),
@@ -2792,9 +2802,37 @@ impl ToGrid for AnyDynamicObject {
                     );
                     selectable_variant(
                         ui,
+                        "DropBear",
+                        matches!(self, AnyDynamicObject::DropBear(_)),
+                        || AnyDynamicObject::DropBear(Box::default()),
+                        self,
+                    );
+                    selectable_variant(
+                        ui,
+                        "Donkey",
+                        matches!(self, AnyDynamicObject::Donkey(_)),
+                        || AnyDynamicObject::Donkey(Box::default()),
+                        self,
+                    );
+                    selectable_variant(
+                        ui,
                         "Egg",
                         matches!(self, AnyDynamicObject::Egg(_)),
                         || AnyDynamicObject::Egg(Box::default()),
+                        self,
+                    );
+                    selectable_variant(
+                        ui,
+                        "ClownFish",
+                        matches!(self, AnyDynamicObject::ClownFish(_)),
+                        || AnyDynamicObject::ClownFish(Box::default()),
+                        self,
+                    );
+                    selectable_variant(
+                        ui,
+                        "Shark",
+                        matches!(self, AnyDynamicObject::Shark(_)),
+                        || AnyDynamicObject::Shark(Box::default()),
                         self,
                     );
                     selectable_variant(
@@ -2848,9 +2886,86 @@ impl ToGrid for AnyDynamicObject {
                     );
                     selectable_variant(
                         ui,
+                        "TradingPost",
+                        matches!(self, AnyDynamicObject::TradingPost(_)),
+                        || AnyDynamicObject::TradingPost(Box::default()),
+                        self,
+                    );
+                    selectable_variant(
+                        ui,
                         "TrainStation",
                         matches!(self, AnyDynamicObject::TrainStation(_)),
                         || AnyDynamicObject::TrainStation(Box::default()),
+                        self,
+                    );
+                    selectable_variant(
+                        ui,
+                        "TradePortal",
+                        matches!(self, AnyDynamicObject::TradePortal(_)),
+                        || AnyDynamicObject::TradePortal(Box::default()),
+                        self,
+                    );
+                    selectable_variant(
+                        ui,
+                        "Scorpion",
+                        matches!(self, AnyDynamicObject::Scorpion(_)),
+                        || AnyDynamicObject::Scorpion(Box::default()),
+                        self,
+                    );
+                    selectable_variant(
+                        ui,
+                        "Painting",
+                        matches!(self, AnyDynamicObject::Painting(_)),
+                        || AnyDynamicObject::Painting(Box::default()),
+                        self,
+                    );
+                    selectable_variant(
+                        ui,
+                        "Column",
+                        matches!(self, AnyDynamicObject::Column(_)),
+                        || AnyDynamicObject::Column(Box::default()),
+                        self,
+                    );
+                    selectable_variant(
+                        ui,
+                        "Stairs",
+                        matches!(self, AnyDynamicObject::Stairs(_)),
+                        || AnyDynamicObject::Stairs(Box::default()),
+                        self,
+                    );
+                    selectable_variant(
+                        ui,
+                        "ElevatorMotor",
+                        matches!(self, AnyDynamicObject::ElevatorMotor(_)),
+                        || AnyDynamicObject::ElevatorMotor(Box::default()),
+                        self,
+                    );
+                    selectable_variant(
+                        ui,
+                        "ElevatorShaft",
+                        matches!(self, AnyDynamicObject::ElevatorShaft(_)),
+                        || AnyDynamicObject::ElevatorShaft(Box::default()),
+                        self,
+                    );
+                    selectable_variant(
+                        ui,
+                        "OwnershipSign",
+                        matches!(self, AnyDynamicObject::OwnershipSign(_)),
+                        || AnyDynamicObject::OwnershipSign(Box::default()),
+                        self,
+                    );
+                    selectable_variant(
+                        ui,
+                        "Yak",
+                        matches!(self, AnyDynamicObject::Yak(_)),
+                        || AnyDynamicObject::Yak(Box::default()),
+                        self,
+                    );
+                    selectable_variant(
+                        ui,
+                        "Mirror",
+                        matches!(self, AnyDynamicObject::Mirror(_)),
+                        || AnyDynamicObject::Mirror(Box::default()),
                         self,
                     );
 
@@ -2858,6 +2973,9 @@ impl ToGrid for AnyDynamicObject {
                 });
 
             ui.horizontal(|ui| match self {
+                AnyDynamicObject::Dodo(dodo) => {
+                    dodo.add_grid("dodo_grid", ui, context);
+                }
                 AnyDynamicObject::Ladder(ladder) => {
                     ladder.add_grid("ladder_grid", ui, context);
                 }
@@ -2867,8 +2985,20 @@ impl ToGrid for AnyDynamicObject {
                 AnyDynamicObject::Bed(bed) => {
                     bed.add_grid("bed_grid", ui, context);
                 }
+                AnyDynamicObject::DropBear(dropbear) => {
+                    dropbear.add_grid("dropbear_grid", ui, context);
+                }
+                AnyDynamicObject::Donkey(donkey) => {
+                    donkey.add_grid("donkey_grid", ui, context);
+                }
                 AnyDynamicObject::Egg(egg) => {
                     egg.add_grid("egg_grid", ui, context);
+                }
+                AnyDynamicObject::ClownFish(clown_fish) => {
+                    clown_fish.add_grid("clown_fish_grid", ui, context);
+                }
+                AnyDynamicObject::Shark(shark) => {
+                    shark.add_grid("shark_grid", ui, context);
                 }
                 AnyDynamicObject::HandCar(hand_car) => {
                     hand_car.add_grid("hand_car_grid", ui, context);
@@ -2891,8 +3021,41 @@ impl ToGrid for AnyDynamicObject {
                 AnyDynamicObject::Sign(sign) => {
                     sign.add_grid("sign_grid", ui, context);
                 }
+                AnyDynamicObject::TradingPost(trading_post) => {
+                    trading_post.add_grid("trading_post_grid", ui, context);
+                }
                 AnyDynamicObject::TrainStation(train_station) => {
                     train_station.add_grid("train_station_grid", ui, context);
+                }
+                AnyDynamicObject::TradePortal(trade_portal) => {
+                    trade_portal.add_grid("trade_portal_grid", ui, context);
+                }
+                AnyDynamicObject::Scorpion(scorpion) => {
+                    scorpion.add_grid("scorpion_grid", ui, context);
+                }
+                AnyDynamicObject::Painting(painting) => {
+                    painting.add_grid("painting_grid", ui, context);
+                }
+                AnyDynamicObject::Column(column) => {
+                    column.add_grid("column_grid", ui, context);
+                }
+                AnyDynamicObject::Stairs(stairs) => {
+                    stairs.add_grid("stairs_grid", ui, context);
+                }
+                AnyDynamicObject::ElevatorMotor(elevator_motor) => {
+                    elevator_motor.add_grid("elevator_motor_grid", ui, context);
+                }
+                AnyDynamicObject::ElevatorShaft(elevator_shaft) => {
+                    elevator_shaft.add_grid("elevator_shaft_grid", ui, context);
+                }
+                AnyDynamicObject::OwnershipSign(ownership_sign) => {
+                    ownership_sign.add_grid("ownership_sign_grid", ui, context);
+                }
+                AnyDynamicObject::Yak(yak) => {
+                    yak.add_grid("yak_grid", ui, context);
+                }
+                AnyDynamicObject::Mirror(mirror) => {
+                    mirror.add_grid("mirror_grid", ui, context);
                 }
             });
         });

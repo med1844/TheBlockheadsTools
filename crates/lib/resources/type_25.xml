@@ -1,62 +1,469 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+    "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
     <key>dynamicObjects</key>
     <array>
-	<dict>
-	    <key>age</key>
-	    <real>993.7469</real>
-	    <key>breed</key>
-	    <integer>0</integer>
-	    <key>courageMeter</key>
-	    <real>1.039999</real>
-	    <key>damage</key>
-	    <integer>0</integer>
-	    <key>dropPos.x</key>
-	    <false/>
-	    <key>dropPos.y</key>
-	    <false/>
-	    <key>dropSpeed</key>
-	    <real>0</real>
-	    <key>dropping</key>
-	    <false/>
-	    <key>floatPos</key>
-	    <array>
-		<real>3962.5</real>
-		<real>576</real>
-	    </array>
-	    <key>fullness</key>
-	    <real>1489.959</real>
-	    <key>goalTreeDirection</key>
-	    <false/>
-	    <key>hasBeenFedByBlockheadOrChest</key>
-	    <false/>
-	    <key>hasBred</key>
-	    <false/>
-	    <key>layCooldownTimer</key>
-	    <real>453.7344</real>
-	    <key>layTimer</key>
-	    <real>0</real>
-	    <key>mateBreed</key>
-	    <integer>0</integer>
-	    <key>mateCooldownTimer</key>
-	    <real>-2</real>
-	    <key>onGround</key>
-	    <false/>
-	    <key>pos_x</key>
-	    <integer>3962</integer>
-	    <key>pos_y</key>
-	    <integer>576</integer>
-	    <key>provokeMeter</key>
-	    <real>-0.03333334</real>
-	    <key>saveTime</key>
-	    <real>5007</real>
-	    <key>tameCooldownTimer</key>
-	    <real>0</real>
-	    <key>uniqueID</key>
-	    <integer>119156</integer>
-	</dict>
+    	<dict>
+    	    <key>age</key>
+    	    <real>993.7469</real>
+    	    <key>breed</key>
+    	    <integer>0</integer>
+    	    <key>courageMeter</key>
+    	    <real>1.039999</real>
+    	    <key>damage</key>
+    	    <integer>0</integer>
+    	    <key>dropPos.x</key>
+    	    <false />
+    	    <key>dropPos.y</key>
+    	    <false />
+    	    <key>dropSpeed</key>
+    	    <real>0</real>
+    	    <key>dropping</key>
+    	    <false />
+    	    <key>floatPos</key>
+    	    <array>
+    		<real>3962.5</real>
+    		<real>576</real>
+    	    </array>
+    	    <key>fullness</key>
+    	    <real>1489.959</real>
+    	    <key>goalTreeDirection</key>
+    	    <false />
+    	    <key>hasBeenFedByBlockheadOrChest</key>
+    	    <false />
+    	    <key>hasBred</key>
+    	    <false />
+    	    <key>layCooldownTimer</key>
+    	    <real>453.7344</real>
+    	    <key>layTimer</key>
+    	    <real>0</real>
+    	    <key>mateBreed</key>
+    	    <integer>0</integer>
+    	    <key>mateCooldownTimer</key>
+    	    <real>-2</real>
+    	    <key>onGround</key>
+    	    <false />
+    	    <key>pos_x</key>
+    	    <integer>3962</integer>
+    	    <key>pos_y</key>
+    	    <integer>576</integer>
+    	    <key>provokeMeter</key>
+    	    <real>-0.03333334</real>
+    	    <key>saveTime</key>
+    	    <real>5007</real>
+    	    <key>tameCooldownTimer</key>
+    	    <real>0</real>
+    	    <key>uniqueID</key>
+    	    <integer>119156</integer>
+    	</dict>
+		<dict>
+			<key>age</key>
+			<real>7006.70556640625</real>
+			<key>breed</key>
+			<integer>0</integer>
+			<key>courageMeter</key>
+			<real>141.15837097167969</real>
+			<key>damage</key>
+			<integer>0</integer>
+			<key>dropPos.x</key>
+			<false />
+			<key>dropPos.y</key>
+			<false />
+			<key>dropSpeed</key>
+			<real>0.0</real>
+			<key>dropping</key>
+			<false />
+			<key>floatPos</key>
+			<array>
+				<real>11188.5</real>
+				<real>597</real>
+			</array>
+			<key>fullness</key>
+			<real>5450.23681640625</real>
+			<key>goalTreeDirection</key>
+			<false />
+			<key>hasBeenFedByBlockheadOrChest</key>
+			<true />
+			<key>hasBred</key>
+			<false />
+			<key>layCooldownTimer</key>
+			<real>-5301.9169921875</real>
+			<key>layTimer</key>
+			<real>0.0</real>
+			<key>mateBreed</key>
+			<integer>0</integer>
+			<key>mateCooldownTimer</key>
+			<real>-6946.705078125</real>
+			<key>onGround</key>
+			<false />
+			<key>pos_x</key>
+			<integer>11188</integer>
+			<key>pos_y</key>
+			<integer>597</integer>
+			<key>provokeMeter</key>
+			<real>-116.82199859619141</real>
+			<key>saveTime</key>
+			<real>32845.07421875</real>
+			<key>tameCooldownTimer</key>
+			<real>0.0</real>
+			<key>tameCountsByClientID</key>
+			<dict>
+				<key>server</key>
+				<integer>3</integer>
+			</dict>
+			<key>uniqueID</key>
+			<integer>147727</integer>
+		</dict>
+		<dict>
+			<key>age</key>
+			<real>5206.99072265625</real>
+			<key>breed</key>
+			<integer>0</integer>
+			<key>courageMeter</key>
+			<real>105.13642120361328</real>
+			<key>damage</key>
+			<integer>0</integer>
+			<key>dropPos.x</key>
+			<false />
+			<key>dropPos.y</key>
+			<false />
+			<key>dropSpeed</key>
+			<real>0.0</real>
+			<key>dropping</key>
+			<false />
+			<key>floatPos</key>
+			<array>
+				<real>11188.5</real>
+				<real>603</real>
+			</array>
+			<key>fullness</key>
+			<real>5766.38134765625</real>
+			<key>goalTreeDirection</key>
+			<false />
+			<key>hasBeenFedByBlockheadOrChest</key>
+			<true />
+			<key>hasBred</key>
+			<false />
+			<key>layCooldownTimer</key>
+			<real>-4045.314453125</real>
+			<key>layTimer</key>
+			<real>0.0</real>
+			<key>mateBreed</key>
+			<integer>0</integer>
+			<key>mateCooldownTimer</key>
+			<real>-5146.98974609375</real>
+			<key>onGround</key>
+			<false />
+			<key>pos_x</key>
+			<integer>11188</integer>
+			<key>pos_y</key>
+			<integer>603</integer>
+			<key>provokeMeter</key>
+			<real>-86.806251525878906</real>
+			<key>saveTime</key>
+			<real>32845.07421875</real>
+			<key>tameCooldownTimer</key>
+			<real>0.0</real>
+			<key>tameCountsByClientID</key>
+			<dict>
+				<key>server</key>
+				<integer>2</integer>
+			</dict>
+			<key>uniqueID</key>
+			<integer>148509</integer>
+		</dict>
+		<dict>
+			<key>age</key>
+			<real>5198.32177734375</real>
+			<key>breed</key>
+			<integer>0</integer>
+			<key>courageMeter</key>
+			<real>7.7960166931152344</real>
+			<key>damage</key>
+			<integer>0</integer>
+			<key>dropPos.x</key>
+			<true />
+			<key>dropPos.y</key>
+			<true />
+			<key>dropSpeed</key>
+			<real>12.000200271606445</real>
+			<key>dropping</key>
+			<false />
+			<key>floatPos</key>
+			<array>
+				<real>11174.5</real>
+				<real>606</real>
+			</array>
+			<key>fullness</key>
+			<real>5751.42431640625</real>
+			<key>goalTreeDirection</key>
+			<false />
+			<key>hasBeenFedByBlockheadOrChest</key>
+			<true />
+			<key>hasBred</key>
+			<false />
+			<key>layCooldownTimer</key>
+			<real>-3655.654541015625</real>
+			<key>layTimer</key>
+			<real>0.0</real>
+			<key>mateBreed</key>
+			<integer>0</integer>
+			<key>mateCooldownTimer</key>
+			<real>-5138.32177734375</real>
+			<key>onGround</key>
+			<false />
+			<key>pos_x</key>
+			<integer>11174</integer>
+			<key>pos_y</key>
+			<integer>606</integer>
+			<key>provokeMeter</key>
+			<real>-86.661582946777344</real>
+			<key>saveTime</key>
+			<real>32845.07421875</real>
+			<key>tameCooldownTimer</key>
+			<real>0.0</real>
+			<key>tameCountsByClientID</key>
+			<dict>
+				<key>server</key>
+				<integer>2</integer>
+			</dict>
+			<key>uniqueID</key>
+			<integer>148510</integer>
+		</dict>
+		<dict>
+			<key>age</key>
+			<real>5194.32421875</real>
+			<key>breed</key>
+			<integer>0</integer>
+			<key>courageMeter</key>
+			<real>104.88307952880859</real>
+			<key>damage</key>
+			<integer>0</integer>
+			<key>dropPos.x</key>
+			<false />
+			<key>dropPos.y</key>
+			<false />
+			<key>dropSpeed</key>
+			<real>0.0</real>
+			<key>dropping</key>
+			<false />
+			<key>floatPos</key>
+			<array>
+				<real>11170.5</real>
+				<real>599</real>
+			</array>
+			<key>fullness</key>
+			<real>8059.93115234375</real>
+			<key>goalTreeDirection</key>
+			<false />
+			<key>hasBeenFedByBlockheadOrChest</key>
+			<true />
+			<key>hasBred</key>
+			<false />
+			<key>layCooldownTimer</key>
+			<real>-3875.249267578125</real>
+			<key>layTimer</key>
+			<real>0.0</real>
+			<key>mateBreed</key>
+			<integer>0</integer>
+			<key>mateCooldownTimer</key>
+			<real>-5134.32275390625</real>
+			<key>onGround</key>
+			<false />
+			<key>pos_x</key>
+			<integer>11170</integer>
+			<key>pos_y</key>
+			<integer>599</integer>
+			<key>provokeMeter</key>
+			<real>-86.594841003417969</real>
+			<key>saveTime</key>
+			<real>32845.07421875</real>
+			<key>tameCooldownTimer</key>
+			<real>665.50018310546875</real>
+			<key>tameCountsByClientID</key>
+			<dict>
+				<key>server</key>
+				<integer>3</integer>
+			</dict>
+			<key>uniqueID</key>
+			<integer>148511</integer>
+		</dict>
+		<dict>
+			<key>age</key>
+			<real>3394.501953125</real>
+			<key>breed</key>
+			<integer>0</integer>
+			<key>courageMeter</key>
+			<real>68.892143249511719</real>
+			<key>damage</key>
+			<integer>0</integer>
+			<key>dropPos.x</key>
+			<false />
+			<key>dropPos.y</key>
+			<false />
+			<key>dropSpeed</key>
+			<real>0.0</real>
+			<key>dropping</key>
+			<false />
+			<key>floatPos</key>
+			<array>
+				<real>11170.5</real>
+				<real>603</real>
+			</array>
+			<key>fullness</key>
+			<real>7373.4384765625</real>
+			<key>goalTreeDirection</key>
+			<false />
+			<key>hasBeenFedByBlockheadOrChest</key>
+			<true />
+			<key>hasBred</key>
+			<false />
+			<key>layCooldownTimer</key>
+			<real>-1688.4964599609375</real>
+			<key>layTimer</key>
+			<real>0.0</real>
+			<key>mateBreed</key>
+			<integer>0</integer>
+			<key>mateCooldownTimer</key>
+			<real>-3334.502685546875</real>
+			<key>onGround</key>
+			<false />
+			<key>pos_x</key>
+			<integer>11170</integer>
+			<key>pos_y</key>
+			<integer>603</integer>
+			<key>provokeMeter</key>
+			<real>-56.578044891357422</real>
+			<key>saveTime</key>
+			<real>32845.07421875</real>
+			<key>tameCooldownTimer</key>
+			<real>265.43521118164062</real>
+			<key>tameCountsByClientID</key>
+			<dict>
+				<key>server</key>
+				<integer>2</integer>
+			</dict>
+			<key>uniqueID</key>
+			<integer>149117</integer>
+		</dict>
+		<dict>
+			<key>age</key>
+			<real>1596.3616943359375</real>
+			<key>breed</key>
+			<integer>0</integer>
+			<key>courageMeter</key>
+			<real>8.0386791229248047</real>
+			<key>damage</key>
+			<integer>0</integer>
+			<key>dropPos.x</key>
+			<true />
+			<key>dropPos.y</key>
+			<true />
+			<key>dropSpeed</key>
+			<real>12.666200637817383</real>
+			<key>dropping</key>
+			<false />
+			<key>floatPos</key>
+			<array>
+				<real>11172.5</real>
+				<real>607</real>
+			</array>
+			<key>fullness</key>
+			<real>7961.40869140625</real>
+			<key>goalTreeDirection</key>
+			<false />
+			<key>hasBeenFedByBlockheadOrChest</key>
+			<true />
+			<key>hasBred</key>
+			<false />
+			<key>layCooldownTimer</key>
+			<real>-312.02059936523438</real>
+			<key>layTimer</key>
+			<real>0.0</real>
+			<key>mateBreed</key>
+			<integer>0</integer>
+			<key>mateCooldownTimer</key>
+			<real>-1536.3612060546875</real>
+			<key>onGround</key>
+			<false />
+			<key>pos_x</key>
+			<integer>11172</integer>
+			<key>pos_y</key>
+			<integer>607</integer>
+			<key>provokeMeter</key>
+			<real>-26.605850219726562</real>
+			<key>saveTime</key>
+			<real>32845.07421875</real>
+			<key>tameCooldownTimer</key>
+			<real>663.96697998046875</real>
+			<key>tameCountsByClientID</key>
+			<dict>
+				<key>server</key>
+				<integer>2</integer>
+			</dict>
+			<key>uniqueID</key>
+			<integer>149525</integer>
+		</dict>
+		<dict>
+			<key>age</key>
+			<real>7005.373046875</real>
+			<key>breed</key>
+			<integer>0</integer>
+			<key>courageMeter</key>
+			<real>29.703449249267578</real>
+			<key>damage</key>
+			<integer>0</integer>
+			<key>dropPos.x</key>
+			<true />
+			<key>dropPos.y</key>
+			<true />
+			<key>dropSpeed</key>
+			<real>11.999659538269043</real>
+			<key>dropping</key>
+			<false />
+			<key>floatPos</key>
+			<array>
+				<real>11186.5</real>
+				<real>607.7672119140625</real>
+			</array>
+			<key>fullness</key>
+			<real>6616.2880859375</real>
+			<key>goalTreeDirection</key>
+			<false />
+			<key>hasBeenFedByBlockheadOrChest</key>
+			<true />
+			<key>hasBred</key>
+			<false />
+			<key>layCooldownTimer</key>
+			<real>-5726.177734375</real>
+			<key>layTimer</key>
+			<real>0.0</real>
+			<key>mateBreed</key>
+			<integer>0</integer>
+			<key>mateCooldownTimer</key>
+			<real>-6945.3720703125</real>
+			<key>onGround</key>
+			<false />
+			<key>pos_x</key>
+			<integer>11186</integer>
+			<key>pos_y</key>
+			<integer>607</integer>
+			<key>provokeMeter</key>
+			<real>-24.76470947265625</real>
+			<key>saveTime</key>
+			<real>32845.07421875</real>
+			<key>tameCooldownTimer</key>
+			<real>0.0</real>
+			<key>tameCountsByClientID</key>
+			<dict>
+				<key>server</key>
+				<integer>-3</integer>
+			</dict>
+			<key>uniqueID</key>
+			<integer>147728</integer>
+		</dict>
     </array>
 </dict>
 </plist>

@@ -461,10 +461,15 @@ pub mod workbench;
 
 #[derive(Debug, Clone, PartialEq, IntoStaticStr)]
 pub enum AnyDynamicObject {
+    Dodo(Box<animal::Dodo>),                      // ID = 13
     Ladder(Box<craft::Ladder>),                   // ID = 19
     Door(Box<craft::Door>),                       // ID = 20
     Bed(Box<craft::Bed>),                         // ID = 23
+    DropBear(Box<animal::DropBear>),              // ID = 25
+    Donkey(Box<animal::Donkey>),                  // ID = 28
     Egg(Box<animal::Egg>),                        // ID = 30
+    ClownFish(Box<animal::ClownFish>),            // ID = 35
+    Shark(Box<animal::Shark>),                    // ID = 36
     HandCar(Box<train::HandCar>),                 // ID = 41
     SteamLocomotive(Box<train::SteamLocomotive>), // ID = 42
     FreightCar(Box<train::FreightCar>),           // ID = 43
@@ -472,7 +477,18 @@ pub enum AnyDynamicObject {
     Workbench(Box<workbench::Workbench>),         // ID = 45
     Chest(Box<chest::Chest>),                     // ID = 46
     Sign(Box<craft::Sign>),                       // ID = 47
+    TradingPost(Box<craft::TradingPost>),         // ID = 48
     TrainStation(Box<train::TrainStation>),       // ID = 49
+    TradePortal(Box<craft::TradePortal>),         // ID = 50
+    Scorpion(Box<animal::Scorpion>),              // ID = 51
+    Painting(Box<craft::Painting>),               // ID = 52
+    Column(Box<craft::Column>),                   // ID = 53
+    Stairs(Box<craft::Stairs>),                   // ID = 54
+    ElevatorMotor(Box<craft::ElevatorMotor>),     // ID = 55
+    ElevatorShaft(Box<craft::ElevatorShaft>),     // ID = 56
+    OwnershipSign(Box<craft::OwnershipSign>),     // ID = 60
+    Yak(Box<animal::Yak>),                        // ID = 63
+    Mirror(Box<craft::Mirror>),                   // ID = 64
 }
 
 impl Default for AnyDynamicObject {
@@ -484,10 +500,15 @@ impl Default for AnyDynamicObject {
 impl AnyDynamicObject {
     pub fn set_float_pos(&mut self, pos: [f32; 2]) {
         match self {
+            AnyDynamicObject::Dodo(dodo) => dodo.set_float_pos(pos),
             AnyDynamicObject::Ladder(ladder) => ladder.set_float_pos(pos),
             AnyDynamicObject::Door(door) => door.set_float_pos(pos),
             AnyDynamicObject::Bed(bed) => bed.set_float_pos(pos),
+            AnyDynamicObject::DropBear(dropbear) => dropbear.set_float_pos(pos),
+            AnyDynamicObject::Donkey(donkey) => donkey.set_float_pos(pos),
             AnyDynamicObject::Egg(egg) => egg.set_float_pos(pos),
+            AnyDynamicObject::ClownFish(clown_fish) => clown_fish.set_float_pos(pos),
+            AnyDynamicObject::Shark(shark) => shark.set_float_pos(pos),
             AnyDynamicObject::HandCar(hand_car) => hand_car.set_float_pos(pos),
             AnyDynamicObject::SteamLocomotive(locomotive) => locomotive.set_float_pos(pos),
             AnyDynamicObject::FreightCar(freight_car) => freight_car.set_float_pos(pos),
@@ -495,16 +516,32 @@ impl AnyDynamicObject {
             AnyDynamicObject::Workbench(workbench) => workbench.set_float_pos(pos),
             AnyDynamicObject::Chest(chest) => chest.set_float_pos(pos),
             AnyDynamicObject::Sign(sign) => sign.set_float_pos(pos),
+            AnyDynamicObject::TradingPost(trading_post) => trading_post.set_float_pos(pos),
             AnyDynamicObject::TrainStation(train_station) => train_station.set_float_pos(pos),
+            AnyDynamicObject::TradePortal(trade_portal) => trade_portal.set_float_pos(pos),
+            AnyDynamicObject::Scorpion(scorpion) => scorpion.set_float_pos(pos),
+            AnyDynamicObject::Painting(painting) => painting.set_float_pos(pos),
+            AnyDynamicObject::Column(column) => column.set_float_pos(pos),
+            AnyDynamicObject::Stairs(stairs) => stairs.set_float_pos(pos),
+            AnyDynamicObject::ElevatorMotor(elevator_motor) => elevator_motor.set_float_pos(pos),
+            AnyDynamicObject::ElevatorShaft(elevator_shaft) => elevator_shaft.set_float_pos(pos),
+            AnyDynamicObject::OwnershipSign(ownership_sign) => ownership_sign.set_float_pos(pos),
+            AnyDynamicObject::Yak(yak) => yak.set_float_pos(pos),
+            AnyDynamicObject::Mirror(mirror) => mirror.set_float_pos(pos),
         }
     }
 
     pub fn set_pos(&mut self, pos: (u32, u16)) {
         match self {
+            AnyDynamicObject::Dodo(dodo) => dodo.set_pos(pos),
             AnyDynamicObject::Ladder(ladder) => ladder.set_pos(pos),
             AnyDynamicObject::Door(door) => door.set_pos(pos),
             AnyDynamicObject::Bed(bed) => bed.set_pos(pos),
+            AnyDynamicObject::DropBear(dropbear) => dropbear.set_pos(pos),
+            AnyDynamicObject::Donkey(donkey) => donkey.set_pos(pos),
             AnyDynamicObject::Egg(egg) => egg.set_pos(pos),
+            AnyDynamicObject::ClownFish(clown_fish) => clown_fish.set_pos(pos),
+            AnyDynamicObject::Shark(shark) => shark.set_pos(pos),
             AnyDynamicObject::HandCar(hand_car) => hand_car.set_pos(pos),
             AnyDynamicObject::SteamLocomotive(locomotive) => locomotive.set_pos(pos),
             AnyDynamicObject::FreightCar(freight_car) => freight_car.set_pos(pos),
@@ -512,16 +549,32 @@ impl AnyDynamicObject {
             AnyDynamicObject::Workbench(workbench) => workbench.set_pos(pos),
             AnyDynamicObject::Chest(chest) => chest.set_pos(pos),
             AnyDynamicObject::Sign(sign) => sign.set_pos(pos),
+            AnyDynamicObject::TradingPost(trading_post) => trading_post.set_pos(pos),
             AnyDynamicObject::TrainStation(train_station) => train_station.set_pos(pos),
+            AnyDynamicObject::TradePortal(trade_portal) => trade_portal.set_pos(pos),
+            AnyDynamicObject::Scorpion(scorpion) => scorpion.set_pos(pos),
+            AnyDynamicObject::Painting(painting) => painting.set_pos(pos),
+            AnyDynamicObject::Column(column) => column.set_pos(pos),
+            AnyDynamicObject::Stairs(stairs) => stairs.set_pos(pos),
+            AnyDynamicObject::ElevatorMotor(elevator_motor) => elevator_motor.set_pos(pos),
+            AnyDynamicObject::ElevatorShaft(elevator_shaft) => elevator_shaft.set_pos(pos),
+            AnyDynamicObject::OwnershipSign(ownership_sign) => ownership_sign.set_pos(pos),
+            AnyDynamicObject::Yak(yak) => yak.set_pos(pos),
+            AnyDynamicObject::Mirror(mirror) => mirror.set_pos(pos),
         }
     }
 
     pub fn set_unique_id(&mut self, unique_id: UniqueID) {
         match self {
+            AnyDynamicObject::Dodo(dodo) => dodo.unique_id = unique_id,
             AnyDynamicObject::Ladder(ladder) => ladder.unique_id = unique_id,
             AnyDynamicObject::Door(door) => door.unique_id = unique_id,
             AnyDynamicObject::Bed(bed) => bed.unique_id = unique_id,
+            AnyDynamicObject::DropBear(dropbear) => dropbear.unique_id = unique_id,
+            AnyDynamicObject::Donkey(donkey) => donkey.unique_id = unique_id,
             AnyDynamicObject::Egg(egg) => egg.unique_id = unique_id,
+            AnyDynamicObject::ClownFish(clown_fish) => clown_fish.unique_id = unique_id,
+            AnyDynamicObject::Shark(shark) => shark.unique_id = unique_id,
             AnyDynamicObject::HandCar(hand_car) => hand_car.unique_id = unique_id,
             AnyDynamicObject::SteamLocomotive(locomotive) => locomotive.unique_id = unique_id,
             AnyDynamicObject::FreightCar(freight_car) => freight_car.unique_id = unique_id,
@@ -529,26 +582,140 @@ impl AnyDynamicObject {
             AnyDynamicObject::Workbench(workbench) => workbench.unique_id = unique_id,
             AnyDynamicObject::Chest(chest) => chest.unique_id = unique_id,
             AnyDynamicObject::Sign(sign) => sign.unique_id = unique_id,
+            AnyDynamicObject::TradingPost(trading_post) => trading_post.unique_id = unique_id,
             AnyDynamicObject::TrainStation(train_station) => train_station.unique_id = unique_id,
+            AnyDynamicObject::TradePortal(trade_portal) => trade_portal.unique_id = unique_id,
+            AnyDynamicObject::Scorpion(scorpion) => scorpion.unique_id = unique_id,
+            AnyDynamicObject::Painting(painting) => painting.unique_id = unique_id,
+            AnyDynamicObject::Column(column) => column.unique_id = unique_id,
+            AnyDynamicObject::Stairs(stairs) => stairs.unique_id = unique_id,
+            AnyDynamicObject::ElevatorMotor(elevator_motor) => elevator_motor.unique_id = unique_id,
+            AnyDynamicObject::ElevatorShaft(elevator_shaft) => elevator_shaft.unique_id = unique_id,
+            AnyDynamicObject::OwnershipSign(ownership_sign) => ownership_sign.unique_id = unique_id,
+            AnyDynamicObject::Yak(yak) => yak.unique_id = unique_id,
+            AnyDynamicObject::Mirror(mirror) => mirror.unique_id = unique_id,
         }
     }
 
     pub fn try_from_save_dict(item_type: ItemType, value: plist::Value) -> Result<Self> {
         match item_type {
-            ItemType::Chest
-            | ItemType::Safe
-            | ItemType::Shelf
-            | ItemType::GoldenChest
-            | ItemType::PortalChest
-            | ItemType::DisplayCabinet
-            | ItemType::FeederChest => {
-                let chest_item = plist::from_value(&value).context(DeserializeDictionarySnafu {
-                    target_type: "ChestItem",
+            ItemType::CagedDodo => {
+                // ID = 13
+                let dodo = plist::from_value(&value).context(DeserializeDictionarySnafu {
+                    target_type: "Dodo",
                     dict: value,
                 })?;
-                Ok(Self::Chest(Box::new(
-                    chest::Chest::from_chest_save_dict_xml(chest_item).context(LoadChestSnafu)?,
-                )))
+                Ok(Self::Dodo(dodo))
+            }
+            ItemType::Ladder => {
+                // ID = 19
+                let ladder = plist::from_value(&value).context(DeserializeDictionarySnafu {
+                    target_type: "Ladder",
+                    dict: value,
+                })?;
+                Ok(Self::Ladder(ladder))
+            }
+            ItemType::WoodenGate
+            | ItemType::Door
+            | ItemType::IronDoor
+            | ItemType::Trapdoor
+            | ItemType::IronTrapdoor => {
+                // ID = 20
+                let door = plist::from_value(&value).context(DeserializeDictionarySnafu {
+                    target_type: "Door",
+                    dict: value,
+                })?;
+                Ok(Self::Door(door))
+            }
+            ItemType::Bed
+            | ItemType::SoftBed
+            | ItemType::GoldenBed
+            | ItemType::RainbowSoftBed
+            | ItemType::RainbowGoldenBed => {
+                // ID = 23
+                let bed = plist::from_value(&value).context(DeserializeDictionarySnafu {
+                    target_type: "Bed",
+                    dict: value,
+                })?;
+                Ok(Self::Bed(Box::new(bed)))
+            }
+            ItemType::CagedDropbear => {
+                // ID = 25
+                let dropbear = plist::from_value(&value).context(DeserializeDictionarySnafu {
+                    target_type: "DropBear",
+                    dict: value,
+                })?;
+                Ok(Self::DropBear(dropbear))
+            }
+            ItemType::CagedDonkey | ItemType::CagedUnicorn => {
+                // ID = 28
+                let donkey = plist::from_value(&value).context(DeserializeDictionarySnafu {
+                    target_type: "Donkey",
+                    dict: value,
+                })?;
+                Ok(Self::Donkey(donkey))
+            }
+            ItemType::DodoEgg => {
+                // ID = 30
+                let egg = plist::from_value(&value).context(DeserializeDictionarySnafu {
+                    target_type: "Egg",
+                    dict: value,
+                })?;
+                Ok(Self::Egg(egg))
+            }
+            ItemType::FishBucket => {
+                // ID = 35
+                let clown_fish = plist::from_value(&value).context(DeserializeDictionarySnafu {
+                    target_type: "ClownFish",
+                    dict: value,
+                })?;
+                Ok(Self::ClownFish(Box::new(clown_fish)))
+            }
+            ItemType::SharkBucket => {
+                // ID = 36
+                let shark = plist::from_value(&value).context(DeserializeDictionarySnafu {
+                    target_type: "Shark",
+                    dict: value,
+                })?;
+                Ok(Self::Shark(shark))
+            }
+            ItemType::RailHandcar => {
+                // ID = 41
+                let hand_car = plist::from_value(&value).context(DeserializeDictionarySnafu {
+                    target_type: "HandCar",
+                    dict: value,
+                })?;
+                Ok(Self::HandCar(hand_car))
+            }
+            ItemType::SteamLocomotive => {
+                // ID = 42
+                let locomotive = plist::from_value(&value).context(DeserializeDictionarySnafu {
+                    target_type: "SteamLocomotive",
+                    dict: value,
+                })?;
+                Ok(Self::SteamLocomotive(locomotive))
+            }
+            ItemType::FreightCar => {
+                // ID = 43
+                let freight_car_save_dict_xml: FreightCarSaveDictXml = plist::from_value(&value)
+                    .context(DeserializeDictionarySnafu {
+                        target_type: "FreightCar",
+                        dict: value,
+                    })?;
+                let freight_car = Box::new(
+                    FreightCar::from_save_dict_xml(freight_car_save_dict_xml)
+                        .context(LoadTrainChestSnafu)?,
+                );
+                Ok(Self::FreightCar(freight_car))
+            }
+            ItemType::PassengerCar => {
+                // ID = 44
+                let passenger_car =
+                    plist::from_value(&value).context(DeserializeDictionarySnafu {
+                        target_type: "PassengerCar",
+                        dict: value,
+                    })?;
+                Ok(Self::PassengerCar(passenger_car))
             }
             ItemType::Portal
             | ItemType::AmethystPortal
@@ -585,90 +752,48 @@ impl AnyDynamicObject {
             | ItemType::ElectricSluice
             | ItemType::EggExtractor
             | ItemType::PizzaOven => {
+                // ID = 45
                 let workbench = plist::from_value(&value).context(DeserializeDictionarySnafu {
                     target_type: "Workbench",
                     dict: value,
                 })?;
                 Ok(Self::Workbench(Box::new(workbench)))
             }
-            ItemType::Bed
-            | ItemType::SoftBed
-            | ItemType::GoldenBed
-            | ItemType::RainbowSoftBed
-            | ItemType::RainbowGoldenBed => {
-                let bed = plist::from_value(&value).context(DeserializeDictionarySnafu {
-                    target_type: "Bed",
+            ItemType::Chest
+            | ItemType::Safe
+            | ItemType::Shelf
+            | ItemType::GoldenChest
+            | ItemType::PortalChest
+            | ItemType::DisplayCabinet
+            | ItemType::FeederChest => {
+                // ID = 46
+                let chest_item = plist::from_value(&value).context(DeserializeDictionarySnafu {
+                    target_type: "ChestItem",
                     dict: value,
                 })?;
-                Ok(Self::Bed(Box::new(bed)))
-            }
-            ItemType::Ladder => {
-                let ladder = plist::from_value(&value).context(DeserializeDictionarySnafu {
-                    target_type: "Ladder",
-                    dict: value,
-                })?;
-                Ok(Self::Ladder(ladder))
-            }
-            ItemType::WoodenGate
-            | ItemType::Door
-            | ItemType::IronDoor
-            | ItemType::Trapdoor
-            | ItemType::IronTrapdoor => {
-                let door = plist::from_value(&value).context(DeserializeDictionarySnafu {
-                    target_type: "Door",
-                    dict: value,
-                })?;
-                Ok(Self::Door(door))
-            }
-            ItemType::DodoEgg => {
-                let egg = plist::from_value(&value).context(DeserializeDictionarySnafu {
-                    target_type: "Egg",
-                    dict: value,
-                })?;
-                Ok(Self::Egg(egg))
-            }
-            ItemType::RailHandcar => {
-                let hand_car = plist::from_value(&value).context(DeserializeDictionarySnafu {
-                    target_type: "HandCar",
-                    dict: value,
-                })?;
-                Ok(Self::HandCar(hand_car))
-            }
-            ItemType::SteamLocomotive => {
-                let locomotive = plist::from_value(&value).context(DeserializeDictionarySnafu {
-                    target_type: "SteamLocomotive",
-                    dict: value,
-                })?;
-                Ok(Self::SteamLocomotive(locomotive))
-            }
-            ItemType::FreightCar => {
-                let freight_car_save_dict_xml: FreightCarSaveDictXml = plist::from_value(&value)
-                    .context(DeserializeDictionarySnafu {
-                        target_type: "FreightCar",
-                        dict: value,
-                    })?;
-                let freight_car = Box::new(
-                    FreightCar::from_save_dict_xml(freight_car_save_dict_xml)
-                        .context(LoadTrainChestSnafu)?,
-                );
-                Ok(Self::FreightCar(freight_car))
-            }
-            ItemType::PassengerCar => {
-                let passenger_car =
-                    plist::from_value(&value).context(DeserializeDictionarySnafu {
-                        target_type: "PassengerCar",
-                        dict: value,
-                    })?;
-                Ok(Self::PassengerCar(passenger_car))
+                Ok(Self::Chest(Box::new(
+                    chest::Chest::from_chest_save_dict_xml(chest_item).context(LoadChestSnafu)?,
+                )))
             }
             ItemType::Sign => {
+                // ID = 47
                 let sign = plist::from_value(&value).context(DeserializeDictionarySnafu {
                     target_type: "Sign",
                     dict: value,
                 })?;
                 Ok(Self::Sign(sign))
             }
+            ItemType::Shop => {
+                // ID = 48
+                let trading_post =
+                    plist::from_value(&value).context(DeserializeDictionarySnafu {
+                        target_type: "TradingPost",
+                        dict: value,
+                    })?;
+                Ok(Self::TradingPost(Box::new(trading_post)))
+            }
             ItemType::TrainStation => {
+                // ID = 49
                 let train_station =
                     plist::from_value(&value).context(DeserializeDictionarySnafu {
                         target_type: "TrainStation",
@@ -676,12 +801,159 @@ impl AnyDynamicObject {
                     })?;
                 Ok(Self::TrainStation(train_station))
             }
+            ItemType::TradePortal => {
+                // ID = 50
+                let trade_portal =
+                    plist::from_value(&value).context(DeserializeDictionarySnafu {
+                        target_type: "TradePortal",
+                        dict: value,
+                    })?;
+                Ok(Self::TradePortal(Box::new(trade_portal)))
+            }
+            ItemType::CagedScorpion => {
+                // ID = 51
+                let scorpion = plist::from_value(&value).context(DeserializeDictionarySnafu {
+                    target_type: "Scorpion",
+                    dict: value,
+                })?;
+                Ok(Self::Scorpion(Box::new(scorpion)))
+            }
+            ItemType::LargeSquarePainting
+            | ItemType::LargeLandscapePainting
+            | ItemType::LargePortraitPainting
+            | ItemType::MedSquarePainting
+            | ItemType::MedLandscapePainting
+            | ItemType::MedPortraitPainting
+            | ItemType::SmallSquarePainting
+            | ItemType::SmallLandscapePainting
+            | ItemType::SmallPortraitPainting => {
+                // ID = 52
+                let painting = plist::from_value(&value).context(DeserializeDictionarySnafu {
+                    target_type: "Painting",
+                    dict: value,
+                })?;
+                Ok(Self::Painting(Box::new(painting)))
+            }
+            ItemType::StoneColumn
+            | ItemType::LimestoneColumn
+            | ItemType::MarbleColumn
+            | ItemType::SandstoneColumn
+            | ItemType::RedMarbleColumn
+            | ItemType::LapisLazuliColumn
+            | ItemType::BasaltColumn
+            | ItemType::CopperColumn
+            | ItemType::TinColumn
+            | ItemType::BronzeColumn
+            | ItemType::IronColumn
+            | ItemType::SteelColumn
+            | ItemType::GoldColumn
+            | ItemType::WoodColumn
+            | ItemType::BrickColumn
+            | ItemType::IceColumn
+            | ItemType::PlatiumColumn
+            | ItemType::GlassColumn
+            | ItemType::BlackGlassColumn
+            | ItemType::TitaniumColumn
+            | ItemType::CarbonFiberColumn
+            | ItemType::PlasterColumn
+            | ItemType::AmethystColumn
+            | ItemType::SapphireColumn
+            | ItemType::EmeraldColumn
+            | ItemType::RubyColumn
+            | ItemType::DiamondColumn => {
+                // ID = 53
+                let column = plist::from_value(&value).context(DeserializeDictionarySnafu {
+                    target_type: "Column",
+                    dict: value,
+                })?;
+                Ok(Self::Column(Box::new(column)))
+            }
+            ItemType::StoneStairs
+            | ItemType::LimestoneStairs
+            | ItemType::MarbleStairs
+            | ItemType::SandstoneStairs
+            | ItemType::RedMarbleStairs
+            | ItemType::LapisLazuliStairs
+            | ItemType::BasaltStairs
+            | ItemType::CopperStairs
+            | ItemType::TinStairs
+            | ItemType::BronzeStairs
+            | ItemType::IronStairs
+            | ItemType::SteelStairs
+            | ItemType::GoldStairs
+            | ItemType::WoodStairs
+            | ItemType::BrickStairs
+            | ItemType::IceStairs
+            | ItemType::PlatiumStairs
+            | ItemType::GlassStairs
+            | ItemType::BlackGlassStairs
+            | ItemType::TitaniumStairs
+            | ItemType::CarbonFiberStairs
+            | ItemType::PlasterStairs
+            | ItemType::AmethystStairs
+            | ItemType::SapphireStairs
+            | ItemType::EmeraldStairs
+            | ItemType::RubyStairs
+            | ItemType::DiamondStairs => {
+                // ID = 54
+                let stairs = plist::from_value(&value).context(DeserializeDictionarySnafu {
+                    target_type: "Stairs",
+                    dict: value,
+                })?;
+                Ok(Self::Stairs(Box::new(stairs)))
+            }
+            ItemType::ElectricElevatorMotor => {
+                // ID = 55
+                let elevator_motor =
+                    plist::from_value(&value).context(DeserializeDictionarySnafu {
+                        target_type: "ElevatorMotor",
+                        dict: value,
+                    })?;
+                Ok(Self::ElevatorMotor(Box::new(elevator_motor)))
+            }
+            ItemType::ElevatorShaft => {
+                // ID = 56
+                let elevator_shaft =
+                    plist::from_value(&value).context(DeserializeDictionarySnafu {
+                        target_type: "ElevatorShaft",
+                        dict: value,
+                    })?;
+                Ok(Self::ElevatorShaft(Box::new(elevator_shaft)))
+            }
+            ItemType::OwnershipSign => {
+                // ID = 60
+                let ownership_sign =
+                    plist::from_value(&value).context(DeserializeDictionarySnafu {
+                        target_type: "OwnershipSign",
+                        dict: value,
+                    })?;
+                Ok(Self::OwnershipSign(Box::new(ownership_sign)))
+            }
+            ItemType::CagedYak => {
+                // ID = 63
+                let yak = plist::from_value(&value).context(DeserializeDictionarySnafu {
+                    target_type: "Yak",
+                    dict: value,
+                })?;
+                Ok(Self::Yak(yak))
+            }
+            ItemType::Mirror => {
+                // ID = 64
+                let mirror = plist::from_value(&value).context(DeserializeDictionarySnafu {
+                    target_type: "Mirror",
+                    dict: value,
+                })?;
+                Ok(Self::Mirror(Box::new(mirror)))
+            }
             _ => UnsupportedItemTypeForDynObjSnafu { item_type, value }.fail(),
         }
     }
 
     pub fn to_save_dict(&self) -> Result<plist::Value> {
         Ok(match self {
+            Self::Dodo(dodo) => plist::to_value(dodo).context(SerializeDictionarySnafu {
+                source_type: "Dodo",
+            })?,
             Self::Ladder(ladder) => plist::to_value(ladder).context(SerializeDictionarySnafu {
                 source_type: "Ladder",
             })?,
@@ -691,9 +963,25 @@ impl AnyDynamicObject {
             Self::Bed(bed) => {
                 plist::to_value(bed).context(SerializeDictionarySnafu { source_type: "Bed" })?
             }
+            Self::DropBear(dropbear) => {
+                plist::to_value(dropbear).context(SerializeDictionarySnafu {
+                    source_type: "DropBear",
+                })?
+            }
+            Self::Donkey(donkey) => plist::to_value(donkey).context(SerializeDictionarySnafu {
+                source_type: "Donkey",
+            })?,
             Self::Egg(egg) => {
                 plist::to_value(egg).context(SerializeDictionarySnafu { source_type: "Egg" })?
             }
+            Self::ClownFish(clown_fish) => {
+                plist::to_value(clown_fish).context(SerializeDictionarySnafu {
+                    source_type: "ClownFish",
+                })?
+            }
+            Self::Shark(shark) => plist::to_value(shark).context(SerializeDictionarySnafu {
+                source_type: "Shark",
+            })?,
             Self::HandCar(hand_car) => {
                 plist::to_value(hand_car).context(SerializeDictionarySnafu {
                     source_type: "HandCar",
@@ -732,21 +1020,73 @@ impl AnyDynamicObject {
             Self::Sign(sign) => plist::to_value(sign).context(SerializeDictionarySnafu {
                 source_type: "Sign",
             })?,
+            Self::TradingPost(trading_post) => {
+                plist::to_value(trading_post).context(SerializeDictionarySnafu {
+                    source_type: "TradingPost",
+                })?
+            }
             Self::TrainStation(train_station) => {
                 plist::to_value(train_station).context(SerializeDictionarySnafu {
                     source_type: "TrainStation",
                 })?
             }
+            Self::TradePortal(trade_portal) => {
+                plist::to_value(trade_portal).context(SerializeDictionarySnafu {
+                    source_type: "TradePortal",
+                })?
+            }
+            Self::Scorpion(scorpion) => {
+                plist::to_value(scorpion).context(SerializeDictionarySnafu {
+                    source_type: "Scorpion",
+                })?
+            }
+            Self::Painting(painting) => {
+                plist::to_value(painting).context(SerializeDictionarySnafu {
+                    source_type: "Painting",
+                })?
+            }
+            Self::Column(column) => plist::to_value(column).context(SerializeDictionarySnafu {
+                source_type: "Column",
+            })?,
+            Self::Stairs(stairs) => plist::to_value(stairs).context(SerializeDictionarySnafu {
+                source_type: "Stairs",
+            })?,
+            Self::ElevatorMotor(elevator_motor) => {
+                plist::to_value(elevator_motor).context(SerializeDictionarySnafu {
+                    source_type: "ElevatorMotor",
+                })?
+            }
+            Self::ElevatorShaft(elevator_shaft) => {
+                plist::to_value(elevator_shaft).context(SerializeDictionarySnafu {
+                    source_type: "ElevatorShaft",
+                })?
+            }
+            Self::OwnershipSign(ownership_sign) => {
+                plist::to_value(ownership_sign).context(SerializeDictionarySnafu {
+                    source_type: "OwnershipSign",
+                })?
+            }
+            Self::Yak(yak) => {
+                plist::to_value(yak).context(SerializeDictionarySnafu { source_type: "Yak" })?
+            }
+            Self::Mirror(mirror) => plist::to_value(mirror).context(SerializeDictionarySnafu {
+                source_type: "Mirror",
+            })?,
         })
     }
 }
 
 #[derive(Debug, PartialEq, IntoStaticStr)]
 pub enum AnyDynamicObjectRef<'a> {
+    Dodo(&'a animal::Dodo),                      // ID = 13
     Ladder(&'a craft::Ladder),                   // ID = 19
     Door(&'a craft::Door),                       // ID = 20
     Bed(&'a craft::Bed),                         // ID = 23
+    DropBear(&'a animal::DropBear),              // ID = 25
+    Donkey(&'a animal::Donkey),                  // ID = 28
     Egg(&'a animal::Egg),                        // ID = 30
+    ClownFish(&'a animal::ClownFish),            // ID = 35
+    Shark(&'a animal::Shark),                    // ID = 36
     HandCar(&'a train::HandCar),                 // ID = 41
     SteamLocomotive(&'a train::SteamLocomotive), // ID = 42
     FreightCar(&'a train::FreightCar),           // ID = 43
@@ -754,16 +1094,32 @@ pub enum AnyDynamicObjectRef<'a> {
     Workbench(&'a workbench::Workbench),         // ID = 45
     Chest(&'a chest::Chest),                     // ID = 46
     Sign(&'a craft::Sign),                       // ID = 47
+    TradingPost(&'a craft::TradingPost),         // ID = 48
     TrainStation(&'a train::TrainStation),       // ID = 49
+    TradePortal(&'a craft::TradePortal),         // ID = 50
+    Scorpion(&'a animal::Scorpion),              // ID = 51
+    Painting(&'a craft::Painting),               // ID = 52
+    Column(&'a craft::Column),                   // ID = 53
+    Stairs(&'a craft::Stairs),                   // ID = 54
+    ElevatorMotor(&'a craft::ElevatorMotor),     // ID = 55
+    ElevatorShaft(&'a craft::ElevatorShaft),     // ID = 56
+    OwnershipSign(&'a craft::OwnershipSign),     // ID = 60
+    Yak(&'a animal::Yak),                        // ID = 63
+    Mirror(&'a craft::Mirror),                   // ID = 64
 }
 
 impl<'a> AnyDynamicObjectRef<'a> {
     pub fn to_owned(&self) -> AnyDynamicObject {
         match *self {
+            AnyDynamicObjectRef::Dodo(x) => AnyDynamicObject::Dodo(Box::new(x.clone())),
             AnyDynamicObjectRef::Ladder(x) => AnyDynamicObject::Ladder(Box::new(x.clone())),
             AnyDynamicObjectRef::Door(x) => AnyDynamicObject::Door(Box::new(x.clone())),
             AnyDynamicObjectRef::Bed(x) => AnyDynamicObject::Bed(Box::new(x.clone())),
+            AnyDynamicObjectRef::DropBear(x) => AnyDynamicObject::DropBear(Box::new(x.clone())),
+            AnyDynamicObjectRef::Donkey(x) => AnyDynamicObject::Donkey(Box::new(x.clone())),
             AnyDynamicObjectRef::Egg(x) => AnyDynamicObject::Egg(Box::new(x.clone())),
+            AnyDynamicObjectRef::ClownFish(x) => AnyDynamicObject::ClownFish(Box::new(x.clone())),
+            AnyDynamicObjectRef::Shark(x) => AnyDynamicObject::Shark(Box::new(x.clone())),
             AnyDynamicObjectRef::HandCar(x) => AnyDynamicObject::HandCar(Box::new(x.clone())),
             AnyDynamicObjectRef::SteamLocomotive(x) => {
                 AnyDynamicObject::SteamLocomotive(Box::new(x.clone()))
@@ -775,9 +1131,30 @@ impl<'a> AnyDynamicObjectRef<'a> {
             AnyDynamicObjectRef::Workbench(x) => AnyDynamicObject::Workbench(Box::new(x.clone())),
             AnyDynamicObjectRef::Chest(x) => AnyDynamicObject::Chest(Box::new(x.clone())),
             AnyDynamicObjectRef::Sign(x) => AnyDynamicObject::Sign(Box::new(x.clone())),
+            AnyDynamicObjectRef::TradingPost(x) => {
+                AnyDynamicObject::TradingPost(Box::new(x.clone()))
+            }
             AnyDynamicObjectRef::TrainStation(x) => {
                 AnyDynamicObject::TrainStation(Box::new(x.clone()))
             }
+            AnyDynamicObjectRef::TradePortal(x) => {
+                AnyDynamicObject::TradePortal(Box::new(x.clone()))
+            }
+            AnyDynamicObjectRef::Scorpion(x) => AnyDynamicObject::Scorpion(Box::new(x.clone())),
+            AnyDynamicObjectRef::Painting(x) => AnyDynamicObject::Painting(Box::new(x.clone())),
+            AnyDynamicObjectRef::Column(x) => AnyDynamicObject::Column(Box::new(x.clone())),
+            AnyDynamicObjectRef::Stairs(x) => AnyDynamicObject::Stairs(Box::new(x.clone())),
+            AnyDynamicObjectRef::ElevatorMotor(x) => {
+                AnyDynamicObject::ElevatorMotor(Box::new(x.clone()))
+            }
+            AnyDynamicObjectRef::ElevatorShaft(x) => {
+                AnyDynamicObject::ElevatorShaft(Box::new(x.clone()))
+            }
+            AnyDynamicObjectRef::OwnershipSign(x) => {
+                AnyDynamicObject::OwnershipSign(Box::new(x.clone()))
+            }
+            AnyDynamicObjectRef::Yak(x) => AnyDynamicObject::Yak(Box::new(x.clone())),
+            AnyDynamicObjectRef::Mirror(x) => AnyDynamicObject::Mirror(Box::new(x.clone())),
         }
     }
 }
