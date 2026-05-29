@@ -12,6 +12,84 @@ use snafu::prelude::*;
 use std::ops::{Deref, DerefMut};
 use strum::{EnumIter, IntoStaticStr};
 
+mod color {
+    use super::{Snafu, TryFromPrimitive};
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use snafu::ResultExt;
+
+    #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, TryFromPrimitive)]
+    #[repr(u8)]
+    pub enum PigmentColor {
+        #[default]
+        Transparent = 0,
+        MarbleWhite = 1,
+        CarbonBlack = 2,
+        RedOchre = 3,
+        IndianYellow = 4,
+        UltraMarineBlue = 5,
+        EmeraldGreen = 6,
+        TyrianPurple = 7,
+        CopperBlue = 8,
+    }
+
+    #[derive(Debug, Snafu)]
+    pub enum ColorError {
+        #[snafu(display("Invalid color type ID {id}"))]
+        InvalidColorTypeId {
+            id: u8,
+            source: num_enum::TryFromPrimitiveError<PigmentColor>,
+        },
+    }
+
+    #[derive(Debug, Clone, Copy, Default, PartialEq)]
+    pub struct PigmentColors {
+        pub pigments: [PigmentColor; Self::MAX_COLORS],
+    }
+
+    impl PigmentColors {
+        pub const MAX_COLORS: usize = 3;
+
+        pub fn encode_colors(&self) -> u16 {
+            let mut color_bits = 0;
+            for color in self.pigments.into_iter() {
+                color_bits <<= 4;
+                color_bits |= color as u16;
+            }
+            color_bits << 4
+        }
+
+        pub fn decode_colors(mut color_bits: u16) -> Result<Self, ColorError> {
+            let mut colors = [PigmentColor::Transparent; _];
+            color_bits >>= 4;
+            for color_mut in colors.iter_mut().rev() {
+                *color_mut = PigmentColor::try_from((color_bits & 0b1111) as u8)
+                    .with_context(|e| InvalidColorTypeIdSnafu { id: e.number })?;
+                color_bits >>= 4;
+            }
+            Ok(Self { pigments: colors })
+        }
+    }
+    impl Serialize for PigmentColors {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            serializer.serialize_u16(self.encode_colors())
+        }
+    }
+
+    impl<'de> Deserialize<'de> for PigmentColors {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            let bits = u16::deserialize(deserializer)?;
+            Ok(Self::decode_colors(bits).unwrap_or_default())
+        }
+    }
+}
+pub use color::{ColorError, PigmentColor, PigmentColors};
+
 #[derive(Debug, Snafu)]
 pub enum ItemError {
     #[snafu(display("Invalid item type ID {id}"))]
@@ -19,11 +97,8 @@ pub enum ItemError {
         id: u16,
         source: num_enum::TryFromPrimitiveError<ItemType>,
     },
-    #[snafu(display("Invalid color type ID {id}"))]
-    InvalidColorTypeId {
-        id: u8,
-        source: num_enum::TryFromPrimitiveError<PigmentColor>,
-    },
+    #[snafu(display("Failed to decode u16 color {color}"))]
+    DecodeColor { color: u16, source: ColorError },
     #[snafu(display("Failed to deserialize extra bytes as plist::Dictionary"))]
     DeserializeExtra { source: plist::Error },
     #[snafu(display("Failed to serialize extra plist::Dictionary to bytes"))]
@@ -720,23 +795,7 @@ impl Item {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, TryFromPrimitive)]
-#[repr(u8)]
-pub enum PigmentColor {
-    Transparent = 0,
-    MarbleWhite = 1,
-    CarbonBlack = 2,
-    RedOchre = 3,
-    IndianYellow = 4,
-    UltraMarineBlue = 5,
-    EmeraldGreen = 6,
-    TyrianPurple = 7,
-    CopperBlue = 8,
-}
-
 impl Item {
-    pub const MAX_COLORS: usize = 3;
-
     pub fn item_type_raw(&self) -> u16 {
         self.type_id
     }
@@ -770,32 +829,12 @@ impl Item {
         &mut self.data_b
     }
 
-    pub fn encode_colors(colors: [PigmentColor; Self::MAX_COLORS]) -> u16 {
-        let mut color_bits = 0;
-        for color in colors.into_iter() {
-            color_bits <<= 4;
-            color_bits |= color as u16;
-        }
-        color_bits << 4
+    pub fn color(&self) -> Result<PigmentColors> {
+        PigmentColors::decode_colors(self.data_b).context(DecodeColorSnafu { color: self.data_b })
     }
 
-    pub fn decode_colors(mut color_bits: u16) -> Result<[PigmentColor; Self::MAX_COLORS]> {
-        let mut colors = [PigmentColor::Transparent; _];
-        color_bits >>= 4;
-        for color_mut in colors.iter_mut().rev() {
-            *color_mut = PigmentColor::try_from((color_bits & 0b1111) as u8)
-                .with_context(|e| InvalidColorTypeIdSnafu { id: e.number })?;
-            color_bits >>= 4;
-        }
-        Ok(colors)
-    }
-
-    pub fn color(&self) -> Result<[PigmentColor; Self::MAX_COLORS]> {
-        Self::decode_colors(self.data_b)
-    }
-
-    pub fn set_color(&mut self, colors: [PigmentColor; Self::MAX_COLORS]) {
-        *self.color_raw_mut() = Self::encode_colors(colors);
+    pub fn set_color(&mut self, colors: PigmentColors) {
+        *self.color_raw_mut() = colors.encode_colors();
     }
 
     pub fn new(item_type: ItemType) -> Self {
@@ -1031,7 +1070,7 @@ mod tests {
             AnyDynamicObject, DynamicObject, InteractionObject, InteractionObjectType, UniqueID,
             workbench::{Workbench, WorkbenchType},
         },
-        Inventory, Item, ItemType, PigmentColor, Slot, Slots,
+        Inventory, Item, ItemType, PigmentColor, PigmentColors, Slot, Slots,
     };
     use crate::util::plist::{diff_plist_keys, to_xml_plist};
 
@@ -1047,11 +1086,13 @@ mod tests {
             dynamic_object: None,
         };
 
-        let colors = [
-            PigmentColor::RedOchre,
-            PigmentColor::EmeraldGreen,
-            PigmentColor::UltraMarineBlue,
-        ];
+        let colors = PigmentColors {
+            pigments: [
+                PigmentColor::RedOchre,
+                PigmentColor::EmeraldGreen,
+                PigmentColor::UltraMarineBlue,
+            ],
+        };
 
         item.set_color(colors);
         let recovered = item.color().unwrap();
@@ -1796,7 +1837,7 @@ mod tests {
                 InteractionObjectType::Workbench,
                 false,
                 false,
-                0,
+                PigmentColors::default(),
                 100.0f32.try_into().unwrap(),
             ),
             0,

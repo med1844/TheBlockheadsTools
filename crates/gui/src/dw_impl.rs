@@ -49,7 +49,7 @@ use the_blockheads_tools_lib::game::{
         },
         workbench::{Workbench, WorkbenchType},
     },
-    item::{Item, ItemType, Slot},
+    item::{Item, ItemType, PigmentColor, PigmentColors, Slot},
 };
 
 const CUBE_NUM_FACES: usize = 5; // back face never get rendered
@@ -62,9 +62,8 @@ pub struct ObjFlags {
 
 // helper mod to keep read-only fields private
 mod context {
-    use the_blockheads_tools_lib::game::dynamic_object::UniqueID;
-
     use super::ObjFlags;
+    use the_blockheads_tools_lib::game::dynamic_object::UniqueID;
 
     #[derive(Debug, Default)]
     pub struct DwUiContext {
@@ -229,8 +228,10 @@ impl ToRow for bool {
 trait ToGrid {
     fn to_grid(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext);
     fn add_grid<H: Hash>(&mut self, id: H, ui: &mut egui::Ui, context: &mut DwUiContext) {
-        egui::Grid::new(id).num_columns(2).show(ui, |ui| {
-            self.to_grid(ui, context);
+        ui.push_id(&id, |ui| {
+            egui::Grid::new(&id).num_columns(2).show(ui, |ui| {
+                self.to_grid(ui, context);
+            });
         });
     }
 }
@@ -1153,6 +1154,41 @@ impl BuildDwMesh for Torch {
             }
         }
         Ok(())
+    }
+}
+
+fn add_pigment_color(ui: &mut egui::Ui, i: usize, color: &mut PigmentColor) -> egui::Response {
+    wrap_combo_box_resp(
+        egui::ComboBox::from_id_salt(ui.id().with(i))
+            .selected_text(format!("{:?}", color))
+            .show_ui(ui, |ui| {
+                ui.selectable_value(color, PigmentColor::Transparent, "Transparent")
+                    | ui.selectable_value(color, PigmentColor::MarbleWhite, "MarbleWhite")
+                    | ui.selectable_value(color, PigmentColor::CarbonBlack, "CarbonBlack")
+                    | ui.selectable_value(color, PigmentColor::RedOchre, "RedOchre")
+                    | ui.selectable_value(color, PigmentColor::IndianYellow, "IndianYellow")
+                    | ui.selectable_value(color, PigmentColor::UltraMarineBlue, "UltraMarineBlue")
+                    | ui.selectable_value(color, PigmentColor::EmeraldGreen, "EmeraldGreen")
+                    | ui.selectable_value(color, PigmentColor::TyrianPurple, "TyrianPurple")
+                    | ui.selectable_value(color, PigmentColor::CopperBlue, "CopperBlue")
+            }),
+    )
+}
+
+impl ToRow for PigmentColors {
+    fn to_row(&mut self, ui: &mut egui::Ui) -> egui::Response {
+        ui.vertical(|ui| {
+            self.pigments
+                .iter_mut()
+                .enumerate()
+                .map(|(i, pigment)| add_pigment_color(ui, i, pigment))
+                .reduce(|mut acc, r| {
+                    acc |= r;
+                    acc
+                })
+                .expect("MAX_COLORS is non-zero")
+        })
+        .inner
     }
 }
 

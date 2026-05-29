@@ -1,4 +1,7 @@
-use super::{block::BlockType, item::ItemType};
+use super::{
+    block::BlockType,
+    item::{ItemType, PigmentColors},
+};
 use crate::util::serde::{deserialize_some, serialize_some};
 use num_enum::TryFromPrimitive;
 use serde::{Deserialize, Serialize};
@@ -300,7 +303,7 @@ pub struct InteractionObject {
     pub interaction_object_type: InteractionObjectType,
     pub is_in_use: bool,
     pub flipped: bool,
-    pub paint_color: u16,
+    pub paint_color: PigmentColors,
 
     // see -[InteractionObject_getSaveDict]
     // .objc_str.256 (0x944600) in decompiled server code
@@ -323,7 +326,7 @@ impl InteractionObject {
         interaction_object_type: InteractionObjectType,
         is_in_use: bool,
         flipped: bool,
-        paint_color: u16,
+        paint_color: PigmentColors,
         save_time: f32,
     ) -> Self {
         Self {

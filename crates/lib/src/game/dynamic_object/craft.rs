@@ -1,6 +1,7 @@
 use super::{
-    super::item::ItemType, ArtificialLight, DynamicObject, InteractionObject,
-    InteractionObjectType, deserialize_some, serialize_some,
+    super::item::{ItemType, PigmentColors},
+    ArtificialLight, DynamicObject, InteractionObject, InteractionObjectType, deserialize_some,
+    serialize_some,
 };
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
@@ -37,7 +38,7 @@ inherit!(Torch -> DynamicObject, obj);
 pub struct Ladder {
     #[serde(flatten)]
     obj: DynamicObject,
-    pub paint_color: u16,
+    pub paint_color: PigmentColors,
     pub item_type: ItemType,
 }
 inherit!(Ladder -> DynamicObject, obj);
@@ -87,7 +88,7 @@ pub struct Bed {
     #[serde(flatten)]
     obj: InteractionObject,
     pub item_type: ItemType,
-    pub bedding_color: u16,
+    pub bedding_color: PigmentColors,
 }
 inherit!(Bed -> InteractionObject, obj);
 
@@ -283,7 +284,7 @@ pub struct Column {
     #[serde(flatten)]
     obj: DynamicObject,
     pub item_type: ItemType,
-    pub paint_color: u16,
+    pub paint_color: PigmentColors,
     pub configuration: ColumnConfiguration,
 }
 inherit!(Column -> DynamicObject, obj);
@@ -304,7 +305,7 @@ pub struct Stairs {
     #[serde(flatten)]
     obj: DynamicObject,
     pub item_type: ItemType,
-    pub paint_color: u16,
+    pub paint_color: PigmentColors,
     pub configuration: StairsConfiguration,
 }
 inherit!(Stairs -> DynamicObject, obj);
@@ -331,7 +332,7 @@ pub struct ElevatorShaft {
     pub last_known_motor_pos_x: u32,
     #[serde(rename = "lastKnownMotorPos.y")]
     pub last_known_motor_pos_y: u16,
-    pub paint_color: u16,
+    pub paint_color: PigmentColors,
 }
 inherit!(ElevatorShaft -> DynamicObject, obj);
 
