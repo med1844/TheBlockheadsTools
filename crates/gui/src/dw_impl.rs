@@ -2799,6 +2799,34 @@ impl ToGrid for AnyDynamicObject {
                     );
                     selectable_variant(
                         ui,
+                        "HandCar",
+                        matches!(self, AnyDynamicObject::HandCar(_)),
+                        || AnyDynamicObject::HandCar(Box::default()),
+                        self,
+                    );
+                    selectable_variant(
+                        ui,
+                        "SteamLocomotive",
+                        matches!(self, AnyDynamicObject::SteamLocomotive(_)),
+                        || AnyDynamicObject::SteamLocomotive(Box::default()),
+                        self,
+                    );
+                    selectable_variant(
+                        ui,
+                        "FreightCar",
+                        matches!(self, AnyDynamicObject::FreightCar(_)),
+                        || AnyDynamicObject::FreightCar(Box::default()),
+                        self,
+                    );
+                    selectable_variant(
+                        ui,
+                        "PassengerCar",
+                        matches!(self, AnyDynamicObject::PassengerCar(_)),
+                        || AnyDynamicObject::PassengerCar(Box::default()),
+                        self,
+                    );
+                    selectable_variant(
+                        ui,
                         "Workbench",
                         matches!(self, AnyDynamicObject::Workbench(_)),
                         || AnyDynamicObject::Workbench(Box::default()),
@@ -2841,6 +2869,18 @@ impl ToGrid for AnyDynamicObject {
                 }
                 AnyDynamicObject::Egg(egg) => {
                     egg.add_grid("egg_grid", ui, context);
+                }
+                AnyDynamicObject::HandCar(hand_car) => {
+                    hand_car.add_grid("hand_car_grid", ui, context);
+                }
+                AnyDynamicObject::SteamLocomotive(locomotive) => {
+                    locomotive.add_grid("steam_locomotive_grid", ui, context);
+                }
+                AnyDynamicObject::FreightCar(freight_car) => {
+                    freight_car.add_grid("freight_car_grid", ui, context);
+                }
+                AnyDynamicObject::PassengerCar(passenger_car) => {
+                    passenger_car.add_grid("passenger_car_grid", ui, context);
                 }
                 AnyDynamicObject::Workbench(workbench) => {
                     workbench.add_grid("workbench_grid", ui, context);

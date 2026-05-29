@@ -1,5 +1,6 @@
 use super::{
     block::BlockType,
+    dynamic_object::train::{FreightCar, FreightCarSaveDictXml},
     item::{ItemType, PigmentColors},
 };
 use crate::util::serde::{deserialize_some, serialize_some};
@@ -42,6 +43,10 @@ pub enum DynamicObjectError {
     LoadChest { source: chest::ChestError },
     #[snafu(display("Failed to save chest"))]
     SaveChest { source: chest::ChestError },
+    #[snafu(display("Failed to load train chest"))]
+    LoadTrainChest { source: chest::ChestError },
+    #[snafu(display("Failed to save train chest"))]
+    SaveTrainChest { source: chest::ChestError },
     #[snafu(display(
         "Can't understand dynamicObjectSaveDict with {item_type:?} yet, value: {value:?}"
     ))]
@@ -456,14 +461,18 @@ pub mod workbench;
 
 #[derive(Debug, Clone, PartialEq, IntoStaticStr)]
 pub enum AnyDynamicObject {
-    Ladder(Box<craft::Ladder>),             // ID = 19
-    Door(Box<craft::Door>),                 // ID = 20
-    Bed(Box<craft::Bed>),                   // ID = 23
-    Egg(Box<animal::Egg>),                  // ID = 30
-    Workbench(Box<workbench::Workbench>),   // ID = 45
-    Chest(Box<chest::Chest>),               // ID = 46
-    Sign(Box<craft::Sign>),                 // ID = 47
-    TrainStation(Box<train::TrainStation>), // ID = 49
+    Ladder(Box<craft::Ladder>),                   // ID = 19
+    Door(Box<craft::Door>),                       // ID = 20
+    Bed(Box<craft::Bed>),                         // ID = 23
+    Egg(Box<animal::Egg>),                        // ID = 30
+    HandCar(Box<train::HandCar>),                 // ID = 41
+    SteamLocomotive(Box<train::SteamLocomotive>), // ID = 42
+    FreightCar(Box<train::FreightCar>),           // ID = 43
+    PassengerCar(Box<train::PassengerCar>),       // ID = 44
+    Workbench(Box<workbench::Workbench>),         // ID = 45
+    Chest(Box<chest::Chest>),                     // ID = 46
+    Sign(Box<craft::Sign>),                       // ID = 47
+    TrainStation(Box<train::TrainStation>),       // ID = 49
 }
 
 impl Default for AnyDynamicObject {
@@ -479,6 +488,10 @@ impl AnyDynamicObject {
             AnyDynamicObject::Door(door) => door.set_float_pos(pos),
             AnyDynamicObject::Bed(bed) => bed.set_float_pos(pos),
             AnyDynamicObject::Egg(egg) => egg.set_float_pos(pos),
+            AnyDynamicObject::HandCar(hand_car) => hand_car.set_float_pos(pos),
+            AnyDynamicObject::SteamLocomotive(locomotive) => locomotive.set_float_pos(pos),
+            AnyDynamicObject::FreightCar(freight_car) => freight_car.set_float_pos(pos),
+            AnyDynamicObject::PassengerCar(passenger_car) => passenger_car.set_float_pos(pos),
             AnyDynamicObject::Workbench(workbench) => workbench.set_float_pos(pos),
             AnyDynamicObject::Chest(chest) => chest.set_float_pos(pos),
             AnyDynamicObject::Sign(sign) => sign.set_float_pos(pos),
@@ -492,6 +505,10 @@ impl AnyDynamicObject {
             AnyDynamicObject::Door(door) => door.set_pos(pos),
             AnyDynamicObject::Bed(bed) => bed.set_pos(pos),
             AnyDynamicObject::Egg(egg) => egg.set_pos(pos),
+            AnyDynamicObject::HandCar(hand_car) => hand_car.set_pos(pos),
+            AnyDynamicObject::SteamLocomotive(locomotive) => locomotive.set_pos(pos),
+            AnyDynamicObject::FreightCar(freight_car) => freight_car.set_pos(pos),
+            AnyDynamicObject::PassengerCar(passenger_car) => passenger_car.set_pos(pos),
             AnyDynamicObject::Workbench(workbench) => workbench.set_pos(pos),
             AnyDynamicObject::Chest(chest) => chest.set_pos(pos),
             AnyDynamicObject::Sign(sign) => sign.set_pos(pos),
@@ -505,6 +522,10 @@ impl AnyDynamicObject {
             AnyDynamicObject::Door(door) => door.unique_id = unique_id,
             AnyDynamicObject::Bed(bed) => bed.unique_id = unique_id,
             AnyDynamicObject::Egg(egg) => egg.unique_id = unique_id,
+            AnyDynamicObject::HandCar(hand_car) => hand_car.unique_id = unique_id,
+            AnyDynamicObject::SteamLocomotive(locomotive) => locomotive.unique_id = unique_id,
+            AnyDynamicObject::FreightCar(freight_car) => freight_car.unique_id = unique_id,
+            AnyDynamicObject::PassengerCar(passenger_car) => passenger_car.unique_id = unique_id,
             AnyDynamicObject::Workbench(workbench) => workbench.unique_id = unique_id,
             AnyDynamicObject::Chest(chest) => chest.unique_id = unique_id,
             AnyDynamicObject::Sign(sign) => sign.unique_id = unique_id,
@@ -606,6 +627,40 @@ impl AnyDynamicObject {
                 })?;
                 Ok(Self::Egg(egg))
             }
+            ItemType::RailHandcar => {
+                let hand_car = plist::from_value(&value).context(DeserializeDictionarySnafu {
+                    target_type: "HandCar",
+                    dict: value,
+                })?;
+                Ok(Self::HandCar(hand_car))
+            }
+            ItemType::SteamLocomotive => {
+                let locomotive = plist::from_value(&value).context(DeserializeDictionarySnafu {
+                    target_type: "SteamLocomotive",
+                    dict: value,
+                })?;
+                Ok(Self::SteamLocomotive(locomotive))
+            }
+            ItemType::FreightCar => {
+                let freight_car_save_dict_xml: FreightCarSaveDictXml = plist::from_value(&value)
+                    .context(DeserializeDictionarySnafu {
+                        target_type: "FreightCar",
+                        dict: value,
+                    })?;
+                let freight_car = Box::new(
+                    FreightCar::from_save_dict_xml(freight_car_save_dict_xml)
+                        .context(LoadTrainChestSnafu)?,
+                );
+                Ok(Self::FreightCar(freight_car))
+            }
+            ItemType::PassengerCar => {
+                let passenger_car =
+                    plist::from_value(&value).context(DeserializeDictionarySnafu {
+                        target_type: "PassengerCar",
+                        dict: value,
+                    })?;
+                Ok(Self::PassengerCar(passenger_car))
+            }
             ItemType::Sign => {
                 let sign = plist::from_value(&value).context(DeserializeDictionarySnafu {
                     target_type: "Sign",
@@ -639,6 +694,29 @@ impl AnyDynamicObject {
             Self::Egg(egg) => {
                 plist::to_value(egg).context(SerializeDictionarySnafu { source_type: "Egg" })?
             }
+            Self::HandCar(hand_car) => {
+                plist::to_value(hand_car).context(SerializeDictionarySnafu {
+                    source_type: "HandCar",
+                })?
+            }
+            Self::SteamLocomotive(locomotive) => {
+                plist::to_value(locomotive).context(SerializeDictionarySnafu {
+                    source_type: "SteamLocomotive",
+                })?
+            }
+            Self::FreightCar(freight_car) => {
+                let freight_car_save_dict_xml: FreightCarSaveDictXml = freight_car
+                    .to_save_dict_xml()
+                    .context(SaveTrainChestSnafu)?;
+                plist::to_value(&freight_car_save_dict_xml).context(SerializeDictionarySnafu {
+                    source_type: "FreightCar",
+                })?
+            }
+            Self::PassengerCar(passenger_car) => {
+                plist::to_value(passenger_car).context(SerializeDictionarySnafu {
+                    source_type: "PassengerCar",
+                })?
+            }
             Self::Workbench(workbench) => {
                 plist::to_value(workbench).context(SerializeDictionarySnafu {
                     source_type: "Workbench",
@@ -665,14 +743,18 @@ impl AnyDynamicObject {
 
 #[derive(Debug, PartialEq, IntoStaticStr)]
 pub enum AnyDynamicObjectRef<'a> {
-    Ladder(&'a craft::Ladder),             // ID = 19
-    Door(&'a craft::Door),                 // ID = 20
-    Bed(&'a craft::Bed),                   // ID = 23
-    Egg(&'a animal::Egg),                  // ID = 30
-    Workbench(&'a workbench::Workbench),   // ID = 45
-    Chest(&'a chest::Chest),               // ID = 46
-    Sign(&'a craft::Sign),                 // ID = 47
-    TrainStation(&'a train::TrainStation), // ID = 49
+    Ladder(&'a craft::Ladder),                   // ID = 19
+    Door(&'a craft::Door),                       // ID = 20
+    Bed(&'a craft::Bed),                         // ID = 23
+    Egg(&'a animal::Egg),                        // ID = 30
+    HandCar(&'a train::HandCar),                 // ID = 41
+    SteamLocomotive(&'a train::SteamLocomotive), // ID = 42
+    FreightCar(&'a train::FreightCar),           // ID = 43
+    PassengerCar(&'a train::PassengerCar),       // ID = 44
+    Workbench(&'a workbench::Workbench),         // ID = 45
+    Chest(&'a chest::Chest),                     // ID = 46
+    Sign(&'a craft::Sign),                       // ID = 47
+    TrainStation(&'a train::TrainStation),       // ID = 49
 }
 
 impl<'a> AnyDynamicObjectRef<'a> {
@@ -682,6 +764,14 @@ impl<'a> AnyDynamicObjectRef<'a> {
             AnyDynamicObjectRef::Door(x) => AnyDynamicObject::Door(Box::new(x.clone())),
             AnyDynamicObjectRef::Bed(x) => AnyDynamicObject::Bed(Box::new(x.clone())),
             AnyDynamicObjectRef::Egg(x) => AnyDynamicObject::Egg(Box::new(x.clone())),
+            AnyDynamicObjectRef::HandCar(x) => AnyDynamicObject::HandCar(Box::new(x.clone())),
+            AnyDynamicObjectRef::SteamLocomotive(x) => {
+                AnyDynamicObject::SteamLocomotive(Box::new(x.clone()))
+            }
+            AnyDynamicObjectRef::FreightCar(x) => AnyDynamicObject::FreightCar(Box::new(x.clone())),
+            AnyDynamicObjectRef::PassengerCar(x) => {
+                AnyDynamicObject::PassengerCar(Box::new(x.clone()))
+            }
             AnyDynamicObjectRef::Workbench(x) => AnyDynamicObject::Workbench(Box::new(x.clone())),
             AnyDynamicObjectRef::Chest(x) => AnyDynamicObject::Chest(Box::new(x.clone())),
             AnyDynamicObjectRef::Sign(x) => AnyDynamicObject::Sign(Box::new(x.clone())),
@@ -707,7 +797,7 @@ mod tests {
             CarrotPlant, ChilliPlant, CornPlant, FlaxPlant, KelpPlant, SunflowerPlant, TomatoPlant,
             TulipPlant, VinePlant, WheatPlant,
         },
-        train::{FreightCarXml, HandCar, PassengerCar, SteamLocomotive, TrainStation},
+        train::{FreightCarDwXml, HandCar, PassengerCar, SteamLocomotive, TrainStation},
         tree::{
             AppleTree, CactusTree, CherryTree, CoconutTree, CoffeeTree, GemTree, LimeTree,
             MangoTree, MapleTree, OrangeTree, PineTree,
@@ -783,7 +873,7 @@ mod tests {
         check_round_trip::<Rail>(DynamicObjectType::Rail).unwrap();
         check_round_trip::<HandCar>(DynamicObjectType::HandCar).unwrap();
         check_round_trip::<SteamLocomotive>(DynamicObjectType::SteamLocomotive).unwrap();
-        check_round_trip::<FreightCarXml>(DynamicObjectType::FreightCar).unwrap();
+        check_round_trip::<FreightCarDwXml>(DynamicObjectType::FreightCar).unwrap();
         check_round_trip::<PassengerCar>(DynamicObjectType::PassengerCar).unwrap();
         check_round_trip::<Workbench>(DynamicObjectType::Workbench).unwrap();
         check_round_trip::<ChestDwXml>(DynamicObjectType::Chest).unwrap();

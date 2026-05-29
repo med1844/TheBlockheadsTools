@@ -14,7 +14,9 @@ use super::{
             CarrotPlant, ChilliPlant, CornPlant, FlaxPlant, KelpPlant, SunflowerPlant, TomatoPlant,
             TulipPlant, VinePlant, WheatPlant,
         },
-        train::{FreightCar, FreightCarXml, HandCar, PassengerCar, SteamLocomotive, TrainStation},
+        train::{
+            FreightCar, FreightCarDwXml, HandCar, PassengerCar, SteamLocomotive, TrainStation,
+        },
         tree::{
             AppleTree, CactusTree, CherryTree, CoconutTree, CoffeeTree, GemTree, LimeTree,
             MangoTree, MapleTree, OrangeTree, PineTree,
@@ -286,6 +288,10 @@ impl ChunkDynamicObjects {
             AnyDynamicObject::Door(v) => self.door.push(*v),
             AnyDynamicObject::Bed(v) => self.bed.push(*v),
             AnyDynamicObject::Egg(v) => self.egg.push(*v),
+            AnyDynamicObject::HandCar(v) => self.hand_car.push(*v),
+            AnyDynamicObject::SteamLocomotive(v) => self.steam_locomotive.push(*v),
+            AnyDynamicObject::FreightCar(v) => self.freight_car.push(*v),
+            AnyDynamicObject::PassengerCar(v) => self.passenger_car.push(*v),
             AnyDynamicObject::Workbench(v) => self.workbench.push(*v),
             AnyDynamicObject::Chest(v) => self.chest.push(*v),
             AnyDynamicObject::Sign(v) => self.sign.push(*v),
@@ -405,10 +411,12 @@ impl ChunkDynamicObjects {
             // Wire => self.wire.get(index),
             // CaveTroll => self.cave_troll.get(index),
             // Rail => self.rail.get(index),
-            // HandCar => self.hand_car.get(index),
-            // SteamLocomotive => self.steam_locomotive.get(index),
-            // FreightCar => self.freight_car.get(index),
-            // PassengerCar => self.passenger_car.get(index),
+            HandCar => AnyDynamicObjectRef::HandCar(self.hand_car.get(index)?),
+            SteamLocomotive => {
+                AnyDynamicObjectRef::SteamLocomotive(self.steam_locomotive.get(index)?)
+            }
+            FreightCar => AnyDynamicObjectRef::FreightCar(self.freight_car.get(index)?),
+            PassengerCar => AnyDynamicObjectRef::PassengerCar(self.passenger_car.get(index)?),
             Workbench => AnyDynamicObjectRef::Workbench(self.workbench.get(index)?),
             Chest => AnyDynamicObjectRef::Chest(self.chest.get(index)?),
             Sign => AnyDynamicObjectRef::Sign(self.sign.get(index)?),
@@ -647,8 +655,8 @@ impl DynamicWorld {
                     entry.steam_locomotive = load(v, obj_ty, coord)?
                 }
                 DynamicObjectType::FreightCar => {
-                    let freight_car_xmls: DynamicObjectList<FreightCarXml> =
-                        plist::from_bytes(v).context(DeserializeObjectSnafu {
+                    let freight_car_xmls: DynamicObjectList<FreightCarDwXml> = plist::from_bytes(v)
+                        .context(DeserializeObjectSnafu {
                             object_type: obj_ty,
                             coord,
                         })?;
@@ -814,7 +822,7 @@ impl DynamicWorld {
                         .context(PutEntrySnafu { key })?;
                     Ok(freight_car_xml)
                 })
-                .collect::<Result<DynamicObjectList<FreightCarXml>>>()?;
+                .collect::<Result<DynamicObjectList<FreightCarDwXml>>>()?;
             put(db, wtxn, &coord_str, FreightCar, &freight_car_xmls)?;
             put(db, wtxn, &coord_str, PassengerCar, &obj.passenger_car)?;
             put(db, wtxn, &coord_str, Workbench, &obj.workbench)?;
@@ -869,7 +877,7 @@ mod tests {
                 DynamicObjectList, FireObjectXml,
                 chest::{Chest, ChestDwXml, ChestSaveDictXml},
                 dropped_item::{DroppedItem, DroppedItemXml},
-                train::{FreightCar, FreightCarXml},
+                train::{FreightCar, FreightCarDwXml},
             },
         },
         ChunkDynamicObjects, DynamicObjectType, DynamicWorld,
@@ -965,7 +973,7 @@ mod tests {
         monster.rail = read_test_xml(DynamicObjectType::Rail);
         monster.hand_car = read_test_xml(DynamicObjectType::HandCar);
         monster.steam_locomotive = read_test_xml(DynamicObjectType::SteamLocomotive);
-        let freight_car_xmls: DynamicObjectList<FreightCarXml> =
+        let freight_car_xmls: DynamicObjectList<FreightCarDwXml> =
             read_test_xml(DynamicObjectType::FreightCar);
         monster.freight_car = freight_car_xmls
             .into_iter()
