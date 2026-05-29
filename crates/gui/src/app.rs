@@ -147,6 +147,11 @@ impl InteractionState {
         }
     }
 
+    fn clear(&mut self) {
+        self.clear_hover();
+        self.set_select(None);
+    }
+
     fn copy_hover_to_select(&mut self) {
         self.set_select(match self.select == self.hover {
             true => None,
@@ -483,6 +488,7 @@ impl EditorApp {
             .set_blockheads(device, &world_db.main.blockheads);
 
         self.world_db = Some(world_db);
+        self.interaction_state.clear();
 
         Ok(())
     }
