@@ -191,6 +191,12 @@ impl ChunkCache {
         Self::default()
     }
 
+    fn clear(&mut self) {
+        self.decompressed_chunks.clear();
+        self.voxel_outdated.clear();
+        self.mesh_outdated.clear();
+    }
+
     fn mark_voxel_outdated<I: Into<ChunkCoord>>(&mut self, chunk_coord: I) {
         self.voxel_outdated.insert(chunk_coord.into());
     }
@@ -489,6 +495,7 @@ impl EditorApp {
 
         self.world_db = Some(world_db);
         self.interaction_state.clear();
+        self.chunk_cache.clear();
 
         Ok(())
     }
