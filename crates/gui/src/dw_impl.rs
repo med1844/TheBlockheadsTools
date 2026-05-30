@@ -323,9 +323,21 @@ impl ToGrid for DynamicObject {
     }
 }
 
-impl<T: Default + ToGrid> ToGrid for Vec<T> {
+impl<T: Default + Clone + ToGrid> ToGrid for Vec<T> {
     fn to_grid(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         ui.vertical(|ui| {
+            ui.horizontal(|ui| {
+                if ui.button("Add").clicked() {
+                    self.push(T::default());
+                }
+
+                if let Some(last) = self.last()
+                    && ui.button("Dup last").clicked()
+                {
+                    self.push(last.clone());
+                }
+            });
+
             let mut to_remove = None;
 
             for (i, item) in self.iter_mut().enumerate() {
@@ -338,10 +350,6 @@ impl<T: Default + ToGrid> ToGrid for Vec<T> {
                         item.add_grid(format!("item_grid_{}", i), ui, context);
                     });
                 });
-            }
-
-            if ui.button("Add").clicked() {
-                self.push(T::default());
             }
 
             // Perform deletion after the loop to avoid borrow checker issues
@@ -1005,6 +1013,10 @@ impl ToRow for TorchConnectionType {
 
 impl ToGrid for Torch {
     fn to_grid(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        context.flags.rebuild_mesh |= self.connection_type.add_row("connectionType", ui).changed();
+        context.flags.rebuild_mesh |= self.item_type.add_row("itemType", ui).changed();
+        self.data_a.add_row("dataA", ui);
+        self.data_b.add_row("dataB", ui);
         grid_as_row(
             &mut self.light_dict,
             "lightDict",
@@ -1012,10 +1024,6 @@ impl ToGrid for Torch {
             ui,
             context,
         );
-        context.flags.rebuild_mesh |= self.connection_type.add_row("connectionType", ui).changed();
-        context.flags.rebuild_mesh |= self.item_type.add_row("itemType", ui).changed();
-        self.data_a.add_row("dataA", ui);
-        self.data_b.add_row("dataB", ui);
     }
 }
 
@@ -3649,6 +3657,7 @@ impl InfoUi for ElevatorShaft {
 impl BuildDwMesh for ElevatorShaft {
     // no up and down face
     const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { items: 0, quads: 4 });
+
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         let [x, y] = self.float_pos;
         builder.add_face(DwFace::from_tile_map(

@@ -967,7 +967,7 @@ pub enum BuildDwMeshError {
     CoordOutOfBound { source: CoordError },
 }
 
-#[derive(Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct DwCapacity {
     pub items: usize,
     pub quads: usize,
@@ -1304,7 +1304,7 @@ impl DwChunkBuf {
         accu(chunk.flax_plant.iter(), &mut sum);
         accu(chunk.sunflower_plant.iter(), &mut sum);
         accu(chunk.corn_plant.iter(), &mut sum);
-        // accu(chunk.dodo.iter(), &mut sum);
+        accu(chunk.dodo.iter(), &mut sum);
         // accu(chunk.dropped_item.iter(), &mut sum);
         // accu(chunk.fire.iter(), &mut sum);
         accu(chunk.torch.iter(), &mut sum);
@@ -1312,46 +1312,46 @@ impl DwChunkBuf {
         accu(chunk.ladder.iter(), &mut sum);
         accu(chunk.door.iter(), &mut sum);
         // accu(chunk.artificial_light.iter(), &mut sum);
-        // accu(chunk.bed.iter(), &mut sum);
-        // accu(chunk.dropbear.iter(), &mut sum);
+        accu(chunk.bed.iter(), &mut sum);
+        accu(chunk.dropbear.iter(), &mut sum);
         // accu(chunk.gather_block.iter(), &mut sum);
         accu(chunk.carrot_plant.iter(), &mut sum);
-        // accu(chunk.donkey.iter(), &mut sum);
+        accu(chunk.donkey.iter(), &mut sum);
         accu(chunk.egg.iter(), &mut sum);
         accu(chunk.window.iter(), &mut sum);
-        // accu(chunk.boat.iter(), &mut sum);
-        // accu(chunk.chilli_plant.iter(), &mut sum);
+        accu(chunk.boat.iter(), &mut sum);
+        accu(chunk.chilli_plant.iter(), &mut sum);
         accu(chunk.kelp_plant.iter(), &mut sum);
-        // accu(chunk.clown_fish.iter(), &mut sum);
-        // accu(chunk.shark.iter(), &mut sum);
+        accu(chunk.clown_fish.iter(), &mut sum);
+        accu(chunk.shark.iter(), &mut sum);
         accu(chunk.lime_tree.iter(), &mut sum);
         accu(chunk.wire.iter(), &mut sum);
-        // accu(chunk.cave_troll.iter(), &mut sum);
-        // accu(chunk.rail.iter(), &mut sum);
-        // accu(chunk.hand_car.iter(), &mut sum);
-        // accu(chunk.steam_locomotive.iter(), &mut sum);
-        // accu(chunk.freight_car.iter(), &mut sum);
-        // accu(chunk.passenger_car.iter(), &mut sum);
+        accu(chunk.cave_troll.iter(), &mut sum);
+        accu(chunk.rail.iter(), &mut sum);
+        accu(chunk.hand_car.iter(), &mut sum);
+        accu(chunk.steam_locomotive.iter(), &mut sum);
+        accu(chunk.freight_car.iter(), &mut sum);
+        accu(chunk.passenger_car.iter(), &mut sum);
         accu(chunk.workbench.iter(), &mut sum);
         accu(chunk.chest.iter(), &mut sum);
         accu(chunk.sign.iter(), &mut sum);
-        // accu(chunk.trading_post.iter(), &mut sum);
+        accu(chunk.trading_post.iter(), &mut sum);
         accu(chunk.train_station.iter(), &mut sum);
-        // accu(chunk.trade_portal.iter(), &mut sum);
-        // accu(chunk.scorpion.iter(), &mut sum);
-        // accu(chunk.painting.iter(), &mut sum);
-        // accu(chunk.column.iter(), &mut sum);
-        // accu(chunk.stairs.iter(), &mut sum);
-        // accu(chunk.elevator_motor.iter(), &mut sum);
-        // accu(chunk.elevator_shaft.iter(), &mut sum);
+        accu(chunk.trade_portal.iter(), &mut sum);
+        accu(chunk.scorpion.iter(), &mut sum);
+        accu(chunk.painting.iter(), &mut sum);
+        accu(chunk.column.iter(), &mut sum);
+        accu(chunk.stairs.iter(), &mut sum);
+        accu(chunk.elevator_motor.iter(), &mut sum);
+        accu(chunk.elevator_shaft.iter(), &mut sum);
         accu(chunk.gem_tree.iter(), &mut sum);
         accu(chunk.vine_plant.iter(), &mut sum);
         accu(chunk.tulip_plant.iter(), &mut sum);
-        // accu(chunk.ownership_sign.iter(), &mut sum);
+        accu(chunk.ownership_sign.iter(), &mut sum);
         accu(chunk.wheat_plant.iter(), &mut sum);
         accu(chunk.tomato_plant.iter(), &mut sum);
-        // accu(chunk.yak.iter(), &mut sum);
-        // accu(chunk.mirror.iter(), &mut sum);
+        accu(chunk.yak.iter(), &mut sum);
+        accu(chunk.mirror.iter(), &mut sum);
 
         sum
     }
