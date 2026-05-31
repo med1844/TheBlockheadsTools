@@ -1297,16 +1297,16 @@ impl EditorApp {
                     }
                     CornPlant => draw_window(title, dw_chunk.corn_plant.get_mut(index), ctx),
                     Dodo => draw_window(title, dw_chunk.dodo.get_mut(index), ctx),
-                    // DroppedItem => {}
-                    // Fire => {}
+                    DroppedItem => draw_window(title, dw_chunk.dropped_item.get_mut(index), ctx),
+                    Fire => draw_window(title, dw_chunk.fire.get_mut(index), ctx),
                     Torch => draw_window(title, dw_chunk.torch.get_mut(index), ctx),
-                    // GlowBlock => {}
+                    GlowBlock => draw_window(title, dw_chunk.glow_block.get_mut(index), ctx),
                     Ladder => draw_window(title, dw_chunk.ladder.get_mut(index), ctx),
                     Door => draw_window(title, dw_chunk.door.get_mut(index), ctx),
                     // ArtificialLight => {}
                     Bed => draw_window(title, dw_chunk.bed.get_mut(index), ctx),
                     DropBear => draw_window(title, dw_chunk.dropbear.get_mut(index), ctx),
-                    // GatherBlock => {}
+                    GatherBlock => draw_window(title, dw_chunk.gather_block.get_mut(index), ctx),
                     CarrotPlant => draw_window(title, dw_chunk.carrot_plant.get_mut(index), ctx),
                     Donkey => draw_window(title, dw_chunk.donkey.get_mut(index), ctx),
                     Egg => draw_window(title, dw_chunk.egg.get_mut(index), ctx),

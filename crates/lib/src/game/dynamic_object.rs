@@ -397,6 +397,7 @@ pub struct FireObject {
     pub spread_timer: [f32; 4],
     pub light_dict: ArtificialLight,
 }
+inherit!(FireObject -> DynamicObject, obj);
 
 impl From<FireObjectXml> for FireObject {
     fn from(value: FireObjectXml) -> Self {

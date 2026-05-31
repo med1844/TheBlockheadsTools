@@ -5,6 +5,7 @@ use super::{
         dw::{
             BuildDwMesh, BuildDwMeshError, CoordOutOfBoundSnafu, DwBlock, DwCapacity,
             DwChunkBufBuilder, DwFace, DwItem, DwItemInstanceRaw, DwQuad, FaceDirection,
+            UnknownItemTypeSnafu,
         },
     },
     image_type::ImageType,
@@ -25,8 +26,8 @@ use the_blockheads_tools_lib::game::{
     coord::BlockCoord,
     db::{dynamic_world_v2::DynamicWorldV2, world_v2::WorldV2},
     dynamic_object::{
-        AnyDynamicObject, ArtificialLight, DynamicObject, InteractionObject, InteractionObjectType,
-        LightDirection, UniqueID,
+        AnyDynamicObject, ArtificialLight, DynamicObject, FireObject, GatherBlock, GlowBlock,
+        InteractionObject, InteractionObjectType, LightDirection, UniqueID,
         animal::{
             Animal, CaveTroll, ClownFish, Dodo, DodoBreed, Donkey, DropBear, Egg, Scorpion, Shark,
             Yak,
@@ -39,6 +40,7 @@ use the_blockheads_tools_lib::game::{
             Stairs, StairsConfiguration, Torch, TorchConnectionType, TradePortal, TradingPost,
             Window, Wire, WireConfiguration, WireSolidConfiguration,
         },
+        dropped_item::DroppedItem,
         plant::{
             CarrotPlant, ChilliPlant, CornPlant, FlaxPlant, KelpPlant, NormalPlant, Plant,
             SunflowerPlant, TomatoPlant, TulipPlant, VinePlant, WheatPlant,
@@ -50,7 +52,7 @@ use the_blockheads_tools_lib::game::{
         },
         workbench::{Workbench, WorkbenchType},
     },
-    item::{Item, ItemType, PigmentColor, PigmentColors, Slot},
+    item::{Item, ItemType, PigmentColor, PigmentColors, Slot, Slots},
 };
 
 const CUBE_NUM_FACES: usize = 5; // back face never get rendered
@@ -854,6 +856,102 @@ impl BuildDwMesh for Dodo {
     }
 }
 
+impl ToGrid for DroppedItem {
+    fn to_grid(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        self.bounce_timer.add_row("bounceTimer", ui);
+        self.creation_time.add_row("creationTime", ui);
+        self.fall_speed.add_row("fallSpeed", ui);
+        self.hovers.add_row("hovers", ui);
+        self.float_pos_vx.add_row("floatPos[VX]", ui);
+        self.float_pos_vy.add_row("floatPos[VY]", ui);
+        grid_as_row_no_push_id(&mut self.item, "item", "item_grid", ui, context);
+    }
+}
+
+impl InfoUi for DroppedItem {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        let obj = self.deref_mut();
+        obj.info(ui, context);
+
+        ui.vertical(|ui| {
+            ui.heading("DroppedItem");
+            ui.separator();
+            self.add_grid("dropped_item_grid", ui, context);
+        });
+    }
+}
+
+impl BuildDwMesh for DroppedItem {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::ITEM);
+
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        builder.add_item(DwItem::from_item_type(
+            self.float_pos,
+            self.item.item_type().context(UnknownItemTypeSnafu {
+                item: self.item.clone(),
+            })?,
+        ));
+        Ok(())
+    }
+}
+
+impl<const N: usize> ToRow for [f32; N] {
+    fn to_row(&mut self, ui: &mut egui::Ui) -> egui::Response {
+        ui.horizontal(|ui| {
+            self.iter_mut()
+                .map(|v| v.to_row(ui))
+                .reduce(|mut acc, r| {
+                    acc |= r;
+                    acc
+                })
+                .expect("N is non-zero")
+        })
+        .inner
+    }
+}
+
+impl ToGrid for FireObject {
+    fn to_grid(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        self.burn_timer.add_row("burnTimer", ui);
+        self.spread_timer.add_row("spreadTimer", ui);
+        grid_as_row_no_push_id(
+            &mut self.light_dict,
+            "lightDict",
+            "light_dict_grid",
+            ui,
+            context,
+        );
+    }
+}
+
+impl InfoUi for FireObject {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        let obj = self.deref_mut();
+        obj.info(ui, context);
+
+        ui.vertical(|ui| {
+            ui.heading("FireObject");
+            ui.separator();
+            self.add_grid("fire_object_grid", ui, context);
+        });
+    }
+}
+
+impl BuildDwMesh for FireObject {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::QUAD);
+
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        builder.add_face(DwFace::new_sprite(
+            ImageType::FireFlame0,
+            [0.5, 0.0],
+            self.float_pos,
+            [1, 2],
+            3.0,
+        ));
+        Ok(())
+    }
+}
+
 struct HandleItemGridDragResult {
     hovered_idx: Option<usize>,
     viewport: egui::Rect,
@@ -1187,6 +1285,167 @@ impl BuildDwMesh for Torch {
     }
 }
 
+impl ToRow for BlockType {
+    fn to_row(&mut self, ui: &mut egui::Ui) -> egui::Response {
+        wrap_combo_box_resp(
+            egui::ComboBox::from_id_salt("block_type_combo_box")
+                .selected_text(format!("{:?}", self))
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(self, Self::Stone, "Stone")
+                        | ui.selectable_value(self, Self::Air, "Air")
+                        | ui.selectable_value(self, Self::Water, "Water")
+                        | ui.selectable_value(self, Self::Ice, "Ice")
+                        | ui.selectable_value(self, Self::Snow, "Snow")
+                        | ui.selectable_value(self, Self::Dirt, "Dirt")
+                        | ui.selectable_value(self, Self::DesertSand, "DesertSand")
+                        | ui.selectable_value(self, Self::BeachSand, "BeachSand")
+                        | ui.selectable_value(self, Self::Wood, "Wood")
+                        | ui.selectable_value(self, Self::MinedStone, "MinedStone")
+                        | ui.selectable_value(self, Self::RedBrick, "RedBrick")
+                        | ui.selectable_value(self, Self::Limestone, "Limestone")
+                        | ui.selectable_value(self, Self::MinedLimestone, "MinedLimestone")
+                        | ui.selectable_value(self, Self::Marble, "Marble")
+                        | ui.selectable_value(self, Self::MinedMarble, "MinedMarble")
+                        | ui.selectable_value(self, Self::TimeCrystal, "TimeCrystal")
+                        | ui.selectable_value(self, Self::SandStone, "SandStone")
+                        | ui.selectable_value(self, Self::MinedSandStone, "MinedSandStone")
+                        | ui.selectable_value(self, Self::RedMarble, "RedMarble")
+                        | ui.selectable_value(self, Self::MinedRedMarble, "MinedRedMarble")
+                        | ui.selectable_value(self, Self::Glass, "Glass")
+                        | ui.selectable_value(self, Self::SpawnPortalBase, "SpawnPortalBase")
+                        | ui.selectable_value(self, Self::GoldBlock, "GoldBlock")
+                        | ui.selectable_value(self, Self::GrassDirt, "GrassDirt")
+                        | ui.selectable_value(self, Self::SnowDirt, "SnowDirt")
+                        | ui.selectable_value(self, Self::LapisLazuli, "LapisLazuli")
+                        | ui.selectable_value(self, Self::MinedLapisLazuli, "MinedLapisLazuli")
+                        | ui.selectable_value(self, Self::Lava, "Lava")
+                        | ui.selectable_value(self, Self::ReinforcedPlatform, "ReinforcedPlatform")
+                        | ui.selectable_value(
+                            self,
+                            Self::SpawnPortalBaseAmethyst,
+                            "SpawnPortalBaseAmethyst",
+                        )
+                        | ui.selectable_value(
+                            self,
+                            Self::SpawnPortalBaseSapphire,
+                            "SpawnPortalBaseSapphire",
+                        )
+                        | ui.selectable_value(
+                            self,
+                            Self::SpawnPortalBaseEmerald,
+                            "SpawnPortalBaseEmerald",
+                        )
+                        | ui.selectable_value(
+                            self,
+                            Self::SpawnPortalBaseRuby,
+                            "SpawnPortalBaseRuby",
+                        )
+                        | ui.selectable_value(
+                            self,
+                            Self::SpawnPortalBaseDiamond,
+                            "SpawnPortalBaseDiamond",
+                        )
+                        | ui.selectable_value(self, Self::NorthPole, "NorthPole")
+                        | ui.selectable_value(self, Self::SouthPole, "SouthPole")
+                        | ui.selectable_value(self, Self::WestPole, "WestPole")
+                        | ui.selectable_value(self, Self::EastPole, "EastPole")
+                        | ui.selectable_value(self, Self::PortalBase, "PortalBase")
+                        | ui.selectable_value(self, Self::PortalBaseAmethyst, "PortalBaseAmethyst")
+                        | ui.selectable_value(self, Self::PortalBaseSapphire, "PortalBaseSapphire")
+                        | ui.selectable_value(self, Self::PortalBaseEmerald, "PortalBaseEmerald")
+                        | ui.selectable_value(self, Self::PortalBaseRuby, "PortalBaseRuby")
+                        | ui.selectable_value(self, Self::PortalBaseDiamond, "PortalBaseDiamond")
+                        | ui.selectable_value(self, Self::Compost, "Compost")
+                        | ui.selectable_value(self, Self::GrassCompost, "GrassCompost")
+                        | ui.selectable_value(self, Self::SnowCompost, "SnowCompost")
+                        | ui.selectable_value(self, Self::Basalt, "Basalt")
+                        | ui.selectable_value(self, Self::MinedBasalt, "MinedBasalt")
+                        | ui.selectable_value(self, Self::CopperBlock, "CopperBlock")
+                        | ui.selectable_value(self, Self::TinBlock, "TinBlock")
+                        | ui.selectable_value(self, Self::BronzeBlock, "BronzeBlock")
+                        | ui.selectable_value(self, Self::IronBlock, "IronBlock")
+                        | ui.selectable_value(self, Self::SteelBlock, "SteelBlock")
+                        | ui.selectable_value(self, Self::BlackSand, "BlackSand")
+                        | ui.selectable_value(self, Self::BlackGlass, "BlackGlass")
+                        | ui.selectable_value(self, Self::TradePortalBase, "TradePortalBase")
+                        | ui.selectable_value(
+                            self,
+                            Self::TradePortalBaseAmethyst,
+                            "TradePortalBaseAmethyst",
+                        )
+                        | ui.selectable_value(
+                            self,
+                            Self::TradePortalBaseSapphire,
+                            "TradePortalBaseSapphire",
+                        )
+                        | ui.selectable_value(
+                            self,
+                            Self::TradePortalBaseEmerald,
+                            "TradePortalBaseEmerald",
+                        )
+                        | ui.selectable_value(
+                            self,
+                            Self::TradePortalBaseRuby,
+                            "TradePortalBaseRuby",
+                        )
+                        | ui.selectable_value(
+                            self,
+                            Self::TradePortalBaseDiamond,
+                            "TradePortalBaseDiamond",
+                        )
+                        | ui.selectable_value(self, Self::PlatinumBlock, "PlatinumBlock")
+                        | ui.selectable_value(self, Self::TitaniumBlock, "TitaniumBlock")
+                        | ui.selectable_value(self, Self::CarbonFiberBlock, "CarbonFiberBlock")
+                        | ui.selectable_value(self, Self::Gravel, "Gravel")
+                        | ui.selectable_value(self, Self::AmethystBlock, "AmethystBlock")
+                        | ui.selectable_value(self, Self::SapphireBlock, "SapphireBlock")
+                        | ui.selectable_value(self, Self::EmeraldBlock, "EmeraldBlock")
+                        | ui.selectable_value(self, Self::RubyBlock, "RubyBlock")
+                        | ui.selectable_value(self, Self::DiamondBlock, "DiamondBlock")
+                        | ui.selectable_value(self, Self::Plaster, "Plaster")
+                        | ui.selectable_value(self, Self::LuminousPlaster, "LuminousPlaster")
+                }),
+        )
+    }
+}
+
+impl ToGrid for GlowBlock {
+    fn to_grid(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        grid_as_row_no_push_id(
+            &mut self.light_dict,
+            "lightDict",
+            "light_dict_grid",
+            ui,
+            context,
+        );
+        self.tile_type.add_row("tileType", ui);
+    }
+}
+
+impl InfoUi for GlowBlock {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        let obj = self.deref_mut();
+        obj.info(ui, context);
+
+        ui.vertical(|ui| {
+            ui.heading("GlowBlock");
+            ui.separator();
+            self.add_grid("glow_block_grid", ui, context);
+        });
+    }
+}
+
+impl BuildDwMesh for GlowBlock {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::ITEM);
+
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        // The correct way is to render with light.png; however dw only accepts tile_map and items texture.
+        // We will keep the pipeline simple by repurposing items that are not obtainable in game
+        builder.add_item(DwItem::from_item_type(self.float_pos, ItemType::Pigment));
+        Ok(())
+    }
+}
+
 fn add_pigment_color(ui: &mut egui::Ui, i: usize, color: &mut PigmentColor) -> egui::Response {
     wrap_combo_box_resp(
         egui::ComboBox::from_id_salt(ui.id().with(i))
@@ -1484,6 +1743,35 @@ impl BuildDwMesh for DropBear {
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
         builder.add_item(DwItem::from_item_type(self.float_pos, ItemType::Fur));
+        Ok(())
+    }
+}
+
+impl ToGrid for GatherBlock {
+    fn to_grid(&mut self, ui: &mut egui::Ui, _: &mut DwUiContext) {
+        self.timer.add_row("", ui);
+        self.last_known_gather_value.add_row("", ui);
+    }
+}
+
+impl InfoUi for GatherBlock {
+    fn info(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        let obj = self.deref_mut();
+        obj.info(ui, context);
+
+        ui.vertical(|ui| {
+            ui.heading("GatherBlock");
+            ui.separator();
+            self.add_grid("gather_block_grid", ui, context);
+        });
+    }
+}
+
+impl BuildDwMesh for GatherBlock {
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::ITEM);
+
+    fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
+        builder.add_item(DwItem::from_item_type(self.float_pos, ItemType::Clothing));
         Ok(())
     }
 }
@@ -3095,6 +3383,20 @@ impl InfoUi for AnyDynamicObject {
     }
 }
 
+impl<const N: usize> ToGrid for Slots<N> {
+    fn to_grid(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
+        ui.vertical(|ui| {
+            paint_slots(
+                ui.id().with("sub_item_item_grid"),
+                self.as_mut_slice(),
+                (N, 1usize),
+                ui,
+                context,
+            )
+        });
+    }
+}
+
 impl ToGrid for Item {
     fn to_grid(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
         self.type_id.add_row("typeId", ui);
@@ -3115,22 +3417,13 @@ impl ToGrid for Item {
         self.selected_sub_item_index
             .add_row("selectedSubItemIndex", ui);
 
-        ui.label("subItems");
-        if let Some(slots) = self.sub_items.as_mut() {
-            ui.vertical(|ui| {
-                paint_slots(
-                    ui.id().with("sub_item_item_grid"),
-                    slots.as_mut_slice(),
-                    (Self::MAX_SUB_ITEMS, 1usize),
-                    ui,
-                    context,
-                )
-            });
-        } else {
-            ui.weak("No subItems");
-        }
-        ui.end_row();
-
+        grid_as_row(
+            &mut self.sub_items,
+            "subItems",
+            "sub_item_item_grid",
+            ui,
+            context,
+        );
         grid_as_row(
             &mut self.dynamic_object,
             "dynamicObject",

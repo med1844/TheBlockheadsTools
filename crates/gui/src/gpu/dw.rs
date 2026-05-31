@@ -965,6 +965,8 @@ impl ChunkDwBlock {
 pub enum BuildDwMeshError {
     #[snafu(display("Object coordinate out of world bound: {source}"))]
     CoordOutOfBound { source: CoordError },
+    #[snafu(display("Unknown item type for item {item:?}: {source}"))]
+    UnknownItemType { source: ItemError, item: Item },
 }
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -1305,16 +1307,16 @@ impl DwChunkBuf {
         accu(chunk.sunflower_plant.iter(), &mut sum);
         accu(chunk.corn_plant.iter(), &mut sum);
         accu(chunk.dodo.iter(), &mut sum);
-        // accu(chunk.dropped_item.iter(), &mut sum);
-        // accu(chunk.fire.iter(), &mut sum);
+        accu(chunk.dropped_item.iter(), &mut sum);
+        accu(chunk.fire.iter(), &mut sum);
         accu(chunk.torch.iter(), &mut sum);
-        // accu(chunk.glow_block.iter(), &mut sum);
+        accu(chunk.glow_block.iter(), &mut sum);
         accu(chunk.ladder.iter(), &mut sum);
         accu(chunk.door.iter(), &mut sum);
         // accu(chunk.artificial_light.iter(), &mut sum);
         accu(chunk.bed.iter(), &mut sum);
         accu(chunk.dropbear.iter(), &mut sum);
-        // accu(chunk.gather_block.iter(), &mut sum);
+        accu(chunk.gather_block.iter(), &mut sum);
         accu(chunk.carrot_plant.iter(), &mut sum);
         accu(chunk.donkey.iter(), &mut sum);
         accu(chunk.egg.iter(), &mut sum);
@@ -1401,16 +1403,16 @@ impl DwChunkBuf {
         add(chunk.sunflower_plant.iter(), SunflowerPlant, &mut builder);
         add(chunk.corn_plant.iter(), CornPlant, &mut builder);
         add(chunk.dodo.iter(), Dodo, &mut builder);
-        // add(chunk.dropped_item.iter(), DroppedItem, &mut builder);
-        // add(chunk.fire.iter(), u8, &mut builder);
+        add(chunk.dropped_item.iter(), DroppedItem, &mut builder);
+        add(chunk.fire.iter(), Fire, &mut builder);
         add(chunk.torch.iter(), Torch, &mut builder);
-        // add(chunk.glow_block.iter(), u8, &mut builder);
+        add(chunk.glow_block.iter(), GlowBlock, &mut builder);
         add(chunk.ladder.iter(), Ladder, &mut builder);
         add(chunk.door.iter(), Door, &mut builder);
         // add(chunk.artificial_light.iter(), u8, &mut builder);
         add(chunk.bed.iter(), Bed, &mut builder);
         add(chunk.dropbear.iter(), DropBear, &mut builder);
-        // add(chunk.gather_block.iter(), u8, &mut builder);
+        add(chunk.gather_block.iter(), GatherBlock, &mut builder);
         add(chunk.carrot_plant.iter(), CarrotPlant, &mut builder);
         add(chunk.donkey.iter(), Donkey, &mut builder);
         add(chunk.egg.iter(), Egg, &mut builder);
