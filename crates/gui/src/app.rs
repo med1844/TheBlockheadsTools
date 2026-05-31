@@ -790,6 +790,20 @@ impl EditorApp {
             });
     }
 
+    fn wrap_x(&self, mut x: f32) -> f32 {
+        if self.render_settings.enable_cyclic
+            && let Some(world_db) = self.world_db.as_ref()
+        {
+            let world_width_macro = world_db.main.world_v2.world_width_macro;
+            if world_width_macro > 0 {
+                let world_block_width = (world_db.main.world_v2.world_width_macro as f32)
+                    * Chunk::NUM_BLOCK_PER_ROW as f32;
+                x = x.rem_euclid(world_block_width);
+            }
+        }
+        x
+    }
+
     fn update_camera_pos(&mut self, ui: &mut egui::Ui, response: &egui::Response) {
         let viewport_size = (
             self.world_viewport_rect.width(),
@@ -831,23 +845,14 @@ impl EditorApp {
         }
 
         // Wrap camera X cyclically when cyclic mode is enabled and a world is loaded
-        if self.render_settings.enable_cyclic
-            && let Some(world_db) = self.world_db.as_ref()
-        {
-            let world_block_width =
-                (world_db.main.world_v2.world_width_macro as f32) * Chunk::NUM_BLOCK_PER_ROW as f32;
-            if world_block_width > 0.0 {
-                let x = &mut self.camera.world_offset_mut().x;
-                *x = x.rem_euclid(world_block_width);
-            }
-        }
+        self.camera.world_offset_mut().x = self.wrap_x(self.camera.world_offset().x);
     }
 
     fn update_interaction_state(&mut self, response: &egui::Response) {
         if response.hovered()
             && let Some(pos) = response.hover_pos()
         {
-            let [x, y] = self
+            let [mut x, y] = self
                 .camera
                 .mouse_at(
                     (pos - self.world_viewport_rect.min).into(),
@@ -855,6 +860,7 @@ impl EditorApp {
                 )
                 .floor()
                 .to_array();
+            x = self.wrap_x(x);
             let hover_on_block_coord = BlockCoord::new(x as u32, y as u16).ok();
 
             if let Some(block_coord) = hover_on_block_coord {
