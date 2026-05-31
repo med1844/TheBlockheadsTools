@@ -1219,67 +1219,113 @@ impl DwQuad for RotatedTorchFace {
     }
 }
 
+fn add_torch_quad(
+    connection_type: TorchConnectionType,
+    image_type: ImageType,
+    float_pos: [f32; 2],
+    w: u8,
+    h: u8,
+    builder: &mut DwChunkBufBuilder,
+) {
+    let [x, y] = float_pos;
+    match connection_type {
+        TorchConnectionType::Bg => {
+            builder.add_quad(FrontTorchFace {
+                bottom_left: [x - 0.5, y, 1.0],
+                uv_min_max: image_type.uv_min_max(w, h),
+            });
+        }
+        TorchConnectionType::Left => {
+            builder.add_quad(RotatedTorchFace {
+                bottom_left: [
+                    x - (1.0 - RotatedTorchFace::THETA.sin()) / 2.0,
+                    y + 0.5,
+                    2.0,
+                ],
+                uv_min_max: image_type.uv_min_max(w, h),
+                theta: -RotatedTorchFace::THETA,
+            });
+        }
+        TorchConnectionType::Ground => {
+            builder.add_face(DwFace::new_sprite(
+                image_type,
+                [0.5, 0.0],
+                float_pos,
+                [w, h],
+                2.0,
+            ));
+        }
+        TorchConnectionType::Right => {
+            builder.add_quad(RotatedTorchFace {
+                bottom_left: [
+                    x + (1.0 - RotatedTorchFace::THETA.sin()) / 2.0,
+                    y + 0.5,
+                    2.0,
+                ],
+                uv_min_max: image_type.uv_min_max(w, h),
+                theta: RotatedTorchFace::THETA,
+            });
+        }
+        TorchConnectionType::Mg => {
+            builder.add_quad(FrontTorchFace {
+                bottom_left: [x - 0.5, y, 2.0],
+                uv_min_max: image_type.uv_min_max(w, h),
+            });
+        }
+    }
+}
+
 impl BuildDwMesh for Torch {
-    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity::QUAD);
+    const STATIC_CAPACITY: Option<DwCapacity> = Some(DwCapacity { quads: 1, items: 1 });
 
     fn build_dw_mesh(&self, builder: &mut DwChunkBufBuilder) -> Result<(), BuildDwMeshError> {
-        let image_type = match self.item_type {
-            ItemType::Torch => ImageType::BasicTorch0,
-            ItemType::IceTorch => ImageType::IceTorch0,
-            ItemType::OilLantern => ImageType::ClayLantern0,
-            ItemType::SteelLantern => ImageType::SteelLantern0,
-            ItemType::SteelDownlight => ImageType::SteelDownlight,
-            ItemType::SteelUplight => ImageType::SteelUplight,
-            _ => {
-                builder.add_item(DwItem::from_item_type(self.float_pos, self.item_type));
-                return Ok(());
-            }
+        let add_1x1_quad = |builder: &mut DwChunkBufBuilder, image_type: ImageType| {
+            add_torch_quad(
+                self.connection_type,
+                image_type,
+                self.float_pos,
+                1,
+                1,
+                builder,
+            );
         };
-        let [x, y] = self.float_pos;
-        match self.connection_type {
-            TorchConnectionType::Bg => {
-                builder.add_quad(FrontTorchFace {
-                    bottom_left: [x - 0.5, y, 1.0],
-                    uv_min_max: image_type.uv_min_max(1, 1),
-                });
-            }
-            TorchConnectionType::Left => {
-                builder.add_quad(RotatedTorchFace {
-                    bottom_left: [
-                        x - (1.0 - RotatedTorchFace::THETA.sin()) / 2.0,
-                        y + 0.5,
-                        2.0,
-                    ],
-                    uv_min_max: image_type.uv_min_max(1, 1),
-                    theta: -RotatedTorchFace::THETA,
-                });
-            }
-            TorchConnectionType::Ground => {
-                builder.add_face(DwFace::new_sprite(
-                    image_type,
-                    [0.5, 0.0],
-                    self.float_pos,
-                    [1, 1],
-                    2.0,
-                ));
-            }
-            TorchConnectionType::Right => {
-                builder.add_quad(RotatedTorchFace {
-                    bottom_left: [
-                        x + (1.0 - RotatedTorchFace::THETA.sin()) / 2.0,
-                        y + 0.5,
-                        2.0,
-                    ],
-                    uv_min_max: image_type.uv_min_max(1, 1),
-                    theta: RotatedTorchFace::THETA,
-                });
-            }
-            TorchConnectionType::Mg => {
-                builder.add_quad(FrontTorchFace {
-                    bottom_left: [x - 0.5, y, 2.0],
-                    uv_min_max: image_type.uv_min_max(1, 1),
-                });
-            }
+        let add_1x1_sprite = |builder: &mut DwChunkBufBuilder, image_type: ImageType| {
+            builder.add_face(DwFace::new_sprite(
+                image_type,
+                [0.5, 0.0],
+                self.float_pos,
+                [1, 1],
+                1.0,
+            ));
+        };
+        let add_2x2_sprite = |builder: &mut DwChunkBufBuilder, image_type: ImageType| {
+            builder.add_face(DwFace::new_sprite(
+                image_type,
+                [1.0, 1.0],
+                self.float_pos,
+                [2, 2],
+                2.0,
+            ));
+        };
+
+        match self.item_type {
+            ItemType::Torch => add_1x1_quad(builder, ImageType::BasicTorch0),
+            ItemType::IceTorch => add_1x1_quad(builder, ImageType::IceTorch0),
+            ItemType::OilLantern => add_1x1_quad(builder, ImageType::ClayLantern0),
+            ItemType::SteelLantern => add_1x1_quad(builder, ImageType::SteelLantern0),
+            ItemType::SteelDownlight => add_1x1_quad(builder, ImageType::SteelDownlight),
+            ItemType::SteelUplight => add_1x1_quad(builder, ImageType::SteelUplight),
+            ItemType::Amethyst => add_1x1_sprite(builder, ImageType::Amethyst),
+            ItemType::Sapphire => add_1x1_sprite(builder, ImageType::Sapphire),
+            ItemType::Emerald => add_1x1_sprite(builder, ImageType::Emerald),
+            ItemType::Ruby => add_1x1_sprite(builder, ImageType::Ruby),
+            ItemType::Diamond => add_1x1_sprite(builder, ImageType::Diamond),
+            ItemType::AmethystChandelier => add_2x2_sprite(builder, ImageType::AmethystChandelier),
+            ItemType::SapphireChandelier => add_2x2_sprite(builder, ImageType::SapphireChandelier),
+            ItemType::EmeraldChandelier => add_2x2_sprite(builder, ImageType::EmeraldChandelier),
+            ItemType::RubyChandelier => add_2x2_sprite(builder, ImageType::RubyChandelier),
+            ItemType::DiamondChandelier => add_2x2_sprite(builder, ImageType::DiamondChandelier),
+            _ => builder.add_item(DwItem::from_item_type(self.float_pos, self.item_type)),
         }
         Ok(())
     }

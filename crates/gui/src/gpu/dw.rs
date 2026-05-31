@@ -966,7 +966,7 @@ pub enum BuildDwMeshError {
     #[snafu(display("Object coordinate out of world bound: {source}"))]
     CoordOutOfBound { source: CoordError },
     #[snafu(display("Unknown item type for item {item:?}: {source}"))]
-    UnknownItemType { source: ItemError, item: Item },
+    UnknownItemType { source: ItemError, item: Box<Item> },
 }
 
 #[derive(Debug, Default, Clone, Copy)]
