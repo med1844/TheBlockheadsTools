@@ -255,7 +255,21 @@ fn grid_as_row<T: ToGrid, H: Hash>(
     context: &mut DwUiContext,
 ) {
     ui.label(label);
-    t.add_grid(id, ui, context);
+    t.add_grid(&id, ui, context);
+    ui.end_row();
+}
+
+fn grid_as_row_no_push_id<T: ToGrid, H: Hash>(
+    t: &mut T,
+    label: &str,
+    id: H,
+    ui: &mut egui::Ui,
+    context: &mut DwUiContext,
+) {
+    ui.label(label);
+    egui::Grid::new(&id).num_columns(2).show(ui, |ui| {
+        t.add_grid(&id, ui, context);
+    });
     ui.end_row();
 }
 
@@ -1014,17 +1028,21 @@ impl ToRow for TorchConnectionType {
 
 impl ToGrid for Torch {
     fn to_grid(&mut self, ui: &mut egui::Ui, context: &mut DwUiContext) {
-        context.flags.rebuild_mesh |= self.connection_type.add_row("connectionType", ui).changed();
-        context.flags.rebuild_mesh |= self.item_type.add_row("itemType", ui).changed();
-        self.data_a.add_row("dataA", ui);
-        self.data_b.add_row("dataB", ui);
-        grid_as_row(
+        // weird bug happens if we push id
+        // there will be vertical space above rows
+        // rows will be out of the bound and overlap with other rows
+        // TODO figure out why this happens
+        grid_as_row_no_push_id(
             &mut self.light_dict,
             "lightDict",
             "light_dict_grid",
             ui,
             context,
         );
+        context.flags.rebuild_mesh |= self.connection_type.add_row("connectionType", ui).changed();
+        context.flags.rebuild_mesh |= self.item_type.add_row("itemType", ui).changed();
+        self.data_a.add_row("dataA", ui);
+        self.data_b.add_row("dataB", ui);
     }
 }
 
