@@ -1,16 +1,15 @@
-use super::{lib, ItemSnafu};
+use super::lib;
 use lib::game::{
     dynamic_object::{
         chest::{Chest, ChestSlots, ChestType, NUM_SHELF_SLOTS, NUM_STANDARD_SLOTS},
         workbench::{Workbench, WorkbenchType},
         AnyDynamicObject, DynamicObject, InteractionObject, InteractionObjectType, UniqueID,
     },
-    item::{Inventory, Item, ItemType, PigmentColor, Slot, Slots},
+    item::{Inventory, Item, ItemType, PigmentColor, PigmentColors, Slot, Slots},
 };
 use num_enum::TryFromPrimitive;
 use pyo3::exceptions::{PyIndexError, PyValueError};
 use pyo3::prelude::*;
-use snafu::ResultExt;
 
 #[pyclass(eq, eq_int, name = "ItemType")]
 #[derive(Debug, Clone, Copy, PartialEq, TryFromPrimitive)]
@@ -466,7 +465,7 @@ pub enum ChestTypePy {
     Shelf = 2,
     Gold = 3,
     Portal = 4,
-    DisplayCabinet = 5,
+    Cabinet = 5,
     Feeder = 6,
 }
 
@@ -830,9 +829,9 @@ macro_rules! define_shelf_chest {
         pub struct $name {
             pub slots: [Py<SlotPy>; NUM_SHELF_SLOTS],
             #[pyo3(get, set)]
-            pub render_items: Option<[ItemTypePy; NUM_SHELF_SLOTS]>,
+            pub render_items: Option<[Option<ItemTypePy>; NUM_SHELF_SLOTS]>,
             #[pyo3(get, set)]
-            pub item_data_bs: Option<[u16; NUM_SHELF_SLOTS]>,
+            pub item_data_bs: Option<[Option<u16>; NUM_SHELF_SLOTS]>,
         }
 
         #[pymethods]
@@ -842,8 +841,8 @@ macro_rules! define_shelf_chest {
             fn new(
                 py: Python<'_>,
                 slots: Option<Vec<Py<SlotPy>>>,
-                render_items: Option<Vec<ItemTypePy>>,
-                item_data_bs: Option<Vec<u16>>,
+                render_items: Option<Vec<Option<ItemTypePy>>>,
+                item_data_bs: Option<Vec<Option<u16>>>,
                 owner_id: Option<String>,
             ) -> PyResult<pyo3::PyClassInitializer<Self>> {
                 let slots = if let Some(s) = slots {
@@ -967,7 +966,7 @@ impl ChestPy {
             interaction_object_type: chest.interaction_object_type as u8,
             is_in_use: chest.is_in_use,
             flipped: chest.flipped,
-            paint_color: chest.paint_color,
+            paint_color: chest.paint_color.encode_colors(),
         };
         let base = ChestPy {};
 
@@ -1002,8 +1001,8 @@ impl ChestPy {
                     py,
                     init.add_subclass(ShelfChestPy {
                         slots,
-                        render_items: render_items.map(|ri| ri.map(|i| i.into())),
-                        item_data_bs,
+                        render_items: Some(render_items.map(|opt| opt.map(ItemTypePy::from))),
+                        item_data_bs: Some(item_data_bs),
                     }),
                 )?
                 .into_any())
@@ -1018,8 +1017,8 @@ impl ChestPy {
                     py,
                     init.add_subclass(CabinetPy {
                         slots,
-                        render_items: render_items.map(|ri| ri.map(|i| i.into())),
-                        item_data_bs,
+                        render_items: Some(render_items.map(|opt| opt.map(ItemTypePy::from))),
+                        item_data_bs: Some(item_data_bs),
                     }),
                 )?
                 .into_any())
@@ -1063,14 +1062,20 @@ impl ChestPy {
         } else if let Ok(c) = any.extract::<pyo3::PyRef<ShelfChestPy>>() {
             ChestSlots::Shelf {
                 slots: Slots::new(Self::deflate_shelf(py, &c.slots)),
-                render_items: c.render_items.map(|ri| ri.map(|i| i.into())),
-                item_data_bs: c.item_data_bs,
+                render_items: c
+                    .render_items
+                    .unwrap_or_default()
+                    .map(|opt| opt.map(Into::into)),
+                item_data_bs: c.item_data_bs.unwrap_or_default(),
             }
         } else if let Ok(c) = any.extract::<pyo3::PyRef<CabinetPy>>() {
             ChestSlots::Cabinet {
                 slots: Slots::new(Self::deflate_shelf(py, &c.slots)),
-                render_items: c.render_items.map(|ri| ri.map(|i| i.into())),
-                item_data_bs: c.item_data_bs,
+                render_items: c
+                    .render_items
+                    .unwrap_or_default()
+                    .map(|opt| opt.map(Into::into)),
+                item_data_bs: c.item_data_bs.unwrap_or_default(),
             }
         } else if any.extract::<pyo3::PyRef<PortalChestPy>>().is_ok() {
             ChestSlots::Portal
@@ -1092,7 +1097,7 @@ impl ChestPy {
                 InteractionObjectType::Chest,
                 int_ref.is_in_use,
                 int_ref.flipped,
-                int_ref.paint_color,
+                PigmentColors::decode_colors(int_ref.paint_color).unwrap_or_default(),
                 0.0,
             ),
             slots,
@@ -1156,7 +1161,7 @@ impl WorkbenchPy {
             interaction_object_type: workbench.interaction_object_type as u8,
             is_in_use: workbench.is_in_use,
             flipped: workbench.flipped,
-            paint_color: workbench.paint_color,
+            paint_color: workbench.paint_color.encode_colors(),
         };
         let bench = Self {
             workbench_type: workbench.workbench_type.into(),
@@ -1202,7 +1207,7 @@ impl WorkbenchPy {
                 InteractionObjectType::Workbench,
                 int_ref.is_in_use,
                 int_ref.flipped,
-                int_ref.paint_color,
+                PigmentColors::decode_colors(int_ref.paint_color).unwrap_or_default(),
                 slf.save_time,
             ),
             slf.available_electricity,
@@ -1473,8 +1478,9 @@ impl ItemPy {
 
     #[getter]
     fn get_colors(&self) -> PyResult<Vec<PigmentColorPy>> {
-        let colors = Item::decode_colors(self.data_b).context(ItemSnafu)?;
-        Ok(colors.into_iter().map(Into::into).collect())
+        let colors = PigmentColors::decode_colors(self.data_b)
+            .map_err(|e| PyValueError::new_err(format!("ItemError: {e}")))?;
+        Ok(colors.pigments.into_iter().map(Into::into).collect())
     }
 
     #[setter]
@@ -1484,11 +1490,11 @@ impl ItemPy {
                 "colors must not have more than 3 elements",
             ));
         }
-        let mut array = [PigmentColor::Transparent; 3];
+        let mut pigments = [PigmentColor::Transparent; 3];
         for (i, color) in colors.into_iter().enumerate() {
-            array[i] = color.into();
+            pigments[i] = color.into();
         }
-        self.data_b = Item::encode_colors(array);
+        self.data_b = PigmentColors { pigments }.encode_colors();
         Ok(())
     }
 

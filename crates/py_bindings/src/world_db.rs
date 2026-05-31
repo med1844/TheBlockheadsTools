@@ -1,6 +1,9 @@
 use super::{chunk::ChunksPy, item::InventoryPy, lib, SharedWorldDb, WorldDbSnafu};
 use lib::{
-    game::{db::world_db::WorldDb, dynamic_object::UniqueID},
+    game::{
+        db::world_db::WorldDb,
+        item::{Inventory, Slots},
+    },
     DynArch,
 };
 use num_enum::TryFromPrimitive;
@@ -433,23 +436,18 @@ impl BlockheadPy {
     #[getter]
     fn get_inventory(&self, py: Python<'_>) -> PyResult<Option<Py<InventoryPy>>> {
         let world_db = self.read();
-        let unique_id = world_db.main.blockheads[self.index].unique_id.clone();
-        if let Some(inv) = world_db.main.blockhead_inventories.get(&unique_id) {
-            Ok(Some(InventoryPy::inflate(py, inv.clone())?))
-        } else {
-            Ok(None)
-        }
+        let inv = world_db.main.blockheads[self.index].inventory.clone();
+        Ok(Some(InventoryPy::inflate(py, inv)?))
     }
 
     #[setter]
     fn set_inventory(&self, py: Python<'_>, inventory: Option<Py<InventoryPy>>) -> PyResult<()> {
         let mut world_db = self.write();
-        let unique_id = world_db.main.blockheads[self.index].unique_id.clone();
         if let Some(inv_py) = inventory {
             let inv = inv_py.bind(py).borrow().deflate(py);
-            world_db.main.blockhead_inventories.insert(unique_id, inv);
+            world_db.main.blockheads[self.index].inventory = inv;
         } else {
-            world_db.main.blockhead_inventories.remove(&unique_id);
+            world_db.main.blockheads[self.index].inventory = Inventory::new(Slots::default());
         }
         Ok(())
     }
@@ -502,9 +500,9 @@ impl WorldDbMainPy {
             .read()
             .unwrap()
             .main
-            .blockhead_inventories
-            .keys()
-            .map(|id| *id.inner())
+            .blockheads
+            .iter()
+            .map(|bh| *bh.unique_id.inner())
             .collect()
     }
 
@@ -514,8 +512,13 @@ impl WorldDbMainPy {
         id: u64,
     ) -> PyResult<Option<Py<InventoryPy>>> {
         let world_db = self.inner.read().unwrap();
-        if let Some(inv) = world_db.main.blockhead_inventories.get(&UniqueID::new(id)) {
-            Ok(Some(InventoryPy::inflate(py, inv.clone())?))
+        if let Some(bh) = world_db
+            .main
+            .blockheads
+            .iter()
+            .find(|bh| *bh.unique_id.inner() == id)
+        {
+            Ok(Some(InventoryPy::inflate(py, bh.inventory.clone())?))
         } else {
             Ok(None)
         }
@@ -528,12 +531,17 @@ impl WorldDbMainPy {
         inventory: Option<Py<InventoryPy>>,
     ) -> PyResult<()> {
         let mut world_db = self.inner.write().unwrap();
-        let unique_id = UniqueID::new(id);
-        if let Some(inv_py) = inventory {
-            let inv = inv_py.bind(py).borrow().deflate(py);
-            world_db.main.blockhead_inventories.insert(unique_id, inv);
-        } else {
-            world_db.main.blockhead_inventories.remove(&unique_id);
+        if let Some(bh) = world_db
+            .main
+            .blockheads
+            .iter_mut()
+            .find(|bh| *bh.unique_id.inner() == id)
+        {
+            if let Some(inv_py) = inventory {
+                bh.inventory = inv_py.bind(py).borrow().deflate(py);
+            } else {
+                bh.inventory = Inventory::new(Slots::default());
+            }
         }
         Ok(())
     }
