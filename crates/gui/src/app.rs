@@ -551,8 +551,9 @@ impl EditorApp {
                     {
                         if let Some(save_path) = rfd::FileDialog::new().pick_folder() {
                             self.chunk_cache.flush(world_db);
-                            if let Err(e) =
-                                world_db.to_path(save_path, arch).context(SaveWorldDbSnafu)
+                            if let Err(e) = world_db
+                                .to_path(save_path, arch, true)
+                                .context(SaveWorldDbSnafu)
                             {
                                 // TODO allow user select arch
                                 self.save_err = Some(e);

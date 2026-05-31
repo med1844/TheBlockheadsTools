@@ -606,7 +606,7 @@ impl WorldDbPy {
         self.inner
             .read()
             .unwrap()
-            .to_path(path, arch.into())
+            .to_path(path, arch.into(), true)
             .context(WorldDbSnafu)?;
         Ok(())
     }

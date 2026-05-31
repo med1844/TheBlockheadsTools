@@ -12,7 +12,7 @@ use lmdb_rs::{
 };
 use snafu::{OptionExt, ResultExt, Snafu};
 use std::{
-    fs::File,
+    fs::{File, OpenOptions},
     io::{Read, Write},
     path::Path,
 };
@@ -120,8 +120,11 @@ impl WorldDb {
         Self::from_bytes(&data)
     }
 
-    pub fn to_path<P: AsRef<Path>>(&self, path: P, arch: DynArch) -> Result<()> {
-        let file = File::create_new(path.as_ref().join("data.mdb")).context(CreateFileSnafu)?;
+    pub fn to_path<P: AsRef<Path>>(&self, path: P, arch: DynArch, overwrite: bool) -> Result<()> {
+        let file = OpenOptions::new()
+            .write(overwrite)
+            .open(path.as_ref().join("data.mdb"))
+            .context(CreateFileSnafu)?;
         self.write_to(file, arch)
     }
 }
