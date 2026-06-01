@@ -351,7 +351,11 @@ pub struct SsaoBlurRenderer {
 }
 
 impl SsaoBlurRenderer {
-    pub fn new(device: &wgpu::Device, g_buffer: &GeometryBuffer) -> Self {
+    pub fn new(
+        device: &wgpu::Device,
+        g_buffer: &GeometryBuffer,
+        camera_buf: &wgpu::Buffer,
+    ) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("SSAO Blur Shader"),
             source: wgpu::ShaderSource::Wgsl(
@@ -394,10 +398,20 @@ impl SsaoBlurRenderer {
                     ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
                     count: None,
                 },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 4,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
             ],
         });
 
-        let bind_group = Self::create_bind_group(&bind_group_layout, g_buffer, device);
+        let bind_group = Self::create_bind_group(&bind_group_layout, g_buffer, camera_buf, device);
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("SSAO Blur Render Pipeline Layout"),
@@ -445,6 +459,7 @@ impl SsaoBlurRenderer {
     fn create_bind_group(
         bind_group_layout: &wgpu::BindGroupLayout,
         g_buffer: &GeometryBuffer,
+        camera_buf: &wgpu::Buffer,
         device: &wgpu::Device,
     ) -> wgpu::BindGroup {
         device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -466,13 +481,23 @@ impl SsaoBlurRenderer {
                     binding: 3,
                     resource: wgpu::BindingResource::Sampler(&g_buffer.voxel_depth.sampler),
                 },
+                wgpu::BindGroupEntry {
+                    binding: 4,
+                    resource: camera_buf.as_entire_binding(),
+                },
             ],
             label: Some("SSAO Blur Bind Group"),
         })
     }
 
-    pub fn resize(&mut self, g_buffer: &GeometryBuffer, device: &wgpu::Device) {
-        self.bind_group = Self::create_bind_group(&self.bind_group_layout, g_buffer, device);
+    pub fn resize(
+        &mut self,
+        g_buffer: &GeometryBuffer,
+        camera_buf: &wgpu::Buffer,
+        device: &wgpu::Device,
+    ) {
+        self.bind_group =
+            Self::create_bind_group(&self.bind_group_layout, g_buffer, camera_buf, device);
     }
 
     pub fn render(&self, render_pass: &mut wgpu::RenderPass<'_>) {

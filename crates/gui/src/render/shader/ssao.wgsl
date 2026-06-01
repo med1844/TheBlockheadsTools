@@ -11,7 +11,7 @@ struct SsaoUniform {
     _padding0: u32,
     _padding1: u32,
     _padding2: u32,
-    kernel: array<vec4<f32>, 256>, // SSAO_MAX_KERNEL_SIZE
+    kernel: array<vec4<f32>, 64>, // SSAO_MAX_KERNEL_SIZE
 };
 
 @group(0) @binding(5) var<uniform> ssao_data: SsaoUniform;
@@ -106,10 +106,7 @@ fn evaluate_sample_occlusion(local_pos: vec3<f32>, sample_local_pos: vec3<f32>) 
     let actual_sample_local_pos = reconstruct_local_pos(offset_uv, sample_depth);
 
     let range_check = smoothstep(0.0, 1.0, RADIUS / abs(local_pos.z - actual_sample_local_pos.z));
-    let dist_to_sample = length(actual_sample_local_pos - camera.camera_pos.xyz);
-    let dist_to_target = length(sample_local_pos - camera.camera_pos.xyz);
-
-    if (dist_to_sample < dist_to_target - BIAS) {
+    if (actual_sample_local_pos.z > sample_local_pos.z + BIAS) {
         return 1.0 * range_check;
     }
 

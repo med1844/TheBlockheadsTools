@@ -3,8 +3,8 @@ use bytemuck::{Pod, Zeroable};
 use eframe::wgpu;
 use glam::Vec3;
 
-pub const SSAO_KERNEL_SIZE: u32 = 64;
-pub const SSAO_MAX_KERNEL_SIZE: usize = 256;
+pub const SSAO_KERNEL_SIZE: u32 = 32;
+pub const SSAO_MAX_KERNEL_SIZE: usize = 64;
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, Pod, Zeroable)]

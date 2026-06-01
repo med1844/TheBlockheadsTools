@@ -105,14 +105,15 @@ impl GeometryBuffer {
             wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
             wgpu::TextureFormat::R8Uint,
         );
+        let downscale = 2;
         let ssao_raw_texture = Texture::new(
-            size,
+            (size.0 / downscale, size.1 / downscale),
             device,
             wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
             wgpu::TextureFormat::R8Unorm,
         );
         let ssao_blur_texture = Texture::new(
-            size,
+            (size.0 / downscale, size.1 / downscale),
             device,
             wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
             wgpu::TextureFormat::R8Unorm,
@@ -334,7 +335,7 @@ impl RenderResources {
                 target_format,
             ),
             ssao: ssao::SsaoRenderer::new(device, queue, &camera_buf, &g_buffer),
-            ssao_blur: ssao::SsaoBlurRenderer::new(device, &g_buffer),
+            ssao_blur: ssao::SsaoBlurRenderer::new(device, &g_buffer, &camera_buf),
             composite,
             item_grid: item_grid::ItemGridRenderer::new(
                 device,
@@ -382,7 +383,8 @@ impl RenderResources {
         if let ResizeOutcome::Resized = self.g_buffer.resize(size, device) {
             self.composite.resize(&self.g_buffer, device);
             self.ssao.resize(&self.camera_buf, &self.g_buffer, device);
-            self.ssao_blur.resize(&self.g_buffer, device);
+            self.ssao_blur
+                .resize(&self.g_buffer, &self.camera_buf, device);
             self.voxel.resize(&self.g_buffer, device);
         }
     }

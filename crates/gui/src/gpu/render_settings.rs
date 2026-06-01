@@ -24,7 +24,7 @@ impl Default for RenderSettings {
             light_dir: Vec3::new(-2.5, 2.0, 3.0),
             enable_reflect: true,
             enable_destruct: true,
-            enable_ssao: false,
+            enable_ssao: true,
             enable_cyclic: true,
             show_grid: false,
             render_dw_mesh: true,

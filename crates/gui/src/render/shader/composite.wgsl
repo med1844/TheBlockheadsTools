@@ -103,7 +103,7 @@ fn fs_composite(in: VertexOutput) -> @location(0) vec4<f32> {
 
     let m_uv_data = textureLoad(mesh_uv_texture, pixel_coords, 0).rg;
     let v_uv_data = textureLoad(voxel_uv_texture, pixel_coords, 0).rg;
-    let ssao_raw = textureLoad(ssao_texture, pixel_coords, 0).r;
+    let ssao_raw = textureSampleLevel(ssao_texture, ssao_sampler, in.uv, 0.0).r;
 
     var solid_color = vec4<f32>(0.0);
 
