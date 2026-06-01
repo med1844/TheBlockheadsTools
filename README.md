@@ -16,7 +16,7 @@ A toolkit for viewing and editing save files for the mobile game *The Blockheads
   ![World Viewer (Zoomed Out)](docs/src/assets/editor_zoom_out.png)
 
 - Edit block:
-  
+
   ![World Viewer (Zoomed In)](docs/src/assets/editor_zoom_in.png)
 
 - Edit dynamic objects:
@@ -26,9 +26,9 @@ A toolkit for viewing and editing save files for the mobile game *The Blockheads
     ![Edit blockhead inventory](docs/src/assets/editor_items.png)
 
   - Edit dynamic object properties:
-  
+
     ![Edit spawn portal position](docs/src/assets/portal_pos_editor_view.png)
-  
+
     ![Spawn portal position edited](docs/src/assets/portal_pos_edit.png)
 
     ![Rails with rail configuration edited](docs/src/assets/dyn_obj_rails.png)

@@ -42,7 +42,7 @@ fn fs_ssao_blur(in: VertexOutput) -> @location(0) f32 {
     if (center_depth >= 1.0) {
         return 1.0; // Fast exit void pixels without blur bleeding
     }
-    
+
     let center_z = get_linear_z(in.uv, center_depth);
 
     var weight_sum: f32 = 0.0;
