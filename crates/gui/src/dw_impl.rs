@@ -3769,7 +3769,7 @@ impl ToGrid for TradePortal {
         local_price_offsets_str
             .as_str()
             .add_row("localPriceOffsets", ui);
-        grid_as_row(
+        grid_as_row_no_push_id(
             &mut self.light_dict,
             "lightDict",
             "light_dict_grid",
